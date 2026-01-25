@@ -249,6 +249,46 @@ npm test
 | `SECRET_KEY` | JWT signing key | (change in production!) |
 | `VITE_API_URL` | Backend URL for frontend | `http://localhost:8000` |
 
+## Smoke Test Checklist
+
+After deployment, verify the end-to-end flow works correctly:
+
+1. **Start services**:
+   ```bash
+   docker compose up --build
+   ```
+
+2. **Register/Login**:
+   - Go to http://localhost:3000
+   - Register a new user or login
+
+3. **Create Administration**:
+   - Create a new administration if prompted
+
+4. **Upload Document**:
+   - Go to "AI Upload" tab
+   - Upload an invoice (PNG, JPG, or PDF)
+
+5. **Wait for Processing**:
+   - Watch the "Processed Documents" section
+   - Document status should change: UPLOADED → PROCESSING → DRAFT_READY
+
+6. **Review Transaction**:
+   - Go to "Smart Transactions" tab
+   - Find the DRAFT transaction created from your document
+
+7. **POST Transaction**:
+   - Verify debit equals credit (balanced)
+   - Click "Approve & Post"
+
+8. **Verify Idempotency**:
+   - Upload or reprocess the same document
+   - Confirm no duplicate transactions are created (count should remain 1)
+
+9. **Test Failed Document Flow**:
+   - If a document fails processing, verify error message is shown
+   - Click "Reprocess" to retry processing
+
 ## License
 
 MIT License - see LICENSE file

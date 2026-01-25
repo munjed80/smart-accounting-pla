@@ -480,7 +480,9 @@ class DatabaseManager:
         except psycopg2.IntegrityError as e:
             # Handle unique constraint violation (concurrent insert)
             self.conn.rollback()
-            if 'ix_transactions_document_id_unique' in str(e) or 'document_id' in str(e):
+            # PostgreSQL error code 23505 is unique_violation
+            is_unique_violation = getattr(e, 'pgcode', None) == '23505'
+            if is_unique_violation:
                 logger.info(f"Concurrent insert detected for document {document_id}, fetching existing")
                 existing_id = self.get_existing_transaction(document_id)
                 if existing_id:

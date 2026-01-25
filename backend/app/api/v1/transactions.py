@@ -330,17 +330,19 @@ async def post_transaction(
     if transaction.status != TransactionStatus.DRAFT:
         raise HTTPException(status_code=400, detail="Transaction is already posted")
     
-    # Validate: no negative amounts
+    # Validate: no negative amounts and valid precision
     validation_errors = []
     for i, line in enumerate(transaction.lines):
         if line.debit_amount < 0:
             validation_errors.append(f"Line {i+1}: Debit amount cannot be negative ({line.debit_amount})")
         if line.credit_amount < 0:
             validation_errors.append(f"Line {i+1}: Credit amount cannot be negative ({line.credit_amount})")
-        # Validate precision (max 2 decimal places)
-        if line.debit_amount != line.debit_amount.quantize(Decimal("0.01")):
+        # Validate precision (max 2 decimal places) using exponent check
+        debit_exp = line.debit_amount.as_tuple().exponent
+        credit_exp = line.credit_amount.as_tuple().exponent
+        if isinstance(debit_exp, int) and debit_exp < -2:
             validation_errors.append(f"Line {i+1}: Debit amount has too many decimal places ({line.debit_amount})")
-        if line.credit_amount != line.credit_amount.quantize(Decimal("0.01")):
+        if isinstance(credit_exp, int) and credit_exp < -2:
             validation_errors.append(f"Line {i+1}: Credit amount has too many decimal places ({line.credit_amount})")
     
     if validation_errors:

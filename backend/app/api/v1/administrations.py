@@ -5,9 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+import redis.asyncio as redis_async
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.models.administration import Administration, AdministrationMember, MemberRole
+from app.models.document import Document, DocumentStatus
 from app.models.user import User
 from app.schemas.administration import (
     AdministrationCreate,
@@ -188,11 +191,6 @@ async def reprocess_document_in_admin(
     This endpoint verifies that the document belongs to the specified administration
     before delegating to the main reprocess logic.
     """
-    import redis.asyncio as redis_async
-    from app.core.config import settings
-    from app.models.document import Document, DocumentStatus
-    from app.schemas.document import DocumentResponse
-    
     # Verify administration exists and user has access
     result = await db.execute(
         select(Administration)

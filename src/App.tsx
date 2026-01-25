@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { AuthProvider, useAuth } from '@/lib/AuthContext'
 import { LoginPage } from '@/components/LoginPage'
-import { Dashboard } from '@/components/Dashboard'
-import { UploadPortal } from '@/components/UploadPortal'
-import { TransactionList } from '@/components/TransactionList'
+import { SmartDashboard } from '@/components/SmartDashboard'
+import { IntelligentUploadPortal } from '@/components/IntelligentUploadPortal'
+import { SmartTransactionList } from '@/components/SmartTransactionList'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -13,7 +13,9 @@ import {
   UploadSimple, 
   User,
   Database,
-  Receipt
+  Receipt,
+  Sparkle,
+  Brain
 } from '@phosphor-icons/react'
 
 const AppContent = () => {
@@ -82,30 +84,30 @@ const AppContent = () => {
                 value="transactions" 
                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
               >
-                <Receipt size={20} />
-                Transactions
+                <Brain size={20} weight="duotone" />
+                Smart Transactions
               </TabsTrigger>
               <TabsTrigger 
                 value="upload" 
                 className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground gap-2"
               >
-                <UploadSimple size={20} />
-                Upload Invoices
+                <Sparkle size={20} weight="duotone" />
+                AI Upload
               </TabsTrigger>
             </TabsList>
           </div>
         </div>
 
         <TabsContent value="dashboard" className="m-0">
-          <Dashboard />
+          <SmartDashboard />
         </TabsContent>
 
         <TabsContent value="transactions" className="m-0">
-          <TransactionList />
+          <SmartTransactionList />
         </TabsContent>
 
         <TabsContent value="upload" className="m-0">
-          <UploadPortal />
+          <IntelligentUploadPortal />
         </TabsContent>
       </Tabs>
     </div>

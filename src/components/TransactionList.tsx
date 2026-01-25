@@ -23,7 +23,7 @@ export const TransactionList = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'posted' | 'reconciled' | 'void'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'DRAFT' | 'POSTED'>('all')
   const [searchTerm, setSearchTerm] = useState('')
 
   const fetchTransactions = async () => {
@@ -79,16 +79,23 @@ export const TransactionList = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'draft':
+      case 'DRAFT':
         return 'bg-accent/20 text-accent-foreground border-accent/40'
-      case 'posted':
+      case 'POSTED':
         return 'bg-primary/20 text-primary-foreground border-primary/40'
-      case 'reconciled':
-        return 'bg-green-500/20 text-green-700 border-green-500/40'
-      case 'void':
-        return 'bg-destructive/20 text-destructive-foreground border-destructive/40'
       default:
         return 'bg-secondary'
+    }
+  }
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'DRAFT':
+        return 'Draft'
+      case 'POSTED':
+        return 'Posted'
+      default:
+        return status
     }
   }
 
@@ -150,10 +157,8 @@ export const TransactionList = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="posted">Posted</SelectItem>
-                  <SelectItem value="reconciled">Reconciled</SelectItem>
-                  <SelectItem value="void">Void</SelectItem>
+                  <SelectItem value="DRAFT">Draft</SelectItem>
+                  <SelectItem value="POSTED">Posted</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -195,7 +200,7 @@ export const TransactionList = () => {
                           {transaction.booking_number}
                         </span>
                         <Badge variant="outline" className={getStatusColor(transaction.status)}>
-                          {transaction.status}
+                          {getStatusLabel(transaction.status)}
                         </Badge>
                         {transaction.ai_confidence_score && transaction.ai_confidence_score > 0.7 && (
                           <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">

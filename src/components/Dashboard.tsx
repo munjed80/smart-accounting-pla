@@ -72,16 +72,23 @@ export const Dashboard = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'draft':
+      case 'DRAFT':
         return 'bg-accent/20 text-accent-foreground border-accent/40'
-      case 'posted':
+      case 'POSTED':
         return 'bg-primary/20 text-primary-foreground border-primary/40'
-      case 'reconciled':
-        return 'bg-green-500/20 text-green-700 border-green-500/40'
-      case 'void':
-        return 'bg-destructive/20 text-destructive-foreground border-destructive/40'
       default:
         return 'bg-secondary'
+    }
+  }
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'DRAFT':
+        return 'Draft'
+      case 'POSTED':
+        return 'Posted'
+      default:
+        return status
     }
   }
 
@@ -244,7 +251,7 @@ export const Dashboard = () => {
                           {transaction.booking_number}
                         </span>
                         <Badge variant="outline" className={getStatusColor(transaction.status)}>
-                          {transaction.status}
+                          {getStatusLabel(transaction.status)}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mb-1">

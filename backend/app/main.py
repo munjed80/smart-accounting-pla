@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 import redis.asyncio as redis
 
 from app.core.config import settings
@@ -69,6 +70,3 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs",
     }
-
-
-from sqlalchemy import text

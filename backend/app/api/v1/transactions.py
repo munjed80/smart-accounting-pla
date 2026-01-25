@@ -67,7 +67,7 @@ def build_transaction_response(transaction: Transaction) -> TransactionResponse:
 async def get_transaction_stats(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    administration_id: UUID = None,
+    administration_id: Optional[UUID] = Query(None),
 ):
     """Get transaction statistics"""
     # Base query for user's administrations

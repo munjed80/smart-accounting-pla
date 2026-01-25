@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 
 from app.models.administration import MemberRole
 
@@ -53,6 +53,3 @@ class AdministrationDetailResponse(AdministrationResponse):
 class AddMemberRequest(BaseModel):
     user_email: EmailStr
     role: MemberRole = MemberRole.MEMBER
-
-
-from pydantic import EmailStr

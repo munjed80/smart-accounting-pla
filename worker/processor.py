@@ -202,9 +202,13 @@ class DocumentProcessor:
                     match = matches[0]
                     if len(match) == 3:
                         if match[0].isdigit() and match[1].isdigit() and match[2].isdigit():
-                            day, month, year = int(match[0]), int(match[1]), int(match[2])
-                            if day > 31:
-                                year, month, day = day, month, int(match[2])
+                            part1, part2, part3 = int(match[0]), int(match[1]), int(match[2])
+                            # Handle YYYY-MM-DD format (first part > 31)
+                            if part1 > 31:
+                                year, month, day = part1, part2, part3
+                            else:
+                                # DD-MM-YYYY format
+                                day, month, year = part1, part2, part3
                             return date(year, month, day)
                 except (ValueError, IndexError):
                     continue
@@ -222,8 +226,14 @@ class DocumentProcessor:
                     continue
         return Decimal('0.00')
     
-    def extract_vat(self, text: str, total: Decimal) -> Tuple[Decimal, Decimal]:
-        """Extract VAT amount and calculate net"""
+    def extract_vat(self, text: str, total: Decimal, default_rate: Decimal = Decimal('0.21')) -> Tuple[Decimal, Decimal]:
+        """Extract VAT amount and calculate net
+        
+        Args:
+            text: OCR extracted text
+            total: Total invoice amount
+            default_rate: Default VAT rate to use if not found (default 21% for Netherlands)
+        """
         for pattern in self.vat_patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
             if matches:
@@ -234,8 +244,8 @@ class DocumentProcessor:
                 except Exception:
                     continue
         
-        # Estimate 21% VAT
-        vat_amount = total * Decimal('0.21') / Decimal('1.21')
+        # Estimate VAT using default rate (21% for Netherlands)
+        vat_amount = total * default_rate / (Decimal('1') + default_rate)
         net_amount = total - vat_amount
         return (vat_amount.quantize(Decimal('0.01')), net_amount.quantize(Decimal('0.01')))
     

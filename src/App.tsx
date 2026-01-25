@@ -14,7 +14,11 @@ import {
   CheckCircle,
   Terminal,
   ShareNetwork,
-  FileCode
+  FileCode,
+  Brain,
+  Lightning,
+  Eye,
+  Target
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 
@@ -840,10 +844,14 @@ SET search_path TO accounting, public;
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7 h-auto p-1 bg-card/50 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 h-auto p-1 bg-card/50 backdrop-blur-sm">
             <TabsTrigger value="overview" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <GitBranch size={20} />
               <span className="hidden sm:inline">Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="spark" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
+              <Cpu size={20} />
+              <span className="hidden sm:inline">Spark AI</span>
             </TabsTrigger>
             <TabsTrigger value="models" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Database size={20} />
@@ -1032,6 +1040,311 @@ SET search_path TO accounting, public;
                         <span className="text-muted-foreground">MinIO Console:</span>
                         <span className="text-accent">9001</span>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="spark" className="space-y-6">
+            <Card className="bg-gradient-to-r from-accent/30 to-primary/30 border-2 border-accent/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <Brain size={32} weight="duotone" className="text-accent" />
+                  Intelligent Invoice Processor - Spark OCR + AI
+                </CardTitle>
+                <CardDescription className="text-base">
+                  Production-grade Apache Spark job with OCR, AI-powered ledger account prediction, and automatic draft transaction creation
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="bg-accent/10 border-accent/40">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Eye size={24} className="text-accent" />
+                        OCR Engine
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle size={16} className="text-accent" />
+                        <span>Tesseract Dutch + English</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle size={16} className="text-accent" />
+                        <span>Extract Date, Amount, VAT</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle size={16} className="text-accent" />
+                        <span>Merchant Identification</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-accent/10 border-accent/40">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Brain size={24} className="text-accent" />
+                        AI Prediction
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle size={16} className="text-accent" />
+                        <span>12+ Ledger Categories</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle size={16} className="text-accent" />
+                        <span>Keyword-Based Rules</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle size={16} className="text-accent" />
+                        <span>Confidence Scoring</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-accent/10 border-accent/40">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Lightning size={24} className="text-accent" />
+                        Auto-Booking
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle size={16} className="text-accent" />
+                        <span>Draft Transaction Creation</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle size={16} className="text-accent" />
+                        <span>Double-Entry Bookkeeping</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle size={16} className="text-accent" />
+                        <span>Ready for Approval</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="bg-muted/50 rounded-lg p-6 space-y-4">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Target size={20} className="text-primary" />
+                    AI Ledger Account Prediction Examples
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div className="bg-background/50 rounded p-3">
+                      <div className="font-semibold text-accent">Shell → 4310 Brandstof</div>
+                      <div className="text-muted-foreground text-xs">Keywords: shell, bp, fuel, benzine</div>
+                    </div>
+                    <div className="bg-background/50 rounded p-3">
+                      <div className="font-semibold text-accent">Microsoft → 4500 IT Costs</div>
+                      <div className="text-muted-foreground text-xs">Keywords: microsoft, aws, hosting, software</div>
+                    </div>
+                    <div className="bg-background/50 rounded p-3">
+                      <div className="font-semibold text-accent">Google Ads → 4600 Marketing</div>
+                      <div className="text-muted-foreground text-xs">Keywords: google ads, facebook, linkedin</div>
+                    </div>
+                    <div className="bg-background/50 rounded p-3">
+                      <div className="font-semibold text-accent">KPN → 5010 Telecom</div>
+                      <div className="text-muted-foreground text-xs">Keywords: kpn, vodafone, internet</div>
+                    </div>
+                    <div className="bg-background/50 rounded p-3">
+                      <div className="font-semibold text-accent">Restaurant → 4710 Entertainment</div>
+                      <div className="text-muted-foreground text-xs">Keywords: restaurant, cafe, horeca</div>
+                    </div>
+                    <div className="bg-background/50 rounded p-3">
+                      <div className="font-semibold text-accent">Albert Heijn → 1450 Private</div>
+                      <div className="text-muted-foreground text-xs">Keywords: ah, jumbo, supermarkt</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-secondary/30 rounded-lg p-6">
+                  <h3 className="font-semibold text-lg mb-4">Processing Workflow</h3>
+                  <div className="space-y-3 font-mono text-xs">
+                    <div className="flex items-start gap-3">
+                      <Badge variant="secondary" className="mt-0.5">1</Badge>
+                      <div className="flex-1">
+                        <div className="font-semibold">Invoice Upload</div>
+                        <div className="text-muted-foreground">API saves to /uploads folder or pushes to Redis queue</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Badge variant="secondary" className="mt-0.5">2</Badge>
+                      <div className="flex-1">
+                        <div className="font-semibold">Spark Processor Detects</div>
+                        <div className="text-muted-foreground">Watches folder or pulls from queue (configurable mode)</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Badge variant="secondary" className="mt-0.5">3</Badge>
+                      <div className="flex-1">
+                        <div className="font-semibold">OCR Extraction</div>
+                        <div className="text-muted-foreground">Tesseract extracts: Date, Merchant, Total, VAT, Text</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Badge variant="secondary" className="mt-0.5">4</Badge>
+                      <div className="flex-1">
+                        <div className="font-semibold">AI Prediction</div>
+                        <div className="text-muted-foreground">Keyword matching → Ledger Account Code + Confidence Score</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Badge variant="secondary" className="mt-0.5">5</Badge>
+                      <div className="flex-1">
+                        <div className="font-semibold">Draft Transaction Creation</div>
+                        <div className="text-muted-foreground">DEBIT Expense | CREDIT Accounts Payable | Status: DRAFT</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Badge variant="secondary" className="mt-0.5">6</Badge>
+                      <div className="flex-1">
+                        <div className="font-semibold">Accountant Review</div>
+                        <div className="text-muted-foreground">Frontend shows draft with confidence → Approve or Edit</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card className="bg-primary/5 border-primary/30">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Example Transaction Output</CardTitle>
+                    </CardHeader>
+                    <CardContent className="font-mono text-xs space-y-2">
+                      <div className="text-muted-foreground">Booking: DRAFT-1705315847</div>
+                      <div className="text-muted-foreground">Date: 2024-01-15</div>
+                      <div className="text-muted-foreground">Description: AUTO: Shell - 85% confidence</div>
+                      <div className="h-px bg-border my-2" />
+                      <div className="text-accent">DEBIT  4310 Brandstof €41.32</div>
+                      <div className="text-muted-foreground pl-6">VAT 21% €8.68</div>
+                      <div className="text-destructive">CREDIT 1600 Crediteuren €50.00</div>
+                      <div className="h-px bg-border my-2" />
+                      <div className="text-muted-foreground">Status: DRAFT (Ready for approval)</div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-primary/5 border-primary/30">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Deployment Modes</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                      <div>
+                        <Badge className="mb-2 bg-accent text-accent-foreground">Redis Queue Mode</Badge>
+                        <p className="text-muted-foreground text-xs">
+                          API pushes jobs → Processor pulls → Scales horizontally
+                        </p>
+                      </div>
+                      <div>
+                        <Badge className="mb-2">Folder Watch Mode</Badge>
+                        <p className="text-muted-foreground text-xs">
+                          Polls /uploads every 10s → Simpler setup → Good for demos
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/80 backdrop-blur-sm border-2 border-primary/20">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileCode size={24} className="text-primary" />
+                      spark-worker/processor.py
+                    </CardTitle>
+                    <CardDescription>Complete OCR + AI + Database processor implementation</CardDescription>
+                  </div>
+                  <Button
+                    onClick={() => copyToClipboard("# See spark-worker/processor.py in the repository\n# Full production-ready implementation with:\n# - OCR Engine (Tesseract)\n# - AI Prediction (12+ categories)\n# - Auto Draft Transactions\n# - Redis + Folder modes", 'Spark Processor Info')}
+                    className="gap-2"
+                  >
+                    {copiedSection === 'Spark Processor Info' ? (
+                      <>
+                        <CheckCircle size={18} />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={18} />
+                        Copy Info
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Badge variant="secondary" className="justify-center">InvoiceOCRProcessor</Badge>
+                  <Badge variant="secondary" className="justify-center">LedgerAccountPredictor</Badge>
+                  <Badge variant="secondary" className="justify-center">DatabaseManager</Badge>
+                  <Badge variant="secondary" className="justify-center">SparkInvoiceProcessor</Badge>
+                </div>
+
+                <div className="bg-secondary/30 rounded-lg p-4">
+                  <h4 className="font-semibold mb-3 text-sm">Key Files Created:</h4>
+                  <div className="space-y-2 font-mono text-xs">
+                    <div className="flex items-center gap-2">
+                      <FileCode size={16} className="text-accent" />
+                      <span>spark-worker/processor.py</span>
+                      <Badge variant="outline" className="ml-auto">Core Logic</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FileCode size={16} className="text-accent" />
+                      <span>spark-worker/Dockerfile</span>
+                      <Badge variant="outline" className="ml-auto">Container</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FileCode size={16} className="text-accent" />
+                      <span>spark-worker/requirements.txt</span>
+                      <Badge variant="outline" className="ml-auto">Dependencies</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FileCode size={16} className="text-accent" />
+                      <span>spark-worker/README.md</span>
+                      <Badge variant="outline" className="ml-auto">Documentation</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FileCode size={16} className="text-accent" />
+                      <span>spark-worker/test_processor.py</span>
+                      <Badge variant="outline" className="ml-auto">Testing Tool</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FileCode size={16} className="text-accent" />
+                      <span>spark-worker/generate_test_invoices.py</span>
+                      <Badge variant="outline" className="ml-auto">Test Data</Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-accent/10 rounded-lg p-4 border border-accent/30">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <Lightning size={18} className="text-accent" />
+                    Quick Start Commands
+                  </h4>
+                  <div className="space-y-2 font-mono text-xs">
+                    <div>
+                      <div className="text-muted-foreground mb-1"># Build the processor</div>
+                      <div className="bg-background/50 rounded p-2">docker build -t spark-processor ./spark-worker</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground mb-1"># Run in folder watch mode</div>
+                      <div className="bg-background/50 rounded p-2">docker run -e PROCESSOR_MODE=folder spark-processor</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground mb-1"># Test prediction engine</div>
+                      <div className="bg-background/50 rounded p-2">python3 test_processor.py --predict "Shell"</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground mb-1"># Generate test invoices</div>
+                      <div className="bg-background/50 rounded p-2">python3 generate_test_invoices.py</div>
                     </div>
                   </div>
                 </div>

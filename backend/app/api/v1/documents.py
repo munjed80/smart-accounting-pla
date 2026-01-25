@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Annotated, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -42,7 +42,7 @@ async def upload_document(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     redis_client: Annotated[redis.Redis, Depends(get_redis_client)],
-    administration_id: UUID = None,
+    administration_id: Annotated[UUID | None, Form()] = None,
 ):
     """Upload a document and enqueue for processing"""
     # Validate file type
@@ -161,6 +161,7 @@ async def list_documents(
         select(Document)
         .join(Administration)
         .join(AdministrationMember)
+        .options(selectinload(Document.transaction))
         .where(AdministrationMember.user_id == current_user.id)
     )
     
@@ -207,6 +208,7 @@ async def get_document(
         .options(
             selectinload(Document.extracted_fields),
             selectinload(Document.administration).selectinload(Administration.members),
+            selectinload(Document.transaction),
         )
         .where(Document.id == document_id)
     )

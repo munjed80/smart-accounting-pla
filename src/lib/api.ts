@@ -82,7 +82,7 @@ export interface RecentTransaction {
   booking_number: string
   transaction_date: string
   description: string
-  status: 'draft' | 'posted' | 'reconciled' | 'void'
+  status: 'DRAFT' | 'POSTED'
   total_amount: number
 }
 
@@ -101,7 +101,7 @@ export interface Transaction {
   booking_number: string
   transaction_date: string
   description: string
-  status: 'draft' | 'posted' | 'reconciled' | 'void'
+  status: 'DRAFT' | 'POSTED'
   total_amount: number
   document_id: string | null
   created_at: string
@@ -117,7 +117,7 @@ export interface TransactionListItem {
   booking_number: string
   transaction_date: string
   description: string
-  status: 'draft' | 'posted' | 'reconciled' | 'void'
+  status: 'DRAFT' | 'POSTED'
   total_amount: number
   created_by_name: string | null
   ai_confidence_score: number | null
@@ -160,7 +160,7 @@ export const transactionApi = {
     return response.data
   },
 
-  getAll: async (status?: 'draft' | 'posted' | 'reconciled' | 'void'): Promise<TransactionListItem[]> => {
+  getAll: async (status?: 'DRAFT' | 'POSTED'): Promise<TransactionListItem[]> => {
     const params = status ? { status } : {}
     const response = await api.get<TransactionListItem[]>('/api/v1/transactions', { params })
     return response.data

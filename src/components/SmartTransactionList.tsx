@@ -25,7 +25,7 @@ export const SmartTransactionList = () => {
   const fetchTransactions = async () => {
     setIsLoading(true)
     try {
-      const statusParam = statusFilter !== 'all' ? statusFilter as 'draft' | 'posted' : undefined
+      const statusParam = statusFilter !== 'all' ? statusFilter as 'DRAFT' | 'POSTED' : undefined
       const data = await transactionApi.getAll(statusParam)
       setTransactions(data)
     } catch (error) {
@@ -64,7 +64,7 @@ export const SmartTransactionList = () => {
   }
 
   const getStatusColor = (status: string) => {
-    switch (status.toUpperCase()) {
+    switch (status) {
       case 'APPROVED':
         return 'bg-accent/20 text-accent-foreground border-accent/40'
       case 'DRAFT':
@@ -73,6 +73,17 @@ export const SmartTransactionList = () => {
         return 'bg-primary/20 text-primary-foreground border-primary/40'
       default:
         return 'bg-secondary'
+    }
+  }
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'DRAFT':
+        return 'Draft'
+      case 'POSTED':
+        return 'Posted'
+      default:
+        return status
     }
   }
 
@@ -163,8 +174,8 @@ export const SmartTransactionList = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="posted">Posted</SelectItem>
+                <SelectItem value="DRAFT">Draft</SelectItem>
+                <SelectItem value="POSTED">Posted</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -197,7 +208,7 @@ export const SmartTransactionList = () => {
                         <Receipt size={20} className="text-primary" weight="duotone" />
                         <span className="font-mono text-sm font-medium">{transaction.booking_number}</span>
                         <Badge className={getStatusColor(transaction.status)}>
-                          {transaction.status}
+                          {getStatusLabel(transaction.status)}
                         </Badge>
                         {transaction.ai_confidence_score && (
                           <Badge variant="outline" className={getConfidenceColor(transaction.ai_confidence_score)}>

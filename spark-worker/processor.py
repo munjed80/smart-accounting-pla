@@ -39,96 +39,83 @@ logger = logging.getLogger(__name__)
 class LedgerAccountPredictor:
     """
     AI-Powered Ledger Account Prediction Engine
-    Uses keyword mapping and pattern matching to intelligently categorize expenses
+    Maps to the Dutch Chart of Accounts from seed script
     """
     
     ACCOUNT_RULES = {
-        # Transportation & Fuel (4300-4399)
-        '4310': {
-            'name': 'Brandstof (Fuel)',
-            'keywords': ['shell', 'bp', 'esso', 'texaco', 'total', 'tankstation', 'fuel', 'benzine', 'diesel'],
+        # Transportation & Fuel - 4000 (Autokosten & Brandstof)
+        '4000': {
+            'name': 'Autokosten & Brandstof',
+            'keywords': ['shell', 'bp', 'esso', 'texaco', 'total', 'tankstation', 'fuel', 'benzine', 'diesel', 'parkeren', 'parking'],
             'priority': 1
         },
+        
+        # Public Transport - 4050
+        '4050': {
+            'name': 'Reiskosten Openbaar Vervoer',
+            'keywords': ['ns', 'ov', 'chipkaart', 'trein', 'train', 'metro', 'tram', 'bus'],
+            'priority': 1
+        },
+        
+        # Housing - 4100
+        '4100': {
+            'name': 'Huisvestingskosten',
+            'keywords': ['huur', 'rent', 'kantoor', 'office', 'workspace'],
+            'priority': 1
+        },
+        
+        # Office Equipment - 4300
         '4300': {
-            'name': 'Reiskosten Auto (Car Travel)',
-            'keywords': ['parkeren', 'parking', 'tolweg', 'toll', 'vignette', 'snelweg'],
+            'name': 'Kantoorkosten & Apparatuur',
+            'keywords': ['laptop', 'computer', 'monitor', 'keyboard', 'mouse', 'desk', 'chair', 'mediamarkt', 'coolblue', 'bol.com'],
             'priority': 1
         },
         
-        # Office & Supplies (4400-4499)
-        '4400': {
-            'name': 'Kantoorbenodigdheden (Office Supplies)',
-            'keywords': ['staples', 'office centre', 'viking', 'kantoor', 'printer', 'papier', 'toner', 'pen'],
-            'priority': 2
+        # Software & Licenses - 4310
+        '4310': {
+            'name': 'Software & Licenties',
+            'keywords': ['microsoft', 'google workspace', 'adobe', 'dropbox', 'hosting', 'domain', 'aws', 'azure', 'digitalocean', 'heroku', 'github', 'saas', 'software'],
+            'priority': 1
         },
         
-        # IT & Software (4500-4599)
+        # General Expenses (Lunch/Food) - 4500
         '4500': {
-            'name': 'Automatiseringskosten (IT Costs)',
-            'keywords': ['microsoft', 'google workspace', 'adobe', 'dropbox', 'hosting', 'domain', 'aws', 'azure', 'digitalocean', 'heroku'],
-            'priority': 1
-        },
-        '4510': {
-            'name': 'Software Licenties',
-            'keywords': ['software', 'saas', 'subscription', 'license', 'licentie'],
+            'name': 'Algemene kosten (Lunch/Diner)',
+            'keywords': ['albert heijn', 'jumbo', 'lidl', 'aldi', 'plus', 'ah to go', 'supermarkt', 'restaurant', 'lunch', 'cafe', 'horeca'],
             'priority': 2
         },
         
-        # Marketing & Advertising (4600-4699)
-        '4600': {
-            'name': 'Reclame & Marketing',
-            'keywords': ['google ads', 'facebook ads', 'meta', 'linkedin', 'advertentie', 'marketing', 'reclame'],
-            'priority': 1
-        },
-        
-        # Meals & Entertainment (4700-4799)
-        '4710': {
-            'name': 'Representatiekosten (Business Entertainment)',
-            'keywords': ['restaurant', 'cafe', 'lunch', 'dinner', 'horeca'],
-            'priority': 2
-        },
-        '4720': {
-            'name': 'Zakelijke Maaltijden',
-            'keywords': ['deliveroo', 'uber eats', 'thuisbezorgd'],
-            'priority': 2
-        },
-        
-        # Groceries (often private/mixed)
-        '1450': {
-            'name': 'Prive Uitgaven (Private Expenses)',
-            'keywords': ['albert heijn', 'jumbo', 'lidl', 'aldi', 'plus', 'ah', 'supermarkt'],
-            'priority': 3
-        },
-        
-        # Professional Services (4800-4899)
-        '4800': {
-            'name': 'Accountantskosten',
-            'keywords': ['accountant', 'boekhouder', 'administratie'],
-            'priority': 1
-        },
-        '4810': {
-            'name': 'Juridische Kosten',
-            'keywords': ['advocaat', 'notaris', 'legal', 'rechtsbijstand'],
-            'priority': 1
-        },
-        
-        # Subscriptions & Services (4900-4999)
-        '4900': {
-            'name': 'Abonnementen & Diensten',
-            'keywords': ['subscription', 'abonnement', 'netflix', 'spotify', 'monthly fee'],
-            'priority': 3
-        },
-        
-        # Utilities (5000-5099)
-        '5010': {
+        # Telecom - 4550
+        '4550': {
             'name': 'Telefoon & Internet',
-            'keywords': ['kpn', 'vodafone', 'tmobile', 'ziggo', 'telecom', 'internet', 'mobile'],
+            'keywords': ['kpn', 'vodafone', 'tmobile', 'ziggo', 'telecom', 'internet', 'mobile', 'phone', 'sim'],
             'priority': 1
+        },
+        
+        # Bank Costs - 4600
+        '4600': {
+            'name': 'Bankkosten',
+            'keywords': ['bank', 'ing', 'rabobank', 'abn amro', 'transaction fee', 'bankcosts'],
+            'priority': 1
+        },
+        
+        # Administration - 4800
+        '4800': {
+            'name': 'Administratiekosten (Bookkeeper)',
+            'keywords': ['accountant', 'boekhouder', 'administratie', 'bookkeeping'],
+            'priority': 1
+        },
+        
+        # Purchase Costs - 7000
+        '7000': {
+            'name': 'Inkoopkosten',
+            'keywords': ['inkoop', 'purchase', 'supplier', 'leverancier', 'groothandel'],
+            'priority': 2
         },
         
         # Default fallback
-        '4999': {
-            'name': 'Overige Bedrijfskosten (Other Expenses)',
+        '9999': {
+            'name': 'Te rubriceren (To be categorized)',
             'keywords': [],
             'priority': 99
         }
@@ -161,9 +148,9 @@ class LedgerAccountPredictor:
                     best_score = score
                     best_match = (account_code, rule['name'], score)
         
-        # Fallback to "Overige Bedrijfskosten"
+        # Fallback to "Te rubriceren"
         if not best_match:
-            return ('4999', cls.ACCOUNT_RULES['4999']['name'], 10)
+            return ('9999', cls.ACCOUNT_RULES['9999']['name'], 10)
         
         return best_match
 
@@ -694,10 +681,18 @@ class SparkInvoiceProcessor:
 def main():
     """Entry point for Spark job"""
     
-    # Configuration from environment variables
-    DB_URL = os.getenv(
+    # Configuration from environment variables (NO .env file!)
+    # These are set directly in Coolify dashboard
+    DB_HOST = os.getenv("DB_HOST", "db")
+    DB_PORT = os.getenv("DB_PORT", "5432")
+    DB_NAME = os.getenv("POSTGRES_DB", "accounting_db")
+    DB_USER = os.getenv("POSTGRES_USER", "accounting_user")
+    DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "change_me")
+    
+    # Construct DATABASE_URL from components or use direct URL
+    DATABASE_URL = os.getenv(
         "DATABASE_URL",
-        "postgresql://accounting_user:change_me@db:5432/accounting_db"
+        f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     )
     
     REDIS_URL = os.getenv(
@@ -707,7 +702,7 @@ def main():
     
     UPLOADS_PATH = os.getenv(
         "UPLOADS_PATH",
-        "/opt/spark-data"
+        "/app/uploads"  # Changed from /opt/spark-data to /app/uploads
     )
     
     MODE = os.getenv("PROCESSOR_MODE", "folder")  # 'redis' or 'folder'
@@ -715,14 +710,14 @@ def main():
     logger.info("=" * 80)
     logger.info("Smart Accounting Platform - Intelligent Invoice Processor")
     logger.info("=" * 80)
-    logger.info(f"Database: {DB_URL.split('@')[1] if '@' in DB_URL else DB_URL}")
+    logger.info(f"Database: {DB_USER}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
     logger.info(f"Redis: {REDIS_URL}")
     logger.info(f"Uploads: {UPLOADS_PATH}")
     logger.info(f"Mode: {MODE}")
     logger.info("=" * 80)
     
     processor = SparkInvoiceProcessor(
-        db_url=DB_URL,
+        db_url=DATABASE_URL,
         redis_url=REDIS_URL,
         uploads_path=UPLOADS_PATH
     )

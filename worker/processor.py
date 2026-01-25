@@ -336,7 +336,7 @@ class DatabaseManager:
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (account_id, administration_id, account_code, account_name, 'EXPENSE', True))
             
-            self.conn.commit()
+            # Note: Don't commit here - let the caller manage the transaction
             return account_id
             
         finally:
@@ -352,28 +352,43 @@ class DatabaseManager:
         finally:
             cursor.close()
     
-    def check_existing_transaction(self, document_id: str) -> bool:
-        """Check if transaction already exists for document (idempotency)"""
-        cursor = self.conn.cursor()
+    def get_existing_transaction(self, document_id: str) -> Optional[str]:
+        """Get existing transaction ID for document (idempotency check)"""
+        cursor = self.conn.cursor(cursor_factory=RealDictCursor)
         try:
             cursor.execute(
                 "SELECT id FROM transactions WHERE document_id = %s",
                 (document_id,)
             )
-            return cursor.fetchone() is not None
+            result = cursor.fetchone()
+            return str(result['id']) if result else None
         finally:
             cursor.close()
+    
+    def check_existing_transaction(self, document_id: str) -> bool:
+        """Check if transaction already exists for document (idempotency)"""
+        return self.get_existing_transaction(document_id) is not None
     
     def create_draft_transaction(
         self,
         administration_id: str,
         document_id: str,
         invoice_data: Dict
-    ) -> str:
-        """Create draft transaction with double-entry bookkeeping"""
+    ) -> Optional[str]:
+        """Create draft transaction with double-entry bookkeeping (idempotent)
+        
+        Returns:
+            transaction_id if created, None if already exists
+        """
         cursor = self.conn.cursor()
         
         try:
+            # Check if transaction already exists (idempotency)
+            existing_id = self.get_existing_transaction(document_id)
+            if existing_id:
+                logger.info(f"Transaction already exists for document {document_id}: {existing_id}")
+                return existing_id
+            
             transaction_id = str(uuid.uuid4())
             booking_number = f"DRAFT-{int(time.time())}"
             
@@ -458,10 +473,22 @@ class DatabaseManager:
                 float(invoice_data['total_amount'])
             ))
             
-            self.conn.commit()
+            # Note: Don't commit here - let the caller manage the transaction
             logger.info(f"Created DRAFT transaction {booking_number}")
             return transaction_id
             
+        except psycopg2.IntegrityError as e:
+            # Handle unique constraint violation (concurrent insert)
+            self.conn.rollback()
+            # PostgreSQL error code 23505 is unique_violation
+            is_unique_violation = getattr(e, 'pgcode', None) == '23505'
+            if is_unique_violation:
+                logger.info(f"Concurrent insert detected for document {document_id}, fetching existing")
+                existing_id = self.get_existing_transaction(document_id)
+                if existing_id:
+                    return existing_id
+            logger.error(f"Integrity error creating transaction: {e}")
+            raise
         except Exception as e:
             self.conn.rollback()
             logger.error(f"Failed to create transaction: {e}")
@@ -469,8 +496,15 @@ class DatabaseManager:
         finally:
             cursor.close()
     
-    def update_document_status(self, document_id: str, status: str, error_message: str = None):
-        """Update document status"""
+    def update_document_status(self, document_id: str, status: str, error_message: str = None, commit: bool = True):
+        """Update document status
+        
+        Args:
+            document_id: Document to update
+            status: New status value
+            error_message: Optional error message
+            commit: Whether to commit the transaction (default True for standalone calls)
+        """
         cursor = self.conn.cursor()
         try:
             if error_message:
@@ -482,15 +516,16 @@ class DatabaseManager:
             else:
                 cursor.execute("""
                     UPDATE documents
-                    SET status = %s, updated_at = NOW()
+                    SET status = %s, error_message = NULL, updated_at = NOW()
                     WHERE id = %s
                 """, (status, document_id))
-            self.conn.commit()
+            if commit:
+                self.conn.commit()
         finally:
             cursor.close()
     
     def save_extracted_fields(self, document_id: str, invoice_data: Dict):
-        """Save extracted fields"""
+        """Save or update extracted fields (idempotent upsert)"""
         cursor = self.conn.cursor()
         try:
             fields = [
@@ -503,10 +538,16 @@ class DatabaseManager:
             ]
             
             for field_name, field_value, confidence in fields:
+                # Use ON CONFLICT to handle duplicates (upsert pattern)
                 cursor.execute("""
                     INSERT INTO extracted_fields
                     (id, document_id, field_name, field_value, confidence, raw_json)
                     VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (document_id, field_name)
+                    DO UPDATE SET 
+                        field_value = EXCLUDED.field_value,
+                        confidence = EXCLUDED.confidence,
+                        raw_json = EXCLUDED.raw_json
                 """, (
                     str(uuid.uuid4()),
                     document_id,
@@ -516,7 +557,7 @@ class DatabaseManager:
                     json.dumps(invoice_data)
                 ))
             
-            self.conn.commit()
+            # Note: Don't commit here - let the caller manage the transaction
         finally:
             cursor.close()
 
@@ -552,7 +593,7 @@ class Worker:
             logger.info(f"Consumer group already exists: {self.consumer_group}")
     
     def process_job(self, job_data: Dict):
-        """Process a single document job"""
+        """Process a single document job with full idempotency guarantees"""
         document_id = job_data.get('document_id')
         administration_id = job_data.get('administration_id')
         storage_path = job_data.get('storage_path')
@@ -563,37 +604,52 @@ class Worker:
         try:
             self.db_manager.connect()
             
-            # Check idempotency
-            if self.db_manager.check_existing_transaction(document_id):
-                logger.info(f"Transaction already exists for document {document_id}, skipping")
+            # Check idempotency - if transaction already exists, just ensure status is correct
+            existing_transaction_id = self.db_manager.get_existing_transaction(document_id)
+            if existing_transaction_id:
+                logger.info(f"Transaction already exists for document {document_id}: {existing_transaction_id}")
+                # Ensure document status is DRAFT_READY
+                self.db_manager.update_document_status(document_id, 'DRAFT_READY')
                 return
             
             # Mark as processing
             self.db_manager.update_document_status(document_id, 'PROCESSING')
             
-            # Process document
+            # Process document (OCR/text extraction)
             invoice_data = self.processor.process(storage_path, original_filename)
             
-            # Save extracted fields
+            # All operations below are in a single DB transaction
+            # Save extracted fields (uses upsert pattern)
             self.db_manager.save_extracted_fields(document_id, invoice_data)
             
-            # Create draft transaction
-            self.db_manager.create_draft_transaction(
+            # Create draft transaction (idempotent)
+            transaction_id = self.db_manager.create_draft_transaction(
                 administration_id,
                 document_id,
                 invoice_data
             )
             
-            # Mark as ready
-            self.db_manager.update_document_status(document_id, 'DRAFT_READY')
-            logger.info(f"Successfully processed document {document_id}")
+            # Mark as ready (don't commit yet)
+            self.db_manager.update_document_status(document_id, 'DRAFT_READY', commit=False)
+            
+            # Commit the entire transaction
+            self.db_manager.conn.commit()
+            logger.info(f"Successfully processed document {document_id} -> transaction {transaction_id}")
             
         except Exception as e:
             logger.error(f"Failed to process document {document_id}: {e}")
+            # Rollback any pending changes
             try:
-                self.db_manager.update_document_status(document_id, 'FAILED', str(e))
+                if self.db_manager.conn:
+                    self.db_manager.conn.rollback()
             except Exception:
                 pass
+            # Update document status to FAILED with error message
+            try:
+                self.db_manager.connect()  # Reconnect if needed
+                self.db_manager.update_document_status(document_id, 'FAILED', str(e))
+            except Exception as status_error:
+                logger.error(f"Failed to update document status: {status_error}")
         finally:
             self.db_manager.close()
     

@@ -247,3 +247,79 @@ async def get_document(
         transaction_id=document.transaction.id if document.transaction else None,
         extracted_fields=extracted,
     )
+
+
+@router.post("/{document_id}/reprocess", response_model=DocumentResponse)
+async def reprocess_document(
+    document_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    redis_client: Annotated[redis.Redis, Depends(get_redis_client)],
+):
+    """Reprocess a failed document - reset status and re-enqueue for processing"""
+    result = await db.execute(
+        select(Document)
+        .options(
+            selectinload(Document.administration).selectinload(Administration.members),
+            selectinload(Document.transaction),
+        )
+        .where(Document.id == document_id)
+    )
+    document = result.scalar_one_or_none()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Check access
+    member = next(
+        (m for m in document.administration.members if m.user_id == current_user.id),
+        None
+    )
+    if not member:
+        raise HTTPException(status_code=403, detail="Not authorized to reprocess this document")
+    
+    # Only allow reprocessing of FAILED documents
+    if document.status != DocumentStatus.FAILED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Can only reprocess documents with FAILED status. Current status: {document.status.value}"
+        )
+    
+    # Reset status and clear error
+    document.status = DocumentStatus.UPLOADED
+    document.error_message = None
+    
+    await db.commit()
+    await db.refresh(document)
+    
+    # Enqueue job to Redis Streams
+    job_data = {
+        "document_id": str(document.id),
+        "administration_id": str(document.administration_id),
+        "storage_path": document.storage_path,
+        "mime_type": document.mime_type,
+        "original_filename": document.original_filename,
+    }
+    
+    try:
+        await redis_client.xadd(
+            "document_processing_stream",
+            job_data,
+            maxlen=10000,
+        )
+    except Exception as e:
+        # Log error but don't fail - document status is already reset
+        print(f"Failed to enqueue job: {e}")
+    
+    return DocumentResponse(
+        id=document.id,
+        administration_id=document.administration_id,
+        original_filename=document.original_filename,
+        mime_type=document.mime_type,
+        file_size=document.file_size,
+        status=document.status,
+        error_message=document.error_message,
+        created_at=document.created_at,
+        updated_at=document.updated_at,
+        transaction_id=document.transaction.id if document.transaction else None,
+    )

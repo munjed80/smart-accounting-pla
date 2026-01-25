@@ -1,10 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
-import { documentApi, getErrorMessage } from '@/lib/api'
+import { documentApi, getErrorMessage, DocumentResponse } from '@/lib/api'
 import { 
   UploadSimple, 
   FileImage, 
@@ -13,9 +13,12 @@ import {
   Clock,
   Trash,
   Sparkle,
-  CloudArrowUp
+  CloudArrowUp,
+  ArrowsClockwise,
+  WarningCircle
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { format } from 'date-fns'
 
 interface UploadedFile {
   id: string
@@ -29,7 +32,44 @@ interface UploadedFile {
 
 export const IntelligentUploadPortal = () => {
   const [files, setFiles] = useState<UploadedFile[]>([])
+  const [documents, setDocuments] = useState<DocumentResponse[]>([])
+  const [isLoadingDocs, setIsLoadingDocs] = useState(false)
+  const [reprocessingIds, setReprocessingIds] = useState<Set<string>>(new Set())
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const fetchDocuments = async () => {
+    setIsLoadingDocs(true)
+    try {
+      const docs = await documentApi.list()
+      setDocuments(docs)
+    } catch (error) {
+      console.error('Failed to fetch documents:', error)
+    } finally {
+      setIsLoadingDocs(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchDocuments()
+  }, [])
+
+  const handleReprocess = async (docId: string) => {
+    setReprocessingIds(prev => new Set(prev).add(docId))
+    try {
+      await documentApi.reprocess(docId)
+      toast.success('Document queued for reprocessing')
+      // Refresh the document list
+      await fetchDocuments()
+    } catch (error) {
+      toast.error('Failed to reprocess: ' + getErrorMessage(error))
+    } finally {
+      setReprocessingIds(prev => {
+        const next = new Set(prev)
+        next.delete(docId)
+        return next
+      })
+    }
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || [])
@@ -205,10 +245,38 @@ export const IntelligentUploadPortal = () => {
     }
   }
 
+  const getDocStatusIcon = (status: DocumentResponse['status']) => {
+    switch (status) {
+      case 'UPLOADED':
+        return <Clock size={16} className="text-muted-foreground" />
+      case 'PROCESSING':
+        return <ArrowsClockwise size={16} className="text-primary animate-spin" />
+      case 'DRAFT_READY':
+        return <CheckCircle size={16} className="text-accent" weight="fill" />
+      case 'FAILED':
+        return <XCircle size={16} className="text-destructive" weight="fill" />
+    }
+  }
+
+  const getDocStatusBadge = (status: DocumentResponse['status']) => {
+    switch (status) {
+      case 'UPLOADED':
+        return <Badge variant="outline">Uploaded</Badge>
+      case 'PROCESSING':
+        return <Badge variant="default" className="bg-primary">Processing...</Badge>
+      case 'DRAFT_READY':
+        return <Badge variant="default" className="bg-accent text-accent-foreground">Ready</Badge>
+      case 'FAILED':
+        return <Badge variant="destructive">Failed</Badge>
+    }
+  }
+
   const pendingCount = files.filter((f) => f.status === 'pending').length
   const uploadingCount = files.filter((f) => f.status === 'uploading').length
   const uploadedCount = files.filter((f) => f.status === 'uploaded').length
   const errorCount = files.filter((f) => f.status === 'error').length
+  
+  const failedDocCount = documents.filter((d) => d.status === 'FAILED').length
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
@@ -354,6 +422,95 @@ export const IntelligentUploadPortal = () => {
                         <Trash size={16} />
                       </Button>
                     </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Processed Documents Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FileImage size={24} weight="duotone" className="text-primary" />
+                Processed Documents
+                {failedDocCount > 0 && (
+                  <Badge variant="destructive" className="ml-2">
+                    {failedDocCount} Failed
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Documents uploaded and processed by the AI worker
+              </CardDescription>
+            </div>
+            <Button onClick={fetchDocuments} variant="outline" size="sm" disabled={isLoadingDocs}>
+              <ArrowsClockwise size={18} className={`mr-2 ${isLoadingDocs ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingDocs ? (
+            <div className="text-center py-8">
+              <ArrowsClockwise size={32} className="mx-auto mb-4 text-primary animate-spin" />
+              <p className="text-muted-foreground">Loading documents...</p>
+            </div>
+          ) : documents.length === 0 ? (
+            <div className="text-center py-8">
+              <FileImage size={48} className="mx-auto mb-4 text-muted-foreground opacity-50" weight="duotone" />
+              <p className="text-muted-foreground">No documents uploaded yet</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {documents.map((doc) => (
+                <div key={doc.id} className="border border-border rounded-lg p-4 hover:bg-accent/5 transition-colors">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1">
+                      {getDocStatusIcon(doc.status)}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium truncate">{doc.original_filename}</span>
+                          {getDocStatusBadge(doc.status)}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Uploaded: {format(new Date(doc.created_at), 'dd MMM yyyy HH:mm')}
+                          {doc.transaction_id && (
+                            <span className="ml-2">• Transaction linked</span>
+                          )}
+                        </div>
+                        
+                        {/* Show error message for FAILED documents */}
+                        {doc.status === 'FAILED' && doc.error_message && (
+                          <Alert variant="destructive" className="mt-3">
+                            <WarningCircle size={16} />
+                            <AlertDescription className="ml-2">
+                              <strong>Error:</strong> {doc.error_message}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Reprocess button for FAILED documents */}
+                    {doc.status === 'FAILED' && (
+                      <Button 
+                        onClick={() => handleReprocess(doc.id)}
+                        size="sm" 
+                        variant="outline"
+                        disabled={reprocessingIds.has(doc.id)}
+                      >
+                        <ArrowsClockwise 
+                          size={16} 
+                          className={`mr-1 ${reprocessingIds.has(doc.id) ? 'animate-spin' : ''}`} 
+                        />
+                        {reprocessingIds.has(doc.id) ? 'Reprocessing...' : 'Reprocess'}
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}

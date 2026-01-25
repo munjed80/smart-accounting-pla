@@ -47,6 +47,9 @@ services:
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production-use-openssl-rand-hex-32}
       UPLOAD_DIR: /data/uploads
       DEBUG: ${DEBUG:-false}
+      # CORS: Allow frontend origins (comma-separated)
+      # For local dev: http://localhost:3000 (container nginx) + http://localhost:5173 (vite dev server)
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173}
     volumes:
       - uploads_data:/data/uploads
     ports:
@@ -93,14 +96,19 @@ services:
         condition: service_healthy
 
   # Frontend
+  # NOTE: The frontend is built at image build time with VITE_API_URL baked in.
+  # For docker-compose, the browser accesses the backend through localhost:8000 
+  # (exposed port), NOT through container networking.
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        # This URL is used at BUILD TIME by Vite - it's the URL the browser will use
+        # In docker-compose, the browser accesses the backend via localhost:8000
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     container_name: smart-accounting-frontend
     restart: unless-stopped
-    environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     ports:
       - "3000:80"
     depends_on:

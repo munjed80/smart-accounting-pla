@@ -303,7 +303,7 @@ async def post_transaction(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Post a transaction (validate debit == credit)"""
+    """Post a transaction (validate debit == credit, no negative amounts, proper precision)"""
     result = await db.execute(
         select(Transaction)
         .options(
@@ -330,18 +330,53 @@ async def post_transaction(
     if transaction.status != TransactionStatus.DRAFT:
         raise HTTPException(status_code=400, detail="Transaction is already posted")
     
+    # Validate: no negative amounts
+    validation_errors = []
+    for i, line in enumerate(transaction.lines):
+        if line.debit_amount < 0:
+            validation_errors.append(f"Line {i+1}: Debit amount cannot be negative ({line.debit_amount})")
+        if line.credit_amount < 0:
+            validation_errors.append(f"Line {i+1}: Credit amount cannot be negative ({line.credit_amount})")
+        # Validate precision (max 2 decimal places)
+        if line.debit_amount != line.debit_amount.quantize(Decimal("0.01")):
+            validation_errors.append(f"Line {i+1}: Debit amount has too many decimal places ({line.debit_amount})")
+        if line.credit_amount != line.credit_amount.quantize(Decimal("0.01")):
+            validation_errors.append(f"Line {i+1}: Credit amount has too many decimal places ({line.credit_amount})")
+    
+    if validation_errors:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Transaction validation failed",
+                "errors": validation_errors
+            }
+        )
+    
     # Validate debit == credit
     total_debit = sum(line.debit_amount for line in transaction.lines)
     total_credit = sum(line.credit_amount for line in transaction.lines)
     
     if total_debit != total_credit:
+        difference = total_debit - total_credit
         raise HTTPException(
             status_code=400,
-            detail=f"Transaction is not balanced. Debit: {total_debit}, Credit: {total_credit}"
+            detail={
+                "message": "Transaction is not balanced",
+                "total_debit": str(total_debit),
+                "total_credit": str(total_credit),
+                "difference": str(difference),
+                "hint": f"Debit exceeds credit by {difference}" if difference > 0 else f"Credit exceeds debit by {abs(difference)}"
+            }
         )
     
     if total_debit == 0:
-        raise HTTPException(status_code=400, detail="Transaction has no amounts")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Transaction has no amounts",
+                "hint": "Add at least one line with a non-zero debit or credit amount"
+            }
+        )
     
     # Post the transaction
     transaction.status = TransactionStatus.POSTED

@@ -58,6 +58,61 @@ An intelligent accounting platform with AI-powered document processing. Upload i
    - Backend API: http://localhost:8000
    - API Docs: http://localhost:8000/docs
 
+### How Docker Compose Networking Works
+
+The docker-compose setup uses the following networking model:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                        Docker Network                              │
+│                                                                    │
+│  ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐       │
+│  │   db    │    │  redis  │    │ backend │    │ worker  │       │
+│  │ :5432   │    │ :6379   │    │ :8000   │    │         │       │
+│  └────┬────┘    └────┬────┘    └────┬────┘    └─────────┘       │
+│       │              │              │                             │
+│       └──────────────┴──────┬───────┘                             │
+│                             │ (container-to-container)            │
+│                     ┌───────┴───────┐                             │
+│                     │   frontend    │                             │
+│                     │    :80        │                             │
+│                     └───────────────┘                             │
+└──────────────────────────────────────────────────────────────────┘
+            │              │              │
+            │              │              │
+         :5432          :6379          :8000          :3000
+            │              │              │              │
+┌───────────┴──────────────┴──────────────┴──────────────┴─────────┐
+│                        Host Machine                                │
+└──────────────────────────────────────────────────────────────────┘
+            │
+            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                          Browser                                  │
+│                                                                   │
+│   Frontend (localhost:3000) ──────► Backend (localhost:8000)      │
+│   React App                        FastAPI                        │
+│                                                                   │
+│   The browser makes API calls to localhost:8000 directly.         │
+│   VITE_API_URL=http://localhost:8000 is baked in at build time.   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key points:**
+- **Frontend container** serves static files via nginx on port 80 (mapped to 3000)
+- **Backend container** runs on port 8000, exposed to the host
+- **Browser** loads the React app from frontend, but API calls go directly to backend via `localhost:8000`
+- **CORS** is configured to allow requests from `localhost:3000` and `localhost:5173`
+- **Worker** connects to Redis and PostgreSQL using Docker internal networking (`db:5432`, `redis:6379`)
+
+**Environment Variables:**
+| Variable | Where Used | Description |
+|----------|------------|-------------|
+| `VITE_API_URL` | Frontend build | URL browser uses to call backend API |
+| `CORS_ORIGINS` | Backend | Allowed origins for CORS requests |
+| `DATABASE_URL` | Backend/Worker | PostgreSQL connection (uses `db` hostname) |
+| `REDIS_URL` | Backend/Worker | Redis connection (uses `redis` hostname) |
+
 ## Demo Flow
 
 1. **Register a new user**:

@@ -46,11 +46,13 @@ export const TransactionDetailDialog = ({
   const [isEditing, setIsEditing] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [editedTransaction, setEditedTransaction] = useState<Transaction | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
 
   useEffect(() => {
     if (transaction) {
       setEditedTransaction({ ...transaction })
       setIsEditing(transaction.status === 'DRAFT')
+      setValidationError(null)
     }
   }, [transaction])
 
@@ -65,6 +67,7 @@ export const TransactionDetailDialog = ({
 
     try {
       setIsLoading(true)
+      setValidationError(null)
       await transactionApi.update(editedTransaction.id, {
         transaction_date: editedTransaction.transaction_date,
         description: editedTransaction.description,
@@ -80,15 +83,45 @@ export const TransactionDetailDialog = ({
     }
   }
 
+  const formatValidationError = (error: unknown): string => {
+    const errorData = (error as any)?.response?.data?.detail
+    if (!errorData) {
+      return getErrorMessage(error)
+    }
+    
+    // Handle structured error response from backend
+    if (typeof errorData === 'object') {
+      const parts: string[] = []
+      if (errorData.message) {
+        parts.push(errorData.message)
+      }
+      if (errorData.hint) {
+        parts.push(errorData.hint)
+      }
+      if (errorData.total_debit && errorData.total_credit) {
+        parts.push(`Debit: €${errorData.total_debit}, Credit: €${errorData.total_credit}`)
+      }
+      if (errorData.errors && Array.isArray(errorData.errors)) {
+        parts.push(...errorData.errors)
+      }
+      return parts.join('\n')
+    }
+    
+    return String(errorData)
+  }
+
   const handleApprove = async () => {
     try {
       setIsLoading(true)
+      setValidationError(null)
       await transactionApi.approve(transaction.id)
       toast.success('Transaction approved and posted to ledger')
       onOpenChange(false)
       onTransactionUpdated()
     } catch (error) {
-      toast.error('Failed to approve transaction: ' + getErrorMessage(error))
+      const errorMessage = formatValidationError(error)
+      setValidationError(errorMessage)
+      toast.error('Failed to approve transaction')
     } finally {
       setIsLoading(false)
     }
@@ -97,6 +130,7 @@ export const TransactionDetailDialog = ({
   const handleReject = async () => {
     try {
       setIsLoading(true)
+      setValidationError(null)
       await transactionApi.reject(transaction.id)
       toast.success('Transaction rejected and marked as void')
       onOpenChange(false)
@@ -304,6 +338,16 @@ export const TransactionDetailDialog = ({
                 <WarningCircle className="h-5 w-5 text-destructive" />
                 <AlertDescription className="ml-2">
                   <strong>Transaction is not balanced!</strong> Debit and credit amounts must be equal before posting.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Validation error from server */}
+            {validationError && (
+              <Alert className="bg-destructive/10 border-destructive/40">
+                <WarningCircle className="h-5 w-5 text-destructive" />
+                <AlertDescription className="ml-2 whitespace-pre-line">
+                  <strong>Validation Error:</strong> {validationError}
                 </AlertDescription>
               </Alert>
             )}

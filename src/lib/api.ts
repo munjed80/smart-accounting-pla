@@ -274,6 +274,11 @@ export const documentApi = {
     const response = await api.get<DocumentResponse>(`/api/v1/documents/${id}`)
     return response.data
   },
+
+  reprocess: async (id: string): Promise<DocumentResponse> => {
+    const response = await api.post<DocumentResponse>(`/api/v1/documents/${id}/reprocess`)
+    return response.data
+  },
 }
 
 export interface ApiError {

@@ -4,41 +4,31 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { intelligentProcessor, ExtractedInvoiceData, LedgerAccountPredictor } from '@/lib/intelligentProcessor'
-import { useKV } from '@github/spark/hooks'
+import { documentApi, getErrorMessage } from '@/lib/api'
 import { 
   UploadSimple, 
   FileImage, 
-  Brain,
   CheckCircle, 
   XCircle,
   Clock,
   Trash,
-  Eye,
   Sparkle,
-  WarningCircle
+  CloudArrowUp
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 
-interface ProcessedInvoice {
+interface UploadedFile {
   id: string
   file: File
-  status: 'pending' | 'processing' | 'processed' | 'error' | 'manual_review'
+  status: 'pending' | 'uploading' | 'uploaded' | 'error'
   progress: number
-  extractedData?: ExtractedInvoiceData
+  documentId?: string
   errorMessage?: string
   imageUrl?: string
 }
 
 export const IntelligentUploadPortal = () => {
-  const [files, setFiles] = useState<ProcessedInvoice[]>([])
-  const [selectedInvoice, setSelectedInvoice] = useState<ProcessedInvoice | null>(null)
-  const [isDetailOpen, setIsDetailOpen] = useState(false)
-  const [transactions, setTransactions] = useKV<any[]>('transactions', [])
+  const [files, setFiles] = useState<UploadedFile[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,7 +47,16 @@ export const IntelligentUploadPortal = () => {
   }
 
   const addFiles = (selectedFiles: File[]) => {
-    const newFiles: ProcessedInvoice[] = selectedFiles.map((file) => ({
+    const validExtensions = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf']
+    const validFiles = selectedFiles.filter(file => {
+      if (!validExtensions.includes(file.type)) {
+        toast.error(`Invalid file type: ${file.name}. Only PNG, JPG, and PDF are allowed.`)
+        return false
+      }
+      return true
+    })
+
+    const newFiles: UploadedFile[] = validFiles.map((file) => ({
       id: `${file.name}-${Date.now()}-${Math.random()}`,
       file,
       status: 'pending',
@@ -67,10 +66,10 @@ export const IntelligentUploadPortal = () => {
     setFiles((prev) => [...prev, ...newFiles])
   }
 
-  const processFile = async (fileItem: ProcessedInvoice) => {
+  const uploadFile = async (fileItem: UploadedFile) => {
     setFiles((prev) =>
       prev.map((f) =>
-        f.id === fileItem.id ? { ...f, status: 'processing', progress: 10 } : f
+        f.id === fileItem.id ? { ...f, status: 'uploading', progress: 10 } : f
       )
     )
 
@@ -93,7 +92,7 @@ export const IntelligentUploadPortal = () => {
             )
           )
 
-          const extractedData = await intelligentProcessor.processInvoiceWithLLM(imageUrl)
+          const response = await documentApi.upload(fileItem.file)
           
           setFiles((prev) =>
             prev.map((f) =>
@@ -101,32 +100,21 @@ export const IntelligentUploadPortal = () => {
             )
           )
 
-          const finalStatus = extractedData.status === 'MANUAL_REVIEW_REQUIRED' 
-            ? 'manual_review' 
-            : extractedData.status === 'FAILED'
-            ? 'error'
-            : 'processed'
-
           setFiles((prev) =>
             prev.map((f) =>
               f.id === fileItem.id 
-                ? { ...f, status: finalStatus, progress: 100, extractedData } 
+                ? { ...f, status: 'uploaded', progress: 100, documentId: response.document_id } 
                 : f
             )
           )
 
-          if (finalStatus === 'processed') {
-            toast.success(`Invoice processed: ${extractedData.merchant}`, {
-              description: `€${extractedData.totalAmount.toFixed(2)} → ${extractedData.predictedAccountName}`
-            })
-          } else if (finalStatus === 'manual_review') {
-            toast.warning('Manual review required', {
-              description: 'Some invoice data could not be extracted automatically'
-            })
-          }
+          toast.success(`File uploaded successfully!`, {
+            description: `${fileItem.file.name} - Document ID: ${response.document_id.substring(0, 8)}...`
+          })
 
         } catch (error) {
-          console.error('Processing failed:', error)
+          const errorMessage = getErrorMessage(error)
+          console.error('Upload failed:', error)
           setFiles((prev) =>
             prev.map((f) =>
               f.id === fileItem.id 
@@ -134,13 +122,13 @@ export const IntelligentUploadPortal = () => {
                     ...f, 
                     status: 'error', 
                     progress: 100, 
-                    errorMessage: error instanceof Error ? error.message : 'Processing failed' 
+                    errorMessage 
                   } 
                 : f
             )
           )
-          toast.error('Processing failed', {
-            description: error instanceof Error ? error.message : 'Unknown error'
+          toast.error('Upload failed', {
+            description: errorMessage
           })
         }
       }
@@ -159,6 +147,7 @@ export const IntelligentUploadPortal = () => {
       reader.readAsDataURL(fileItem.file)
 
     } catch (error) {
+      const errorMessage = getErrorMessage(error)
       console.error('Upload failed:', error)
       setFiles((prev) =>
         prev.map((f) =>
@@ -167,19 +156,21 @@ export const IntelligentUploadPortal = () => {
                 ...f, 
                 status: 'error', 
                 progress: 100, 
-                errorMessage: error instanceof Error ? error.message : 'Upload failed' 
+                errorMessage 
               } 
             : f
         )
       )
-      toast.error('Upload failed')
+      toast.error('Upload failed', {
+        description: errorMessage
+      })
     }
   }
 
-  const processAllPending = () => {
+  const uploadAllPending = () => {
     files.forEach((file) => {
       if (file.status === 'pending') {
-        processFile(file)
+        uploadFile(file)
       }
     })
   }
@@ -188,87 +179,46 @@ export const IntelligentUploadPortal = () => {
     setFiles((prev) => prev.filter((f) => f.id !== fileId))
   }
 
-  const viewDetails = (file: ProcessedInvoice) => {
-    setSelectedInvoice(file)
-    setIsDetailOpen(true)
-  }
-
-  const approveDraft = () => {
-    if (!selectedInvoice?.extractedData) return
-
-    const newTransaction = {
-      id: selectedInvoice.id,
-      booking_number: `AUTO-${Date.now()}`,
-      date: selectedInvoice.extractedData.invoiceDate,
-      description: `${selectedInvoice.extractedData.merchant}`,
-      amount: selectedInvoice.extractedData.totalAmount,
-      vat_amount: selectedInvoice.extractedData.vatAmount,
-      net_amount: selectedInvoice.extractedData.netAmount,
-      account_code: selectedInvoice.extractedData.predictedAccountCode,
-      account_name: selectedInvoice.extractedData.predictedAccountName,
-      confidence: selectedInvoice.extractedData.predictionConfidence,
-      status: 'APPROVED',
-      created_at: new Date().toISOString(),
-      type: 'EXPENSE'
-    }
-
-    setTransactions((current) => {
-      const existing = current || []
-      return [...existing, newTransaction]
-    })
-    
-    removeFile(selectedInvoice.id)
-    setIsDetailOpen(false)
-    
-    toast.success('Transaction approved!', {
-      description: `€${newTransaction.amount.toFixed(2)} booked to ${newTransaction.account_name}`
-    })
-  }
-
-  const getStatusIcon = (status: ProcessedInvoice['status']) => {
+  const getStatusIcon = (status: UploadedFile['status']) => {
     switch (status) {
       case 'pending':
         return <Clock size={20} className="text-muted-foreground" />
-      case 'processing':
-        return <Brain size={20} className="text-primary animate-pulse" weight="duotone" />
-      case 'processed':
+      case 'uploading':
+        return <CloudArrowUp size={20} className="text-primary animate-pulse" weight="duotone" />
+      case 'uploaded':
         return <CheckCircle size={20} className="text-accent" weight="fill" />
-      case 'manual_review':
-        return <WarningCircle size={20} className="text-amber-500" weight="fill" />
       case 'error':
         return <XCircle size={20} className="text-destructive" weight="fill" />
     }
   }
 
-  const getStatusBadge = (status: ProcessedInvoice['status']) => {
+  const getStatusBadge = (status: UploadedFile['status']) => {
     switch (status) {
       case 'pending':
         return <Badge variant="outline">Pending</Badge>
-      case 'processing':
-        return <Badge variant="default" className="bg-primary">Processing...</Badge>
-      case 'processed':
-        return <Badge variant="default" className="bg-accent text-accent-foreground">Processed</Badge>
-      case 'manual_review':
-        return <Badge variant="default" className="bg-amber-500">Review Required</Badge>
+      case 'uploading':
+        return <Badge variant="default" className="bg-primary">Uploading...</Badge>
+      case 'uploaded':
+        return <Badge variant="default" className="bg-accent text-accent-foreground">Uploaded</Badge>
       case 'error':
         return <Badge variant="destructive">Error</Badge>
     }
   }
 
   const pendingCount = files.filter((f) => f.status === 'pending').length
-  const processingCount = files.filter((f) => f.status === 'processing').length
-  const processedCount = files.filter((f) => f.status === 'processed').length
-  const reviewCount = files.filter((f) => f.status === 'manual_review').length
+  const uploadingCount = files.filter((f) => f.status === 'uploading').length
+  const uploadedCount = files.filter((f) => f.status === 'uploaded').length
+  const errorCount = files.filter((f) => f.status === 'error').length
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Intelligent Invoice Processing
+            Document Upload Portal
           </h2>
           <p className="text-muted-foreground mt-1">
-            AI-powered OCR with automatic ledger classification
+            Upload invoices and receipts to the backend for AI processing
           </p>
         </div>
         <div className="flex gap-2">
@@ -279,9 +229,9 @@ export const IntelligentUploadPortal = () => {
                 Clear All
               </Button>
               {pendingCount > 0 && (
-                <Button onClick={processAllPending} className="bg-accent text-accent-foreground hover:bg-accent/90">
-                  <Brain size={18} className="mr-2" weight="duotone" />
-                  Process All ({pendingCount})
+                <Button onClick={uploadAllPending} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                  <CloudArrowUp size={18} className="mr-2" weight="duotone" />
+                  Upload All ({pendingCount})
                 </Button>
               )}
             </>
@@ -298,20 +248,20 @@ export const IntelligentUploadPortal = () => {
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Processing</CardDescription>
-            <CardTitle className="text-3xl text-primary">{processingCount}</CardTitle>
+            <CardDescription>Uploading</CardDescription>
+            <CardTitle className="text-3xl text-primary">{uploadingCount}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Processed</CardDescription>
-            <CardTitle className="text-3xl text-accent">{processedCount}</CardTitle>
+            <CardDescription>Uploaded</CardDescription>
+            <CardTitle className="text-3xl text-accent">{uploadedCount}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Review Required</CardDescription>
-            <CardTitle className="text-3xl text-amber-500">{reviewCount}</CardTitle>
+            <CardDescription>Errors</CardDescription>
+            <CardTitle className="text-3xl text-destructive">{errorCount}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -320,10 +270,10 @@ export const IntelligentUploadPortal = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkle size={24} weight="duotone" className="text-primary" />
-            Upload Invoices
+            Upload Documents
           </CardTitle>
           <CardDescription>
-            Drop invoice images here or click to browse. The AI will extract data and suggest ledger accounts.
+            Drop invoice or receipt images here. Files will be uploaded to the backend at <code className="bg-secondary px-2 py-0.5 rounded text-xs">POST /api/v1/documents/upload</code>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -334,7 +284,7 @@ export const IntelligentUploadPortal = () => {
             className="border-2 border-dashed border-border rounded-lg p-12 text-center cursor-pointer hover:border-primary hover:bg-accent/5 transition-all"
           >
             <UploadSimple size={48} className="mx-auto mb-4 text-muted-foreground" weight="duotone" />
-            <p className="text-lg font-medium mb-2">Drop invoice images here</p>
+            <p className="text-lg font-medium mb-2">Drop documents here</p>
             <p className="text-sm text-muted-foreground">or click to browse (PNG, JPG, PDF)</p>
             <input
               ref={fileInputRef}
@@ -367,30 +317,22 @@ export const IntelligentUploadPortal = () => {
                         {getStatusBadge(file.status)}
                       </div>
 
-                      {file.status === 'processing' && (
-                        <Progress value={file.progress} className="h-2 mb-2" />
+                      <div className="text-sm text-muted-foreground">
+                        Size: {(file.file.size / 1024).toFixed(2)} KB
+                      </div>
+
+                      {file.status === 'uploading' && (
+                        <Progress value={file.progress} className="h-2 mt-2" />
                       )}
 
-                      {file.extractedData && (
-                        <div className="grid grid-cols-2 gap-3 mt-3 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Merchant:</span>
-                            <span className="ml-2 font-medium">{file.extractedData.merchant}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Date:</span>
-                            <span className="ml-2 font-medium">{file.extractedData.invoiceDate}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Total:</span>
-                            <span className="ml-2 font-medium">€{file.extractedData.totalAmount.toFixed(2)}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Account:</span>
-                            <span className="ml-2 font-medium">
-                              {file.extractedData.predictedAccountCode} ({file.extractedData.predictionConfidence}%)
-                            </span>
-                          </div>
+                      {file.documentId && (
+                        <div className="mt-2">
+                          <Alert>
+                            <CheckCircle size={16} weight="fill" />
+                            <AlertDescription>
+                              Document ID: <code className="bg-secondary px-2 py-0.5 rounded text-xs">{file.documentId}</code>
+                            </AlertDescription>
+                          </Alert>
                         </div>
                       )}
 
@@ -403,15 +345,9 @@ export const IntelligentUploadPortal = () => {
 
                     <div className="flex gap-2">
                       {file.status === 'pending' && (
-                        <Button onClick={() => processFile(file)} size="sm" variant="default">
-                          <Brain size={16} className="mr-1" />
-                          Process
-                        </Button>
-                      )}
-                      {(file.status === 'processed' || file.status === 'manual_review') && (
-                        <Button onClick={() => viewDetails(file)} size="sm" variant="outline">
-                          <Eye size={16} className="mr-1" />
-                          Review
+                        <Button onClick={() => uploadFile(file)} size="sm" variant="default">
+                          <CloudArrowUp size={16} className="mr-1" />
+                          Upload
                         </Button>
                       )}
                       <Button onClick={() => removeFile(file.id)} size="sm" variant="ghost">
@@ -426,86 +362,13 @@ export const IntelligentUploadPortal = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Invoice Details</DialogTitle>
-            <DialogDescription>
-              Review and approve the extracted invoice data
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedInvoice?.extractedData && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Merchant</Label>
-                  <Input value={selectedInvoice.extractedData.merchant} readOnly />
-                </div>
-                <div>
-                  <Label>Date</Label>
-                  <Input value={selectedInvoice.extractedData.invoiceDate} readOnly />
-                </div>
-                <div>
-                  <Label>Total Amount (incl. VAT)</Label>
-                  <Input value={`€${selectedInvoice.extractedData.totalAmount.toFixed(2)}`} readOnly />
-                </div>
-                <div>
-                  <Label>VAT Amount</Label>
-                  <Input value={`€${selectedInvoice.extractedData.vatAmount.toFixed(2)}`} readOnly />
-                </div>
-                <div>
-                  <Label>Net Amount</Label>
-                  <Input value={`€${selectedInvoice.extractedData.netAmount.toFixed(2)}`} readOnly />
-                </div>
-                <div>
-                  <Label>Confidence</Label>
-                  <Input value={`${selectedInvoice.extractedData.predictionConfidence}%`} readOnly />
-                </div>
-              </div>
-
-              <div>
-                <Label>Predicted Ledger Account</Label>
-                <Select value={selectedInvoice.extractedData.predictedAccountCode}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LedgerAccountPredictor.getAllAccounts().map((account) => (
-                      <SelectItem key={account.code} value={account.code}>
-                        {account.code} - {account.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedInvoice.imageUrl && (
-                <div>
-                  <Label>Invoice Image</Label>
-                  <div className="mt-2 border rounded-lg overflow-hidden">
-                    <img 
-                      src={selectedInvoice.imageUrl} 
-                      alt="Invoice" 
-                      className="w-full h-auto max-h-96 object-contain"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3 pt-4">
-                <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={approveDraft} className="bg-accent text-accent-foreground hover:bg-accent/90">
-                  <CheckCircle size={18} className="mr-2" weight="fill" />
-                  Approve & Book
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <Alert>
+        <Sparkle size={16} weight="duotone" />
+        <AlertDescription>
+          <strong>Backend Integration:</strong> Files are uploaded to <code className="bg-secondary px-2 py-0.5 rounded text-xs">http://localhost:8000/api/v1/documents/upload</code>. 
+          The Spark worker will automatically process uploaded documents and create draft transactions with AI-predicted ledger accounts.
+        </AlertDescription>
+      </Alert>
     </div>
   )
 }

@@ -135,7 +135,7 @@ export const authApi = {
     formData.append('username', credentials.username)
     formData.append('password', credentials.password)
 
-    const response = await api.post<TokenResponse>('/api/v1/auth/login', formData, {
+    const response = await api.post<TokenResponse>('/token', formData, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
@@ -200,7 +200,7 @@ export const documentApi = {
     }
 
     const response = await api.post<{ message: string; document_id: string }>(
-      '/api/v1/documents',
+      '/api/v1/documents/upload',
       formData,
       {
         headers: {

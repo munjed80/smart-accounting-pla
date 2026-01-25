@@ -189,6 +189,59 @@ export const transactionApi = {
   delete: async (id: string): Promise<void> => {
     await api.delete(`/api/v1/transactions/${id}`)
   },
+
+  post: async (id: string): Promise<Transaction> => {
+    const response = await api.post<Transaction>(`/api/v1/transactions/${id}/post`)
+    return response.data
+  },
+}
+
+export interface Administration {
+  id: string
+  name: string
+  description: string | null
+  kvk_number: string | null
+  btw_number: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AdministrationCreateRequest {
+  name: string
+  description?: string
+  kvk_number?: string
+  btw_number?: string
+}
+
+export const administrationApi = {
+  create: async (data: AdministrationCreateRequest): Promise<Administration> => {
+    const response = await api.post<Administration>('/api/v1/administrations', data)
+    return response.data
+  },
+
+  list: async (): Promise<Administration[]> => {
+    const response = await api.get<Administration[]>('/api/v1/administrations')
+    return response.data
+  },
+
+  get: async (id: string): Promise<Administration> => {
+    const response = await api.get<Administration>(`/api/v1/administrations/${id}`)
+    return response.data
+  },
+}
+
+export interface DocumentResponse {
+  id: string
+  administration_id: string
+  original_filename: string
+  mime_type: string
+  file_size: number
+  status: 'UPLOADED' | 'PROCESSING' | 'DRAFT_READY' | 'FAILED'
+  error_message: string | null
+  created_at: string
+  updated_at: string
+  transaction_id: string | null
 }
 
 export const documentApi = {
@@ -208,6 +261,17 @@ export const documentApi = {
         },
       }
     )
+    return response.data
+  },
+
+  list: async (administrationId?: string): Promise<DocumentResponse[]> => {
+    const params = administrationId ? { administration_id: administrationId } : {}
+    const response = await api.get<DocumentResponse[]>('/api/v1/documents', { params })
+    return response.data
+  },
+
+  get: async (id: string): Promise<DocumentResponse> => {
+    const response = await api.get<DocumentResponse>(`/api/v1/documents/${id}`)
     return response.data
   },
 }

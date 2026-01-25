@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext'
 import { LoginPage } from '@/components/LoginPage'
 import { Dashboard } from '@/components/Dashboard'
 import { UploadPortal } from '@/components/UploadPortal'
+import { TransactionList } from '@/components/TransactionList'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -11,12 +12,13 @@ import {
   House, 
   UploadSimple, 
   User,
-  Database
+  Database,
+  Receipt
 } from '@phosphor-icons/react'
 
 const AppContent = () => {
   const { user, isAuthenticated, isLoading, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'upload'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'upload'>('dashboard')
 
   if (isLoading) {
     return (
@@ -65,7 +67,7 @@ const AppContent = () => {
         </div>
       </nav>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'dashboard' | 'upload')} className="w-full">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'dashboard' | 'transactions' | 'upload')} className="w-full">
         <div className="border-b border-border bg-secondary/30">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <TabsList className="bg-transparent border-none h-12">
@@ -75,6 +77,13 @@ const AppContent = () => {
               >
                 <House size={20} />
                 Dashboard
+              </TabsTrigger>
+              <TabsTrigger 
+                value="transactions" 
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
+              >
+                <Receipt size={20} />
+                Transactions
               </TabsTrigger>
               <TabsTrigger 
                 value="upload" 
@@ -89,6 +98,10 @@ const AppContent = () => {
 
         <TabsContent value="dashboard" className="m-0">
           <Dashboard />
+        </TabsContent>
+
+        <TabsContent value="transactions" className="m-0">
+          <TransactionList />
         </TabsContent>
 
         <TabsContent value="upload" className="m-0">

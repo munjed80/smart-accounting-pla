@@ -86,6 +86,49 @@ export interface RecentTransaction {
   total_amount: number
 }
 
+export interface TransactionLine {
+  id: string
+  ledger_account_code: string
+  ledger_account_name: string
+  debit_amount: number
+  credit_amount: number
+  vat_code: string | null
+  description: string
+}
+
+export interface Transaction {
+  id: string
+  booking_number: string
+  transaction_date: string
+  description: string
+  status: 'draft' | 'posted' | 'reconciled' | 'void'
+  total_amount: number
+  document_id: string | null
+  created_at: string
+  updated_at: string | null
+  created_by_name: string | null
+  updated_by_name: string | null
+  ai_confidence_score: number | null
+  lines: TransactionLine[]
+}
+
+export interface TransactionListItem {
+  id: string
+  booking_number: string
+  transaction_date: string
+  description: string
+  status: 'draft' | 'posted' | 'reconciled' | 'void'
+  total_amount: number
+  created_by_name: string | null
+  ai_confidence_score: number | null
+}
+
+export interface TransactionUpdateRequest {
+  transaction_date?: string
+  description?: string
+  lines?: Omit<TransactionLine, 'id'>[]
+}
+
 export const authApi = {
   login: async (credentials: LoginRequest): Promise<TokenResponse> => {
     const formData = new URLSearchParams()
@@ -115,6 +158,36 @@ export const transactionApi = {
   getStats: async (): Promise<TransactionStats> => {
     const response = await api.get<TransactionStats>('/api/v1/transactions/stats')
     return response.data
+  },
+
+  getAll: async (status?: 'draft' | 'posted' | 'reconciled' | 'void'): Promise<TransactionListItem[]> => {
+    const params = status ? { status } : {}
+    const response = await api.get<TransactionListItem[]>('/api/v1/transactions', { params })
+    return response.data
+  },
+
+  getById: async (id: string): Promise<Transaction> => {
+    const response = await api.get<Transaction>(`/api/v1/transactions/${id}`)
+    return response.data
+  },
+
+  update: async (id: string, data: TransactionUpdateRequest): Promise<Transaction> => {
+    const response = await api.put<Transaction>(`/api/v1/transactions/${id}`, data)
+    return response.data
+  },
+
+  approve: async (id: string): Promise<Transaction> => {
+    const response = await api.post<Transaction>(`/api/v1/transactions/${id}/approve`)
+    return response.data
+  },
+
+  reject: async (id: string): Promise<Transaction> => {
+    const response = await api.post<Transaction>(`/api/v1/transactions/${id}/reject`)
+    return response.data
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/api/v1/transactions/${id}`)
   },
 }
 

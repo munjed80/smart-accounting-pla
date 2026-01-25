@@ -1,23 +1,199 @@
-# ✨ Welcome to Your Spark Template!
-You've just launched your brand-new Spark Template Codespace — everything’s fired up and ready for you to explore, build, and create with Spark!
+# Smart Accounting Platform
 
-This template is your blank canvas. It comes with a minimal setup to help you get started quickly with Spark development.
+An intelligent accounting platform with AI-powered document processing. Upload invoices, and the system automatically extracts data, predicts ledger accounts, and creates draft transactions.
 
-🚀 What's Inside?
-- A clean, minimal Spark environment
-- Pre-configured for local development
-- Ready to scale with your ideas
-  
-🧠 What Can You Do?
+## Architecture
 
-Right now, this is just a starting point — the perfect place to begin building and testing your Spark applications.
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  Frontend   │────▶│   Backend   │────▶│  PostgreSQL │
+│   (React)   │     │  (FastAPI)  │     │   Database  │
+└─────────────┘     └──────┬──────┘     └─────────────┘
+                          │
+                          ▼
+                    ┌─────────────┐
+                    │    Redis    │
+                    │   Streams   │
+                    └──────┬──────┘
+                          │
+                          ▼
+                    ┌─────────────┐
+                    │   Worker    │
+                    │ (OCR + AI)  │
+                    └─────────────┘
+```
 
-🧹 Just Exploring?
-No problem! If you were just checking things out and don’t need to keep this code:
+## Tech Stack
 
-- Simply delete your Spark.
-- Everything will be cleaned up — no traces left behind.
+- **Frontend**: React + Vite + TypeScript + TailwindCSS + shadcn/ui
+- **Backend**: FastAPI + SQLAlchemy 2.0 + Alembic
+- **Database**: PostgreSQL 15
+- **Queue**: Redis Streams
+- **Worker**: Python with pdfplumber + Tesseract OCR
+- **Containerization**: Docker Compose
 
-📄 License For Spark Template Resources 
+## Quick Start
 
-The Spark Template files and resources from GitHub are licensed under the terms of the MIT license, Copyright GitHub, Inc.
+### Prerequisites
+
+- Docker & Docker Compose
+- Node.js 20+ (for local frontend development)
+- Python 3.11+ (for local backend development)
+
+### Run with Docker Compose
+
+1. **Clone and setup environment**:
+   ```bash
+   cp .env.example .env
+   # Edit .env and set a secure SECRET_KEY
+   ```
+
+2. **Start all services**:
+   ```bash
+   docker compose up --build
+   ```
+
+3. **Access the application**:
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8000
+   - API Docs: http://localhost:8000/docs
+
+## Demo Flow
+
+1. **Register a new user**:
+   - Go to http://localhost:3000
+   - Click "Register" tab
+   - Create an account (e.g., `demo@example.com`)
+
+2. **Login**:
+   - Login with your credentials
+
+3. **Create an Administration**:
+   - The system will prompt you to create one on first login
+   - Or use the API directly:
+   ```bash
+   curl -X POST http://localhost:8000/api/v1/administrations \
+     -H "Authorization: Bearer YOUR_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"name": "My Company", "description": "Demo administration"}'
+   ```
+
+4. **Upload a document**:
+   - Go to "AI Upload" tab
+   - Drag and drop an invoice (PNG, JPG, or PDF)
+   - The document will be uploaded and queued for processing
+
+5. **Worker processes the document**:
+   - The worker service picks up the job from Redis
+   - Extracts text using OCR (if needed)
+   - Predicts the ledger account using keyword matching
+   - Creates a DRAFT transaction
+
+6. **Review draft transaction**:
+   - Go to "Smart Transactions" tab
+   - Find the draft transaction
+   - Review and edit if needed
+
+7. **Post the transaction**:
+   - Verify debit equals credit
+   - Click "Post" to finalize
+
+## API Endpoints
+
+### Authentication
+- `POST /token` - Login (OAuth2 form)
+- `POST /api/v1/auth/register` - Register new user
+- `GET /api/v1/auth/me` - Get current user
+
+### Administrations
+- `POST /api/v1/administrations` - Create administration
+- `GET /api/v1/administrations` - List user's administrations
+- `GET /api/v1/administrations/{id}` - Get administration details
+
+### Documents
+- `POST /api/v1/documents/upload` - Upload document
+- `GET /api/v1/documents` - List documents
+- `GET /api/v1/documents/{id}` - Get document details
+
+### Transactions
+- `GET /api/v1/transactions/stats` - Get statistics
+- `GET /api/v1/transactions` - List transactions
+- `GET /api/v1/transactions/{id}` - Get transaction details
+- `PUT /api/v1/transactions/{id}` - Update draft transaction
+- `POST /api/v1/transactions/{id}/post` - Post transaction (validates debit=credit)
+
+### Health
+- `GET /health` - Health check (DB + Redis)
+
+## Project Structure
+
+```
+smart-accounting-pla/
+├── backend/                 # FastAPI backend
+│   ├── app/
+│   │   ├── api/v1/         # API routes
+│   │   ├── core/           # Config, security, database
+│   │   ├── models/         # SQLAlchemy models
+│   │   └── schemas/        # Pydantic schemas
+│   ├── alembic/            # Database migrations
+│   └── seed.py             # Seed data (VAT codes, CoA)
+├── worker/                  # Document processing worker
+│   └── processor.py        # Redis Streams consumer
+├── src/                    # React frontend
+│   ├── components/         # UI components
+│   └── lib/               # API client, auth context
+├── docker-compose.yml      # Container orchestration
+└── .env.example           # Environment template
+```
+
+## Development
+
+### Local Backend Development
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Run migrations
+alembic upgrade head
+
+# Seed database
+python seed.py
+
+# Start server
+uvicorn app.main:app --reload
+```
+
+### Local Frontend Development
+
+```bash
+npm install
+npm run dev
+```
+
+### Run Tests
+
+```bash
+# Backend
+cd backend
+pytest
+
+# Frontend
+npm test
+```
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `POSTGRES_USER` | Database user | `accounting_user` |
+| `POSTGRES_PASSWORD` | Database password | `change_me` |
+| `POSTGRES_DB` | Database name | `accounting_db` |
+| `SECRET_KEY` | JWT signing key | (change in production!) |
+| `VITE_API_URL` | Backend URL for frontend | `http://localhost:8000` |
+
+## License
+
+MIT License - see LICENSE file

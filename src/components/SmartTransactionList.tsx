@@ -1,74 +1,59 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useKV } from '@github/spark/hooks'
+import { transactionApi, TransactionListItem } from '@/lib/api'
 import { 
   Receipt, 
   MagnifyingGlass,
   Sparkle,
-  CheckCircle,
-  Clock,
-  TrendUp,
   TrendDown,
-  Brain
+  Brain,
+  ArrowsClockwise
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
-
-interface StoredTransaction {
-  id: string
-  booking_number: string
-  date: string
-  description: string
-  amount: number
-  vat_amount: number
-  net_amount: number
-  account_code: string
-  account_name: string
-  confidence: number
-  status: string
-  created_at: string
-  type: 'EXPENSE' | 'REVENUE'
-}
+import { toast } from 'sonner'
 
 export const SmartTransactionList = () => {
-  const [transactions] = useKV<StoredTransaction[]>('transactions', [])
+  const [transactions, setTransactions] = useState<TransactionListItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [accountFilter, setAccountFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+
+  const fetchTransactions = async () => {
+    setIsLoading(true)
+    try {
+      const statusParam = statusFilter !== 'all' ? statusFilter as 'draft' | 'posted' : undefined
+      const data = await transactionApi.getAll(statusParam)
+      setTransactions(data)
+    } catch (error) {
+      console.error('Failed to fetch transactions:', error)
+      toast.error('Failed to load transactions')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchTransactions()
+  }, [statusFilter])
 
   const filteredTransactions = (transactions || []).filter((transaction) => {
     const searchLower = searchTerm.toLowerCase()
     const matchesSearch = 
       transaction.booking_number.toLowerCase().includes(searchLower) ||
-      transaction.description.toLowerCase().includes(searchLower) ||
-      transaction.account_name.toLowerCase().includes(searchLower)
+      transaction.description.toLowerCase().includes(searchLower)
     
-    const matchesAccount = accountFilter === 'all' || transaction.account_code === accountFilter
-    const matchesStatus = statusFilter === 'all' || transaction.status === statusFilter
-    
-    return matchesSearch && matchesAccount && matchesStatus
-  })
-
-  const uniqueAccounts = Array.from(
-    new Set((transactions || []).map(t => `${t.account_code}|${t.account_name}`))
-  ).map(str => {
-    const [code, name] = str.split('|')
-    return { code, name }
+    return matchesSearch
   })
 
   const totalExpenses = (transactions || [])
-    .filter(t => t.type === 'EXPENSE')
-    .reduce((sum, t) => sum + t.amount, 0)
-
-  const totalVAT = (transactions || [])
-    .reduce((sum, t) => sum + t.vat_amount, 0)
+    .reduce((sum, t) => sum + Number(t.total_amount), 0)
 
   const avgConfidence = (transactions || []).length > 0
-    ? (transactions || []).reduce((sum, t) => sum + t.confidence, 0) / (transactions || []).length
+    ? (transactions || []).reduce((sum, t) => sum + (t.ai_confidence_score || 0), 0) / (transactions || []).length
     : 0
 
   const formatCurrency = (amount: number) => {
@@ -109,26 +94,30 @@ export const SmartTransactionList = () => {
             AI-processed and auto-categorized transactions
           </p>
         </div>
+        <Button onClick={fetchTransactions} variant="outline" size="sm" disabled={isLoading}>
+          <ArrowsClockwise size={18} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardDescription>Total Expenses</CardDescription>
-              <TrendDown size={20} className="text-destructive" weight="duotone" />
+              <CardDescription>Total Transactions</CardDescription>
+              <Receipt size={20} className="text-primary" weight="duotone" />
             </div>
-            <CardTitle className="text-3xl">{formatCurrency(totalExpenses)}</CardTitle>
+            <CardTitle className="text-3xl">{transactions.length}</CardTitle>
           </CardHeader>
         </Card>
         
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardDescription>Total VAT</CardDescription>
-              <Receipt size={20} className="text-muted-foreground" weight="duotone" />
+              <CardDescription>Total Amount</CardDescription>
+              <TrendDown size={20} className="text-destructive" weight="duotone" />
             </div>
-            <CardTitle className="text-3xl">{formatCurrency(totalVAT)}</CardTitle>
+            <CardTitle className="text-3xl">{formatCurrency(totalExpenses)}</CardTitle>
           </CardHeader>
         </Card>
 
@@ -167,20 +156,6 @@ export const SmartTransactionList = () => {
                 className="pl-10"
               />
             </div>
-            
-            <Select value={accountFilter} onValueChange={setAccountFilter}>
-              <SelectTrigger className="w-full sm:w-[250px]">
-                <SelectValue placeholder="Filter by account" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Accounts</SelectItem>
-                {uniqueAccounts.map((account) => (
-                  <SelectItem key={account.code} value={account.code}>
-                    {account.code} - {account.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-[200px]">
@@ -188,16 +163,20 @@ export const SmartTransactionList = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="APPROVED">Approved</SelectItem>
-                <SelectItem value="DRAFT">Draft</SelectItem>
-                <SelectItem value="POSTED">Posted</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="posted">Posted</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </CardHeader>
 
         <CardContent>
-          {filteredTransactions.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-12">
+              <ArrowsClockwise size={48} className="mx-auto mb-4 text-primary animate-spin" />
+              <p className="text-muted-foreground">Loading transactions...</p>
+            </div>
+          ) : filteredTransactions.length === 0 ? (
             <div className="text-center py-12">
               <Receipt size={64} className="mx-auto mb-4 text-muted-foreground" weight="duotone" />
               <p className="text-lg font-medium mb-2">No transactions yet</p>
@@ -220,39 +199,26 @@ export const SmartTransactionList = () => {
                         <Badge className={getStatusColor(transaction.status)}>
                           {transaction.status}
                         </Badge>
-                        <Badge variant="outline" className={getConfidenceColor(transaction.confidence)}>
-                          <Sparkle size={14} className="mr-1" weight="fill" />
-                          {transaction.confidence}% AI
-                        </Badge>
+                        {transaction.ai_confidence_score && (
+                          <Badge variant="outline" className={getConfidenceColor(transaction.ai_confidence_score)}>
+                            <Sparkle size={14} className="mr-1" weight="fill" />
+                            {transaction.ai_confidence_score}% AI
+                          </Badge>
+                        )}
                       </div>
 
                       <p className="font-medium text-lg mb-1">{transaction.description}</p>
                       
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm mt-3">
-                        <div>
-                          <span className="text-muted-foreground">Date:</span>
-                          <span className="ml-2 font-medium">
-                            {format(new Date(transaction.date), 'dd-MM-yyyy')}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Account:</span>
-                          <span className="ml-2 font-medium">{transaction.account_code}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Net:</span>
-                          <span className="ml-2 font-medium">{formatCurrency(transaction.net_amount)}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">VAT:</span>
-                          <span className="ml-2 font-medium">{formatCurrency(transaction.vat_amount)}</span>
-                        </div>
+                      <div className="text-sm mt-3">
+                        <span className="text-muted-foreground">Date:</span>
+                        <span className="ml-2 font-medium">
+                          {format(new Date(transaction.transaction_date), 'dd-MM-yyyy')}
+                        </span>
                       </div>
                     </div>
 
                     <div className="text-right">
-                      <div className="text-2xl font-bold">{formatCurrency(transaction.amount)}</div>
-                      <div className="text-sm text-muted-foreground mt-1">{transaction.account_name}</div>
+                      <div className="text-2xl font-bold">{formatCurrency(Number(transaction.total_amount))}</div>
                     </div>
                   </div>
                 </div>

@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: smart-accounting-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-accounting_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+      POSTGRES_DB: ${POSTGRES_DB:-accounting_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-accounting_user} -d ${POSTGRES_DB:-accounting_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: smart-accounting-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smart-accounting-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-accounting_user}:${POSTGRES_PASSWORD:-change_me}@db:5432/${POSTGRES_DB:-accounting_db}
+      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-accounting_user}:${POSTGRES_PASSWORD:-change_me}@db:5432/${POSTGRES_DB:-accounting_db}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-use-openssl-rand-hex-32}
+      UPLOAD_DIR: /data/uploads
+      DEBUG: ${DEBUG:-false}
+    volumes:
+      - uploads_data:/data/uploads
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: >
+      sh -c "
+        echo 'Running migrations...' &&
+        cd /app && alembic upgrade head &&
+        echo 'Seeding database...' &&
+        python seed.py &&
+        echo 'Starting backend...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000
+      "
+
+  # Worker Service
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: smart-accounting-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-accounting_user}:${POSTGRES_PASSWORD:-change_me}@db:5432/${POSTGRES_DB:-accounting_db}
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - uploads_data:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: smart-accounting-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  uploads_data:

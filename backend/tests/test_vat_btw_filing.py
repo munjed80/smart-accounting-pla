@@ -367,7 +367,7 @@ class TestICPExtraction:
         
         has_vat_number = bool(icp_transaction.get("customer_vat_number"))
         
-        assert has_vat_number == True
+        assert has_vat_number is True
     
     def test_icp_without_vat_number_is_invalid(self):
         """ICP supply without VAT number should be flagged."""
@@ -379,7 +379,7 @@ class TestICPExtraction:
         
         is_valid_icp = bool(icp_transaction.get("customer_vat_number"))
         
-        assert is_valid_icp == False
+        assert is_valid_icp is False
     
     def test_icp_country_extracted_from_vat_number(self):
         """Country code should be extracted from VAT number."""
@@ -414,15 +414,14 @@ class TestICPExtraction:
     
     def test_icp_maps_to_box_3b(self):
         """ICP supplies should map to box 3b."""
-        category = "INTRA_EU"
+        # ICP supplies (leveringen naar EU-landen) always map to box 3b
+        # This is distinct from EU acquisitions (verwervingen uit EU) which use 4b
         is_icp = True
+        expected_box = "3b"
         
-        if is_icp:
-            target_box = "3b"  # ICP supplies to EU countries
-        else:
-            target_box = "4b"  # Intra-EU acquisition (corrected from 2a)
-        
-        assert target_box == "3b"
+        # Verify ICP supplies use box 3b
+        assert expected_box == "3b"
+        assert is_icp is True  # ICP flag must be set for ICP transactions
     
     def test_icp_is_zero_rate(self):
         """ICP supplies are at 0% VAT."""
@@ -451,7 +450,7 @@ class TestSnapshotInclusion:
         
         has_vat = "vat_summary" in snapshot and bool(snapshot["vat_summary"])
         
-        assert has_vat == True
+        assert has_vat is True
     
     def test_snapshot_includes_vat_boxes(self):
         """Finalization snapshot should include all VAT boxes."""
@@ -467,7 +466,7 @@ class TestSnapshotInclusion:
         
         has_boxes = "boxes" in vat_summary
         
-        assert has_boxes == True
+        assert has_boxes is True
     
     def test_snapshot_includes_icp_entries(self):
         """Finalization snapshot should include ICP entries."""
@@ -482,7 +481,7 @@ class TestSnapshotInclusion:
         has_icp = "icp_entries" in vat_summary
         icp_count = len(vat_summary["icp_entries"])
         
-        assert has_icp == True
+        assert has_icp is True
         assert icp_count == 2
     
     def test_snapshot_vat_totals_match_report(self):
@@ -520,7 +519,7 @@ class TestVATAnomalyDetection:
             line["vat_rate"] > 0
         )
         
-        assert has_anomaly == True
+        assert has_anomaly is True
     
     def test_detect_vat_without_base(self):
         """Detect VAT amount without base amount."""
@@ -531,7 +530,7 @@ class TestVATAnomalyDetection:
         
         has_anomaly = line["vat_amount"] and not line["vat_base_amount"]
         
-        assert has_anomaly == True
+        assert has_anomaly is True
     
     def test_detect_rate_mismatch(self):
         """Detect VAT rate mismatch."""
@@ -547,7 +546,7 @@ class TestVATAnomalyDetection:
         
         has_mismatch = difference > tolerance
         
-        assert has_mismatch == True
+        assert has_mismatch is True
         assert difference == Decimal("4.00")
     
     def test_detect_icp_without_vat_number(self):
@@ -560,7 +559,7 @@ class TestVATAnomalyDetection:
         
         has_anomaly = line["is_icp"] and not line["party_vat_number"]
         
-        assert has_anomaly == True
+        assert has_anomaly is True
     
     def test_detect_reverse_charge_without_country(self):
         """Detect reverse charge without supplier country."""
@@ -571,7 +570,7 @@ class TestVATAnomalyDetection:
         
         has_anomaly = line["is_reverse_charge"] and not line["vat_country"]
         
-        assert has_anomaly == True
+        assert has_anomaly is True
     
     def test_detect_unexpected_negative_vat(self):
         """Detect unexpected negative VAT amount."""
@@ -583,7 +582,7 @@ class TestVATAnomalyDetection:
         is_credit_or_reversal = line["source_type"] in ("CREDIT_NOTE", "REVERSAL")
         has_anomaly = line["vat_amount"] < 0 and not is_credit_or_reversal
         
-        assert has_anomaly == True
+        assert has_anomaly is True
     
     def test_negative_vat_allowed_for_credit_notes(self):
         """Negative VAT is allowed for credit notes."""
@@ -595,7 +594,7 @@ class TestVATAnomalyDetection:
         is_credit_or_reversal = line["source_type"] in ("CREDIT_NOTE", "REVERSAL")
         has_anomaly = line["vat_amount"] < 0 and not is_credit_or_reversal
         
-        assert has_anomaly == False
+        assert has_anomaly is False
 
 
 class TestVATCodeCategories:
@@ -671,7 +670,7 @@ class TestPeriodEligibility:
         
         is_eligible = period_status in ("REVIEW", "FINALIZED", "LOCKED") or allow_draft
         
-        assert is_eligible == False
+        assert is_eligible is False
     
     def test_review_period_is_eligible(self):
         """REVIEW periods are eligible for VAT report."""
@@ -679,7 +678,7 @@ class TestPeriodEligibility:
         
         is_eligible = period_status in ("REVIEW", "FINALIZED", "LOCKED")
         
-        assert is_eligible == True
+        assert is_eligible is True
     
     def test_finalized_period_is_eligible(self):
         """FINALIZED periods are eligible for VAT report."""
@@ -687,7 +686,7 @@ class TestPeriodEligibility:
         
         is_eligible = period_status in ("REVIEW", "FINALIZED", "LOCKED")
         
-        assert is_eligible == True
+        assert is_eligible is True
     
     def test_locked_period_is_eligible(self):
         """LOCKED periods are eligible for VAT report."""
@@ -695,7 +694,7 @@ class TestPeriodEligibility:
         
         is_eligible = period_status in ("REVIEW", "FINALIZED", "LOCKED")
         
-        assert is_eligible == True
+        assert is_eligible is True
     
     def test_open_period_eligible_with_allow_draft(self):
         """OPEN periods are eligible when allow_draft is True."""
@@ -704,7 +703,7 @@ class TestPeriodEligibility:
         
         is_eligible = period_status in ("REVIEW", "FINALIZED", "LOCKED") or allow_draft
         
-        assert is_eligible == True
+        assert is_eligible is True
 
 
 class TestDutchVATBoxNames:
@@ -990,7 +989,7 @@ class TestVATCodeMappingDefinitions:
         assert expected["turnover_box"] == "4b"
         assert expected["vat_box"] == "4b"
         assert expected["deductible_box"] == "5b"
-        assert expected["eu_only"] == True
+        assert expected["eu_only"] is True
     
     def test_icp_supplies_definition(self):
         """ICP_SUPPLIES must have correct box mapping."""
@@ -1006,7 +1005,7 @@ class TestVATCodeMappingDefinitions:
         
         assert expected["turnover_box"] == "3b"
         assert expected["rate"] == Decimal("0.00")
-        assert expected["is_icp"] == True
+        assert expected["is_icp"] is True
     
     def test_rc_non_eu_services_definition(self):
         """RC_NON_EU_SERVICES must have correct box mapping."""
@@ -1021,7 +1020,7 @@ class TestVATCodeMappingDefinitions:
         }
         
         assert expected["turnover_box"] == "4a"
-        assert expected["eu_only"] == False
+        assert expected["eu_only"] is False
     
     def test_rc_import_definition(self):
         """RC_IMPORT must have correct box mapping."""
@@ -1051,4 +1050,4 @@ class TestVATCodeMappingDefinitions:
         
         assert expected["turnover_box"] == "4b"
         assert expected["vat_box"] == "4b"
-        assert expected["eu_only"] == True
+        assert expected["eu_only"] is True

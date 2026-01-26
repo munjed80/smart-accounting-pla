@@ -74,6 +74,7 @@ def upgrade() -> None:
     """)
     
     # Add new code: EU_ACQUISITION_SERVICES for services acquired from EU -> 4b
+    # Note: gen_random_uuid() is PostgreSQL specific (requires pgcrypto extension)
     op.execute("""
         INSERT INTO vat_codes (id, code, name, description, rate, category, box_mapping, eu_only, requires_vat_number, is_reverse_charge, is_icp, is_active)
         VALUES (
@@ -82,7 +83,7 @@ def upgrade() -> None:
             'ICV diensten EU', 
             'Verwerving van diensten uit EU-landen (rubriek 4b)',
             21.00, 
-            'INTRA_EU', 
+            'INTRA_EU',
             '{"turnover_box": "4b", "vat_box": "4b", "deductible_box": "5b"}', 
             true, 
             true, 

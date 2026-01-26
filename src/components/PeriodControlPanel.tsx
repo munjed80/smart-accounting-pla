@@ -586,5 +586,3 @@ export const PeriodControlPanel = ({
     </Card>
   )
 }
-
-export default PeriodControlPanel

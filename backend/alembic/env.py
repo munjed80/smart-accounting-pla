@@ -1,7 +1,7 @@
 import os
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, text
 from alembic import context
 
 # Import models to ensure they're registered with the metadata
@@ -65,6 +65,25 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # Defensive step: Expand alembic_version.version_num to VARCHAR(128) if it exists.
+        # This handles the case where alembic_version was created by a previous Alembic run
+        # before we added the column expansion to 001_initial.py.
+        # Our revision IDs are human-readable and longer than VARCHAR(32), e.g.,
+        # "010_accountant_dashboard_bulk_ops", which would cause truncation errors.
+        # Use a conditional check to avoid errors if table doesn't exist (first ever run).
+        connection.execute(text("""
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'alembic_version' AND column_name = 'version_num'
+                ) THEN
+                    ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128);
+                END IF;
+            END $$;
+        """))
+        connection.commit()
+
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

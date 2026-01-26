@@ -5,7 +5,7 @@ Handles journal entry posting with double-entry enforcement.
 All operations are idempotent and use database transactions.
 """
 import uuid
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 from decimal import Decimal
 from typing import List, Optional, Tuple
 from sqlalchemy import select, func
@@ -409,7 +409,3 @@ class LedgerService:
         
         await self.db.commit()
         return entry
-
-
-# Import at the bottom to avoid circular imports
-from datetime import timedelta

@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime, date, timezone, timedelta
 from decimal import Decimal
 from typing import List, Optional, Tuple
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -97,8 +97,13 @@ class ConsistencyEngine:
         )
         issues = result.scalars().all()
         count = len(issues)
-        for issue in issues:
-            await self.db.delete(issue)
+        # Bulk delete for efficiency
+        if count > 0:
+            await self.db.execute(
+                delete(ClientIssue)
+                .where(ClientIssue.administration_id == self.administration_id)
+                .where(ClientIssue.is_resolved == False)
+            )
         return count
     
     def _add_issue(

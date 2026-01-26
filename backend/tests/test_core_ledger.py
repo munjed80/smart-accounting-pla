@@ -419,9 +419,10 @@ class TestIssueGeneration:
         ]
         
         for code in issue_codes:
-            # Codes should be uppercase with underscores
-            assert code.isupper() or "_" in code
-            assert " " not in code
+            # Codes should be uppercase snake_case
+            assert code.isupper(), f"Code {code} should be uppercase"
+            assert "_" in code, f"Code {code} should contain underscores"
+            assert " " not in code, f"Code {code} should not contain spaces"
 
 
 # Run tests with pytest

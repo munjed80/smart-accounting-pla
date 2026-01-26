@@ -19,6 +19,22 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Expand alembic_version.version_num to VARCHAR(128) if it exists.
+    # This is needed because our revision IDs are human-readable and longer than the
+    # default VARCHAR(32), e.g., "010_accountant_dashboard_bulk_ops".
+    # Safe to run on fresh databases where alembic_version doesn't exist yet.
+    op.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'alembic_version' AND column_name = 'version_num'
+            ) THEN
+                ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128);
+            END IF;
+        END $$;
+    """)
+
     # Create users table
     op.create_table(
         'users',

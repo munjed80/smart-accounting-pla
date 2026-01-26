@@ -308,6 +308,12 @@ cd backend
 alembic upgrade head
 ```
 
+> **Note on Alembic Version Column**: This project uses human-readable revision IDs 
+> (e.g., `010_accountant_dashboard_bulk_ops`) that exceed PostgreSQL's default 
+> `alembic_version.version_num` column length of VARCHAR(32). Both `alembic/env.py` 
+> and the initial migration include safeguards to expand this column to VARCHAR(128), 
+> ensuring fresh databases and existing databases can run migrations without truncation errors.
+
 ### Environment Variables for New Features
 
 Add these to your `.env` file for enhanced functionality:

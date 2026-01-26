@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AuthProvider, useAuth } from '@/lib/AuthContext'
 import { LoginPage } from '@/components/LoginPage'
 import { SmartDashboard } from '@/components/SmartDashboard'
+import { AccountantDashboard } from '@/components/AccountantDashboard'
 import { IntelligentUploadPortal } from '@/components/IntelligentUploadPortal'
 import { SmartTransactionList } from '@/components/SmartTransactionList'
 import { Button } from '@/components/ui/button'
@@ -15,12 +16,16 @@ import {
   Database,
   Receipt,
   Sparkle,
-  Brain
+  Brain,
+  UsersThree
 } from '@phosphor-icons/react'
 
 const AppContent = () => {
   const { user, isAuthenticated, isLoading, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'upload'>('dashboard')
+  const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'transactions' | 'upload'>(
+    isAccountant ? 'clients' : 'dashboard'
+  )
 
   if (isLoading) {
     return (
@@ -34,7 +39,7 @@ const AppContent = () => {
   }
 
   if (!isAuthenticated) {
-    return <LoginPage onSuccess={() => setActiveTab('dashboard')} />
+    return <LoginPage onSuccess={() => setActiveTab(isAccountant ? 'clients' : 'dashboard')} />
   }
 
   return (
@@ -69,10 +74,20 @@ const AppContent = () => {
         </div>
       </nav>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'dashboard' | 'transactions' | 'upload')} className="w-full">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'dashboard' | 'clients' | 'transactions' | 'upload')} className="w-full">
         <div className="border-b border-border bg-secondary/30">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <TabsList className="bg-transparent border-none h-12">
+              {/* Accountant-specific: Client Overview (Master Dashboard) */}
+              {isAccountant && (
+                <TabsTrigger 
+                  value="clients" 
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
+                >
+                  <UsersThree size={20} weight="duotone" />
+                  Clients
+                </TabsTrigger>
+              )}
               <TabsTrigger 
                 value="dashboard" 
                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
@@ -97,6 +112,13 @@ const AppContent = () => {
             </TabsList>
           </div>
         </div>
+
+        {/* Accountant Master Dashboard */}
+        {isAccountant && (
+          <TabsContent value="clients" className="m-0">
+            <AccountantDashboard />
+          </TabsContent>
+        )}
 
         <TabsContent value="dashboard" className="m-0">
           <SmartDashboard />

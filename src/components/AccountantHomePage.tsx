@@ -653,19 +653,27 @@ export const AccountantHomePage = () => {
             {/* Results */}
             {bulkOperationResult && (
               <div className="py-4">
-                <div className="flex items-center gap-2 mb-4">
-                  {bulkOperationResult.status === 'COMPLETED' && (
-                    <Badge className="bg-green-500">COMPLETED</Badge>
-                  )}
-                  {bulkOperationResult.status === 'COMPLETED_WITH_ERRORS' && (
-                    <Badge className="bg-amber-500">COMPLETED WITH ERRORS</Badge>
-                  )}
-                  {bulkOperationResult.status === 'FAILED' && (
-                    <Badge variant="destructive">FAILED</Badge>
-                  )}
-                  <span className="text-sm text-muted-foreground">
-                    {bulkOperationResult.successful_clients}/{bulkOperationResult.total_clients} successful
-                  </span>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    {bulkOperationResult.status === 'COMPLETED' && (
+                      <Badge className="bg-green-500">COMPLETED</Badge>
+                    )}
+                    {bulkOperationResult.status === 'COMPLETED_WITH_ERRORS' && (
+                      <Badge className="bg-amber-500">COMPLETED WITH ERRORS</Badge>
+                    )}
+                    {bulkOperationResult.status === 'FAILED' && (
+                      <Badge variant="destructive">FAILED</Badge>
+                    )}
+                    <span className="text-sm text-muted-foreground">
+                      {bulkOperationResult.successful_clients}/{bulkOperationResult.total_clients} successful
+                    </span>
+                  </div>
+                  {/* Idempotency key and timestamp */}
+                  <div className="text-xs text-muted-foreground">
+                    {bulkOperationResult.completed_at && (
+                      <span>Completed: {new Date(bulkOperationResult.completed_at).toLocaleTimeString()}</span>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="max-h-64 overflow-y-auto space-y-2">
@@ -694,6 +702,27 @@ export const AccountantHomePage = () => {
                     </div>
                   ))}
                 </div>
+
+                {/* Retry failed clients button */}
+                {bulkOperationResult.failed_clients > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        // Get failed client IDs and retry
+                        const failedIds = bulkOperationResult.results
+                          .filter(r => r.status === 'FAILED')
+                          .map(r => r.client_id)
+                        setSelectedClientIds(new Set(failedIds))
+                        setBulkOperationResult(null)
+                      }}
+                    >
+                      <ArrowsClockwise size={14} className="mr-2" />
+                      Retry {bulkOperationResult.failed_clients} Failed Client{bulkOperationResult.failed_clients > 1 ? 's' : ''}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
 

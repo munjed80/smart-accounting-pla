@@ -1815,3 +1815,366 @@ All key events are logged with structured JSON format including:
 **System Events:**
 - `system.operation_failed`
 - `system.rate_limit_exceeded`
+
+---
+
+## Work Queue API
+
+The Work Queue API provides unified work items for the accountant dashboard.
+
+### GET /api/v1/accountant/work-queue
+
+Get unified work queue for accountant dashboard.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `queue` | string | "all" | Queue filter: red, review, vat_due, stale, all |
+| `limit` | int | 50 | Max items to return (1-100) |
+| `cursor` | string | null | Pagination cursor |
+| `sort` | string | "readiness_score" | Sort field: readiness_score, due_date, severity |
+| `order` | string | "asc" | Sort order: asc or desc |
+
+**Response:**
+```json
+{
+  "items": [
+    {
+      "client_id": "uuid",
+      "client_name": "Example BV",
+      "period_id": "uuid",
+      "period_status": "REVIEW",
+      "work_item_type": "ISSUE",
+      "severity": "RED",
+      "title": "3 RED issues requiring immediate attention",
+      "description": "Client has unresolved RED severity issues",
+      "suggested_next_action": "Review and resolve RED issues",
+      "due_date": "2024-04-30",
+      "age_days": null,
+      "counts": {"red": 3, "yellow": 2, "backlog": 5},
+      "readiness_score": 40,
+      "readiness_breakdown": {
+        "base_score": 100,
+        "deductions": [
+          {"reason": "red_issues", "count": 3, "penalty": 60}
+        ],
+        "final_score": 40
+      }
+    }
+  ],
+  "total_count": 15,
+  "returned_count": 15,
+  "queue_type": "all",
+  "counts": {"red_issues": 5, "needs_review": 8, "vat_due": 3, "stale": 2},
+  "sort_by": "readiness_score",
+  "sort_order": "asc",
+  "generated_at": "2024-01-26T10:00:00Z"
+}
+```
+
+**Work Item Types:**
+| Type | Description |
+|------|-------------|
+| `ISSUE` | RED or YELLOW validation issues |
+| `VAT` | VAT deadline approaching |
+| `BACKLOG` | Document backlog needing review |
+| `ALERT` | Critical alerts |
+| `PERIOD_REVIEW` | Period in REVIEW state |
+| `STALE` | No activity for 30+ days |
+
+---
+
+### GET /api/v1/accountant/dashboard/sla-summary
+
+Get SLA summary for all assigned clients.
+
+**Response:**
+```json
+{
+  "total_violations": 8,
+  "critical_count": 3,
+  "warning_count": 5,
+  "by_type": {
+    "RED_UNRESOLVED": {"critical": 2, "warning": 1},
+    "VAT_DEADLINE": {"critical": 1, "warning": 2},
+    "REVIEW_STALE": {"critical": 0, "warning": 1},
+    "BACKLOG_HIGH": {"critical": 0, "warning": 1}
+  },
+  "escalation_events_today": 2,
+  "policy": {
+    "red_unresolved_warning_days": 5,
+    "red_unresolved_critical_days": 7,
+    "vat_due_warning_days": 14,
+    "vat_due_critical_days": 7,
+    "review_stale_warning_days": 10,
+    "backlog_warning_threshold": 20
+  },
+  "generated_at": "2024-01-26T10:00:00Z"
+}
+```
+
+---
+
+## Readiness Score Definition
+
+The readiness score is a deterministic 0-100 score indicating client health.
+
+**Score Ranges:**
+| Range | Status | Description |
+|-------|--------|-------------|
+| 80-100 | Good | Minor or no attention needed |
+| 50-79 | Moderate | Review recommended |
+| 20-49 | Poor | Significant issues |
+| 0-19 | Critical | Immediate action required |
+
+**Scoring Factors:**
+| Factor | Penalty | Maximum |
+|--------|---------|---------|
+| RED issues | -20 per issue | -60 |
+| YELLOW issues | -5 per issue | -20 |
+| Document backlog | -3 per doc | -15 |
+| Critical alerts | -20 | -20 |
+| VAT deadline ≤ 7 days | -15 | -15 |
+| VAT deadline ≤ 14 days | -10 | -10 |
+| Staleness > 30 days | -10 | -10 |
+
+---
+
+## Reminders API
+
+### POST /api/v1/accountant/reminders/send
+
+Send reminders immediately to selected clients.
+
+**Rate Limit:** 10 reminders per minute
+
+**Request Body:**
+```json
+{
+  "client_ids": ["uuid1", "uuid2"],
+  "reminder_type": "ACTION_REQUIRED",
+  "title": "Documents needed",
+  "message": "Please upload your Q1 invoices",
+  "channel": "IN_APP",
+  "due_date": "2024-02-15",
+  "template_id": null,
+  "variables": null
+}
+```
+
+**Channels:**
+- `IN_APP`: Notification in client dashboard (always available)
+- `EMAIL`: Email via Resend (requires `RESEND_API_KEY` env var)
+
+**Response:**
+```json
+[
+  {
+    "id": "uuid",
+    "administration_id": "uuid",
+    "reminder_type": "ACTION_REQUIRED",
+    "title": "Documents needed",
+    "message": "Please upload your Q1 invoices",
+    "channel": "IN_APP",
+    "status": "SENT",
+    "due_date": "2024-02-15",
+    "scheduled_at": null,
+    "sent_at": "2024-01-26T10:00:00Z",
+    "created_at": "2024-01-26T10:00:00Z",
+    "send_error": null
+  }
+]
+```
+
+---
+
+### POST /api/v1/accountant/reminders/schedule
+
+Schedule reminders for future sending.
+
+**Rate Limit:** 10 reminders per minute
+
+**Request Body:**
+```json
+{
+  "client_ids": ["uuid1", "uuid2"],
+  "reminder_type": "VAT_DEADLINE",
+  "title": "VAT deadline reminder",
+  "message": "BTW Aangifte is due in 7 days",
+  "channel": "EMAIL",
+  "scheduled_at": "2024-02-01T09:00:00Z",
+  "due_date": "2024-02-07"
+}
+```
+
+---
+
+### GET /api/v1/accountant/reminders/history
+
+Get reminder history.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `client_id` | uuid | null | Filter by client ID |
+| `limit` | int | 50 | Max results (1-100) |
+| `offset` | int | 0 | Pagination offset |
+
+**Response:**
+```json
+{
+  "reminders": [...],
+  "total_count": 100,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+---
+
+## Evidence Packs API
+
+### POST /api/v1/accountant/clients/{client_id}/periods/{period_id}/evidence-pack
+
+Generate a VAT evidence pack for compliance export.
+
+**Rate Limit:** 5 packs per minute
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `pack_type` | string | "VAT_EVIDENCE" | Pack type: VAT_EVIDENCE or AUDIT_TRAIL |
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "administration_id": "uuid",
+  "period_id": "uuid",
+  "pack_type": "VAT_EVIDENCE",
+  "created_at": "2024-01-26T10:00:00Z",
+  "file_size_bytes": 15234,
+  "checksum": "sha256-hash",
+  "download_count": 0,
+  "metadata": {
+    "administration_name": "Example BV",
+    "kvk_number": "12345678",
+    "period_name": "Q1-2024",
+    "period_status": "FINALIZED",
+    "generated_at": "2024-01-26T10:00:00Z"
+  }
+}
+```
+
+**Evidence Pack Contents:**
+- VAT box summary
+- List of relevant journal entries
+- List of invoices/documents used in VAT calculation
+- Validation status + acknowledged issues
+- Period snapshot info
+
+---
+
+### GET /api/v1/accountant/evidence-packs/{pack_id}/download
+
+Download an evidence pack file.
+
+**Response:** JSON file download with checksum verification
+
+---
+
+### GET /api/v1/accountant/evidence-packs
+
+List evidence packs.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `client_id` | uuid | null | Filter by client ID |
+| `period_id` | uuid | null | Filter by period ID |
+| `limit` | int | 50 | Max results (1-100) |
+| `offset` | int | 0 | Pagination offset |
+
+---
+
+## Environment Variables
+
+### Required for Email Reminders
+```
+RESEND_API_KEY=your-api-key          # Required for EMAIL channel
+RESEND_FROM_EMAIL=noreply@zzphub.nl  # Optional, defaults to noreply@zzphub.nl
+```
+
+### Evidence Pack Storage
+```
+EVIDENCE_STORAGE_PATH=/data/evidence  # Default storage path
+```
+
+---
+
+## Database Tables (Migration 011)
+
+### client_readiness_cache
+Cached readiness scores for efficient querying.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | uuid | Primary key |
+| `administration_id` | uuid | Client ID |
+| `readiness_score` | int | Score 0-100 |
+| `readiness_breakdown` | json | Score breakdown |
+| `red_issue_count` | int | RED issue count |
+| `yellow_issue_count` | int | YELLOW issue count |
+| `document_backlog` | int | Pending documents |
+| `vat_days_remaining` | int | Days to VAT deadline |
+| `period_status` | string | Current period status |
+| `has_critical_alerts` | bool | Has critical alerts |
+| `staleness_days` | int | Days since last activity |
+| `computed_at` | datetime | When score was computed |
+
+### escalation_events
+SLA violation tracking.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | uuid | Primary key |
+| `administration_id` | uuid | Client ID |
+| `escalation_type` | string | Type: RED_UNRESOLVED, VAT_DEADLINE, etc. |
+| `severity` | string | WARNING or CRITICAL |
+| `trigger_reason` | text | Why escalation was triggered |
+| `threshold_value` | int | SLA threshold value |
+| `actual_value` | int | Actual value that triggered |
+| `created_at` | datetime | When escalation occurred |
+| `acknowledged_at` | datetime | When acknowledged |
+| `acknowledged_by_id` | uuid | User who acknowledged |
+
+### evidence_packs
+Generated evidence packs.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | uuid | Primary key |
+| `administration_id` | uuid | Client ID |
+| `period_id` | uuid | Period ID |
+| `pack_type` | string | VAT_EVIDENCE or AUDIT_TRAIL |
+| `storage_path` | string | File path |
+| `checksum` | string | SHA256 checksum |
+| `file_size_bytes` | bigint | File size |
+| `download_count` | int | Download count |
+| `metadata` | json | Pack metadata |
+
+### dashboard_audit_log
+Audit trail for dashboard operations.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | uuid | Primary key |
+| `user_id` | uuid | User who performed action |
+| `action_type` | string | REMINDER_SEND, EVIDENCE_PACK_GENERATE, etc. |
+| `administration_id` | uuid | Related client |
+| `entity_type` | string | Entity type |
+| `entity_id` | uuid | Entity ID |
+| `details` | json | Action details |
+| `ip_address` | string | Client IP |
+| `user_agent` | string | Client user agent |
+| `created_at` | datetime | When action occurred |

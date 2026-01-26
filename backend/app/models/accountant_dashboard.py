@@ -146,11 +146,27 @@ class ReminderType(str, enum.Enum):
     ACTION_REQUIRED = "ACTION_REQUIRED"
 
 
+class ReminderChannel(str, enum.Enum):
+    """Channels for sending reminders."""
+    IN_APP = "IN_APP"
+    EMAIL = "EMAIL"
+
+
+class ReminderStatus(str, enum.Enum):
+    """Status of a reminder."""
+    PENDING = "PENDING"
+    SCHEDULED = "SCHEDULED"
+    SENT = "SENT"
+    FAILED = "FAILED"
+
+
 class ClientReminder(Base):
     """
-    In-app reminders/tasks for clients created by accountants.
+    Reminders/tasks for clients created by accountants.
     
-    No email/SMS - just in-app notifications visible to the client.
+    Supports multiple channels:
+    - IN_APP: Notification visible in the client's dashboard
+    - EMAIL: Email sent via Resend (optional, requires RESEND_API_KEY)
     """
     __tablename__ = "client_reminders"
 
@@ -177,6 +193,16 @@ class ClientReminder(Base):
     bulk_operation_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("bulk_operations.id", ondelete="SET NULL"), nullable=True
     )
+    
+    # Enhanced fields for multi-channel reminders
+    channel: Mapped[str] = mapped_column(String(20), nullable=False, default="IN_APP")
+    template_id: Mapped[str] = mapped_column(String(100), nullable=True)
+    variables: Mapped[dict] = mapped_column(JSON, nullable=True)
+    scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
+    email_address: Mapped[str] = mapped_column(String(255), nullable=True)
+    send_error: Mapped[str] = mapped_column(Text, nullable=True)
 
     # Relationships
     administration = relationship("Administration")

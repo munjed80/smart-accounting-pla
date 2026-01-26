@@ -1060,3 +1060,349 @@ List all available Dutch VAT codes.
 - `accounting_periods` - Extended with status (OPEN, REVIEW, FINALIZED, LOCKED)
 - `period_snapshots` - Immutable snapshots of financial reports at finalization (includes VAT)
 - `period_audit_logs` - Complete audit trail of period control actions
+
+---
+
+## Document Review Queue API
+
+The Document Review Queue API provides accountant-only endpoints for reviewing, posting, and managing documents.
+
+### Document States
+
+| Status | Description |
+|--------|-------------|
+| `UPLOADED` | Document uploaded, waiting for processing |
+| `PROCESSING` | Document being processed/extracted |
+| `EXTRACTED` | Fields extracted, ready for matching |
+| `NEEDS_REVIEW` | Needs accountant review before posting |
+| `POSTED` | Successfully posted to journal |
+| `REJECTED` | Rejected by accountant |
+| `FAILED` | Processing failed |
+
+### Suggested Action Types
+
+| Action Type | Description |
+|-------------|-------------|
+| `ALLOCATE_OPEN_ITEM` | Match document to an open AR/AP item |
+| `RECLASSIFY_TO_ASSET` | Treat as fixed asset purchase |
+| `CREATE_DEPRECIATION` | Create depreciation schedule |
+| `MARK_DUPLICATE` | Flag as duplicate document |
+| `POST_AS_EXPENSE` | Post as regular expense |
+| `POST_AS_REVENUE` | Post as revenue |
+| `NEEDS_MANUAL_REVIEW` | Requires manual review |
+
+---
+
+### GET /clients/{client_id}/documents
+
+List documents for a client, optionally filtered by status.
+
+**Query Parameters:**
+- `status` (string, optional) - Filter by document status (e.g., `NEEDS_REVIEW`)
+
+**Response:**
+```json
+{
+  "client_id": "uuid",
+  "client_name": "Example BV",
+  "total_documents": 15,
+  "documents": [
+    {
+      "id": "uuid",
+      "administration_id": "uuid",
+      "original_filename": "invoice_001.pdf",
+      "mime_type": "application/pdf",
+      "file_size": 125000,
+      "status": "NEEDS_REVIEW",
+      "error_message": null,
+      "created_at": "2024-01-26T10:00:00Z",
+      "updated_at": "2024-01-26T10:05:00Z",
+      "supplier_name": "ACME Corp",
+      "invoice_number": "INV-2024-001",
+      "invoice_date": "2024-01-15T00:00:00Z",
+      "due_date": "2024-02-15T00:00:00Z",
+      "total_amount": 1210.00,
+      "vat_amount": 210.00,
+      "net_amount": 1000.00,
+      "currency": "EUR",
+      "extraction_confidence": 0.92,
+      "matched_party_id": "uuid",
+      "matched_party_name": "ACME Corp",
+      "matched_open_item_id": null,
+      "match_confidence": 0.85,
+      "is_duplicate": false,
+      "duplicate_of_id": null,
+      "suggested_actions": [
+        {
+          "id": "uuid",
+          "action_type": "POST_AS_EXPENSE",
+          "title": "Post as expense",
+          "explanation": "Document can be posted as a regular expense.",
+          "confidence_score": 0.75,
+          "parameters": {"amount": "1210.00"},
+          "priority": 1,
+          "created_at": "2024-01-26T10:05:00Z"
+        }
+      ],
+      "extracted_fields": {}
+    }
+  ]
+}
+```
+
+---
+
+### GET /clients/{client_id}/documents/{document_id}
+
+Get detailed information about a specific document.
+
+**Response:** Same structure as document item in list response.
+
+---
+
+### POST /clients/{client_id}/documents/{document_id}/post
+
+Post a document to the journal.
+
+**Request Body:**
+```json
+{
+  "description": "Office supplies from ACME Corp",
+  "entry_date": "2024-01-15",
+  "account_id": "uuid (optional - override expense account)",
+  "vat_code_id": "uuid (optional - override VAT code)",
+  "allocate_to_open_item_id": "uuid (optional - allocate to open item)",
+  "notes": "Approved by accountant"
+}
+```
+
+**Response:**
+```json
+{
+  "document_id": "uuid",
+  "status": "POSTED",
+  "journal_entry_id": "uuid",
+  "message": "Document successfully posted to journal",
+  "posted_at": "2024-01-26T14:30:00Z",
+  "posted_by_name": "Jan Accountant"
+}
+```
+
+**Error Response (Period locked):**
+```json
+{
+  "detail": "Cannot post to period Q1-2024 with status FINALIZED. Period must be OPEN or REVIEW."
+}
+```
+
+---
+
+### POST /clients/{client_id}/documents/{document_id}/reject
+
+Reject a document.
+
+**Request Body:**
+```json
+{
+  "reason": "Duplicate invoice - already posted on 2024-01-10",
+  "notes": "See document DOC-2024-005"
+}
+```
+
+**Response:**
+```json
+{
+  "document_id": "uuid",
+  "status": "REJECTED",
+  "rejection_reason": "Duplicate invoice - already posted on 2024-01-10",
+  "rejected_at": "2024-01-26T14:35:00Z",
+  "rejected_by_name": "Jan Accountant",
+  "message": "Document rejected"
+}
+```
+
+---
+
+### POST /clients/{client_id}/documents/{document_id}/reprocess
+
+Reprocess a document (reset for re-extraction).
+
+**Response:**
+```json
+{
+  "document_id": "uuid",
+  "status": "UPLOADED",
+  "process_count": 2,
+  "message": "Document queued for reprocessing (attempt #2)"
+}
+```
+
+---
+
+### POST /clients/{client_id}/documents/{document_id}/match
+
+Run matching logic on a document.
+
+**Response:**
+```json
+{
+  "document_id": "uuid",
+  "status": "NEEDS_REVIEW",
+  "is_duplicate": false,
+  "match_confidence": "0.85",
+  "matched_party_id": "uuid",
+  "matched_open_item_id": null,
+  "message": "Matching completed successfully"
+}
+```
+
+---
+
+## Period Closing Checklist API
+
+### GET /clients/{client_id}/periods/{period_id}/closing-checklist
+
+Get the closing checklist for a period.
+
+**Response:**
+```json
+{
+  "client_id": "uuid",
+  "client_name": "Example BV",
+  "period_id": "uuid",
+  "period_name": "2024-Q1",
+  "period_status": "REVIEW",
+  "can_finalize": false,
+  "blocking_items": 1,
+  "warning_items": 2,
+  "items": [
+    {
+      "name": "Documents Posted",
+      "description": "All documents in period must be posted or rejected",
+      "status": "PASSED",
+      "details": "All documents processed",
+      "value": "15/15 (100%)",
+      "required": true
+    },
+    {
+      "name": "Critical Issues",
+      "description": "All RED issues must be resolved",
+      "status": "FAILED",
+      "details": "1 critical issue(s) require resolution",
+      "value": "1",
+      "required": true
+    },
+    {
+      "name": "Warning Issues",
+      "description": "All YELLOW issues must be acknowledged or resolved",
+      "status": "WARNING",
+      "details": "2 warning(s) need acknowledgment",
+      "value": "2 unacknowledged",
+      "required": false
+    },
+    {
+      "name": "VAT Report Ready",
+      "description": "VAT report must be ready with no anomalies",
+      "status": "PASSED",
+      "details": "No VAT anomalies detected",
+      "value": "Ready",
+      "required": true
+    },
+    {
+      "name": "AR Reconciled",
+      "description": "Accounts Receivable must reconcile with subledger",
+      "status": "PASSED",
+      "details": "AR reconciled",
+      "value": "OK",
+      "required": true
+    },
+    {
+      "name": "AP Reconciled",
+      "description": "Accounts Payable must reconcile with subledger",
+      "status": "PASSED",
+      "details": "AP reconciled",
+      "value": "OK",
+      "required": true
+    },
+    {
+      "name": "Asset Schedules Consistent",
+      "description": "All asset depreciation must be posted and consistent",
+      "status": "PASSED",
+      "details": "Asset schedules are consistent",
+      "value": "OK",
+      "required": false
+    }
+  ],
+  "documents_posted_percent": 100.0,
+  "documents_pending_review": 0,
+  "red_issues_count": 1,
+  "yellow_issues_count": 2,
+  "unacknowledged_yellow_count": 2,
+  "vat_report_ready": true,
+  "ar_reconciled": true,
+  "ap_reconciled": true,
+  "assets_consistent": true
+}
+```
+
+---
+
+## Document Data Model
+
+### Documents (Extended)
+
+New fields added to the `documents` table:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `supplier_name` | string | Extracted supplier name |
+| `invoice_number` | string | Extracted invoice number |
+| `invoice_date` | datetime | Extracted invoice date |
+| `due_date` | datetime | Extracted due date |
+| `total_amount` | decimal | Extracted total amount |
+| `vat_amount` | decimal | Extracted VAT amount |
+| `net_amount` | decimal | Extracted net amount |
+| `currency` | string | Currency (default: EUR) |
+| `extraction_confidence` | decimal | Confidence score (0.0 - 1.0) |
+| `matched_party_id` | uuid | Matched supplier/customer |
+| `matched_open_item_id` | uuid | Matched open item |
+| `match_confidence` | decimal | Match confidence score |
+| `is_duplicate` | boolean | Duplicate flag |
+| `duplicate_of_id` | uuid | Reference to original document |
+| `posted_at` | datetime | When document was posted |
+| `posted_by_id` | uuid | Who posted the document |
+| `posted_journal_entry_id` | uuid | Resulting journal entry |
+| `rejected_at` | datetime | When document was rejected |
+| `rejected_by_id` | uuid | Who rejected the document |
+| `rejection_reason` | text | Reason for rejection |
+| `process_count` | integer | Number of times processed |
+| `last_processed_at` | datetime | Last processing timestamp |
+
+### Document Suggested Actions
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | uuid | Primary key |
+| `document_id` | uuid | Reference to document |
+| `action_type` | enum | Type of suggested action |
+| `title` | string | Action title |
+| `explanation` | text | Why this action is suggested |
+| `confidence_score` | decimal | Confidence (0.0 - 1.0) |
+| `parameters` | jsonb | Action parameters |
+| `priority` | integer | Priority (1 = highest) |
+
+### Document Audit Logs
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | uuid | Primary key |
+| `document_id` | uuid | Reference to document |
+| `administration_id` | uuid | Client/administration |
+| `action` | enum | Action type (POSTED, REJECTED, etc.) |
+| `from_status` | string | Previous status |
+| `to_status` | string | New status |
+| `performed_by_id` | uuid | User who performed action |
+| `performed_at` | datetime | When action was performed |
+| `notes` | text | Additional notes |
+| `ip_address` | string | Client IP for audit |
+| `result_journal_entry_id` | uuid | Resulting journal entry (for POST) |

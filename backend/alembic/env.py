@@ -71,18 +71,23 @@ def run_migrations_online() -> None:
         # Our revision IDs are human-readable and longer than VARCHAR(32), e.g.,
         # "010_accountant_dashboard_bulk_ops", which would cause truncation errors.
         # Use a conditional check to avoid errors if table doesn't exist (first ever run).
-        connection.execute(text("""
-            DO $$
-            BEGIN
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.columns 
-                    WHERE table_name = 'alembic_version' AND column_name = 'version_num'
-                ) THEN
-                    ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128);
-                END IF;
-            END $$;
-        """))
-        connection.commit()
+        # Wrapped in try/except so a fresh DB without the table does not crash.
+        try:
+            connection.execute(text("""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name = 'alembic_version' AND column_name = 'version_num'
+                    ) THEN
+                        ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128);
+                    END IF;
+                END $$;
+            """))
+            connection.commit()
+        except Exception:
+            # Ignore errors - table may not exist yet on a fresh database
+            pass
 
         context.configure(
             connection=connection,

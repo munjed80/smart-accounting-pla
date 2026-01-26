@@ -49,11 +49,12 @@ class BalanceSheet:
     # Assets (Activa)
     current_assets: BalanceSheetSection
     fixed_assets: BalanceSheetSection
-    total_assets: Decimal = Decimal("0.00")
     # Liabilities + Equity (Passiva)
     current_liabilities: BalanceSheetSection
     long_term_liabilities: BalanceSheetSection
     equity: BalanceSheetSection
+    # Computed totals (fields with defaults must come last)
+    total_assets: Decimal = Decimal("0.00")
     total_liabilities_equity: Decimal = Decimal("0.00")
     is_balanced: bool = False
 
@@ -73,11 +74,12 @@ class ProfitAndLoss:
     end_date: date
     revenue: PnLSection
     cost_of_goods_sold: PnLSection
-    gross_profit: Decimal = Decimal("0.00")
     operating_expenses: PnLSection
-    operating_income: Decimal = Decimal("0.00")
     other_income: PnLSection
     other_expenses: PnLSection
+    # Computed totals (fields with defaults must come last)
+    gross_profit: Decimal = Decimal("0.00")
+    operating_income: Decimal = Decimal("0.00")
     net_income: Decimal = Decimal("0.00")
 
 

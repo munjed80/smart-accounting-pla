@@ -1,7 +1,7 @@
 # Models module
 from app.models.user import User
 from app.models.administration import Administration, AdministrationMember
-from app.models.document import Document, ExtractedField
+from app.models.document import Document, ExtractedField, DocumentSuggestedAction, DocumentAuditLog
 from app.models.transaction import Transaction, TransactionLine
 from app.models.accounting import ChartOfAccount, VatCode, VatCategory
 from app.models.ledger import AccountingPeriod, JournalEntry, JournalLine
@@ -16,6 +16,8 @@ __all__ = [
     "AdministrationMember",
     "Document",
     "ExtractedField",
+    "DocumentSuggestedAction",
+    "DocumentAuditLog",
     "Transaction",
     "TransactionLine",
     "ChartOfAccount",

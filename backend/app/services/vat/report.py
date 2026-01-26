@@ -97,23 +97,29 @@ class BTWAangifteReport:
     Complete Dutch VAT return (BTW Aangifte) report.
     
     Box structure follows Dutch Belastingdienst format:
-    - 1a: Leveringen/diensten belast met hoog tarief
-    - 1b: Leveringen/diensten belast met laag tarief
+    - 1a: Leveringen/diensten belast met hoog tarief (21%)
+    - 1b: Leveringen/diensten belast met laag tarief (9%)
     - 1c: Leveringen/diensten belast met ander tarief
     - 1d: Privégebruik
     - 1e: Leveringen/diensten belast met 0% of niet bij u belast
-    - 2a: Verwerving uit landen binnen de EU
-    - 3a: Leveringen naar landen binnen de EU
-    - 3b: Leveringen naar/diensten in landen binnen de EU
-    - 4a: Verlegde btw binnen de EU - diensten
-    - 4b: Verlegde btw - overig
+    - 2a: Verwerving uit landen binnen de EU (binnenlandse verlegging)
+    - 3a: Leveringen naar landen buiten de EU
+    - 3b: Leveringen naar/diensten in landen binnen de EU (ICP)
+    - 4a: Verlegde btw - diensten/invoer van buiten de EU
+    - 4b: Verlegde btw - verwervingen uit EU-landen (intra-EU acquisitions)
     - 5a: Verschuldigde btw (subtotaal)
-    - 5b: Voorbelasting
-    - 5c: Subtotaal
-    - 5d: Vermindering volgens kleineondernemersregeling
+    - 5b: Voorbelasting (aftrekbare btw)
+    - 5c: Subtotaal (5a - 5b)
+    - 5d: Vermindering KOR
     - 5e: Schatting vorige tijdvak(ken)
     - 5f: Schatting dit tijdvak
     - 5g: Totaal te betalen / te ontvangen
+    
+    Key compliance rules:
+    - EU acquisitions (goods/services from EU) → 4b turnover + 4b VAT + 5b deductible
+    - Non-EU services reverse charge → 4a turnover + 4a VAT + 5b deductible
+    - Import VAT → 4a turnover + 4a VAT + 5b deductible
+    - ICP supplies (supplies to EU) → 3b turnover only (0% VAT)
     """
     period_id: uuid.UUID
     period_name: str
@@ -143,20 +149,21 @@ class BTWAangifteReport:
     total_icp_supplies: Decimal = Decimal("0.00")
 
 
-# Dutch VAT box definitions
+# Dutch VAT box definitions (Belastingdienst compliant)
+# Reference: https://www.belastingdienst.nl/wps/wcm/connect/nl/btw/
 DUTCH_VAT_BOXES = {
     "1a": "Leveringen/diensten belast met hoog tarief (21%)",
     "1b": "Leveringen/diensten belast met laag tarief (9%)",
     "1c": "Leveringen/diensten belast met ander tarief",
     "1d": "Privégebruik",
     "1e": "Leveringen/diensten belast met 0% of niet bij u belast",
-    "2a": "Verwerving uit landen binnen de EU",
+    "2a": "Verwerving uit landen binnen de EU (binnenlandse verlegging)",
     "3a": "Leveringen naar landen buiten de EU",
-    "3b": "Leveringen naar/diensten in landen binnen de EU",
-    "4a": "Verlegde btw - diensten uit EU",
-    "4b": "Verlegde btw - overig",
+    "3b": "Leveringen naar/diensten in landen binnen de EU (ICP)",
+    "4a": "Verlegde btw - diensten/invoer van buiten de EU",
+    "4b": "Verlegde btw - verwervingen uit EU-landen",
     "5a": "Verschuldigde btw (subtotaal)",
-    "5b": "Voorbelasting",
+    "5b": "Voorbelasting (aftrekbare btw)",
     "5c": "Subtotaal (5a - 5b)",
     "5d": "Vermindering KOR",
     "5e": "Schatting vorige tijdvak(ken)",
@@ -446,7 +453,18 @@ class VatReportService:
         vat_amount: Decimal,
         is_reverse_charge: bool,
     ) -> None:
-        """Map VAT amounts to the correct Dutch VAT return boxes."""
+        """
+        Map VAT amounts to the correct Dutch VAT return boxes.
+        
+        Box totals are fully driven by vat_codes.box_mapping to ensure compliance:
+        - turnover_box: Where the taxable base amount goes
+        - vat_box: Where the VAT payable amount goes
+        - deductible_box: Where the deductible VAT goes (input VAT/voorbelasting)
+        
+        For reverse charge and EU acquisitions:
+        - Both vat_box and deductible_box receive the same VAT amount
+        - This ensures net effect is zero for fully deductible transactions
+        """
         box_mapping = vat_code.box_mapping or {}
         
         # Get target boxes from mapping
@@ -454,41 +472,49 @@ class VatReportService:
         vat_box = box_mapping.get("vat_box")
         deductible_box = box_mapping.get("deductible_box")
         
-        # Map turnover
+        # Track if amounts were mapped via box_mapping
+        turnover_mapped = False
+        vat_mapped = False
+        deductible_mapped = False
+        
+        # Map turnover to designated box
         if turnover_box and turnover_box in report.boxes:
             report.boxes[turnover_box].turnover_amount += base_amount
             report.boxes[turnover_box].transaction_count += 1
+            turnover_mapped = True
         
-        # Map VAT payable
+        # Map VAT payable to designated box
         if vat_box and vat_box in report.boxes:
             report.boxes[vat_box].vat_amount += vat_amount
+            vat_mapped = True
         
-        # Map deductible VAT (for purchases/reverse charge)
+        # Map deductible VAT to designated box (for purchases/reverse charge/EU acquisitions)
         if deductible_box and deductible_box in report.boxes:
             report.boxes[deductible_box].vat_amount += vat_amount
+            deductible_mapped = True
         
-        # Category-specific handling
-        if vat_code.category == VatCategory.SALES:
+        # Fallback handling when box_mapping is incomplete
+        # Only apply category-specific defaults if not already mapped
+        if vat_code.category == VatCategory.SALES and not turnover_mapped:
             if vat_code.rate == Decimal("21.00"):
-                if "1a" not in (turnover_box, vat_box):
-                    report.boxes["1a"].turnover_amount += base_amount
+                report.boxes["1a"].turnover_amount += base_amount
+                if not vat_mapped:
                     report.boxes["1a"].vat_amount += vat_amount
             elif vat_code.rate == Decimal("9.00"):
-                if "1b" not in (turnover_box, vat_box):
-                    report.boxes["1b"].turnover_amount += base_amount
+                report.boxes["1b"].turnover_amount += base_amount
+                if not vat_mapped:
                     report.boxes["1b"].vat_amount += vat_amount
         
-        elif vat_code.category == VatCategory.PURCHASES:
-            # Input VAT goes to box 5b
-            if not deductible_box:
-                report.boxes["5b"].vat_amount += vat_amount
+        elif vat_code.category == VatCategory.PURCHASES and not deductible_mapped:
+            # Input VAT goes to box 5b as fallback
+            report.boxes["5b"].vat_amount += vat_amount
         
-        elif vat_code.category == VatCategory.ZERO_RATE or vat_code.category == VatCategory.EXEMPT:
-            if "1e" not in (turnover_box,):
+        elif vat_code.category in (VatCategory.ZERO_RATE, VatCategory.EXEMPT):
+            if not turnover_mapped:
                 report.boxes["1e"].turnover_amount += base_amount
         
         elif vat_code.category == VatCategory.INTRA_EU:
-            if vat_code.is_icp:
+            if vat_code.is_icp and not turnover_mapped:
                 # ICP supplies go to 3b
                 report.boxes["3b"].turnover_amount += base_amount
     

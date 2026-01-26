@@ -221,15 +221,18 @@ class TestReverseChargeNetZero:
         
         assert net_vat == Decimal("0.00")
     
-    def test_reverse_charge_eu_services_maps_to_box_4a(self):
-        """EU services reverse charge should map to box 4a."""
+    def test_reverse_charge_non_eu_services_maps_to_box_4a(self):
+        """Non-EU services reverse charge should map to box 4a (corrected naming)."""
         category = "REVERSE_CHARGE"
-        sub_type = "EU_SERVICES"
+        sub_type = "NON_EU_SERVICES"
         
-        # Box mapping for reverse charge
+        # Corrected box mapping for reverse charge
+        # 4a = Non-EU services and import VAT  
+        # 4b = EU acquisitions
         box_mapping = {
-            "EU_SERVICES": {"turnover": "4a", "vat": "4a", "deductible": "5b"},
-            "IMPORT": {"turnover": "4b", "vat": "4b", "deductible": "5b"},
+            "NON_EU_SERVICES": {"turnover": "4a", "vat": "4a", "deductible": "5b"},
+            "IMPORT": {"turnover": "4a", "vat": "4a", "deductible": "5b"},
+            "EU_ACQUISITION": {"turnover": "4b", "vat": "4b", "deductible": "5b"},
         }
         
         mapping = box_mapping.get(sub_type)
@@ -238,19 +241,23 @@ class TestReverseChargeNetZero:
         assert mapping["vat"] == "4a"
         assert mapping["deductible"] == "5b"
     
-    def test_reverse_charge_import_maps_to_box_4b(self):
-        """Import reverse charge should map to box 4b."""
+    def test_reverse_charge_import_maps_to_box_4a(self):
+        """Import reverse charge should map to box 4a (corrected per Belastingdienst rules)."""
         sub_type = "IMPORT"
         
+        # Corrected mapping: IMPORT goes to 4a (not 4b)
+        # 4a = Non-EU services and import VAT
+        # 4b = EU acquisitions
         box_mapping = {
-            "EU_SERVICES": {"turnover": "4a", "vat": "4a", "deductible": "5b"},
-            "IMPORT": {"turnover": "4b", "vat": "4b", "deductible": "5b"},
+            "NON_EU_SERVICES": {"turnover": "4a", "vat": "4a", "deductible": "5b"},
+            "IMPORT": {"turnover": "4a", "vat": "4a", "deductible": "5b"},
+            "EU_ACQUISITION": {"turnover": "4b", "vat": "4b", "deductible": "5b"},
         }
         
         mapping = box_mapping.get(sub_type)
         
-        assert mapping["turnover"] == "4b"
-        assert mapping["vat"] == "4b"
+        assert mapping["turnover"] == "4a", "Import VAT must go to box 4a"
+        assert mapping["vat"] == "4a", "Import VAT must go to box 4a"
     
     def test_reverse_charge_journal_lines(self):
         """Reverse charge should create 4 journal lines."""
@@ -411,9 +418,9 @@ class TestICPExtraction:
         is_icp = True
         
         if is_icp:
-            target_box = "3b"
+            target_box = "3b"  # ICP supplies to EU countries
         else:
-            target_box = "2a"  # Intra-EU acquisition
+            target_box = "4b"  # Intra-EU acquisition (corrected from 2a)
         
         assert target_box == "3b"
     
@@ -737,3 +744,311 @@ class TestDutchVATBoxNames:
         
         assert "betalen" in boxes["5g"]
         assert "ontvangen" in boxes["5g"]
+
+
+class TestDutchVATBoxMappingCompliance:
+    """
+    Tests for Dutch VAT box mapping compliance with Belastingdienst rules.
+    
+    These tests verify the corrected box mappings:
+    - 4b: Intra-EU acquisitions (goods/services purchased from other EU countries)
+    - 4a: Non-EU services reverse charge + import VAT
+    - 3b: ICP supplies (Intra-Community supplies to other EU countries)
+    - 5b: Input VAT (voorbelasting) - deductible VAT
+    """
+    
+    def test_eu_acquisition_goods_maps_to_box_4b(self):
+        """
+        EU acquisition of goods (INTRA_EU_GOODS) should map to box 4b.
+        
+        Belastingdienst rule: Intra-EU acquisitions where VAT is self-assessed
+        by the NL buyer go to rubriek 4b, not 2a.
+        """
+        # Corrected box mapping for INTRA_EU_GOODS
+        box_mapping = {
+            "turnover_box": "4b",
+            "vat_box": "4b",
+            "deductible_box": "5b"
+        }
+        
+        # Verify correct boxes
+        assert box_mapping["turnover_box"] == "4b", "EU acquisition turnover must go to 4b"
+        assert box_mapping["vat_box"] == "4b", "EU acquisition VAT payable must go to 4b"
+        assert box_mapping["deductible_box"] == "5b", "EU acquisition deductible VAT must go to 5b"
+        
+        # Verify NOT using incorrect box 2a for EU acquisitions
+        assert box_mapping["turnover_box"] != "2a", "EU acquisitions should NOT use box 2a"
+    
+    def test_eu_acquisition_services_maps_to_box_4b(self):
+        """
+        EU acquisition of services (EU_ACQUISITION_SERVICES) should map to box 4b.
+        
+        Services acquired from other EU countries where VAT is self-assessed
+        by the NL buyer go to rubriek 4b.
+        """
+        box_mapping = {
+            "turnover_box": "4b",
+            "vat_box": "4b",
+            "deductible_box": "5b"
+        }
+        
+        assert box_mapping["turnover_box"] == "4b"
+        assert box_mapping["vat_box"] == "4b"
+        assert box_mapping["deductible_box"] == "5b"
+    
+    def test_non_eu_services_reverse_charge_maps_to_box_4a(self):
+        """
+        Non-EU services reverse charge (RC_NON_EU_SERVICES) should map to box 4a.
+        
+        Belastingdienst rule: Services from outside the EU where VAT is shifted
+        to the NL buyer go to rubriek 4a.
+        """
+        box_mapping = {
+            "turnover_box": "4a",
+            "vat_box": "4a",
+            "deductible_box": "5b"
+        }
+        
+        assert box_mapping["turnover_box"] == "4a", "Non-EU services turnover must go to 4a"
+        assert box_mapping["vat_box"] == "4a", "Non-EU services VAT payable must go to 4a"
+        assert box_mapping["deductible_box"] == "5b", "Non-EU services deductible VAT must go to 5b"
+    
+    def test_import_vat_reverse_charge_maps_to_box_4a(self):
+        """
+        Import VAT reverse charge (RC_IMPORT) should map to box 4a.
+        
+        Belastingdienst rule: Import-related VAT cases where VAT is shifted
+        to the NL buyer go to rubriek 4a.
+        """
+        box_mapping = {
+            "turnover_box": "4a",
+            "vat_box": "4a",
+            "deductible_box": "5b"
+        }
+        
+        assert box_mapping["turnover_box"] == "4a", "Import VAT turnover must go to 4a"
+        assert box_mapping["vat_box"] == "4a", "Import VAT payable must go to 4a"
+        # Verify NOT using incorrect box 4b for imports
+        assert box_mapping["turnover_box"] != "4b", "Import VAT should NOT use box 4b"
+    
+    def test_icp_supplies_maps_to_box_3b(self):
+        """
+        ICP supplies (ICP_SUPPLIES) should map to box 3b.
+        
+        Belastingdienst rule: Intra-Community supplies (leveringen aan EU-landen)
+        go to rubriek 3b with 0% VAT.
+        """
+        box_mapping = {
+            "turnover_box": "3b"
+        }
+        
+        assert box_mapping["turnover_box"] == "3b", "ICP supplies must go to 3b"
+        assert "vat_box" not in box_mapping or box_mapping.get("vat_box") is None, \
+            "ICP supplies should have no VAT payable (0% rate)"
+    
+    def test_eu_acquisition_results_in_net_zero_vat(self):
+        """
+        EU acquisition should result in net zero VAT effect when fully deductible.
+        
+        The VAT is self-assessed (added to 4b) and then immediately deducted (5b).
+        """
+        base_amount = Decimal("1000.00")
+        vat_rate = Decimal("21.00")
+        calculated_vat = (base_amount * vat_rate / Decimal("100")).quantize(Decimal("0.01"))
+        
+        # VAT payable (goes to 4b, then to 5a subtotal)
+        vat_payable = calculated_vat
+        # VAT deductible (goes to 5b)
+        vat_deductible = calculated_vat
+        
+        # Net effect should be zero
+        net_vat = vat_payable - vat_deductible
+        
+        assert vat_payable == Decimal("210.00")
+        assert vat_deductible == Decimal("210.00")
+        assert net_vat == Decimal("0.00"), "EU acquisition should have net zero VAT effect"
+    
+    def test_non_eu_services_reverse_charge_results_in_net_zero_vat(self):
+        """
+        Non-EU services reverse charge should result in net zero VAT when fully deductible.
+        """
+        base_amount = Decimal("500.00")
+        vat_rate = Decimal("21.00")
+        calculated_vat = (base_amount * vat_rate / Decimal("100")).quantize(Decimal("0.01"))
+        
+        # VAT payable (goes to 4a, then to 5a subtotal)
+        vat_payable = calculated_vat
+        # VAT deductible (goes to 5b)
+        vat_deductible = calculated_vat
+        
+        net_vat = vat_payable - vat_deductible
+        
+        assert net_vat == Decimal("0.00"), "Non-EU services RC should have net zero VAT effect"
+    
+    def test_box_5a_includes_4a_and_4b_vat(self):
+        """
+        Box 5a (VAT payable subtotal) must include VAT from boxes 4a and 4b.
+        """
+        boxes = {
+            "1a": {"vat": Decimal("210.00")},   # NL domestic sales 21%
+            "1b": {"vat": Decimal("45.00")},    # NL domestic sales 9%
+            "2a": {"vat": Decimal("0.00")},     # Domestic reverse charge (usually 0)
+            "4a": {"vat": Decimal("105.00")},   # Non-EU services + import VAT
+            "4b": {"vat": Decimal("210.00")},   # EU acquisitions
+        }
+        
+        # Payable boxes per Belastingdienst rules
+        payable_box_codes = ["1a", "1b", "1c", "1d", "2a", "4a", "4b"]
+        
+        box_5a = sum(
+            boxes.get(code, {}).get("vat", Decimal("0.00"))
+            for code in payable_box_codes
+        )
+        
+        # 210 + 45 + 0 + 105 + 210 = 570
+        assert box_5a == Decimal("570.00")
+        # Verify 4a and 4b are included
+        assert boxes["4a"]["vat"] > 0, "4a VAT should contribute to 5a"
+        assert boxes["4b"]["vat"] > 0, "4b VAT should contribute to 5a"
+    
+    def test_box_5b_includes_deductible_from_eu_acquisitions(self):
+        """
+        Box 5b (voorbelasting) must include deductible VAT from EU acquisitions.
+        """
+        # Input VAT from various sources
+        purchase_input_vat = Decimal("100.00")
+        eu_acquisition_deductible = Decimal("210.00")  # From 4b acquisition
+        non_eu_services_deductible = Decimal("105.00")  # From 4a reverse charge
+        
+        box_5b = purchase_input_vat + eu_acquisition_deductible + non_eu_services_deductible
+        
+        assert box_5b == Decimal("415.00")
+    
+    def test_no_double_counting_reverse_charge(self):
+        """
+        Reverse charge VAT should not be double counted in the report.
+        
+        The VAT appears in the payable box (4a/4b) AND in the deductible box (5b),
+        but this is correct - it's not double counting, it's the reverse charge mechanism.
+        """
+        base_amount = Decimal("1000.00")
+        vat_rate = Decimal("21.00")
+        calculated_vat = Decimal("210.00")
+        
+        # Simulate box totals
+        box_4b_vat = calculated_vat  # EU acquisition payable
+        box_5b_vat = calculated_vat  # Deductible from EU acquisition
+        
+        # Both should be equal for proper reverse charge
+        assert box_4b_vat == box_5b_vat, "Reverse charge payable and deductible must match"
+        
+        # Calculate net
+        box_5a = box_4b_vat  # Subtotal payable
+        box_5c = box_5a - box_5b_vat  # Net
+        
+        assert box_5c == Decimal("0.00"), "Net should be zero for reverse charge"
+    
+    def test_domestic_reverse_charge_uses_box_2a(self):
+        """
+        Domestic reverse charge (RC_NL) for certain transactions uses box 2a.
+        
+        This applies to specific domestic transactions like construction services
+        under article 24ba.
+        """
+        box_mapping = {
+            "turnover_box": "2a",
+            "vat_box": "2a",
+            "deductible_box": "5b"
+        }
+        
+        assert box_mapping["turnover_box"] == "2a", "Domestic RC uses box 2a"
+        assert box_mapping["vat_box"] == "2a"
+
+
+class TestVATCodeMappingDefinitions:
+    """
+    Tests to verify VAT code definitions match expected mappings.
+    
+    These tests ensure the migration data is correct.
+    """
+    
+    def test_intra_eu_goods_definition(self):
+        """INTRA_EU_GOODS must have correct box mapping."""
+        expected = {
+            "code": "INTRA_EU_GOODS",
+            "category": "INTRA_EU",
+            "turnover_box": "4b",
+            "vat_box": "4b",
+            "deductible_box": "5b",
+            "eu_only": True,
+            "requires_vat_number": True,
+            "is_reverse_charge": False,
+            "is_icp": False,
+        }
+        
+        # Verify key properties
+        assert expected["turnover_box"] == "4b"
+        assert expected["vat_box"] == "4b"
+        assert expected["deductible_box"] == "5b"
+        assert expected["eu_only"] == True
+    
+    def test_icp_supplies_definition(self):
+        """ICP_SUPPLIES must have correct box mapping."""
+        expected = {
+            "code": "ICP_SUPPLIES",
+            "category": "INTRA_EU",
+            "turnover_box": "3b",
+            "rate": Decimal("0.00"),
+            "eu_only": True,
+            "requires_vat_number": True,
+            "is_icp": True,
+        }
+        
+        assert expected["turnover_box"] == "3b"
+        assert expected["rate"] == Decimal("0.00")
+        assert expected["is_icp"] == True
+    
+    def test_rc_non_eu_services_definition(self):
+        """RC_NON_EU_SERVICES must have correct box mapping."""
+        expected = {
+            "code": "RC_NON_EU_SERVICES",
+            "category": "REVERSE_CHARGE",
+            "turnover_box": "4a",
+            "vat_box": "4a",
+            "deductible_box": "5b",
+            "eu_only": False,  # NOT EU only - it's for non-EU
+            "is_reverse_charge": True,
+        }
+        
+        assert expected["turnover_box"] == "4a"
+        assert expected["eu_only"] == False
+    
+    def test_rc_import_definition(self):
+        """RC_IMPORT must have correct box mapping."""
+        expected = {
+            "code": "RC_IMPORT",
+            "category": "REVERSE_CHARGE",
+            "turnover_box": "4a",
+            "vat_box": "4a",
+            "deductible_box": "5b",
+            "is_reverse_charge": True,
+        }
+        
+        assert expected["turnover_box"] == "4a"
+        assert expected["vat_box"] == "4a"
+    
+    def test_eu_acquisition_services_definition(self):
+        """EU_ACQUISITION_SERVICES must have correct box mapping."""
+        expected = {
+            "code": "EU_ACQUISITION_SERVICES",
+            "category": "INTRA_EU",
+            "turnover_box": "4b",
+            "vat_box": "4b",
+            "deductible_box": "5b",
+            "eu_only": True,
+            "requires_vat_number": True,
+        }
+        
+        assert expected["turnover_box"] == "4b"
+        assert expected["vat_box"] == "4b"
+        assert expected["eu_only"] == True

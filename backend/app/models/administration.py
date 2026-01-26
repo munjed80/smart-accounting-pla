@@ -46,6 +46,8 @@ class Administration(Base):
     fixed_assets = relationship("FixedAsset", back_populates="administration", cascade="all, delete-orphan")
     client_issues = relationship("ClientIssue", back_populates="administration", cascade="all, delete-orphan")
     validation_runs = relationship("ValidationRun", back_populates="administration", cascade="all, delete-orphan")
+    # Decision engine relationships
+    decision_patterns = relationship("DecisionPattern", back_populates="administration", cascade="all, delete-orphan")
 
 
 class AdministrationMember(Base):

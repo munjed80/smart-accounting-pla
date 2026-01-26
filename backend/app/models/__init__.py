@@ -8,6 +8,7 @@ from app.models.ledger import AccountingPeriod, JournalEntry, JournalLine
 from app.models.subledger import Party, OpenItem, OpenItemAllocation
 from app.models.assets import FixedAsset, DepreciationSchedule
 from app.models.issues import ClientIssue, ValidationRun
+from app.models.decisions import SuggestedAction, AccountantDecision, DecisionPattern
 
 __all__ = [
     "User",
@@ -29,4 +30,7 @@ __all__ = [
     "DepreciationSchedule",
     "ClientIssue",
     "ValidationRun",
+    "SuggestedAction",
+    "AccountantDecision",
+    "DecisionPattern",
 ]

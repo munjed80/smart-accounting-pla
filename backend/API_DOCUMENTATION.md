@@ -347,6 +347,206 @@ All endpoints return standard error responses:
 
 ---
 
+## Decision Engine API
+
+The Decision Engine allows accountants to approve, reject, or override suggested actions for detected issues.
+
+### GET /issues/{issue_id}/suggestions
+
+Get suggested actions for an issue.
+
+**Response:**
+```json
+{
+  "issue_id": "uuid",
+  "issue_title": "Unposted depreciation: Laptop",
+  "issue_code": "DEPRECIATION_NOT_POSTED",
+  "suggestions": [
+    {
+      "id": "uuid",
+      "issue_id": "uuid",
+      "action_type": "CREATE_DEPRECIATION",
+      "title": "Post depreciation entry for Laptop",
+      "explanation": "Depreciation for this period has not been posted...",
+      "parameters": {
+        "fixed_asset_id": "uuid",
+        "amount": "333.33"
+      },
+      "confidence_score": 0.85,
+      "is_auto_suggested": false,
+      "priority": 1,
+      "created_at": "2024-01-26T10:00:00Z"
+    }
+  ],
+  "total_suggestions": 1
+}
+```
+
+**Action Types:**
+| Action Type | Description |
+|------------|-------------|
+| `RECLASSIFY_TO_ASSET` | Reclassify expense to fixed asset |
+| `CREATE_DEPRECIATION` | Create depreciation schedule entry |
+| `CORRECT_VAT_RATE` | Correct VAT rate calculation |
+| `ALLOCATE_OPEN_ITEM` | Allocate payment to AR/AP item |
+| `FLAG_DOCUMENT_INVALID` | Flag document as invalid/missing |
+| `LOCK_PERIOD` | Lock accounting period |
+| `REVERSE_JOURNAL_ENTRY` | Reverse a journal entry |
+| `CREATE_ADJUSTMENT_ENTRY` | Create adjustment entry |
+
+---
+
+### POST /issues/{issue_id}/decide
+
+Make a decision on an issue.
+
+**Request Body:**
+```json
+{
+  "suggested_action_id": "uuid",
+  "action_type": "CREATE_DEPRECIATION",
+  "decision": "APPROVED",
+  "override_parameters": null,
+  "notes": "Approved monthly depreciation"
+}
+```
+
+**Query Parameters:**
+- `auto_execute` (boolean, default: true) - Execute immediately after approval
+
+**Decision Types:**
+- `APPROVED` - Accept and execute the suggestion
+- `REJECTED` - Reject the suggestion (remembered for learning)
+- `OVERRIDDEN` - Approve with custom parameters
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "issue_id": "uuid",
+  "suggested_action_id": "uuid",
+  "action_type": "CREATE_DEPRECIATION",
+  "decision": "APPROVED",
+  "override_parameters": null,
+  "notes": "Approved monthly depreciation",
+  "decided_by_id": "uuid",
+  "decided_at": "2024-01-26T10:30:00Z",
+  "execution_status": "EXECUTED",
+  "executed_at": "2024-01-26T10:30:01Z",
+  "execution_error": null,
+  "result_journal_entry_id": "uuid",
+  "is_reversible": true
+}
+```
+
+**Execution Status:**
+- `PENDING` - Awaiting execution
+- `EXECUTED` - Successfully executed
+- `FAILED` - Execution failed
+- `ROLLED_BACK` - Action was reversed
+
+---
+
+### POST /decisions/{decision_id}/execute
+
+Execute a previously approved decision (if auto_execute was false).
+
+**Response:**
+```json
+{
+  "decision_id": "uuid",
+  "execution_status": "EXECUTED",
+  "executed_at": "2024-01-26T10:30:01Z",
+  "result_journal_entry_id": "uuid",
+  "error_message": null,
+  "message": "Execution successful"
+}
+```
+
+---
+
+### POST /decisions/{decision_id}/reverse
+
+Reverse an executed decision.
+
+**Request Body:**
+```json
+{
+  "reason": "Incorrect depreciation amount"
+}
+```
+
+**Response:**
+```json
+{
+  "decision_id": "uuid",
+  "reversed_at": "2024-01-26T11:00:00Z",
+  "reversal_journal_entry_id": "uuid",
+  "message": "Decision reversed successfully. Issue has been re-opened."
+}
+```
+
+---
+
+### GET /clients/{client_id}/decision-history
+
+Get decision history for a client.
+
+**Query Parameters:**
+- `limit` (integer, default: 50) - Max results to return
+- `offset` (integer, default: 0) - Pagination offset
+
+**Response:**
+```json
+{
+  "client_id": "uuid",
+  "client_name": "Example BV",
+  "total_decisions": 25,
+  "decisions": [
+    {
+      "id": "uuid",
+      "issue_id": "uuid",
+      "issue_title": "Unposted depreciation: Laptop",
+      "issue_code": "DEPRECIATION_NOT_POSTED",
+      "action_type": "CREATE_DEPRECIATION",
+      "decision": "APPROVED",
+      "decided_by_name": "Jan Accountant",
+      "decided_at": "2024-01-26T10:30:00Z",
+      "execution_status": "EXECUTED",
+      "is_reversible": true
+    }
+  ]
+}
+```
+
+---
+
+### GET /clients/{client_id}/decision-patterns
+
+Get learned decision patterns for a client.
+
+**Response:**
+```json
+{
+  "client_id": "uuid",
+  "client_name": "Example BV",
+  "patterns": [
+    {
+      "id": "uuid",
+      "issue_code": "DEPRECIATION_NOT_POSTED",
+      "action_type": "CREATE_DEPRECIATION",
+      "approval_count": 5,
+      "rejection_count": 0,
+      "confidence_boost": 0.25,
+      "last_approved_at": "2024-01-26T10:30:00Z",
+      "last_rejected_at": null
+    }
+  ]
+}
+```
+
+---
+
 ## Data Model Summary
 
 ### Journal Entries
@@ -366,3 +566,8 @@ All endpoints return standard error responses:
 ### Issues
 - `client_issues` - Consistency issues found by validation engine
 - `validation_runs` - Audit trail of validation runs
+
+### Decision Engine
+- `suggested_actions` - Suggested actions for issues with confidence scores
+- `accountant_decisions` - Accountant decisions with audit trail
+- `decision_patterns` - Learning patterns for confidence boosting

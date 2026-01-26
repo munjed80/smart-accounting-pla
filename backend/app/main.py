@@ -5,7 +5,7 @@ import redis.asyncio as redis
 
 from app.core.config import settings
 from app.core.database import engine
-from app.api.v1 import auth, administrations, documents, transactions
+from app.api.v1 import auth, administrations, documents, transactions, dashboard
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -29,6 +29,7 @@ api_v1_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_v1_router.include_router(administrations.router, prefix="/administrations", tags=["administrations"])
 api_v1_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 api_v1_router.include_router(transactions.router, prefix="/transactions", tags=["transactions"])
+api_v1_router.include_router(dashboard.router, prefix="/accountant", tags=["accountant-dashboard"])
 
 app.include_router(api_v1_router)
 

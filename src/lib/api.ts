@@ -281,6 +281,69 @@ export const documentApi = {
   },
 }
 
+// Accountant Dashboard Types
+export type ClientStatus = 'GREEN' | 'YELLOW' | 'RED'
+export type BTWQuarterStatus = 'ON_TRACK' | 'PENDING_DOCS' | 'DEADLINE_APPROACHING' | 'OVERDUE' | 'NOT_APPLICABLE'
+export type IssueSeverity = 'ERROR' | 'WARNING' | 'INFO'
+export type IssueCategory = 'MISSING_DOCUMENT' | 'PROCESSING_ERROR' | 'VALIDATION_ERROR' | 'BTW_DEADLINE' | 'UNBALANCED_TRANSACTION' | 'DRAFT_PENDING' | 'LOW_CONFIDENCE'
+
+export interface DashboardIssue {
+  id: string
+  category: IssueCategory
+  severity: IssueSeverity
+  title: string
+  description: string
+  suggested_action: string
+  related_entity_id: string | null
+  related_entity_type: string | null
+  created_at: string
+}
+
+export interface ClientOverview {
+  id: string
+  name: string
+  kvk_number: string | null
+  btw_number: string | null
+  status: ClientStatus
+  last_document_upload: string | null
+  btw_quarter_status: BTWQuarterStatus
+  current_quarter: string
+  error_count: number
+  warning_count: number
+  issues: DashboardIssue[]
+  total_transactions: number
+  draft_transactions: number
+  failed_documents: number
+}
+
+export interface AccountantDashboardResponse {
+  total_clients: number
+  clients_needing_attention: number
+  clients_with_errors: number
+  clients: ClientOverview[]
+  global_issues: DashboardIssue[]
+  generated_at: string
+}
+
+export interface ClientIssuesResponse {
+  client_id: string
+  client_name: string
+  total_issues: number
+  issues: DashboardIssue[]
+}
+
+export const accountantDashboardApi = {
+  getDashboard: async (): Promise<AccountantDashboardResponse> => {
+    const response = await api.get<AccountantDashboardResponse>('/api/v1/accountant/dashboard')
+    return response.data
+  },
+
+  getClientIssues: async (clientId: string): Promise<ClientIssuesResponse> => {
+    const response = await api.get<ClientIssuesResponse>(`/api/v1/accountant/dashboard/client/${clientId}/issues`)
+    return response.data
+  },
+}
+
 export interface ApiError {
   message: string
   detail?: string

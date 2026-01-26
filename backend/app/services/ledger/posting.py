@@ -152,8 +152,13 @@ class LedgerService:
                 vat_code_id=line_data.get("vat_code_id"),
                 vat_amount=Decimal(str(line_data["vat_amount"])) if line_data.get("vat_amount") else None,
                 taxable_amount=Decimal(str(line_data["taxable_amount"])) if line_data.get("taxable_amount") else None,
+                # Extended VAT fields for Dutch BTW compliance
+                vat_base_amount=Decimal(str(line_data["vat_base_amount"])) if line_data.get("vat_base_amount") else None,
+                vat_country=line_data.get("vat_country"),
+                vat_is_reverse_charge=line_data.get("vat_is_reverse_charge", False),
                 party_type=line_data.get("party_type"),
                 party_id=line_data.get("party_id"),
+                party_vat_number=line_data.get("party_vat_number"),
             )
             self.db.add(line)
         
@@ -310,7 +315,7 @@ class LedgerService:
                 )
             effective_reversal_date = next_open_period.start_date
         
-        # Create reversal lines (swap debit/credit)
+        # Create reversal lines (swap debit/credit, preserve VAT data for reporting)
         result = await self.db.execute(
             select(JournalLine).where(JournalLine.journal_entry_id == entry_id)
         )
@@ -318,14 +323,27 @@ class LedgerService:
         
         reversal_lines = []
         for line in original_lines:
+            # Negate VAT amounts for reversal
+            vat_amount = line.vat_amount
+            if vat_amount:
+                vat_amount = -vat_amount
+            vat_base_amount = line.vat_base_amount
+            if vat_base_amount:
+                vat_base_amount = -vat_base_amount
+            
             reversal_lines.append({
                 "account_id": line.account_id,
                 "debit_amount": line.credit_amount,  # Swap
                 "credit_amount": line.debit_amount,  # Swap
                 "description": f"Reversal: {line.description or ''}",
                 "vat_code_id": line.vat_code_id,
+                "vat_amount": vat_amount,
+                "vat_base_amount": vat_base_amount,
+                "vat_country": line.vat_country,
+                "vat_is_reverse_charge": line.vat_is_reverse_charge,
                 "party_type": line.party_type,
                 "party_id": line.party_id,
+                "party_vat_number": line.party_vat_number,
             })
         
         # Create the reversal entry

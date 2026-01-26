@@ -797,12 +797,246 @@ Get audit logs for a period.
 
 ---
 
+## Dutch VAT/BTW Filing API
+
+The VAT Filing API provides accountant-only endpoints for Dutch VAT returns (BTW Aangifte).
+
+### VAT Code Categories
+
+| Category | Description |
+|----------|-------------|
+| `SALES` | Standard sales VAT |
+| `PURCHASES` | Standard purchase VAT (input tax) |
+| `REVERSE_CHARGE` | Reverse charge mechanism |
+| `INTRA_EU` | Intra-EU transactions |
+| `EXEMPT` | VAT exempt transactions |
+| `ZERO_RATE` | Zero-rate taxable supplies |
+
+### Dutch VAT Return Boxes
+
+| Box | Description |
+|-----|-------------|
+| 1a | Leveringen/diensten belast met hoog tarief (21%) |
+| 1b | Leveringen/diensten belast met laag tarief (9%) |
+| 1c | Leveringen/diensten belast met ander tarief |
+| 1d | Privégebruik |
+| 1e | Leveringen/diensten belast met 0% of niet bij u belast |
+| 2a | Verwerving uit landen binnen de EU |
+| 3a | Leveringen naar landen buiten de EU |
+| 3b | Leveringen naar/diensten in landen binnen de EU (ICP) |
+| 4a | Verlegde btw - diensten uit EU |
+| 4b | Verlegde btw - overig |
+| 5a | Verschuldigde btw (subtotaal) |
+| 5b | Voorbelasting |
+| 5c | Subtotaal (5a - 5b) |
+| 5g | Totaal te betalen / te ontvangen |
+
+---
+
+### GET /clients/{client_id}/periods/{period_id}/reports/vat
+
+Generate Dutch VAT return (BTW Aangifte) report for a period.
+
+**Query Parameters:**
+- `allow_draft` (boolean, default: false) - Allow report generation for OPEN periods
+
+**Response:**
+```json
+{
+  "period_id": "uuid",
+  "period_name": "2024-Q1",
+  "start_date": "2024-01-01",
+  "end_date": "2024-03-31",
+  "generated_at": "2024-01-26T15:00:00Z",
+  "boxes": {
+    "1a": {
+      "box_code": "1a",
+      "box_name": "Leveringen/diensten belast met hoog tarief (21%)",
+      "turnover_amount": "10000.00",
+      "vat_amount": "2100.00",
+      "transaction_count": 45
+    },
+    "5b": {
+      "box_code": "5b",
+      "box_name": "Voorbelasting",
+      "turnover_amount": "0.00",
+      "vat_amount": "500.00",
+      "transaction_count": 0
+    },
+    "5g": {
+      "box_code": "5g",
+      "box_name": "Totaal te betalen / te ontvangen",
+      "turnover_amount": "0.00",
+      "vat_amount": "1600.00",
+      "transaction_count": 0
+    }
+  },
+  "vat_code_summaries": [
+    {
+      "vat_code_id": "uuid",
+      "vat_code": "NL_21",
+      "vat_code_name": "BTW 21%",
+      "vat_rate": "21.00",
+      "category": "SALES",
+      "base_amount": "10000.00",
+      "vat_amount": "2100.00",
+      "transaction_count": 45
+    }
+  ],
+  "total_turnover": "10000.00",
+  "total_vat_payable": "2100.00",
+  "total_vat_receivable": "500.00",
+  "net_vat": "1600.00",
+  "anomalies": [],
+  "has_red_anomalies": false,
+  "has_yellow_anomalies": false,
+  "icp_entries": [],
+  "total_icp_supplies": "0.00"
+}
+```
+
+---
+
+### GET /clients/{client_id}/periods/{period_id}/reports/vat/icp
+
+Get ICP (Intra-Community) supplies report for EU B2B transactions.
+
+**Response:**
+```json
+{
+  "period_id": "uuid",
+  "period_name": "2024-Q1",
+  "start_date": "2024-01-01",
+  "end_date": "2024-03-31",
+  "entries": [
+    {
+      "customer_vat_number": "DE123456789",
+      "country_code": "DE",
+      "customer_name": "German Customer GmbH",
+      "customer_id": "uuid",
+      "taxable_base": "5000.00",
+      "transaction_count": 3
+    },
+    {
+      "customer_vat_number": "BE0123456789",
+      "country_code": "BE",
+      "customer_name": "Belgian Company NV",
+      "customer_id": "uuid",
+      "taxable_base": "2500.00",
+      "transaction_count": 2
+    }
+  ],
+  "total_supplies": "7500.00",
+  "total_customers": 2
+}
+```
+
+---
+
+### POST /clients/{client_id}/periods/{period_id}/vat/validate
+
+Validate VAT data for a period and return anomalies.
+
+**Response:**
+```json
+{
+  "period_id": "uuid",
+  "period_name": "2024-Q1",
+  "anomalies": [
+    {
+      "id": "VAT_ANOMALY_0001",
+      "code": "VAT_RATE_MISMATCH",
+      "severity": "YELLOW",
+      "title": "VAT rate mismatch",
+      "description": "VAT amount €25.00 doesn't match expected €21.00 for base €100.00 at 21%.",
+      "journal_entry_id": "uuid",
+      "journal_line_id": "uuid",
+      "document_id": "uuid",
+      "suggested_fix": "Verify VAT calculation or correct the rate",
+      "amount_discrepancy": "4.00"
+    }
+  ],
+  "total_anomalies": 1,
+  "red_count": 0,
+  "yellow_count": 1,
+  "is_valid": true,
+  "message": "VAT data has 1 warning(s) that can be acknowledged."
+}
+```
+
+**Anomaly Codes:**
+
+| Code | Severity | Description |
+|------|----------|-------------|
+| `VAT_BASE_NO_AMOUNT` | YELLOW | VAT base amount without VAT amount |
+| `VAT_AMOUNT_NO_BASE` | YELLOW | VAT amount without base amount |
+| `VAT_RATE_MISMATCH` | YELLOW/RED | VAT amount doesn't match expected rate |
+| `ICP_NO_VAT_NUMBER` | RED | ICP supply without customer VAT number |
+| `RC_NO_COUNTRY` | YELLOW | Reverse charge without supplier country |
+| `VAT_NEGATIVE_UNEXPECTED` | YELLOW | Unexpected negative VAT amount |
+
+---
+
+### GET /accountant/vat-codes
+
+List all available Dutch VAT codes.
+
+**Query Parameters:**
+- `active_only` (boolean, default: true) - Only return active VAT codes
+
+**Response:**
+```json
+{
+  "vat_codes": [
+    {
+      "id": "uuid",
+      "code": "NL_21",
+      "name": "BTW 21%",
+      "description": "Standaard BTW tarief 21%",
+      "rate": "21.00",
+      "category": "SALES",
+      "box_mapping": {"turnover_box": "1a", "vat_box": "1a"},
+      "eu_only": false,
+      "requires_vat_number": false,
+      "is_reverse_charge": false,
+      "is_icp": false,
+      "is_active": true
+    },
+    {
+      "id": "uuid",
+      "code": "ICP_SUPPLIES",
+      "name": "ICL - Intracommunautaire levering",
+      "description": "Leveringen aan EU-landen",
+      "rate": "0.00",
+      "category": "INTRA_EU",
+      "box_mapping": {"turnover_box": "3b"},
+      "eu_only": true,
+      "requires_vat_number": true,
+      "is_reverse_charge": false,
+      "is_icp": true,
+      "is_active": true
+    }
+  ],
+  "total_count": 12
+}
+```
+
+---
+
 ## Data Model Summary
 
 ### Journal Entries
 - `journal_entries` - Header table with entry_number, date, description, totals
-- `journal_lines` - Lines with account_id, debit/credit amounts
+- `journal_lines` - Lines with account_id, debit/credit amounts, VAT fields
 - Double-entry enforced: sum(debit) == sum(credit) per entry
+
+### VAT/BTW
+- `vat_codes` - Dutch VAT codes with category, rate, and box mapping
+- `journal_lines.vat_code_id` - VAT code for each line
+- `journal_lines.vat_base_amount` - Base amount for VAT calculation
+- `journal_lines.vat_country` - Country code for EU transactions
+- `journal_lines.vat_is_reverse_charge` - Reverse charge indicator
+- `journal_lines.party_vat_number` - Customer/supplier VAT number for ICP
 
 ### Subledgers
 - `parties` - Customers (CUSTOMER) and suppliers (SUPPLIER)
@@ -824,5 +1058,5 @@ Get audit logs for a period.
 
 ### Period Control
 - `accounting_periods` - Extended with status (OPEN, REVIEW, FINALIZED, LOCKED)
-- `period_snapshots` - Immutable snapshots of financial reports at finalization
+- `period_snapshots` - Immutable snapshots of financial reports at finalization (includes VAT)
 - `period_audit_logs` - Complete audit trail of period control actions

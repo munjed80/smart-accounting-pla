@@ -277,8 +277,14 @@ class JournalLine(Base):
     )
     vat_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=True)
     taxable_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=True)
+    # Extended VAT fields for Dutch BTW compliance
+    vat_base_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=True)  # Base amount for VAT calculation
+    vat_country: Mapped[str] = mapped_column(String(2), nullable=True)  # ISO country code (e.g., NL, DE, BE)
+    vat_is_reverse_charge: Mapped[bool] = mapped_column(Boolean, default=False)  # Reverse charge indicator
     party_type: Mapped[str] = mapped_column(String(20), nullable=True)  # CUSTOMER, SUPPLIER
     party_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=True)
+    # Party VAT number for ICP reporting
+    party_vat_number: Mapped[str] = mapped_column(String(30), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

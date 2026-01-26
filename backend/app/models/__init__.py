@@ -9,6 +9,7 @@ from app.models.subledger import Party, OpenItem, OpenItemAllocation
 from app.models.assets import FixedAsset, DepreciationSchedule
 from app.models.issues import ClientIssue, ValidationRun
 from app.models.decisions import SuggestedAction, AccountantDecision, DecisionPattern
+from app.models.alerts import Alert, AlertSeverity, AlertCode
 
 __all__ = [
     "User",
@@ -36,4 +37,7 @@ __all__ = [
     "SuggestedAction",
     "AccountantDecision",
     "DecisionPattern",
+    "Alert",
+    "AlertSeverity",
+    "AlertCode",
 ]

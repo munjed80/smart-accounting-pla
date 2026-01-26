@@ -1406,3 +1406,412 @@ New fields added to the `documents` table:
 | `notes` | text | Additional notes |
 | `ip_address` | string | Client IP for audit |
 | `result_journal_entry_id` | uuid | Resulting journal entry (for POST) |
+
+---
+
+## Observability & Ops Control API
+
+The observability API provides application health monitoring, metrics, and alerting for accountants.
+
+### Base URL
+
+```
+/api/v1/ops
+```
+
+### GET /health (root level)
+
+Comprehensive health check endpoint. No authentication required.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-26T10:00:00Z",
+  "components": {
+    "database": {
+      "status": "healthy",
+      "message": "Connected"
+    },
+    "redis": {
+      "status": "healthy",
+      "message": "Connected"
+    },
+    "migrations": {
+      "status": "healthy",
+      "message": "5/5 key tables present"
+    },
+    "background_tasks": {
+      "status": "healthy",
+      "message": "No background task queue configured"
+    }
+  }
+}
+```
+
+**Component Statuses:**
+- `healthy` - Component is functioning normally
+- `unhealthy` - Component has an error
+- `warning` - Component has a minor issue
+- `unknown` - Component status cannot be determined
+
+---
+
+### GET /metrics
+
+Get application metrics. Requires accountant role.
+
+**Query Parameters:**
+- `administration_id` (uuid, optional) - Filter metrics by client
+
+**Response:**
+```json
+{
+  "timestamp": "2024-01-26T10:00:00Z",
+  "scope": "global",
+  "administration_id": null,
+  "documents": {
+    "documents_processed_today": 15,
+    "documents_uploaded_today": 20,
+    "documents_failed_today": 2,
+    "documents_by_status": {
+      "UPLOADED": 5,
+      "PROCESSING": 3,
+      "POSTED": 100,
+      "REJECTED": 10
+    },
+    "documents_pending_review": 8,
+    "documents_in_processing": 3
+  },
+  "issues": {
+    "issues_created_today": {
+      "red": 1,
+      "yellow": 3,
+      "total": 4
+    },
+    "active_issues": {
+      "red": 5,
+      "yellow": 12,
+      "total": 17
+    },
+    "issues_resolved_today": 6
+  },
+  "decisions": {
+    "decisions_today": {
+      "approved": 8,
+      "rejected": 2,
+      "overridden": 1,
+      "total": 11
+    },
+    "execution_today": {
+      "executed": 9,
+      "failed": 1,
+      "pending": 1
+    }
+  },
+  "postings": {
+    "postings_created_today": 12,
+    "draft_entries": 5,
+    "entries_by_status": {
+      "DRAFT": 5,
+      "POSTED": 200,
+      "REVERSED": 3
+    }
+  },
+  "alerts": {
+    "active_alerts": {
+      "critical": 2,
+      "warning": 5,
+      "info": 3,
+      "total": 10
+    },
+    "alerts_created_today": 4,
+    "alerts_resolved_today": 2
+  },
+  "summary": {
+    "documents_processed_today": 15,
+    "issues_created_today": 4,
+    "red_issues_active": 5,
+    "decisions_approved_today": 8,
+    "decisions_rejected_today": 2,
+    "postings_created_today": 12,
+    "failed_operations_count": 3,
+    "active_critical_alerts": 2
+  }
+}
+```
+
+---
+
+### GET /alerts
+
+List active alerts.
+
+**Query Parameters:**
+- `administration_id` (uuid, optional) - Filter by client
+- `severity` (string, optional) - Filter by severity (CRITICAL, WARNING, INFO)
+- `include_resolved` (boolean, default: false) - Include resolved alerts
+- `limit` (integer, default: 100, max: 500) - Maximum results
+
+**Response:**
+```json
+{
+  "alerts": [
+    {
+      "id": "uuid",
+      "alert_code": "RED_ISSUE_UNRESOLVED",
+      "severity": "CRITICAL",
+      "title": "RED issue unresolved for 10 days",
+      "message": "Issue 'AR Reconciliation Mismatch' has been unresolved for 10 days. Immediate action required.",
+      "entity_type": "issue",
+      "entity_id": "uuid",
+      "administration_id": "uuid",
+      "context": "{\"issue_code\": \"AR_RECON_MISMATCH\", \"days_old\": 10}",
+      "created_at": "2024-01-26T10:00:00Z",
+      "acknowledged_at": null,
+      "acknowledged_by_id": null,
+      "resolved_at": null,
+      "resolved_by_id": null,
+      "resolution_notes": null,
+      "auto_resolved": false
+    }
+  ],
+  "total_count": 10,
+  "active_count": 10,
+  "acknowledged_count": 3,
+  "critical_count": 2,
+  "warning_count": 5,
+  "info_count": 3
+}
+```
+
+---
+
+### GET /alerts/grouped
+
+Get alerts grouped by severity for dashboard display.
+
+**Query Parameters:**
+- `administration_id` (uuid, optional) - Filter by client
+
+**Response:**
+```json
+{
+  "critical": [/* alerts array */],
+  "warning": [/* alerts array */],
+  "info": [/* alerts array */],
+  "counts": {
+    "critical": 2,
+    "warning": 5,
+    "info": 3,
+    "total": 10
+  }
+}
+```
+
+---
+
+### GET /alerts/counts
+
+Get counts of active alerts by severity.
+
+**Query Parameters:**
+- `administration_id` (uuid, optional) - Filter by client
+
+**Response:**
+```json
+{
+  "critical": 2,
+  "warning": 5,
+  "info": 3,
+  "total": 10
+}
+```
+
+---
+
+### GET /alerts/{alert_id}
+
+Get a single alert by ID.
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "alert_code": "DOCUMENT_BACKLOG_HIGH",
+  "severity": "WARNING",
+  "title": "Document backlog: 25 documents pending",
+  "message": "There are 25 documents waiting for processing or review.",
+  "entity_type": "document",
+  "entity_id": null,
+  "administration_id": "uuid",
+  "context": "{\"backlog_count\": 25}",
+  "created_at": "2024-01-26T10:00:00Z",
+  "acknowledged_at": "2024-01-26T11:00:00Z",
+  "acknowledged_by_id": "uuid",
+  "resolved_at": null,
+  "resolved_by_id": null,
+  "resolution_notes": null,
+  "auto_resolved": false
+}
+```
+
+---
+
+### POST /alerts/{alert_id}/acknowledge
+
+Acknowledge an alert (mark as seen but still active).
+
+**Response:** Returns the updated alert object.
+
+---
+
+### POST /alerts/{alert_id}/resolve
+
+Resolve an alert.
+
+**Request Body:**
+```json
+{
+  "notes": "Issue fixed by reviewing documents"
+}
+```
+
+**Response:** Returns the updated alert object.
+
+---
+
+### POST /alerts/check/{administration_id}
+
+Manually trigger alert checks for a client.
+
+**Response:**
+```json
+{
+  "alerts": [/* newly created alerts */],
+  "total_count": 2,
+  "active_count": 2,
+  "acknowledged_count": 0,
+  "critical_count": 1,
+  "warning_count": 1,
+  "info_count": 0
+}
+```
+
+---
+
+### Alert Codes
+
+| Code | Severity | Description |
+|------|----------|-------------|
+| `RED_ISSUE_UNRESOLVED` | CRITICAL | RED issue unresolved for 7+ days |
+| `YELLOW_ISSUE_BACKLOG` | WARNING | Multiple unresolved YELLOW issues |
+| `VAT_ANOMALIES_DETECTED` | CRITICAL/WARNING | VAT report has anomalies |
+| `VAT_DEADLINE_APPROACHING` | WARNING | VAT filing deadline approaching |
+| `POSTING_TO_FINALIZED_PERIOD` | WARNING | Attempted posting to FINALIZED period |
+| `POSTING_TO_LOCKED_PERIOD` | WARNING | Attempted posting to LOCKED period |
+| `PERIOD_LOCK_PENDING` | INFO | Period ready for locking |
+| `DOCUMENT_BACKLOG_HIGH` | WARNING | Document backlog above threshold |
+| `DOCUMENT_PROCESSING_FAILED` | WARNING | Document processing failed |
+| `DOCUMENT_STUCK_PROCESSING` | WARNING | Document stuck in processing |
+| `BACKGROUND_OPERATION_FAILED` | CRITICAL | Background operation failed after retries |
+| `RATE_LIMIT_EXCEEDED` | WARNING | Rate limit exceeded for operation |
+| `SYSTEM_HEALTH_DEGRADED` | CRITICAL | System health check failed |
+
+---
+
+### Alerts Table Schema
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | uuid | Primary key |
+| `administration_id` | uuid | Client (nullable for system alerts) |
+| `alert_code` | string | Alert type code |
+| `severity` | enum | CRITICAL, WARNING, INFO |
+| `title` | string | Alert title |
+| `message` | text | Detailed message |
+| `entity_type` | string | Related entity type |
+| `entity_id` | uuid | Related entity ID |
+| `context` | text | JSON with additional context |
+| `created_at` | datetime | When alert was created |
+| `acknowledged_at` | datetime | When alert was acknowledged |
+| `acknowledged_by_id` | uuid | User who acknowledged |
+| `resolved_at` | datetime | When alert was resolved |
+| `resolved_by_id` | uuid | User who resolved |
+| `resolution_notes` | text | Resolution notes |
+| `auto_resolved` | boolean | Whether auto-resolved |
+
+---
+
+## Ops Safeguards
+
+The platform includes protective safeguards:
+
+### Rate Limits
+
+| Operation | Limit | Window |
+|-----------|-------|--------|
+| `recalculate` | 5 calls | 60 seconds |
+| `vat_report` | 10 calls | 60 seconds |
+| `document_reprocess` | 20 calls | 60 seconds |
+| `period_finalize` | 3 calls | 300 seconds |
+| `bulk_post` | 5 calls | 60 seconds |
+
+### Exponential Backoff
+
+Failed operations are retried with exponential backoff:
+- Initial delay: 1 second
+- Maximum delay: 60 seconds
+- Maximum retries: 3-5 depending on operation
+
+### Idempotency
+
+Operations include idempotency checks to prevent duplicate processing.
+
+---
+
+## Structured Logging
+
+All key events are logged with structured JSON format including:
+- `timestamp` - Event timestamp
+- `event` - Event type (e.g., `document.posted`)
+- `severity` - INFO, WARN, ERROR
+- `entity_type` - document, journal_entry, vat_report, period
+- `entity_id` - Related entity ID
+- `client_id` - Administration ID
+- `period_id` - Accounting period ID
+- `user_id` - User who triggered event
+- `message` - Human-readable message
+
+### Event Types
+
+**Document Events:**
+- `document.uploaded`
+- `document.posted`
+- `document.rejected`
+- `document.processing_failed`
+
+**Journal Entry Events:**
+- `journal_entry.created`
+- `journal_entry.reversed`
+
+**VAT Events:**
+- `vat_report.generated`
+
+**Period Events:**
+- `period.review_started`
+- `period.finalized`
+- `period.locked`
+- `period.posting_blocked`
+
+**Decision Events:**
+- `decision.approved`
+- `decision.rejected`
+
+**Alert Events:**
+- `alert.created`
+- `alert.resolved`
+
+**System Events:**
+- `system.operation_failed`
+- `system.rate_limit_exceeded`

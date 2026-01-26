@@ -64,8 +64,17 @@ const ChecklistItemRow = ({ item }: { item: ClosingChecklistItem }) => {
   const StatusIcon = config.icon
   const ItemIcon = itemIcons[item.name] || ClipboardText
 
+  // Use explicit border classes to work with CSS purging
+  const borderClass = item.status === 'PASSED' 
+    ? 'border-green-600/30' 
+    : item.status === 'FAILED' 
+      ? 'border-red-600/30' 
+      : item.status === 'WARNING' 
+        ? 'border-amber-600/30' 
+        : 'border-gray-600/30'
+
   return (
-    <div className={`p-4 rounded-lg border ${config.bg} border-${config.text.replace('text-', '')}/30`}>
+    <div className={`p-4 rounded-lg border ${config.bg} ${borderClass}`}>
       <div className="flex items-start gap-3">
         <div className={`p-2 rounded-lg ${config.bg}`}>
           <StatusIcon size={20} weight="fill" className={config.text} />

@@ -78,14 +78,18 @@ const ConfidenceIndicator = ({ confidence }: { confidence: number | null }) => {
   if (confidence === null) return <span className="text-muted-foreground">—</span>
   
   const percent = Math.round(confidence * 100)
-  let color = 'bg-red-500'
-  if (percent >= 85) color = 'bg-green-500'
-  else if (percent >= 65) color = 'bg-amber-500'
+  
+  // Use explicit color classes based on confidence level
+  const getColorClass = () => {
+    if (percent >= 85) return 'text-green-600'
+    if (percent >= 65) return 'text-amber-600'
+    return 'text-red-600'
+  }
   
   return (
     <div className="flex items-center gap-2">
-      <Progress value={percent} className={`w-16 h-2 ${color}`} />
-      <span className="text-xs">{percent}%</span>
+      <Progress value={percent} className="w-16 h-2" />
+      <span className={`text-xs font-medium ${getColorClass()}`}>{percent}%</span>
     </div>
   )
 }

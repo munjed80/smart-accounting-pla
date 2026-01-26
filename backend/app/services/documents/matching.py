@@ -65,10 +65,6 @@ class DocumentMatchingService:
             raise ValueError(f"Document {document_id} not found")
         
         # Clear existing suggested actions for idempotency
-        await self.db.execute(
-            select(DocumentSuggestedAction)
-            .where(DocumentSuggestedAction.document_id == document_id)
-        )
         existing_actions = await self.db.execute(
             select(DocumentSuggestedAction)
             .where(DocumentSuggestedAction.document_id == document_id)

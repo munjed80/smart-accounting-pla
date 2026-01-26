@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.ledger import JournalEntry, JournalLine, JournalEntryStatus, AccountingPeriod
+from app.models.ledger import JournalEntry, JournalLine, JournalEntryStatus, AccountingPeriod, PeriodStatus
 from app.models.accounting import ChartOfAccount
 from app.models.subledger import Party, OpenItem, OpenItemStatus
 from app.models.assets import FixedAsset, DepreciationSchedule
@@ -103,9 +103,20 @@ class LedgerService:
         # Find period for the entry date
         period = await self._find_period_for_date(entry_date)
         
-        # Check if period is closed
-        if period and period.is_closed:
-            raise LedgerError(f"Period {period.name} is closed and cannot accept new entries")
+        # Check period status - enforce period control rules
+        if period:
+            if period.status == PeriodStatus.LOCKED:
+                raise LedgerError(
+                    f"Period '{period.name}' is LOCKED and cannot accept any entries. "
+                    f"This period is immutable."
+                )
+            elif period.status == PeriodStatus.FINALIZED:
+                raise LedgerError(
+                    f"Period '{period.name}' is FINALIZED and cannot accept new entries. "
+                    f"To correct entries in this period, create a reversal in the next open period."
+                )
+            elif period.is_closed:
+                raise LedgerError(f"Period {period.name} is closed and cannot accept new entries")
         
         # Generate entry number
         entry_number = await self.get_next_entry_number()
@@ -251,6 +262,9 @@ class LedgerService:
         """
         Create a reversal entry for an existing posted entry.
         
+        If the original entry is in a FINALIZED period, the reversal
+        will be posted to the next OPEN period.
+        
         Returns the new reversal entry.
         """
         result = await self.db.execute(
@@ -268,6 +282,33 @@ class LedgerService:
         
         if entry.reversed_by_id:
             raise LedgerError("Entry has already been reversed")
+        
+        # Check if the original entry's period is LOCKED
+        if entry.period_id:
+            result = await self.db.execute(
+                select(AccountingPeriod).where(AccountingPeriod.id == entry.period_id)
+            )
+            original_period = result.scalar_one_or_none()
+            if original_period and original_period.status == PeriodStatus.LOCKED:
+                raise LedgerError(
+                    f"Cannot reverse entry in LOCKED period '{original_period.name}'. "
+                    f"Locked periods are completely immutable."
+                )
+        
+        # Determine the reversal date and period
+        effective_reversal_date = reversal_date
+        target_period = await self._find_period_for_date(reversal_date)
+        
+        # If the target period is FINALIZED or LOCKED, find the next OPEN period
+        if target_period and target_period.status in (PeriodStatus.FINALIZED, PeriodStatus.LOCKED):
+            next_open_period = await self._find_next_open_period(reversal_date)
+            if not next_open_period:
+                raise LedgerError(
+                    f"Cannot post reversal: target period '{target_period.name}' is "
+                    f"{target_period.status.value} and no subsequent OPEN period exists. "
+                    f"Please create a new open period first."
+                )
+            effective_reversal_date = next_open_period.start_date
         
         # Create reversal lines (swap debit/credit)
         result = await self.db.execute(
@@ -289,7 +330,7 @@ class LedgerService:
         
         # Create the reversal entry
         reversal = await self.create_journal_entry(
-            entry_date=reversal_date,
+            entry_date=effective_reversal_date,
             description=description or f"Reversal of {entry.entry_number}",
             lines=reversal_lines,
             source_type="REVERSAL",
@@ -313,6 +354,18 @@ class LedgerService:
             .where(AccountingPeriod.administration_id == self.administration_id)
             .where(AccountingPeriod.start_date <= entry_date)
             .where(AccountingPeriod.end_date >= entry_date)
+        )
+        return result.scalar_one_or_none()
+    
+    async def _find_next_open_period(self, after_date: date) -> Optional[AccountingPeriod]:
+        """Find the next OPEN or REVIEW period after a given date."""
+        result = await self.db.execute(
+            select(AccountingPeriod)
+            .where(AccountingPeriod.administration_id == self.administration_id)
+            .where(AccountingPeriod.status.in_([PeriodStatus.OPEN, PeriodStatus.REVIEW]))
+            .where(AccountingPeriod.start_date > after_date)
+            .order_by(AccountingPeriod.start_date)
+            .limit(1)
         )
         return result.scalar_one_or_none()
     

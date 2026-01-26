@@ -1092,3 +1092,192 @@ export const observabilityApi = {
     return response.data
   },
 }
+
+// ============ Accountant Master Dashboard Types ============
+
+export interface VATDeadlineInfo {
+  client_id: string
+  client_name: string
+  period_name: string
+  deadline_date: string
+  days_remaining: number
+  status: string
+}
+
+export interface AlertSeverityCounts {
+  critical: number
+  warning: number
+  info: number
+}
+
+export interface DashboardSummary {
+  total_clients: number
+  clients_with_red_issues: number
+  clients_in_review: number
+  upcoming_vat_deadlines_7d: number
+  upcoming_vat_deadlines_14d: number
+  upcoming_vat_deadlines_30d: number
+  document_backlog_total: number
+  alerts_by_severity: AlertSeverityCounts
+  vat_deadlines: VATDeadlineInfo[]
+  generated_at: string
+}
+
+export interface ClientStatusCard {
+  id: string
+  name: string
+  kvk_number: string | null
+  btw_number: string | null
+  last_activity_at: string | null
+  open_period_status: string | null
+  open_period_name: string | null
+  red_issue_count: number
+  yellow_issue_count: number
+  documents_needing_review_count: number
+  backlog_age_max_days: number | null
+  vat_anomaly_count: number
+  next_vat_deadline: string | null
+  days_to_vat_deadline: number | null
+  readiness_score: number
+  has_critical_alerts: boolean
+  needs_immediate_attention: boolean
+}
+
+export interface ClientsListResponse {
+  clients: ClientStatusCard[]
+  total_count: number
+  filtered_count: number
+  sort_by: string
+  sort_order: string
+  filters_applied: string[]
+  generated_at: string
+}
+
+export interface BulkOperationResultItem {
+  client_id: string
+  client_name: string
+  status: 'SUCCESS' | 'FAILED' | 'SKIPPED'
+  result_data: Record<string, unknown> | null
+  error_message: string | null
+  processed_at: string
+}
+
+export interface BulkOperationResponse {
+  id: string
+  operation_type: string
+  status: string
+  initiated_by_id: string
+  initiated_by_name: string | null
+  created_at: string
+  started_at: string | null
+  completed_at: string | null
+  total_clients: number
+  processed_clients: number
+  successful_clients: number
+  failed_clients: number
+  error_message: string | null
+  results: BulkOperationResultItem[]
+  message: string
+}
+
+export interface BulkRecalculateRequest {
+  client_ids?: string[]
+  filters?: Record<string, unknown>
+  force?: boolean
+  stale_only?: boolean
+  idempotency_key?: string
+}
+
+export interface BulkAckYellowRequest {
+  client_ids?: string[]
+  filters?: Record<string, unknown>
+  issue_codes?: string[]
+  notes?: string
+  idempotency_key?: string
+}
+
+export interface BulkGenerateVatDraftRequest {
+  client_ids?: string[]
+  filters?: Record<string, unknown>
+  period_year: number
+  period_quarter: number
+  idempotency_key?: string
+}
+
+export interface BulkSendRemindersRequest {
+  client_ids?: string[]
+  filters?: Record<string, unknown>
+  reminder_type: string
+  title: string
+  message: string
+  due_date?: string
+  idempotency_key?: string
+}
+
+export interface BulkLockPeriodRequest {
+  client_ids?: string[]
+  filters?: Record<string, unknown>
+  period_year: number
+  period_quarter: number
+  confirm_irreversible: boolean
+  idempotency_key?: string
+}
+
+// Accountant Master Dashboard API
+export const accountantMasterDashboardApi = {
+  getSummary: async (): Promise<DashboardSummary> => {
+    const response = await api.get<DashboardSummary>('/api/v1/accountant/dashboard/summary')
+    return response.data
+  },
+
+  getClients: async (
+    sort?: string,
+    order?: string,
+    filters?: string[]
+  ): Promise<ClientsListResponse> => {
+    const params: Record<string, unknown> = {}
+    if (sort) params.sort = sort
+    if (order) params.order = order
+    if (filters && filters.length > 0) params.filter = filters
+    const response = await api.get<ClientsListResponse>('/api/v1/accountant/dashboard/clients', { params })
+    return response.data
+  },
+
+  bulkRecalculate: async (request: BulkRecalculateRequest): Promise<BulkOperationResponse> => {
+    const response = await api.post<BulkOperationResponse>('/api/v1/accountant/bulk/recalculate', request)
+    return response.data
+  },
+
+  bulkAckYellow: async (request: BulkAckYellowRequest): Promise<BulkOperationResponse> => {
+    const response = await api.post<BulkOperationResponse>('/api/v1/accountant/bulk/ack-yellow', request)
+    return response.data
+  },
+
+  bulkGenerateVatDraft: async (request: BulkGenerateVatDraftRequest): Promise<BulkOperationResponse> => {
+    const response = await api.post<BulkOperationResponse>('/api/v1/accountant/bulk/generate-vat-draft', request)
+    return response.data
+  },
+
+  bulkSendReminders: async (request: BulkSendRemindersRequest): Promise<BulkOperationResponse> => {
+    const response = await api.post<BulkOperationResponse>('/api/v1/accountant/bulk/send-reminders', request)
+    return response.data
+  },
+
+  bulkLockPeriod: async (request: BulkLockPeriodRequest): Promise<BulkOperationResponse> => {
+    const response = await api.post<BulkOperationResponse>('/api/v1/accountant/bulk/lock-period', request)
+    return response.data
+  },
+
+  getBulkOperation: async (operationId: string): Promise<BulkOperationResponse> => {
+    const response = await api.get<BulkOperationResponse>(`/api/v1/accountant/bulk/operations/${operationId}`)
+    return response.data
+  },
+
+  listBulkOperations: async (limit?: number, operationType?: string): Promise<{ operations: BulkOperationResponse[], total_count: number }> => {
+    const params: Record<string, unknown> = {}
+    if (limit) params.limit = limit
+    if (operationType) params.operation_type = operationType
+    const response = await api.get<{ operations: BulkOperationResponse[], total_count: number }>('/api/v1/accountant/bulk/operations', { params })
+    return response.data
+  },
+}

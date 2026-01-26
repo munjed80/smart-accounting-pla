@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext'
 import { LoginPage } from '@/components/LoginPage'
 import { SmartDashboard } from '@/components/SmartDashboard'
 import { AccountantDashboard } from '@/components/AccountantDashboard'
+import { AccountantHomePage } from '@/components/AccountantHomePage'
 import { IntelligentUploadPortal } from '@/components/IntelligentUploadPortal'
 import { SmartTransactionList } from '@/components/SmartTransactionList'
 import { Button } from '@/components/ui/button'
@@ -17,14 +18,15 @@ import {
   Receipt,
   Sparkle,
   Brain,
-  UsersThree
+  UsersThree,
+  Stack
 } from '@phosphor-icons/react'
 
 const AppContent = () => {
   const { user, isAuthenticated, isLoading, logout } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'transactions' | 'upload'>(
-    isAccountant ? 'clients' : 'dashboard'
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'transactions' | 'upload'>(
+    isAccountant ? 'workqueue' : 'dashboard'
   )
 
   if (isLoading) {
@@ -39,7 +41,7 @@ const AppContent = () => {
   }
 
   if (!isAuthenticated) {
-    return <LoginPage onSuccess={() => setActiveTab(isAccountant ? 'clients' : 'dashboard')} />
+    return <LoginPage onSuccess={() => setActiveTab(isAccountant ? 'workqueue' : 'dashboard')} />
   }
 
   return (
@@ -74,11 +76,21 @@ const AppContent = () => {
         </div>
       </nav>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'dashboard' | 'clients' | 'transactions' | 'upload')} className="w-full">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'dashboard' | 'clients' | 'workqueue' | 'transactions' | 'upload')} className="w-full">
         <div className="border-b border-border bg-secondary/30">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <TabsList className="bg-transparent border-none h-12">
-              {/* Accountant-specific: Client Overview (Master Dashboard) */}
+              {/* Accountant-specific: Work Queue (New Master Dashboard) */}
+              {isAccountant && (
+                <TabsTrigger 
+                  value="workqueue" 
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
+                >
+                  <Stack size={20} weight="duotone" />
+                  Work Queue
+                </TabsTrigger>
+              )}
+              {/* Accountant-specific: Client Overview (Original Dashboard) */}
               {isAccountant && (
                 <TabsTrigger 
                   value="clients" 
@@ -113,7 +125,14 @@ const AppContent = () => {
           </div>
         </div>
 
-        {/* Accountant Master Dashboard */}
+        {/* Accountant Work Queue (New Master Dashboard with Bulk Ops) */}
+        {isAccountant && (
+          <TabsContent value="workqueue" className="m-0">
+            <AccountantHomePage />
+          </TabsContent>
+        )}
+
+        {/* Accountant Client Dashboard (Original) */}
         {isAccountant && (
           <TabsContent value="clients" className="m-0">
             <AccountantDashboard />

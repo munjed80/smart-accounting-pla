@@ -10,6 +10,14 @@ from app.models.assets import FixedAsset, DepreciationSchedule
 from app.models.issues import ClientIssue, ValidationRun
 from app.models.decisions import SuggestedAction, AccountantDecision, DecisionPattern
 from app.models.alerts import Alert, AlertSeverity, AlertCode
+from app.models.accountant_dashboard import (
+    AccountantClientAssignment,
+    BulkOperation,
+    BulkOperationType,
+    BulkOperationStatus,
+    BulkOperationResult,
+    ClientReminder,
+)
 
 __all__ = [
     "User",
@@ -40,4 +48,10 @@ __all__ = [
     "Alert",
     "AlertSeverity",
     "AlertCode",
+    "AccountantClientAssignment",
+    "BulkOperation",
+    "BulkOperationType",
+    "BulkOperationStatus",
+    "BulkOperationResult",
+    "ClientReminder",
 ]

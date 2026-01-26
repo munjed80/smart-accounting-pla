@@ -1,11 +1,10 @@
-from typing import Annotated, List
+from typing import Annotated, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-import redis.asyncio as redis_async
 
 from app.core.database import get_db
 from app.core.config import settings
@@ -23,6 +22,27 @@ from app.schemas.document import DocumentResponse
 from app.api.v1.deps import CurrentUser
 
 router = APIRouter()
+
+
+async def enqueue_document_job_to_redis(job_data: dict) -> bool:
+    """Enqueue a document processing job to Redis. Returns True if successful."""
+    if not settings.redis_enabled:
+        print("Redis not configured - document processing job not queued")
+        return False
+    
+    try:
+        import redis.asyncio as redis_async
+        redis_client = redis_async.from_url(settings.REDIS_URL)
+        await redis_client.xadd(
+            "document_processing_stream",
+            job_data,
+            maxlen=10000,
+        )
+        await redis_client.close()
+        return True
+    except Exception as e:
+        print(f"Failed to enqueue job: {e}")
+        return False
 
 
 @router.post("", response_model=AdministrationResponse)
@@ -248,17 +268,7 @@ async def reprocess_document_in_admin(
         "original_filename": document.original_filename,
     }
     
-    try:
-        redis_client = redis_async.from_url(settings.REDIS_URL)
-        await redis_client.xadd(
-            "document_processing_stream",
-            job_data,
-            maxlen=10000,
-        )
-        await redis_client.close()
-    except Exception as e:
-        # Log error but don't fail - document status is already reset
-        print(f"Failed to enqueue job: {e}")
+    await enqueue_document_job_to_redis(job_data)
     
     return DocumentResponse(
         id=document.id,

@@ -6,6 +6,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
@@ -15,11 +16,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Make startup script executable
+RUN chmod +x /app/startup.sh
+
 # Create uploads directory
 RUN mkdir -p /data/uploads
 
 # Expose port
 EXPOSE 8000
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the startup script which handles migrations and starts uvicorn
+CMD ["/app/startup.sh"]

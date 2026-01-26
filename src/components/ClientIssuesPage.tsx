@@ -1,10 +1,12 @@
 /**
- * Client Issues Page
+ * Client Issues Page with Decision Engine
  * 
  * Displays all issues from the consistency engine for a specific client.
  * Features:
  * - List issues with severity (RED/YELLOW)
- * - Show suggested action for each issue
+ * - Show suggested actions per issue (Decision Engine)
+ * - Allow approve / reject / override decisions
+ * - Show "why this is suggested" in simple language
  * - Link to related entities (document/journal entry)
  * - Trigger recalculation
  */
@@ -16,13 +18,28 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/lib/AuthContext'
 import { 
   ledgerApi, 
+  decisionApi,
   LedgerClientIssuesResponse,
   LedgerClientIssue,
   LedgerIssueSeverity,
   RecalculateResponse,
+  SuggestedAction,
+  IssueSuggestionsResponse,
+  DecisionResponse,
+  ActionType,
+  DecisionType,
   getErrorMessage 
 } from '@/lib/api'
 import { 
@@ -35,7 +52,14 @@ import {
   BookOpen,
   User,
   CurrencyEur,
-  CaretRight
+  CaretRight,
+  CaretDown,
+  ThumbsUp,
+  ThumbsDown,
+  PencilSimple,
+  Lightning,
+  Lightbulb,
+  Gauge
 } from '@phosphor-icons/react'
 import { formatDistanceToNow, format } from 'date-fns'
 
@@ -81,10 +105,188 @@ const issueCodeIcons: Record<string, typeof FileText> = {
   VAT_NEGATIVE: CurrencyEur,
 }
 
-// Issue item component
-const IssueCard = ({ issue }: { issue: LedgerClientIssue }) => {
+// Action type display names
+const actionTypeLabels: Record<ActionType, string> = {
+  RECLASSIFY_TO_ASSET: 'Reclassify to Asset',
+  CREATE_DEPRECIATION: 'Create Depreciation Entry',
+  CORRECT_VAT_RATE: 'Correct VAT Rate',
+  ALLOCATE_OPEN_ITEM: 'Allocate Open Item',
+  FLAG_DOCUMENT_INVALID: 'Flag Document',
+  LOCK_PERIOD: 'Lock Period',
+  REVERSE_JOURNAL_ENTRY: 'Reverse Journal Entry',
+  CREATE_ADJUSTMENT_ENTRY: 'Create Adjustment Entry',
+}
+
+// Confidence score color based on value
+const getConfidenceColor = (score: number): string => {
+  if (score >= 0.8) return 'text-green-600 dark:text-green-400'
+  if (score >= 0.6) return 'text-blue-600 dark:text-blue-400'
+  if (score >= 0.4) return 'text-amber-600 dark:text-amber-400'
+  return 'text-gray-500'
+}
+
+// Suggested action card component
+const SuggestionCard = ({ 
+  suggestion,
+  onApprove,
+  onReject,
+  isProcessing,
+}: { 
+  suggestion: SuggestedAction
+  onApprove: () => void
+  onReject: () => void
+  isProcessing: boolean
+}) => {
+  const confidencePercent = Math.round(suggestion.confidence_score * 100)
+  
+  return (
+    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <Lightning size={16} weight="fill" className="text-blue-500" />
+            <span className="font-medium text-sm">{suggestion.title}</span>
+            {suggestion.is_auto_suggested && (
+              <Badge variant="outline" className="text-xs bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30">
+                Auto-suggested
+              </Badge>
+            )}
+          </div>
+          
+          <p className="text-sm text-muted-foreground mb-3">
+            {suggestion.explanation}
+          </p>
+          
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Gauge size={14} />
+              Confidence: 
+              <span className={`font-semibold ${getConfidenceColor(suggestion.confidence_score)}`}>
+                {confidencePercent}%
+              </span>
+            </span>
+            <span>
+              Action: {actionTypeLabels[suggestion.action_type]}
+            </span>
+          </div>
+        </div>
+        
+        <div className="flex flex-col gap-2">
+          <Button 
+            size="sm" 
+            onClick={onApprove}
+            disabled={isProcessing}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            <ThumbsUp size={14} className="mr-1" />
+            Approve
+          </Button>
+          <Button 
+            size="sm" 
+            variant="outline"
+            onClick={onReject}
+            disabled={isProcessing}
+            className="border-red-500/40 text-red-600 hover:bg-red-500/10"
+          >
+            <ThumbsDown size={14} className="mr-1" />
+            Reject
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Issue item component with suggestions
+const IssueCard = ({ 
+  issue,
+  onIssueResolved,
+}: { 
+  issue: LedgerClientIssue
+  onIssueResolved: () => void
+}) => {
   const severity = severityConfig[issue.severity]
   const Icon = issueCodeIcons[issue.issue_code] || FileText
+  
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [suggestions, setSuggestions] = useState<SuggestedAction[]>([])
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  
+  const loadSuggestions = async () => {
+    if (suggestions.length > 0) return // Already loaded
+    
+    setIsLoadingSuggestions(true)
+    setError(null)
+    try {
+      const response = await decisionApi.getIssueSuggestions(issue.id)
+      setSuggestions(response.suggestions)
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setIsLoadingSuggestions(false)
+    }
+  }
+  
+  const handleExpand = () => {
+    const newExpanded = !isExpanded
+    setIsExpanded(newExpanded)
+    if (newExpanded) {
+      loadSuggestions()
+    }
+  }
+  
+  const handleApprove = async (suggestion: SuggestedAction) => {
+    setIsProcessing(true)
+    setError(null)
+    setSuccessMessage(null)
+    
+    try {
+      const response = await decisionApi.makeDecision(issue.id, {
+        suggested_action_id: suggestion.id,
+        action_type: suggestion.action_type,
+        decision: 'APPROVED',
+      })
+      
+      if (response.execution_status === 'EXECUTED') {
+        setSuccessMessage('Action approved and executed successfully!')
+        // Notify parent to refresh
+        setTimeout(() => onIssueResolved(), 1500)
+      } else if (response.execution_status === 'FAILED') {
+        setError(`Execution failed: ${response.execution_error || 'Unknown error'}`)
+      } else {
+        setSuccessMessage('Action approved. Pending execution.')
+      }
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+  
+  const handleReject = async (suggestion: SuggestedAction) => {
+    setIsProcessing(true)
+    setError(null)
+    setSuccessMessage(null)
+    
+    try {
+      await decisionApi.makeDecision(issue.id, {
+        suggested_action_id: suggestion.id,
+        action_type: suggestion.action_type,
+        decision: 'REJECTED',
+      })
+      
+      setSuccessMessage('Suggestion rejected. This will be remembered for future suggestions.')
+      // Remove from list
+      setSuggestions(prev => prev.filter(s => s.id !== suggestion.id))
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setIsProcessing(false)
+    }
+  }
   
   return (
     <Card className={`${severity.bg} border ${severity.border}`}>
@@ -123,14 +325,14 @@ const IssueCard = ({ issue }: { issue: LedgerClientIssue }) => {
             )}
             
             {issue.suggested_action && (
-              <div className="bg-background/50 rounded-lg p-3 border">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Suggested Action:</p>
+              <div className="bg-background/50 rounded-lg p-3 border mb-3">
+                <p className="text-xs font-medium text-muted-foreground mb-1">Quick Suggestion:</p>
                 <p className="text-sm font-medium">{issue.suggested_action}</p>
               </div>
             )}
             
             {/* References */}
-            <div className="flex flex-wrap gap-2 mt-3">
+            <div className="flex flex-wrap gap-2 mt-3 mb-3">
               {issue.document_id && (
                 <Badge variant="secondary" className="text-xs">
                   <FileText size={12} className="mr-1" />
@@ -154,6 +356,61 @@ const IssueCard = ({ issue }: { issue: LedgerClientIssue }) => {
                   <CurrencyEur size={12} className="mr-1" />
                   €{issue.amount_discrepancy.toFixed(2)}
                 </Badge>
+              )}
+            </div>
+            
+            {/* Suggestions expansion */}
+            <div className="border-t pt-3 mt-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleExpand}
+                className="w-full justify-between"
+              >
+                <span className="flex items-center gap-2">
+                  <Lightbulb size={16} className="text-blue-500" />
+                  <span className="text-sm font-medium">
+                    {isExpanded ? 'Hide Suggested Actions' : 'View Suggested Actions'}
+                  </span>
+                </span>
+                {isExpanded ? <CaretDown size={16} /> : <CaretRight size={16} />}
+              </Button>
+              
+              {isExpanded && (
+                <div className="mt-3 space-y-3">
+                  {isLoadingSuggestions ? (
+                    <div className="space-y-2">
+                      <Skeleton className="h-24 w-full" />
+                    </div>
+                  ) : error ? (
+                    <Alert className="bg-red-500/10 border-red-500/30">
+                      <WarningCircle className="h-4 w-4 text-red-500" />
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  ) : successMessage ? (
+                    <Alert className="bg-green-500/10 border-green-500/30">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <AlertDescription>{successMessage}</AlertDescription>
+                    </Alert>
+                  ) : suggestions.length > 0 ? (
+                    suggestions.map((suggestion) => (
+                      <SuggestionCard
+                        key={suggestion.id}
+                        suggestion={suggestion}
+                        onApprove={() => handleApprove(suggestion)}
+                        onReject={() => handleReject(suggestion)}
+                        isProcessing={isProcessing}
+                      />
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-muted-foreground text-sm">
+                      <Lightbulb size={24} className="mx-auto mb-2 opacity-50" />
+                      No automated suggestions available for this issue.
+                      <br />
+                      Manual resolution may be required.
+                    </div>
+                  )}
+                </div>
               )}
             </div>
             
@@ -368,7 +625,7 @@ export const ClientIssuesPage = ({ clientId, onBack }: ClientIssuesPageProps) =>
             ) : issues?.issues && issues.issues.length > 0 ? (
               <div className="space-y-4">
                 {issues.issues.map((issue) => (
-                  <IssueCard key={issue.id} issue={issue} />
+                  <IssueCard key={issue.id} issue={issue} onIssueResolved={fetchIssues} />
                 ))}
               </div>
             ) : (

@@ -126,6 +126,9 @@ class ClientIssue(Base):
     party = relationship("Party", back_populates="issues")
     open_item = relationship("OpenItem", back_populates="issues")
     resolved_by = relationship("User")
+    # Decision engine relationships
+    suggested_actions = relationship("SuggestedAction", back_populates="issue", cascade="all, delete-orphan")
+    decisions = relationship("AccountantDecision", back_populates="issue", cascade="all, delete-orphan")
 
 
 class ValidationRun(Base):

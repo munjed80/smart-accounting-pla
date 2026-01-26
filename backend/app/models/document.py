@@ -43,6 +43,8 @@ class Document(Base):
     administration = relationship("Administration", back_populates="documents")
     extracted_fields = relationship("ExtractedField", back_populates="document", cascade="all, delete-orphan")
     transaction = relationship("Transaction", back_populates="document", uselist=False)
+    journal_entry = relationship("JournalEntry", back_populates="document", uselist=False)
+    issues = relationship("ClientIssue", back_populates="document")
 
 
 class ExtractedField(Base):

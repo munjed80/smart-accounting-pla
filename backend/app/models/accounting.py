@@ -24,6 +24,9 @@ class ChartOfAccount(Base):
         UUID(as_uuid=True), ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Control account flags for AR/AP reconciliation
+    is_control_account: Mapped[bool] = mapped_column(Boolean, default=False)
+    control_type: Mapped[str] = mapped_column(String(20), nullable=True)  # AR, AP, BANK, VAT
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -31,8 +34,10 @@ class ChartOfAccount(Base):
     # Relationships
     administration = relationship("Administration", back_populates="chart_of_accounts")
     transaction_lines = relationship("TransactionLine", back_populates="account")
+    journal_lines = relationship("JournalLine", back_populates="account")
     children = relationship("ChartOfAccount", back_populates="parent")
     parent = relationship("ChartOfAccount", back_populates="children", remote_side=[id])
+    issues = relationship("ClientIssue", back_populates="account")
 
 
 class VatCode(Base):
@@ -51,3 +56,4 @@ class VatCode(Base):
 
     # Relationships
     transaction_lines = relationship("TransactionLine", back_populates="vat_code")
+    journal_lines = relationship("JournalLine", back_populates="vat_code")

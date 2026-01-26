@@ -737,8 +737,3 @@ class TestDutchVATBoxNames:
         
         assert "betalen" in boxes["5g"]
         assert "ontvangen" in boxes["5g"]
-
-
-# Run tests with pytest
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

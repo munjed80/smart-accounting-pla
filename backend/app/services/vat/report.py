@@ -13,7 +13,7 @@ All operations are:
 - Testable: pure calculations where possible
 """
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import List, Dict, Optional, Any, Tuple
 from dataclasses import dataclass, field
@@ -214,7 +214,7 @@ class VatReportService:
             period_name=period.name,
             start_date=period.start_date,
             end_date=period.end_date,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(timezone.utc),
         )
         
         # Initialize all boxes

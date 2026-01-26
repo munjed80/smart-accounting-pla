@@ -470,6 +470,8 @@ class PeriodControlService:
                         result[key] = str(value)
                     elif isinstance(value, list):
                         result[key] = [convert_to_dict(item) for item in value]
+                    elif isinstance(value, dict):
+                        result[key] = {k: convert_to_dict(v) for k, v in value.items()}
                     elif hasattr(value, '__dict__'):
                         result[key] = convert_to_dict(value)
                     else:
@@ -483,14 +485,25 @@ class PeriodControlService:
         ap_dict = convert_to_dict(ap_report)
         trial_balance_dict = [convert_to_dict(tb) for tb in trial_balance]
         
-        # Calculate VAT summary (simplified - would need proper VAT account logic)
-        vat_summary = {
-            "period_start": period.start_date.isoformat(),
-            "period_end": period.end_date.isoformat(),
-            "vat_payable": "0.00",  # Would be calculated from VAT accounts
-            "vat_receivable": "0.00",
-            "net_vat": "0.00",
-        }
+        # Generate VAT summary using VatReportService
+        from app.services.vat import VatReportService
+        vat_service = VatReportService(self.db, self.administration_id)
+        try:
+            vat_report = await vat_service.generate_vat_report(period.id, allow_draft=True)
+            vat_summary = vat_service.report_to_dict(vat_report)
+        except Exception:
+            # Fallback if VAT report generation fails
+            vat_summary = {
+                "period_start": period.start_date.isoformat(),
+                "period_end": period.end_date.isoformat(),
+                "vat_payable": "0.00",
+                "vat_receivable": "0.00",
+                "net_vat": "0.00",
+            }
+        
+        # Extract VAT totals for snapshot summary
+        vat_payable = Decimal(vat_summary.get("total_vat_payable", "0.00"))
+        vat_receivable = Decimal(vat_summary.get("total_vat_receivable", "0.00"))
         
         # Create snapshot
         snapshot = PeriodSnapshot(
@@ -513,6 +526,8 @@ class PeriodControlService:
             net_income=pnl.net_income,
             total_ar=ar_report.total_open,
             total_ap=ap_report.total_open,
+            vat_payable=vat_payable,
+            vat_receivable=vat_receivable,
             acknowledged_yellow_issues=acknowledged_yellow_issues,
             issue_summary=validation_status.get("validation_summary"),
         )

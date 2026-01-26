@@ -38,6 +38,14 @@ class Administration(Base):
     documents = relationship("Document", back_populates="administration", cascade="all, delete-orphan")
     transactions = relationship("Transaction", back_populates="administration", cascade="all, delete-orphan")
     chart_of_accounts = relationship("ChartOfAccount", back_populates="administration", cascade="all, delete-orphan")
+    # Core ledger relationships
+    accounting_periods = relationship("AccountingPeriod", back_populates="administration", cascade="all, delete-orphan")
+    journal_entries = relationship("JournalEntry", back_populates="administration", cascade="all, delete-orphan")
+    parties = relationship("Party", back_populates="administration", cascade="all, delete-orphan")
+    open_items = relationship("OpenItem", back_populates="administration", cascade="all, delete-orphan")
+    fixed_assets = relationship("FixedAsset", back_populates="administration", cascade="all, delete-orphan")
+    client_issues = relationship("ClientIssue", back_populates="administration", cascade="all, delete-orphan")
+    validation_runs = relationship("ValidationRun", back_populates="administration", cascade="all, delete-orphan")
 
 
 class AdministrationMember(Base):

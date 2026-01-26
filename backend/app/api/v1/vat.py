@@ -72,21 +72,26 @@ async def verify_accountant_access(
     description="""
     Generate Dutch VAT return (BTW Aangifte) report for a period.
     
-    **Box Mapping:**
-    - 1a: Sales at 21% rate
-    - 1b: Sales at 9% rate
-    - 1c: Sales at other rates
-    - 1d: Private use
+    **Box Mapping (Belastingdienst compliant):**
+    - 1a: NL domestic supplies at 21% rate (leveringen/diensten hoog tarief)
+    - 1b: NL domestic supplies at 9% rate (leveringen/diensten laag tarief)
+    - 1c: Supplies at other rates
+    - 1d: Private use (privégebruik)
     - 1e: Zero-rate/exempt supplies
-    - 2a: Intra-EU acquisitions
+    - 2a: Domestic reverse charge (binnenlandse verlegging, e.g. construction)
     - 3a: Exports (outside EU)
-    - 3b: Intra-EU supplies (ICP)
-    - 4a: Reverse charge - EU services
-    - 4b: Reverse charge - other
-    - 5a: VAT payable (subtotal)
-    - 5b: Input VAT (voorbelasting)
+    - 3b: ICP - Intra-Community supplies to other EU countries
+    - 4a: Non-EU services reverse charge + import VAT (diensten/invoer buiten EU)
+    - 4b: Intra-EU acquisitions (goods/services from other EU countries)
+    - 5a: VAT payable (subtotal of 1a-1d, 2a, 4a, 4b)
+    - 5b: Input VAT / voorbelasting (deductible VAT)
     - 5c: Subtotal (5a - 5b)
     - 5g: Total to pay/receive
+    
+    **Key compliance notes:**
+    - EU acquisition purchases → 4b turnover + 4b VAT + 5b input VAT (net zero if deductible)
+    - Non-EU services reverse charge → 4a turnover + 4a VAT + 5b input VAT (net zero if deductible)
+    - ICP supplies → 3b turnover only (0% VAT)
     
     **Note:** Report can only be generated for REVIEW, FINALIZED, or LOCKED periods
     unless `allow_draft=true` is specified.

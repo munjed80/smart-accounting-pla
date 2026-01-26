@@ -48,6 +48,8 @@ class Administration(Base):
     validation_runs = relationship("ValidationRun", back_populates="administration", cascade="all, delete-orphan")
     # Decision engine relationships
     decision_patterns = relationship("DecisionPattern", back_populates="administration", cascade="all, delete-orphan")
+    # Alerts relationship
+    alerts = relationship("Alert", back_populates="administration", cascade="all, delete-orphan")
 
 
 class AdministrationMember(Base):

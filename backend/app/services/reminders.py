@@ -13,6 +13,12 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy import select, func, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
+try:
+    import httpx
+    HTTPX_AVAILABLE = True
+except ImportError:
+    HTTPX_AVAILABLE = False
+
 from app.models.administration import Administration
 from app.models.accountant_dashboard import (
     ClientReminder, 
@@ -374,9 +380,10 @@ class ReminderService:
         if not reminder.email_address:
             raise ReminderServiceError("No email address for client")
         
+        if not HTTPX_AVAILABLE:
+            raise ReminderServiceError("httpx package not installed - email sending unavailable")
+        
         try:
-            import httpx
-            
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     "https://api.resend.com/emails",

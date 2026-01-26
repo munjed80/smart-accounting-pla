@@ -8,6 +8,7 @@ Service layer for:
 """
 import uuid
 import hashlib
+import calendar
 from datetime import datetime, timezone, date, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from decimal import Decimal
@@ -22,7 +23,7 @@ from app.models.issues import ClientIssue, IssueSeverity
 from app.models.alerts import Alert, AlertSeverity, AlertCode
 from app.models.accountant_dashboard import AccountantClientAssignment
 from app.models.work_queue import (
-    ClientReadinessCache, 
+    ClientReadinessCache,
     EscalationEvent, 
     EscalationType,
     EscalationSeverity,
@@ -364,7 +365,6 @@ class WorkQueueService:
                     if next_month > 12:
                         deadline = date(period.end_date.year + 1, 1, 31)
                     else:
-                        import calendar
                         last_day = calendar.monthrange(period.end_date.year, next_month)[1]
                         deadline = date(period.end_date.year, next_month, last_day)
                 
@@ -660,7 +660,6 @@ class SLAService:
                 if next_month > 12:
                     deadline = date(period.end_date.year + 1, 1, 31)
                 else:
-                    import calendar
                     last_day = calendar.monthrange(period.end_date.year, next_month)[1]
                     deadline = date(period.end_date.year, next_month, last_day)
             

@@ -354,14 +354,26 @@ class EvidencePackService:
     ) -> Dict[str, Any]:
         """Build audit trail content."""
         # Get all journal entries with their history
+        # Limited to 10000 entries to prevent memory issues
+        MAX_ENTRIES = 10000
         entries_result = await self.db.execute(
             select(JournalEntry)
             .where(JournalEntry.administration_id == administration_id)
             .where(JournalEntry.transaction_date >= period.start_date)
             .where(JournalEntry.transaction_date <= period.end_date)
             .order_by(JournalEntry.created_at)
+            .limit(MAX_ENTRIES)
         )
         entries = entries_result.scalars().all()
+        
+        # Also get total count if truncated
+        count_result = await self.db.execute(
+            select(func.count(JournalEntry.id))
+            .where(JournalEntry.administration_id == administration_id)
+            .where(JournalEntry.transaction_date >= period.start_date)
+            .where(JournalEntry.transaction_date <= period.end_date)
+        )
+        total_count = count_result.scalar() or 0
         
         return {
             "audit_entries": [
@@ -377,7 +389,9 @@ class EvidencePackService:
                 }
                 for e in entries
             ],
-            "total_entries": len(entries),
+            "total_entries": total_count,
+            "entries_included": len(entries),
+            "truncated": total_count > MAX_ENTRIES,
         }
     
     async def get_evidence_pack(

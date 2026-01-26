@@ -161,7 +161,7 @@ class EvidencePack(Base):
     checksum: Mapped[str] = mapped_column(String(64), nullable=False)  # SHA256
     file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=True)
     snapshot_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=True)
-    metadata: Mapped[dict] = mapped_column(JSON, nullable=True)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=True)
     download_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_downloaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     last_downloaded_by_id: Mapped[uuid.UUID] = mapped_column(

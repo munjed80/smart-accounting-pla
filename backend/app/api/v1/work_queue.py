@@ -376,7 +376,7 @@ async def create_evidence_pack(
             file_size_bytes=pack.file_size_bytes,
             checksum=pack.checksum,
             download_count=pack.download_count,
-            metadata=pack.metadata,
+            metadata=pack.metadata_json,
         )
         
     except EvidenceRateLimitError as e:

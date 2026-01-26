@@ -187,7 +187,7 @@ class EvidencePackService:
             storage_path=str(relative_path),
             checksum=checksum,
             file_size_bytes=file_size,
-            metadata={
+            metadata_json={
                 "administration_name": administration.name,
                 "kvk_number": administration.kvk_number,
                 "btw_number": administration.btw_number,
@@ -519,7 +519,7 @@ class EvidencePackService:
                     "file_size_bytes": p.file_size_bytes,
                     "checksum": p.checksum,
                     "download_count": p.download_count,
-                    "metadata": p.metadata,
+                    "metadata": p.metadata_json,
                 }
                 for p in packs
             ],

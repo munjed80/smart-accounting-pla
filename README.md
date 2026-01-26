@@ -292,3 +292,90 @@ After deployment, verify the end-to-end flow works correctly:
 ## License
 
 MIT License - see LICENSE file
+
+## Operations Guide
+
+### Running Migrations
+
+After updating the codebase, run database migrations:
+
+```bash
+# Using Docker
+docker compose exec backend alembic upgrade head
+
+# Local development
+cd backend
+alembic upgrade head
+```
+
+### Environment Variables for New Features
+
+Add these to your `.env` file for enhanced functionality:
+
+```bash
+# Email Reminders (via Resend)
+RESEND_API_KEY=your_resend_api_key  # Optional - enables EMAIL channel
+RESEND_FROM_EMAIL=noreply@zzphub.nl # Default sender address
+
+# Evidence Pack Storage
+EVIDENCE_STORAGE_PATH=/data/evidence  # Where evidence packs are stored
+```
+
+### Starting the Server
+
+```bash
+# Development
+cd backend
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Production with Docker
+docker compose up -d
+```
+
+### Accountant Dashboard Features
+
+The accountant master dashboard provides:
+
+1. **Work Queue** - Unified work items across all clients
+   - Filter by: RED issues, Needs Review, VAT Due, Stale clients
+   - Sort by: Readiness score, Severity, Due date
+   
+2. **Readiness Score** (0-100)
+   - 80-100: Good health
+   - 50-79: Needs review
+   - 20-49: Significant issues
+   - 0-19: Critical attention required
+
+3. **SLA Monitoring**
+   - RED unresolved > 5 days = WARNING
+   - RED unresolved > 7 days = CRITICAL
+   - VAT due ≤ 14 days = WARNING
+   - VAT due ≤ 7 days = CRITICAL
+
+4. **Reminders**
+   - IN_APP: Always available
+   - EMAIL: Requires RESEND_API_KEY
+   - Schedule for future sending
+
+5. **Evidence Packs**
+   - VAT compliance export
+   - Includes journal entries, documents, validation status
+   - SHA256 checksum verification
+
+### API Rate Limits
+
+| Endpoint | Limit | Window |
+|----------|-------|--------|
+| Reminders | 10/min | per accountant |
+| Evidence Packs | 5/min | per accountant |
+| Bulk Operations | 5/min | per accountant |
+
+### Storage Requirements
+
+Evidence packs are stored at `EVIDENCE_STORAGE_PATH` (default: `/data/evidence`).
+Structure: `{client_id}/{period_id}/{filename}.json`
+
+Ensure this directory:
+- Is writable by the backend process
+- Has sufficient disk space
+- Is backed up regularly for compliance

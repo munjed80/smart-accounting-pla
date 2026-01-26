@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.core.database import engine
-from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard
+from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -37,6 +37,7 @@ api_v1_router.include_router(periods.router, prefix="/accountant", tags=["period
 api_v1_router.include_router(vat.router, prefix="/accountant", tags=["vat-btw-filing"])
 api_v1_router.include_router(review_queue.router, prefix="/accountant", tags=["document-review-queue"])
 api_v1_router.include_router(accountant_dashboard.router, prefix="/accountant", tags=["accountant-master-dashboard"])
+api_v1_router.include_router(work_queue.router, prefix="/accountant", tags=["work-queue-reminders-evidence"])
 api_v1_router.include_router(observability.router, prefix="/ops", tags=["observability"])
 
 app.include_router(api_v1_router)

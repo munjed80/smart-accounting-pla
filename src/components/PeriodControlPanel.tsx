@@ -43,8 +43,16 @@ import {
   FileText,
   ArrowsClockwise,
   ShieldCheck,
+  FileArchive,
+  Download,
+  Plus,
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
+import {
+  evidencePackApi,
+  EvidencePackResponse,
+  getErrorMessage,
+} from '@/lib/api'
 
 // Types
 type PeriodStatus = 'OPEN' | 'REVIEW' | 'FINALIZED' | 'LOCKED'
@@ -195,6 +203,138 @@ const IssueList = ({
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+// Inline Evidence Pack Panel (simplified version)
+const EvidencePackPanelInline = ({
+  clientId,
+  periodId,
+  periodName,
+}: {
+  clientId: string
+  periodId: string
+  periodName?: string
+}) => {
+  const [packs, setPacks] = useState<EvidencePackResponse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchPacks = async () => {
+      try {
+        setIsLoading(true)
+        const response = await evidencePackApi.list(clientId, periodId)
+        setPacks(response.packs)
+      } catch (err) {
+        setError(getErrorMessage(err))
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchPacks()
+  }, [clientId, periodId])
+
+  const handleGenerate = async () => {
+    try {
+      setIsGenerating(true)
+      setError(null)
+      const newPack = await evidencePackApi.generate(clientId, periodId, 'VAT_EVIDENCE')
+      setPacks(prev => [newPack, ...prev])
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleDownload = async (pack: EvidencePackResponse) => {
+    try {
+      const blob = await evidencePackApi.download(pack.id)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${pack.pack_type}_${periodName || 'pack'}_${format(new Date(pack.created_at || new Date()), 'yyyyMMdd')}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(getErrorMessage(err))
+    }
+  }
+
+  const formatSize = (bytes: number | null) => {
+    if (!bytes) return '—'
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold flex items-center gap-2">
+          <FileArchive size={16} />
+          Evidence Packs
+        </h4>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleGenerate}
+          disabled={isGenerating}
+        >
+          {isGenerating ? (
+            <ArrowsClockwise size={14} className="mr-1 animate-spin" />
+          ) : (
+            <Plus size={14} className="mr-1" />
+          )}
+          Generate
+        </Button>
+      </div>
+
+      {error && (
+        <Alert className="bg-destructive/10 border-destructive/40 py-2">
+          <AlertDescription className="text-xs">{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {isLoading ? (
+        <Skeleton className="h-10 w-full" />
+      ) : packs.length > 0 ? (
+        <div className="space-y-2">
+          {packs.slice(0, 3).map((pack) => (
+            <div
+              key={pack.id}
+              className="flex items-center justify-between p-2 rounded bg-muted/50 text-sm"
+            >
+              <div>
+                <span className="font-medium">
+                  {pack.pack_type === 'VAT_EVIDENCE' ? 'VAT Evidence' : 'Audit Trail'}
+                </span>
+                <span className="text-muted-foreground ml-2 text-xs">
+                  {pack.created_at && format(new Date(pack.created_at), 'MMM d, HH:mm')}
+                </span>
+                <span className="text-muted-foreground ml-2 text-xs">
+                  ({formatSize(pack.file_size_bytes)})
+                </span>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => handleDownload(pack)}>
+                <Download size={14} />
+              </Button>
+            </div>
+          ))}
+          {packs.length > 3 && (
+            <p className="text-xs text-muted-foreground">
+              +{packs.length - 3} more packs
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">No evidence packs yet</p>
+      )}
     </div>
   )
 }
@@ -581,6 +721,17 @@ export const PeriodControlPanel = ({
               This period is permanently locked and cannot be modified in any way.
             </AlertDescription>
           </Alert>
+        )}
+
+        {/* Evidence Pack Section - show for FINALIZED or LOCKED periods */}
+        {(period.status === 'FINALIZED' || period.status === 'LOCKED') && (
+          <div className="pt-4 border-t">
+            <EvidencePackPanelInline
+              clientId={clientId}
+              periodId={period.id}
+              periodName={period.name}
+            />
+          </div>
         )}
       </CardContent>
     </Card>

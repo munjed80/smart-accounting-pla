@@ -547,6 +547,256 @@ Get learned decision patterns for a client.
 
 ---
 
+## Period Control & Finalization API
+
+The Period Control API provides accountant-only endpoints for managing accounting period lifecycle.
+
+### Period Status Model
+
+| Status | Description | Posting Allowed | Modifications Allowed |
+|--------|-------------|-----------------|----------------------|
+| `OPEN` | Normal working period | ✅ Yes | ✅ Yes |
+| `REVIEW` | Under review, validation triggered | ✅ Yes | ✅ Yes |
+| `FINALIZED` | Closed for changes | ❌ No | ❌ No (reversals only) |
+| `LOCKED` | Immutable (hard lock) | ❌ No | ❌ No |
+
+### GET /clients/{client_id}/periods
+
+List accounting periods for a client.
+
+**Query Parameters:**
+- `status` (array, optional) - Filter by status (OPEN, REVIEW, FINALIZED, LOCKED)
+- `limit` (integer, default: 50) - Max results
+
+**Response:**
+```json
+{
+  "administration_id": "uuid",
+  "periods": [
+    {
+      "id": "uuid",
+      "name": "2024-Q1",
+      "period_type": "QUARTER",
+      "start_date": "2024-01-01",
+      "end_date": "2024-03-31",
+      "status": "OPEN",
+      "is_closed": false,
+      "created_at": "2024-01-01T00:00:00Z",
+      "finalized_at": null,
+      "locked_at": null
+    }
+  ],
+  "total_count": 4
+}
+```
+
+---
+
+### GET /clients/{client_id}/periods/{period_id}
+
+Get period details with current validation status.
+
+**Response:**
+```json
+{
+  "period": {
+    "id": "uuid",
+    "name": "2024-Q1",
+    "status": "REVIEW"
+  },
+  "validation": {
+    "red_issues": [
+      {
+        "id": "uuid",
+        "code": "AR_RECON_MISMATCH",
+        "title": "AR mismatch",
+        "description": "Control account doesn't match open items"
+      }
+    ],
+    "yellow_issues": [
+      {
+        "id": "uuid",
+        "code": "DEPRECIATION_NOT_POSTED",
+        "title": "Unposted depreciation"
+      }
+    ],
+    "can_finalize": false,
+    "validation_summary": {
+      "total_issues": 2,
+      "red_count": 1,
+      "yellow_count": 1
+    }
+  }
+}
+```
+
+---
+
+### POST /clients/{client_id}/periods/{period_id}/review
+
+Start the review process for a period. Triggers full validation.
+
+**Request Body:**
+```json
+{
+  "notes": "Quarterly review start"
+}
+```
+
+**Response:**
+```json
+{
+  "period": {
+    "id": "uuid",
+    "status": "REVIEW",
+    "review_started_at": "2024-01-26T10:00:00Z"
+  },
+  "validation_run_id": "uuid",
+  "issues_found": 5,
+  "message": "Period review started. Found 5 issues."
+}
+```
+
+---
+
+### POST /clients/{client_id}/periods/{period_id}/finalize
+
+Finalize an accounting period. Creates immutable snapshot.
+
+**Prerequisites:**
+- All RED issues must be resolved
+- All YELLOW issues must be explicitly acknowledged
+
+**Request Body:**
+```json
+{
+  "acknowledged_yellow_issues": ["uuid-1", "uuid-2"],
+  "notes": "Q1 2024 finalization complete"
+}
+```
+
+**Response:**
+```json
+{
+  "period": {
+    "id": "uuid",
+    "status": "FINALIZED",
+    "finalized_at": "2024-01-26T15:00:00Z"
+  },
+  "snapshot_id": "uuid",
+  "message": "Period finalized successfully. A snapshot of all financial reports has been created."
+}
+```
+
+**Error Response (Prerequisites not met):**
+```json
+{
+  "detail": {
+    "message": "Cannot finalize: 1 RED issues must be resolved first.",
+    "red_issues": [...],
+    "yellow_issues": [...]
+  }
+}
+```
+
+---
+
+### POST /clients/{client_id}/periods/{period_id}/lock
+
+Lock a finalized period. **IRREVERSIBLE.**
+
+**Request Body:**
+```json
+{
+  "confirm_irreversible": true,
+  "notes": "Locked for annual audit"
+}
+```
+
+**Response:**
+```json
+{
+  "period": {
+    "id": "uuid",
+    "status": "LOCKED",
+    "locked_at": "2024-01-26T16:00:00Z"
+  },
+  "message": "Period locked permanently. This action cannot be undone."
+}
+```
+
+---
+
+### GET /clients/{client_id}/periods/{period_id}/snapshot
+
+Get the finalization snapshot for a period.
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "period_id": "uuid",
+  "snapshot_type": "FINALIZATION",
+  "created_at": "2024-01-26T15:00:00Z",
+  "summary": {
+    "total_assets": 50000.00,
+    "total_liabilities": 20000.00,
+    "total_equity": 30000.00,
+    "net_income": 15000.00,
+    "total_ar": 5000.00,
+    "total_ap": 3000.00
+  },
+  "balance_sheet": { ... },
+  "profit_and_loss": { ... },
+  "vat_summary": { ... },
+  "open_ar_balances": { ... },
+  "open_ap_balances": { ... },
+  "acknowledged_yellow_issues": ["uuid-1", "uuid-2"],
+  "issue_summary": {
+    "total_issues": 2,
+    "red_count": 0,
+    "yellow_count": 2
+  }
+}
+```
+
+---
+
+### GET /clients/{client_id}/periods/{period_id}/audit-logs
+
+Get audit logs for a period.
+
+**Response:**
+```json
+{
+  "period_id": "uuid",
+  "logs": [
+    {
+      "id": "uuid",
+      "action": "FINALIZE",
+      "from_status": "REVIEW",
+      "to_status": "FINALIZED",
+      "performed_by_id": "uuid",
+      "performed_at": "2024-01-26T15:00:00Z",
+      "notes": "Q1 finalization",
+      "snapshot_id": "uuid"
+    },
+    {
+      "id": "uuid",
+      "action": "REVIEW_START",
+      "from_status": "OPEN",
+      "to_status": "REVIEW",
+      "performed_by_id": "uuid",
+      "performed_at": "2024-01-26T10:00:00Z",
+      "notes": null
+    }
+  ],
+  "total_count": 2
+}
+```
+
+---
+
 ## Data Model Summary
 
 ### Journal Entries
@@ -571,3 +821,8 @@ Get learned decision patterns for a client.
 - `suggested_actions` - Suggested actions for issues with confidence scores
 - `accountant_decisions` - Accountant decisions with audit trail
 - `decision_patterns` - Learning patterns for confidence boosting
+
+### Period Control
+- `accounting_periods` - Extended with status (OPEN, REVIEW, FINALIZED, LOCKED)
+- `period_snapshots` - Immutable snapshots of financial reports at finalization
+- `period_audit_logs` - Complete audit trail of period control actions

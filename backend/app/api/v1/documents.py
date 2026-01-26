@@ -1,7 +1,7 @@
 import os
 import json
 from pathlib import Path
-from typing import Annotated, List
+from typing import Annotated, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
@@ -9,7 +9,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 import aiofiles
-import redis.asyncio as redis
 
 from app.core.database import get_db
 from app.core.config import settings
@@ -29,6 +28,12 @@ ALLOWED_MIME_TYPES = [
 
 
 async def get_redis_client():
+    """Get Redis client if Redis is enabled, otherwise return None."""
+    if not settings.redis_enabled:
+        yield None
+        return
+    
+    import redis.asyncio as redis
     client = redis.from_url(settings.REDIS_URL)
     try:
         yield client
@@ -36,12 +41,31 @@ async def get_redis_client():
         await client.close()
 
 
+async def enqueue_document_job(redis_client, job_data: dict) -> bool:
+    """Enqueue a document processing job to Redis. Returns True if successful."""
+    if redis_client is None:
+        print("Redis not configured - document processing job not queued")
+        return False
+    
+    try:
+        await redis_client.xadd(
+            "document_processing_stream",
+            job_data,
+            maxlen=10000,  # Keep last 10000 messages
+        )
+        return True
+    except Exception as e:
+        # Log error but don't fail the upload
+        print(f"Failed to enqueue job: {e}")
+        return False
+
+
 @router.post("/upload", response_model=DocumentUploadResponse)
 async def upload_document(
     file: Annotated[UploadFile, File(...)],
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    redis_client: Annotated[redis.Redis, Depends(get_redis_client)],
+    redis_client: Annotated[Optional[object], Depends(get_redis_client)],
     administration_id: Annotated[UUID | None, Form()] = None,
 ):
     """Upload a document and enqueue for processing"""
@@ -133,15 +157,7 @@ async def upload_document(
         "original_filename": original_filename,
     }
     
-    try:
-        await redis_client.xadd(
-            "document_processing_stream",
-            job_data,
-            maxlen=10000,  # Keep last 10000 messages
-        )
-    except Exception as e:
-        # Log error but don't fail the upload
-        print(f"Failed to enqueue job: {e}")
+    await enqueue_document_job(redis_client, job_data)
     
     return DocumentUploadResponse(
         message="Document uploaded successfully",
@@ -254,7 +270,7 @@ async def reprocess_document(
     document_id: UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    redis_client: Annotated[redis.Redis, Depends(get_redis_client)],
+    redis_client: Annotated[Optional[object], Depends(get_redis_client)],
 ):
     """Reprocess a failed document - reset status and re-enqueue for processing"""
     result = await db.execute(
@@ -301,15 +317,7 @@ async def reprocess_document(
         "original_filename": document.original_filename,
     }
     
-    try:
-        await redis_client.xadd(
-            "document_processing_stream",
-            job_data,
-            maxlen=10000,
-        )
-    except Exception as e:
-        # Log error but don't fail - document status is already reset
-        print(f"Failed to enqueue job: {e}")
+    await enqueue_document_job(redis_client, job_data)
     
     return DocumentResponse(
         id=document.id,

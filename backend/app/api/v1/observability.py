@@ -44,10 +44,11 @@ async def health_check():
     Verifies:
     - Database connectivity
     - Database migrations status (basic check)
-    - Redis connectivity
+    - Redis connectivity (if enabled)
     - Background tasks status (placeholder)
     
-    Returns structured health status.
+    Returns structured health status with HTTP 200 if core services are healthy.
+    Redis is optional and won't cause health check to fail if disabled.
     """
     health = {
         "status": "healthy",
@@ -94,17 +95,21 @@ async def health_check():
         health["components"]["migrations"]["message"] = str(e)
         all_healthy = False
     
-    # Check Redis connectivity
-    try:
-        client = redis.from_url(settings.REDIS_URL)
-        await client.ping()
-        await client.close()
-        health["components"]["redis"]["status"] = "healthy"
-        health["components"]["redis"]["message"] = "Connected"
-    except Exception as e:
-        health["components"]["redis"]["status"] = "unhealthy"
-        health["components"]["redis"]["message"] = str(e)
-        # Redis is not critical for core functionality
+    # Check Redis connectivity (only if enabled)
+    if settings.redis_enabled:
+        try:
+            client = redis.from_url(settings.REDIS_URL)
+            await client.ping()
+            await client.close()
+            health["components"]["redis"]["status"] = "healthy"
+            health["components"]["redis"]["message"] = "Connected"
+        except Exception as e:
+            health["components"]["redis"]["status"] = "unhealthy"
+            health["components"]["redis"]["message"] = str(e)
+            # Redis is not critical for core functionality - don't fail health check
+    else:
+        health["components"]["redis"]["status"] = "disabled"
+        health["components"]["redis"]["message"] = "Redis not configured (REDIS_URL not set)"
     
     # Background tasks status (placeholder - would check actual task queue in production)
     health["components"]["background_tasks"]["status"] = "healthy"

@@ -277,8 +277,11 @@ async def reverse_decision(
     """
     Reverse an executed decision.
     
-    This creates a reversal journal entry (if applicable) and
-    re-opens the associated issue.
+    This marks the decision as reversed and re-opens the associated issue.
+    
+    Note: For decisions that created journal entries, the financial entries
+    remain in place for audit purposes. The accountant should manually create
+    a reversal journal entry if needed to undo the financial impact.
     """
     # Get the decision
     result = await db.execute(
@@ -317,7 +320,8 @@ async def reverse_decision(
         reversed_by_id=current_user.id,
     )
     
-    # TODO: Create reversal journal entry if applicable
+    # Note: Financial journal entries remain in place for audit trail.
+    # The issue is re-opened so accountant can create manual reversal if needed.
     
     await db.commit()
     
@@ -325,7 +329,7 @@ async def reverse_decision(
         decision_id=decision.id,
         reversed_at=decision.reversed_at,
         reversal_journal_entry_id=None,
-        message="Decision reversed successfully. Issue has been re-opened.",
+        message="Decision marked as reversed. Issue has been re-opened. If financial entries were created, please manually create a reversal entry.",
     )
 
 

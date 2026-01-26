@@ -10,7 +10,7 @@ and updating related records. All actions are:
 import uuid
 from datetime import datetime, date, timezone
 from decimal import Decimal
-from typing import Optional, Tuple
+from typing import Optional, Tuple, TYPE_CHECKING
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -20,6 +20,7 @@ from app.models.decisions import (
     ActionType,
     DecisionType,
     ExecutionStatus,
+    SuggestedAction,
 )
 from app.models.issues import ClientIssue
 from app.models.ledger import JournalEntry, JournalLine, JournalEntryStatus
@@ -248,8 +249,9 @@ class ActionExecutor:
         self.db.add(journal_entry)
         await self.db.flush()
         
-        # Find VAT account (from original entry lines or default)
+        # Find VAT account and expense/revenue account from original entry
         vat_account_id = None
+        offset_account_id = None
         for line in original_entry.lines:
             if line.vat_code_id:
                 # Get the VAT code to find account
@@ -259,24 +261,59 @@ class ActionExecutor:
                 vat_code = vc_result.scalar_one_or_none()
                 if vat_code:
                     vat_account_id = vat_code.sales_account_id or vat_code.purchase_account_id
-                    break
+            elif line.debit_amount > 0 or line.credit_amount > 0:
+                # Use the first non-VAT account as offset
+                if not offset_account_id:
+                    offset_account_id = line.account_id
         
         if not vat_account_id:
             raise ActionExecutionError("Cannot determine VAT account for correction")
         
-        # Create correction lines (adjust VAT account)
-        debit_line = JournalLine(
-            journal_entry_id=journal_entry.id,
-            account_id=vat_account_id,
-            line_number=1,
-            description="VAT correction",
-            debit_amount=correction_amount if correction_amount > 0 else Decimal("0.00"),
-            credit_amount=abs(correction_amount) if correction_amount < 0 else Decimal("0.00"),
-        )
-        self.db.add(debit_line)
+        if not offset_account_id:
+            raise ActionExecutionError("Cannot determine offset account for correction")
         
-        # Offset to suspense/rounding account (would need to be configured per admin)
-        # For now, we'll just note this needs proper account configuration
+        # Create correction lines - proper double-entry
+        # If VAT was over-recorded (positive discrepancy), we debit VAT and credit offset
+        # If VAT was under-recorded (negative discrepancy), we credit VAT and debit offset
+        if correction_amount > 0:
+            # VAT was over-recorded, reduce it
+            vat_line = JournalLine(
+                journal_entry_id=journal_entry.id,
+                account_id=vat_account_id,
+                line_number=1,
+                description="VAT correction - reduce over-recorded VAT",
+                debit_amount=abs(correction_amount),
+                credit_amount=Decimal("0.00"),
+            )
+            offset_line = JournalLine(
+                journal_entry_id=journal_entry.id,
+                account_id=offset_account_id,
+                line_number=2,
+                description="VAT correction - offset adjustment",
+                debit_amount=Decimal("0.00"),
+                credit_amount=abs(correction_amount),
+            )
+        else:
+            # VAT was under-recorded, increase it
+            vat_line = JournalLine(
+                journal_entry_id=journal_entry.id,
+                account_id=vat_account_id,
+                line_number=1,
+                description="VAT correction - increase under-recorded VAT",
+                debit_amount=Decimal("0.00"),
+                credit_amount=abs(correction_amount),
+            )
+            offset_line = JournalLine(
+                journal_entry_id=journal_entry.id,
+                account_id=offset_account_id,
+                line_number=2,
+                description="VAT correction - offset adjustment",
+                debit_amount=abs(correction_amount),
+                credit_amount=Decimal("0.00"),
+            )
+        
+        self.db.add(vat_line)
+        self.db.add(offset_line)
         
         journal_entry.total_debit = abs(correction_amount)
         journal_entry.total_credit = abs(correction_amount)
@@ -292,7 +329,13 @@ class ActionExecutor:
         decision: AccountantDecision,
         params: dict,
     ) -> Optional[uuid.UUID]:
-        """Allocate or write off an open item."""
+        """
+        Allocate or write off an open item.
+        
+        Note: This performs basic status update. Full implementation would create
+        journal entries for write-offs and payment allocations. The status change
+        marks the item as resolved for tracking purposes.
+        """
         if not issue.open_item_id:
             raise ActionExecutionError("No open item linked to issue")
         
@@ -308,21 +351,25 @@ class ActionExecutor:
         if open_item.status == OpenItemStatus.PAID:
             raise ActionExecutionError("Open item is already paid")
         
-        # For write-off, mark as written off
-        # For allocation, mark as paid
-        action = params.get("allocation_action", "write_off")
+        # Determine action type
+        action = params.get("allocation_action", "mark_for_review")
         
         if action == "write_off":
+            # Mark as written off - journal entry for write-off would be manual
             open_item.status = OpenItemStatus.WRITTEN_OFF
-        else:
+        elif action == "allocate":
+            # Mark as paid - actual allocation journal would be manual
             open_item.status = OpenItemStatus.PAID
             open_item.paid_amount = open_item.original_amount
             open_item.open_amount = Decimal("0.00")
+        else:
+            # Mark for review only - accountant will handle manually
+            pass
         
         await self.db.flush()
         
-        # Note: In a full implementation, this would create a journal entry
-        # for the write-off or payment allocation
+        # Status update only - no journal entry created
+        # Full allocation requires manual journal entry creation
         return None
     
     async def _execute_flag_document(
@@ -555,7 +602,3 @@ class ActionExecutor:
         )
         count = result.scalar() or 0
         return f"JE-{date.today().year}-{count + 1:05d}"
-
-
-# Import here to avoid circular imports
-from app.models.decisions import SuggestedAction

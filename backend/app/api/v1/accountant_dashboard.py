@@ -167,6 +167,24 @@ async def get_dashboard_clients(
         filters=filter,
     )
     
+    def safe_parse_datetime(dt_str: str | None) -> datetime | None:
+        """Safely parse datetime string, returning None on failure."""
+        if not dt_str:
+            return None
+        try:
+            return datetime.fromisoformat(dt_str)
+        except (ValueError, TypeError):
+            return None
+    
+    def safe_parse_date(d_str: str | None) -> date | None:
+        """Safely parse date string, returning None on failure."""
+        if not d_str:
+            return None
+        try:
+            return date.fromisoformat(d_str)
+        except (ValueError, TypeError):
+            return None
+    
     return ClientsListResponse(
         clients=[
             ClientStatusCard(
@@ -174,7 +192,7 @@ async def get_dashboard_clients(
                 name=c["name"],
                 kvk_number=c["kvk_number"],
                 btw_number=c["btw_number"],
-                last_activity_at=datetime.fromisoformat(c["last_activity_at"]) if c["last_activity_at"] else None,
+                last_activity_at=safe_parse_datetime(c["last_activity_at"]),
                 open_period_status=c["open_period_status"],
                 open_period_name=c["open_period_name"],
                 red_issue_count=c["red_issue_count"],
@@ -182,7 +200,7 @@ async def get_dashboard_clients(
                 documents_needing_review_count=c["documents_needing_review_count"],
                 backlog_age_max_days=c["backlog_age_max_days"],
                 vat_anomaly_count=c["vat_anomaly_count"],
-                next_vat_deadline=date.fromisoformat(c["next_vat_deadline"]) if c["next_vat_deadline"] else None,
+                next_vat_deadline=safe_parse_date(c["next_vat_deadline"]),
                 days_to_vat_deadline=c["days_to_vat_deadline"],
                 readiness_score=c["readiness_score"],
                 has_critical_alerts=c["has_critical_alerts"],

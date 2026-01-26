@@ -43,7 +43,15 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAuth } from '@/lib/AuthContext'
-import { api, getErrorMessage } from '@/lib/api'
+import { 
+  api, 
+  getErrorMessage,
+  DashboardSummary,
+  ClientStatusCard,
+  ClientsListResponse,
+  BulkOperationResponse,
+  BulkOperationResultItem,
+} from '@/lib/api'
 import { 
   ArrowsClockwise,
   WarningCircle,
@@ -62,75 +70,6 @@ import {
   CaretDown,
 } from '@phosphor-icons/react'
 import { format, formatDistanceToNow } from 'date-fns'
-
-// Types
-interface DashboardSummary {
-  total_clients: number
-  clients_with_red_issues: number
-  clients_in_review: number
-  upcoming_vat_deadlines_7d: number
-  upcoming_vat_deadlines_14d: number
-  upcoming_vat_deadlines_30d: number
-  document_backlog_total: number
-  alerts_by_severity: {
-    critical: number
-    warning: number
-    info: number
-  }
-  generated_at: string
-}
-
-interface ClientStatusCard {
-  id: string
-  name: string
-  kvk_number: string | null
-  btw_number: string | null
-  last_activity_at: string | null
-  open_period_status: string | null
-  open_period_name: string | null
-  red_issue_count: number
-  yellow_issue_count: number
-  documents_needing_review_count: number
-  backlog_age_max_days: number | null
-  vat_anomaly_count: number
-  next_vat_deadline: string | null
-  days_to_vat_deadline: number | null
-  readiness_score: number
-  has_critical_alerts: boolean
-  needs_immediate_attention: boolean
-}
-
-interface ClientsListResponse {
-  clients: ClientStatusCard[]
-  total_count: number
-  filtered_count: number
-  sort_by: string
-  sort_order: string
-  filters_applied: string[]
-  generated_at: string
-}
-
-interface BulkOperationResult {
-  client_id: string
-  client_name: string
-  status: 'SUCCESS' | 'FAILED' | 'SKIPPED'
-  result_data: Record<string, unknown> | null
-  error_message: string | null
-  processed_at: string
-}
-
-interface BulkOperationResponse {
-  id: string
-  operation_type: string
-  status: string
-  total_clients: number
-  processed_clients: number
-  successful_clients: number
-  failed_clients: number
-  error_message: string | null
-  results: BulkOperationResult[]
-  message: string
-}
 
 // KPI Card Component
 const KPICard = ({ 

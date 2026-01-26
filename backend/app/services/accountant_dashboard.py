@@ -195,17 +195,19 @@ class AccountantDashboardService:
         )
         
         for period, admin in result.all():
-            # Dutch VAT deadline: 1 month after quarter end
-            if period.end_date.month == 12:
-                deadline = date(period.end_date.year + 1, 1, 31)
-            else:
-                next_month = period.end_date.month + 1
-                if next_month == 12:
-                    deadline = date(period.end_date.year, 12, 31)
-                elif next_month == 2:
-                    deadline = date(period.end_date.year, 2, 28)
-                else:
-                    deadline = date(period.end_date.year, next_month + 1, 1) - timedelta(days=1)
+            # Dutch VAT deadline: last day of the month following the quarter end
+            # Use calendar module for proper month end calculation
+            import calendar
+            deadline_year = period.end_date.year
+            deadline_month = period.end_date.month + 1
+            
+            if deadline_month > 12:
+                deadline_month = 1
+                deadline_year += 1
+            
+            # Get last day of the deadline month (handles leap years correctly)
+            last_day = calendar.monthrange(deadline_year, deadline_month)[1]
+            deadline = date(deadline_year, deadline_month, last_day)
             
             days_remaining = (deadline - today).days
             

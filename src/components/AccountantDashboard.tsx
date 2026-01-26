@@ -61,10 +61,10 @@ const statusColors: Record<ClientStatus, { bg: string; text: string; border: str
   RED: { bg: 'bg-red-500/20', text: 'text-red-700 dark:text-red-400', border: 'border-red-500/40' },
 }
 
-const severityColors: Record<IssueSeverity, { bg: string; text: string; icon: typeof WarningCircle }> = {
-  ERROR: { bg: 'bg-red-500/20', text: 'text-red-700 dark:text-red-400', icon: WarningCircle },
-  WARNING: { bg: 'bg-amber-500/20', text: 'text-amber-700 dark:text-amber-400', icon: Warning },
-  INFO: { bg: 'bg-blue-500/20', text: 'text-blue-700 dark:text-blue-400', icon: CheckCircle },
+const severityColors: Record<IssueSeverity, { bg: string; text: string; border: string; icon: typeof WarningCircle }> = {
+  ERROR: { bg: 'bg-red-500/20', text: 'text-red-700 dark:text-red-400', border: 'border-red-500/30', icon: WarningCircle },
+  WARNING: { bg: 'bg-amber-500/20', text: 'text-amber-700 dark:text-amber-400', border: 'border-amber-500/30', icon: Warning },
+  INFO: { bg: 'bg-blue-500/20', text: 'text-blue-700 dark:text-blue-400', border: 'border-blue-500/30', icon: CheckCircle },
 }
 
 const btwStatusLabels: Record<BTWQuarterStatus, { label: string; color: string }> = {
@@ -97,7 +97,7 @@ const IssueItem = ({ issue }: { issue: DashboardIssue }) => {
   const Icon = severity.icon
   
   return (
-    <div className={`p-3 rounded-lg ${severity.bg} border ${severity.text.replace('text-', 'border-').replace('dark:', 'dark:border-')}/30`}>
+    <div className={`p-3 rounded-lg ${severity.bg} border ${severity.border}`}>
       <div className="flex items-start gap-3">
         <Icon size={20} weight="fill" className={severity.text} />
         <div className="flex-1 min-w-0">

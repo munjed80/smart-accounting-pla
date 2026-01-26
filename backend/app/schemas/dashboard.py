@@ -135,3 +135,18 @@ class AccountantDashboardResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class ClientIssuesResponse(BaseModel):
+    """
+    Response for detailed client issues endpoint.
+    
+    Returns all issues for a specific client, not just top 3.
+    """
+    client_id: UUID
+    client_name: str
+    total_issues: int
+    issues: List[DashboardIssue]
+    
+    class Config:
+        from_attributes = True

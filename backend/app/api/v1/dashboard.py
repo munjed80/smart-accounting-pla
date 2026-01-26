@@ -9,7 +9,7 @@ Design principles:
 - Status-based prioritization (RED > YELLOW > GREEN)
 - Accountant only needs to click when there's a problem
 """
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from typing import Annotated, List
 from uuid import UUID
 import uuid
@@ -32,10 +32,20 @@ from app.schemas.dashboard import (
     DashboardIssue,
     ClientOverview,
     AccountantDashboardResponse,
+    ClientIssuesResponse,
 )
 from app.api.v1.deps import CurrentUser
 
 router = APIRouter()
+
+
+def ensure_utc(dt: datetime) -> datetime:
+    """Ensure datetime has UTC timezone, adding it if missing."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def get_current_quarter() -> tuple[str, date, date]:
@@ -79,7 +89,6 @@ def calculate_btw_status(
         btw_deadline = date(btw_deadline_year, 12, 31)
     else:
         btw_deadline = date(btw_deadline_year, btw_deadline_month + 1, 1)
-        from datetime import timedelta
         btw_deadline = btw_deadline - timedelta(days=1)
     
     if has_errors:
@@ -170,7 +179,8 @@ async def build_client_issues(
     # Check for documents stuck in PROCESSING for too long (> 5 minutes)
     processing_docs = [d for d in documents if d.status == DocumentStatus.PROCESSING]
     for doc in processing_docs:
-        time_diff = (now - doc.updated_at.replace(tzinfo=timezone.utc) if doc.updated_at else now - doc.created_at.replace(tzinfo=timezone.utc))
+        doc_updated = ensure_utc(doc.updated_at) if doc.updated_at else ensure_utc(doc.created_at)
+        time_diff = now - doc_updated
         if time_diff.total_seconds() > 300:  # 5 minutes
             issues.append(DashboardIssue(
                 id=f"doc-stuck-{doc.id}",
@@ -188,7 +198,7 @@ async def build_client_issues(
     draft_transactions = [t for t in transactions if t.status == TransactionStatus.DRAFT]
     if len(draft_transactions) > 0:
         # Group by age
-        old_drafts = [t for t in draft_transactions if (now - t.created_at.replace(tzinfo=timezone.utc)).days > 7]
+        old_drafts = [t for t in draft_transactions if (now - ensure_utc(t.created_at)).days > 7]
         
         if len(old_drafts) > 0:
             issues.append(DashboardIssue(
@@ -344,7 +354,7 @@ async def get_accountant_dashboard(
     )
 
 
-@router.get("/dashboard/client/{client_id}/issues")
+@router.get("/dashboard/client/{client_id}/issues", response_model=ClientIssuesResponse)
 async def get_client_issues(
     client_id: UUID,
     current_user: CurrentUser,
@@ -391,9 +401,9 @@ async def get_client_issues(
     severity_order = {IssueSeverity.ERROR: 0, IssueSeverity.WARNING: 1, IssueSeverity.INFO: 2}
     issues.sort(key=lambda i: severity_order[i.severity])
     
-    return {
-        "client_id": client_id,
-        "client_name": administration.name,
-        "total_issues": len(issues),
-        "issues": issues,
-    }
+    return ClientIssuesResponse(
+        client_id=client_id,
+        client_name=administration.name,
+        total_issues=len(issues),
+        issues=issues,
+    )

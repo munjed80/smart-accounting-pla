@@ -8,7 +8,9 @@ import re
 class UserBase(BaseModel):
     email: EmailStr
     full_name: str = Field(..., min_length=1, max_length=255)
-    role: str = Field(default="zzp", pattern="^(zzp|accountant|admin)$")
+    # Role validation: admin role is NOT allowed via public registration
+    # Admin users can only be created via database seed or protected internal commands
+    role: str = Field(default="zzp", pattern="^(zzp|accountant)$")
 
 
 class UserCreate(UserBase):

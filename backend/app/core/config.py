@@ -59,6 +59,16 @@ class Settings(BaseSettings):
         """Parse CORS_ORIGINS string into a list of origins."""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
     
+    # Admin whitelist - comma-separated list of emails allowed to use admin role
+    # Admin users can only be created via database seed or protected internal commands
+    # Example: "admin@example.com,superadmin@company.com"
+    ADMIN_WHITELIST: str = ""
+    
+    @property
+    def admin_whitelist_list(self) -> list[str]:
+        """Parse ADMIN_WHITELIST string into a list of whitelisted admin emails."""
+        return [email.strip().lower() for email in self.ADMIN_WHITELIST.split(",") if email.strip()]
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

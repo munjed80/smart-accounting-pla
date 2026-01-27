@@ -150,6 +150,79 @@ def seed_chart_of_accounts(conn, administration_id: str):
     cursor.close()
 
 
+def seed_admin_user(conn, email: str, password: str, full_name: str = "System Administrator"):
+    """
+    Seed an admin user in the database.
+    
+    IMPORTANT: This is the ONLY supported way to create admin users.
+    Admin role is NOT available via public registration for security reasons.
+    
+    Args:
+        conn: Database connection
+        email: Admin user's email address
+        password: Plain text password (will be hashed)
+        full_name: Admin user's full name (default: "System Administrator")
+    
+    Returns:
+        str: The UUID of the created/existing admin user
+        
+    Example usage from CLI:
+        python -c "from seed import seed_admin_user, get_db_connection; \\
+                   conn = get_db_connection(); \\
+                   seed_admin_user(conn, 'admin@example.com', 'SecurePass123'); \\
+                   conn.close()"
+    """
+    from datetime import datetime, timezone
+    
+    cursor = conn.cursor()
+    
+    # Check if user already exists
+    cursor.execute("SELECT id, role FROM users WHERE email = %s", (email.lower(),))
+    existing = cursor.fetchone()
+    
+    if existing:
+        user_id, role = existing
+        if role == "admin":
+            print(f"Admin user already exists: {email}")
+        else:
+            # Update existing user to admin role
+            cursor.execute(
+                "UPDATE users SET role = %s, updated_at = %s WHERE id = %s",
+                ("admin", datetime.now(timezone.utc), user_id)
+            )
+            conn.commit()
+            print(f"Updated existing user to admin role: {email}")
+        cursor.close()
+        return str(user_id)
+    
+    # Hash the password using bcrypt
+    try:
+        import bcrypt
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    except ImportError:
+        print("WARNING: bcrypt not available, using passlib")
+        from passlib.context import CryptContext
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        hashed_password = pwd_context.hash(password)
+    
+    # Create new admin user
+    user_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    
+    cursor.execute(
+        """INSERT INTO users (id, email, hashed_password, full_name, role, is_active, email_verified_at, created_at, updated_at)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+        (user_id, email.lower(), hashed_password, full_name, "admin", True, now, now, now)
+    )
+    
+    conn.commit()
+    print(f"Created admin user: {email}")
+    print(f"IMPORTANT: Add this email to ADMIN_WHITELIST environment variable to allow login!")
+    cursor.close()
+    
+    return user_id
+
+
 def main():
     """Main seed script entry point"""
     print("=" * 60)
@@ -174,6 +247,15 @@ def main():
         
         if not administrations:
             print("No administrations found. Chart of accounts will be seeded when first administration is created.")
+        
+        # Check for admin seeding via environment variables
+        admin_email = os.environ.get("SEED_ADMIN_EMAIL")
+        admin_password = os.environ.get("SEED_ADMIN_PASSWORD")
+        admin_name = os.environ.get("SEED_ADMIN_NAME", "System Administrator")
+        
+        if admin_email and admin_password:
+            print("\n--- Admin User Seeding ---")
+            seed_admin_user(conn, admin_email, admin_password, admin_name)
         
         conn.close()
         print("=" * 60)

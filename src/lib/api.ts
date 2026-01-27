@@ -62,7 +62,9 @@ export interface RegisterRequest {
   email: string
   password: string
   full_name: string
-  role?: 'zzp' | 'accountant' | 'admin'
+  // Admin role is NOT allowed via public registration for security
+  // Admin users can only be created via database seed
+  role?: 'zzp' | 'accountant'
 }
 
 export interface User {

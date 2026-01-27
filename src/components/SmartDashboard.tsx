@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/lib/AuthContext'
 import { transactionApi, TransactionStats, TransactionListItem, administrationApi, Administration } from '@/lib/api'
+import { navigateTo } from '@/lib/navigation'
 import { NoAdministrationsEmptyState, NoTransactionsEmptyState } from '@/components/EmptyState'
 import { 
   Receipt, 
@@ -17,12 +18,6 @@ import {
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
-
-// Helper to navigate (reuse from App.tsx pattern)
-const navigateTo = (path: string) => {
-  window.history.pushState({}, '', path)
-  window.dispatchEvent(new PopStateEvent('popstate'))
-}
 
 export const SmartDashboard = () => {
   const { user } = useAuth()

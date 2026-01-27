@@ -283,9 +283,8 @@ export const OnboardingPage = ({ userRole, userName, onComplete }: OnboardingPag
           
           {/* Progress indicator */}
           <div className="flex items-center justify-center gap-2 mt-6">
-            <div className={`h-2 w-16 rounded-full transition-colors ${
-              currentStep === 'account-type' ? 'bg-primary' : 'bg-primary'
-            }`} />
+            {/* Step 1 is always highlighted (current or completed) */}
+            <div className="h-2 w-16 rounded-full transition-colors bg-primary" />
             <div className={`h-2 w-16 rounded-full transition-colors ${
               currentStep === 'create-administration' || currentStep === 'confirmation' 
                 ? 'bg-primary' 

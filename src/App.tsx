@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { administrationApi } from '@/lib/api'
+import { navigateTo } from '@/lib/navigation'
 import { 
   SignOut, 
   House, 
@@ -63,11 +64,6 @@ const getRouteFromURL = (): Route => {
   }
   
   return { type: 'app' }
-}
-
-const navigateTo = (path: string) => {
-  window.history.pushState({}, '', path)
-  window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
 const AppContent = () => {
@@ -120,7 +116,7 @@ const AppContent = () => {
     }
     
     checkOnboarding()
-  }, [isAuthenticated, user])
+  }, [isAuthenticated, user, route])
 
   // Handle special auth routes first (before checking authentication)
   if (route.type === 'verify-email') {

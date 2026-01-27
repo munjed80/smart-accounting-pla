@@ -18,6 +18,7 @@ from app.models.accountant_dashboard import (
     BulkOperationResult,
     ClientReminder,
 )
+from app.models.auth_token import AuthToken, TokenType
 
 __all__ = [
     "User",
@@ -54,4 +55,6 @@ __all__ = [
     "BulkOperationStatus",
     "BulkOperationResult",
     "ClientReminder",
+    "AuthToken",
+    "TokenType",
 ]

@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     # Server
     PORT: int = 8000
     
+    # URLs
+    APP_URL: str = "http://localhost:8000"  # Backend URL
+    FRONTEND_URL: str = "http://localhost:5173"  # Frontend URL for email links
+    
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://accounting_user:change_me@db:5432/accounting_db"
     DATABASE_URL_SYNC: str = "postgresql://accounting_user:change_me@db:5432/accounting_db"
@@ -28,6 +32,20 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-me-in-production-use-openssl-rand-hex-32"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
+    
+    # Email (Resend)
+    RESEND_API_KEY: Optional[str] = None
+    RESEND_FROM_EMAIL: str = "no-reply@example.com"
+    SUPPORT_EMAIL: str = "support@example.com"
+    
+    @property
+    def email_enabled(self) -> bool:
+        """Check if email sending is configured."""
+        return bool(self.RESEND_API_KEY and self.RESEND_API_KEY.strip())
+    
+    # Token expiry times (in hours)
+    EMAIL_VERIFY_TOKEN_EXPIRE_HOURS: int = 24
+    PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 1
     
     # File uploads
     UPLOAD_DIR: str = "/data/uploads"

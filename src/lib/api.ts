@@ -2,6 +2,16 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+// Export API base for display purposes
+export const getApiBaseUrl = () => API_BASE_URL
+
+// Check if running in production with localhost API (likely misconfigured)
+export const isApiMisconfigured = () => {
+  const isProduction = import.meta.env.PROD
+  const hasLocalhost = API_BASE_URL.includes('localhost') || API_BASE_URL.includes('127.0.0.1')
+  return isProduction && hasLocalhost
+}
+
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -61,11 +71,42 @@ export interface User {
   full_name: string
   role: 'zzp' | 'accountant' | 'admin'
   is_active: boolean
+  is_email_verified?: boolean
 }
 
 export interface TokenResponse {
   access_token: string
   token_type: string
+}
+
+// New auth response interfaces
+export interface RegisterResponse {
+  message: string
+  user_id: string
+}
+
+export interface GenericMessageResponse {
+  message: string
+}
+
+export interface VerifyEmailResponse {
+  message: string
+  verified: boolean
+}
+
+export interface ResetPasswordRequest {
+  token: string
+  new_password: string
+}
+
+export interface ResetPasswordResponse {
+  message: string
+}
+
+export interface EmailNotVerifiedError {
+  message: string
+  code: 'EMAIL_NOT_VERIFIED'
+  hint: string
 }
 
 export interface TransactionStats {
@@ -143,13 +184,35 @@ export const authApi = {
     return response.data
   },
 
-  register: async (data: RegisterRequest): Promise<User> => {
-    const response = await api.post<User>('/api/v1/auth/register', data)
+  register: async (data: RegisterRequest): Promise<RegisterResponse> => {
+    const response = await api.post<RegisterResponse>('/api/v1/auth/register', data)
     return response.data
   },
 
   me: async (): Promise<User> => {
     const response = await api.get<User>('/api/v1/auth/me')
+    return response.data
+  },
+
+  verifyEmail: async (token: string): Promise<VerifyEmailResponse> => {
+    const response = await api.get<VerifyEmailResponse>('/api/v1/auth/verify-email', {
+      params: { token }
+    })
+    return response.data
+  },
+
+  resendVerification: async (email: string): Promise<GenericMessageResponse> => {
+    const response = await api.post<GenericMessageResponse>('/api/v1/auth/resend-verification', { email })
+    return response.data
+  },
+
+  forgotPassword: async (email: string): Promise<GenericMessageResponse> => {
+    const response = await api.post<GenericMessageResponse>('/api/v1/auth/forgot-password', { email })
+    return response.data
+  },
+
+  resetPassword: async (data: ResetPasswordRequest): Promise<ResetPasswordResponse> => {
+    const response = await api.post<ResetPasswordResponse>('/api/v1/auth/reset-password', data)
     return response.data
   },
 }

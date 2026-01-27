@@ -1,33 +1,232 @@
-# Core Ledger API Documentation
+# Smart Accounting Platform API Documentation
 
-This document describes the API endpoints for the Core Ledger + Consistency Engine.
+This document describes the API endpoints for the Smart Accounting Platform.
 
 ## Overview
 
-The Core Ledger API provides accountant-only endpoints to support:
+The API provides:
+- Authentication (registration, login, email verification, password reset)
 - Client overview with status counts
 - Issues list from consistency engine
 - Trigger recalculation/validation
 - Financial reports (Balance Sheet, P&L, AR, AP)
 
-All endpoints require authentication and accountant role.
+---
 
-## Base URL
+## Authentication Endpoints
 
+Base URL: `/api/v1/auth`
+
+### POST /register
+
+Register a new user. Creates an unverified user and sends a verification email.
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com",
+  "password": "securePassword123",
+  "full_name": "John Doe",
+  "role": "zzp"  // Optional: "zzp" | "accountant" | "admin"
+}
 ```
-/api/v1/accountant
+
+**Response (201 Created):**
+```json
+{
+  "message": "Check your email to verify your account",
+  "user_id": "uuid"
+}
 ```
 
-## Authentication
+**Error Responses:**
+- `400 Bad Request`: Email already registered
+- `422 Unprocessable Entity`: Validation errors
+- `429 Too Many Requests`: Rate limit exceeded (5/min per IP)
 
-All endpoints require a valid JWT token in the Authorization header:
+---
+
+### POST /resend-verification
+
+Resend verification email. Always returns success to prevent email enumeration.
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "If an account with this email exists and is not yet verified, a verification email has been sent."
+}
+```
+
+**Rate Limit:** 5 requests per minute per IP
+
+---
+
+### GET /verify-email?token={token}
+
+Verify user's email address.
+
+**Query Parameters:**
+- `token` (required): Verification token from email
+
+**Response (200 OK):**
+```json
+{
+  "message": "Email verified successfully",
+  "verified": true
+}
+```
+
+**Error Responses:**
+- `400 Bad Request`: Invalid or expired token
+- `429 Too Many Requests`: Rate limit exceeded (20/min per IP)
+
+---
+
+### POST /token
+
+Login and get access token. Blocked if email is not verified.
+
+**Request Body (form-urlencoded):**
+```
+username=user@example.com&password=securePassword123
+```
+
+**Response (200 OK):**
+```json
+{
+  "access_token": "eyJ...",
+  "token_type": "bearer"
+}
+```
+
+**Error Responses:**
+- `401 Unauthorized`: Incorrect email or password
+- `403 Forbidden`: Email not verified
+  ```json
+  {
+    "detail": {
+      "message": "Please verify your email before logging in",
+      "code": "EMAIL_NOT_VERIFIED",
+      "hint": "Check your inbox for a verification email or request a new one"
+    }
+  }
+  ```
+- `429 Too Many Requests`: Rate limit exceeded (10/min per IP)
+
+---
+
+### POST /forgot-password
+
+Request password reset email. Always returns success to prevent email enumeration.
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "If an account with this email exists, a password reset email has been sent."
+}
+```
+
+**Rate Limit:** 5 requests per minute per IP
+
+---
+
+### POST /reset-password
+
+Reset password with token.
+
+**Request Body:**
+```json
+{
+  "token": "reset_token_from_email",
+  "new_password": "newSecurePass123"
+}
+```
+
+**Password Requirements:**
+- Minimum 10 characters
+- Must contain at least one letter (A-Z, a-z)
+- Must contain at least one number (0-9)
+
+**Response (200 OK):**
+```json
+{
+  "message": "Password reset successfully"
+}
+```
+
+**Error Responses:**
+- `400 Bad Request`: Invalid or expired token
+- `422 Unprocessable Entity`: Password doesn't meet requirements
+- `429 Too Many Requests`: Rate limit exceeded (5/min per IP)
+
+---
+
+### GET /me
+
+Get current authenticated user info.
+
+**Headers:**
 ```
 Authorization: Bearer <token>
 ```
 
+**Response (200 OK):**
+```json
+{
+  "id": "uuid",
+  "email": "user@example.com",
+  "full_name": "John Doe",
+  "role": "zzp",
+  "is_active": true,
+  "is_email_verified": true,
+  "created_at": "2024-01-01T00:00:00Z"
+}
+```
+
 ---
 
-## Endpoints
+## Error Codes Reference
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `EMAIL_NOT_VERIFIED` | 403 | User's email is not verified |
+| `INVALID_TOKEN` | 400 | Token is invalid, expired, or already used |
+| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
+
+---
+
+## Rate Limits
+
+| Endpoint | Limit |
+|----------|-------|
+| /register | 5/min per IP |
+| /resend-verification | 5/min per IP |
+| /verify-email | 20/min per IP |
+| /token (login) | 10/min per IP |
+| /forgot-password | 5/min per IP |
+| /reset-password | 5/min per IP |
+
+---
+
+## Core Ledger API
+
+Base URL: `/api/v1/accountant`
+
+All endpoints below require authentication and accountant role.
 
 ### GET /clients/{client_id}/overview
 

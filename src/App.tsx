@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from '@/lib/AuthContext'
 import { LoginPage } from '@/components/LoginPage'
+import { VerifyEmailPage } from '@/components/VerifyEmailPage'
+import { ForgotPasswordPage } from '@/components/ForgotPasswordPage'
+import { ResetPasswordPage } from '@/components/ResetPasswordPage'
 import { SmartDashboard } from '@/components/SmartDashboard'
 import { AccountantDashboard } from '@/components/AccountantDashboard'
 import { AccountantHomePage } from '@/components/AccountantHomePage'
@@ -22,12 +25,87 @@ import {
   Stack
 } from '@phosphor-icons/react'
 
+// Simple URL-based routing
+type Route = 
+  | { type: 'login' }
+  | { type: 'forgot-password' }
+  | { type: 'verify-email'; token: string }
+  | { type: 'reset-password'; token: string }
+  | { type: 'app' }
+
+const getRouteFromURL = (): Route => {
+  const path = window.location.pathname
+  const params = new URLSearchParams(window.location.search)
+  
+  if (path === '/verify-email' || path.startsWith('/verify-email')) {
+    const token = params.get('token') || ''
+    return { type: 'verify-email', token }
+  }
+  
+  if (path === '/reset-password' || path.startsWith('/reset-password')) {
+    const token = params.get('token') || ''
+    return { type: 'reset-password', token }
+  }
+  
+  if (path === '/forgot-password') {
+    return { type: 'forgot-password' }
+  }
+  
+  if (path === '/login') {
+    return { type: 'login' }
+  }
+  
+  return { type: 'app' }
+}
+
+const navigateTo = (path: string) => {
+  window.history.pushState({}, '', path)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
 const AppContent = () => {
   const { user, isAuthenticated, isLoading, logout } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
   const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'transactions' | 'upload'>(
     isAccountant ? 'workqueue' : 'dashboard'
   )
+  const [route, setRoute] = useState<Route>(getRouteFromURL)
+
+  // Listen for URL changes
+  useEffect(() => {
+    const handlePopState = () => {
+      setRoute(getRouteFromURL())
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  // Handle special auth routes first (before checking authentication)
+  if (route.type === 'verify-email') {
+    return (
+      <VerifyEmailPage 
+        token={route.token} 
+        onNavigateToLogin={() => navigateTo('/login')} 
+      />
+    )
+  }
+
+  if (route.type === 'reset-password') {
+    return (
+      <ResetPasswordPage 
+        token={route.token} 
+        onNavigateToLogin={() => navigateTo('/login')} 
+      />
+    )
+  }
+
+  if (route.type === 'forgot-password') {
+    return (
+      <ForgotPasswordPage 
+        onNavigateToLogin={() => navigateTo('/login')} 
+      />
+    )
+  }
 
   if (isLoading) {
     return (
@@ -41,7 +119,15 @@ const AppContent = () => {
   }
 
   if (!isAuthenticated) {
-    return <LoginPage onSuccess={() => setActiveTab(isAccountant ? 'workqueue' : 'dashboard')} />
+    return (
+      <LoginPage 
+        onSuccess={() => {
+          navigateTo('/')
+          setActiveTab(isAccountant ? 'workqueue' : 'dashboard')
+        }}
+        onForgotPassword={() => navigateTo('/forgot-password')}
+      />
+    )
   }
 
   return (

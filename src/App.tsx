@@ -4,6 +4,7 @@ import { LoginPage } from '@/components/LoginPage'
 import { VerifyEmailPage } from '@/components/VerifyEmailPage'
 import { ForgotPasswordPage } from '@/components/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/components/ResetPasswordPage'
+import { OnboardingPage } from '@/components/OnboardingPage'
 import { SmartDashboard } from '@/components/SmartDashboard'
 import { AccountantDashboard } from '@/components/AccountantDashboard'
 import { AccountantHomePage } from '@/components/AccountantHomePage'
@@ -12,6 +13,7 @@ import { SmartTransactionList } from '@/components/SmartTransactionList'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { administrationApi } from '@/lib/api'
 import { 
   SignOut, 
   House, 
@@ -31,6 +33,7 @@ type Route =
   | { type: 'forgot-password' }
   | { type: 'verify-email'; token: string }
   | { type: 'reset-password'; token: string }
+  | { type: 'onboarding' }
   | { type: 'app' }
 
 const getRouteFromURL = (): Route => {
@@ -55,6 +58,10 @@ const getRouteFromURL = (): Route => {
     return { type: 'login' }
   }
   
+  if (path === '/onboarding') {
+    return { type: 'onboarding' }
+  }
+  
   return { type: 'app' }
 }
 
@@ -70,6 +77,10 @@ const AppContent = () => {
     isAccountant ? 'workqueue' : 'dashboard'
   )
   const [route, setRoute] = useState<Route>(getRouteFromURL)
+  
+  // Onboarding state - tracks if user needs onboarding (no administrations)
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null)
+  const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(false)
 
   // Listen for URL changes
   useEffect(() => {
@@ -79,6 +90,37 @@ const AppContent = () => {
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
+  
+  // Check if user needs onboarding (first login - no administrations)
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      if (!isAuthenticated || !user) {
+        setNeedsOnboarding(null)
+        return
+      }
+      
+      setIsCheckingOnboarding(true)
+      try {
+        const administrations = await administrationApi.list()
+        // User needs onboarding if they have no administrations
+        const needsSetup = administrations.length === 0
+        setNeedsOnboarding(needsSetup)
+        
+        // Auto-redirect to onboarding if needed and not already there
+        if (needsSetup && route.type === 'app') {
+          navigateTo('/onboarding')
+        }
+      } catch (error) {
+        console.error('Failed to check administrations:', error)
+        // Don't block user if check fails, let them proceed
+        setNeedsOnboarding(false)
+      } finally {
+        setIsCheckingOnboarding(false)
+      }
+    }
+    
+    checkOnboarding()
+  }, [isAuthenticated, user])
 
   // Handle special auth routes first (before checking authentication)
   if (route.type === 'verify-email') {
@@ -107,7 +149,7 @@ const AppContent = () => {
     )
   }
 
-  if (isLoading) {
+  if (isLoading || isCheckingOnboarding) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center">
         <div className="text-center">
@@ -126,6 +168,20 @@ const AppContent = () => {
           setActiveTab(isAccountant ? 'workqueue' : 'dashboard')
         }}
         onForgotPassword={() => navigateTo('/forgot-password')}
+      />
+    )
+  }
+  
+  // Show onboarding if user needs it (first login, no administrations)
+  if (route.type === 'onboarding' || needsOnboarding === true) {
+    return (
+      <OnboardingPage
+        userRole={user?.role as 'zzp' | 'accountant' | 'admin'}
+        userName={user?.full_name || 'there'}
+        onComplete={() => {
+          setNeedsOnboarding(false)
+          navigateTo('/')
+        }}
       />
     )
   }

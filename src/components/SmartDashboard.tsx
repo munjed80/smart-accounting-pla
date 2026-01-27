@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/lib/AuthContext'
-import { transactionApi, TransactionStats, TransactionListItem } from '@/lib/api'
+import { transactionApi, TransactionStats, TransactionListItem, administrationApi, Administration } from '@/lib/api'
+import { NoAdministrationsEmptyState, NoTransactionsEmptyState } from '@/components/EmptyState'
 import { 
   Receipt, 
   TrendUp, 
@@ -17,20 +18,32 @@ import {
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 
+// Helper to navigate (reuse from App.tsx pattern)
+const navigateTo = (path: string) => {
+  window.history.pushState({}, '', path)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
 export const SmartDashboard = () => {
   const { user } = useAuth()
   const [stats, setStats] = useState<TransactionStats | null>(null)
+  const [administrations, setAdministrations] = useState<Administration[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
 
-  const fetchStats = async () => {
+  const fetchData = async () => {
     setIsLoading(true)
     try {
-      const data = await transactionApi.getStats()
-      setStats(data)
+      // Fetch both administrations and stats in parallel
+      const [admins, statsData] = await Promise.all([
+        administrationApi.list(),
+        transactionApi.getStats().catch(() => null),  // Stats might fail if no admins
+      ])
+      setAdministrations(admins)
+      setStats(statsData)
       setLastRefresh(new Date())
     } catch (error) {
-      console.error('Failed to fetch stats:', error)
+      console.error('Failed to fetch data:', error)
       // Don't show error toast for initial load - backend might not be ready
     } finally {
       setIsLoading(false)
@@ -38,11 +51,11 @@ export const SmartDashboard = () => {
   }
 
   useEffect(() => {
-    fetchStats()
+    fetchData()
   }, [])
 
   const handleRefresh = () => {
-    fetchStats()
+    fetchData()
   }
 
   const formatCurrency = (amount: number) => {
@@ -50,6 +63,35 @@ export const SmartDashboard = () => {
       style: 'currency',
       currency: 'EUR',
     }).format(amount)
+  }
+  
+  // Show empty state if user has no administrations
+  if (!isLoading && administrations.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
+                <Brain size={40} weight="duotone" className="text-primary" />
+                Smart Dashboard
+              </h1>
+              <p className="text-muted-foreground">
+                Welcome, <span className="font-semibold">{user?.full_name}</span>
+              </p>
+            </div>
+          </div>
+          
+          <div className="mt-12">
+            <NoAdministrationsEmptyState
+              userRole={user?.role as 'zzp' | 'accountant' | 'admin'}
+              onCreateAdministration={() => navigateTo('/onboarding')}
+            />
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

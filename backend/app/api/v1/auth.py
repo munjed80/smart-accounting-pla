@@ -215,6 +215,7 @@ async def login(
     Login and get access token.
     
     Returns 403 with code EMAIL_NOT_VERIFIED if email is not verified.
+    Returns 403 with code ADMIN_NOT_WHITELISTED if admin user is not in whitelist.
     """
     check_rate_limit("login", request)
     
@@ -241,6 +242,28 @@ async def login(
                 "hint": "Check your inbox for a verification email or request a new one",
             },
         )
+    
+    # Admin role safety: block admin login unless explicitly whitelisted
+    # This prevents unauthorized admin access even if someone gains admin role
+    if user.role == "admin":
+        whitelist = settings.admin_whitelist_list
+        if user.email.lower() not in whitelist:
+            logger.warning(
+                f"Admin login blocked - user not in whitelist",
+                extra={
+                    "event": "admin_login_blocked",
+                    "user_id": str(user.id),
+                    "email": user.email,
+                }
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "message": "Admin access is restricted",
+                    "code": "ADMIN_NOT_WHITELISTED",
+                    "hint": "Contact your system administrator if you need admin access",
+                },
+            )
     
     # Update last login time
     user.last_login_at = datetime.now(timezone.utc)

@@ -26,7 +26,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
     email: '',
     password: '',
     full_name: '',
-    role: 'zzp' as 'zzp' | 'accountant' | 'admin',
+    role: 'zzp' as 'zzp' | 'accountant',  // Admin role not allowed via public registration
   })
 
   // State for email not verified handling
@@ -320,7 +320,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                     <Label htmlFor="register-role">Role</Label>
                     <Select
                       value={registerForm.role}
-                      onValueChange={(value: 'zzp' | 'accountant' | 'admin') => 
+                      onValueChange={(value: 'zzp' | 'accountant') => 
                         setRegisterForm({ ...registerForm, role: value })
                       }
                     >
@@ -330,7 +330,8 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                       <SelectContent>
                         <SelectItem value="zzp">ZZP (Self-Employed)</SelectItem>
                         <SelectItem value="accountant">Accountant</SelectItem>
-                        <SelectItem value="admin">Administrator</SelectItem>
+                        {/* Admin role is NOT available via public registration for security */}
+                        {/* Admin users can only be created via database seed */}
                       </SelectContent>
                     </Select>
                   </div>

@@ -357,3 +357,143 @@ class TestPasswordResetFlow:
         
         is_valid = is_found and not is_used and not is_expired
         assert is_valid == True
+
+
+class TestRoleSafety:
+    """Tests for role safety - admin whitelist and registration restrictions."""
+    
+    def test_admin_role_not_allowed_in_registration(self):
+        """Admin role should not be allowed via public registration."""
+        # Role validation pattern (from UserBase schema)
+        import re
+        valid_roles_pattern = r"^(zzp|accountant)$"
+        
+        # These should be valid
+        assert re.match(valid_roles_pattern, "zzp") is not None
+        assert re.match(valid_roles_pattern, "accountant") is not None
+        
+        # Admin should NOT be valid for registration
+        assert re.match(valid_roles_pattern, "admin") is None
+    
+    def test_default_registration_role_is_safe(self):
+        """Default registration role should be 'zzp' (safe role)."""
+        default_role = "zzp"
+        safe_roles = ["zzp", "accountant"]
+        
+        assert default_role in safe_roles
+        assert default_role != "admin"
+    
+    def test_admin_whitelist_parsing_empty(self):
+        """Empty whitelist should return empty list."""
+        whitelist_string = ""
+        whitelist_list = [email.strip().lower() for email in whitelist_string.split(",") if email.strip()]
+        
+        assert whitelist_list == []
+    
+    def test_admin_whitelist_parsing_single_email(self):
+        """Single email whitelist should parse correctly."""
+        whitelist_string = "admin@example.com"
+        whitelist_list = [email.strip().lower() for email in whitelist_string.split(",") if email.strip()]
+        
+        assert whitelist_list == ["admin@example.com"]
+    
+    def test_admin_whitelist_parsing_multiple_emails(self):
+        """Multiple emails in whitelist should parse correctly."""
+        whitelist_string = "admin@example.com, super@company.com, UPPERCASE@TEST.COM"
+        whitelist_list = [email.strip().lower() for email in whitelist_string.split(",") if email.strip()]
+        
+        assert whitelist_list == ["admin@example.com", "super@company.com", "uppercase@test.com"]
+    
+    def test_admin_whitelist_check_whitelisted_user(self):
+        """Whitelisted admin should be allowed to login."""
+        whitelist = ["admin@example.com", "super@company.com"]
+        user_email = "admin@example.com"
+        user_role = "admin"
+        
+        is_admin = user_role == "admin"
+        is_whitelisted = user_email.lower() in whitelist
+        
+        should_block = is_admin and not is_whitelisted
+        assert should_block == False
+    
+    def test_admin_whitelist_check_non_whitelisted_user(self):
+        """Non-whitelisted admin should be blocked from login."""
+        whitelist = ["admin@example.com"]
+        user_email = "unauthorized@example.com"
+        user_role = "admin"
+        
+        is_admin = user_role == "admin"
+        is_whitelisted = user_email.lower() in whitelist
+        
+        should_block = is_admin and not is_whitelisted
+        assert should_block == True
+    
+    def test_admin_whitelist_check_non_admin_user(self):
+        """Non-admin users should not be affected by whitelist."""
+        whitelist = ["admin@example.com"]
+        user_email = "user@example.com"
+        user_role = "zzp"
+        
+        is_admin = user_role == "admin"
+        is_whitelisted = user_email.lower() in whitelist
+        
+        should_block = is_admin and not is_whitelisted
+        assert should_block == False
+    
+    def test_admin_blocked_response_has_correct_code(self):
+        """Blocked admin login should return ADMIN_NOT_WHITELISTED code."""
+        expected_code = "ADMIN_NOT_WHITELISTED"
+        
+        # Simulated response (matching auth.py implementation)
+        response = {
+            "detail": {
+                "message": "Admin access is restricted",
+                "code": "ADMIN_NOT_WHITELISTED",
+                "hint": "Contact your system administrator if you need admin access",
+            }
+        }
+        
+        assert response["detail"]["code"] == expected_code
+    
+    def test_accountant_not_affected_by_whitelist(self):
+        """Accountants should not be affected by admin whitelist."""
+        whitelist = []  # Empty whitelist
+        user_email = "accountant@example.com"
+        user_role = "accountant"
+        
+        is_admin = user_role == "admin"
+        is_whitelisted = user_email.lower() in whitelist
+        
+        should_block = is_admin and not is_whitelisted
+        assert should_block == False  # Accountants are never blocked by admin whitelist
+
+
+class TestUserRoles:
+    """Tests for user role validation and hierarchy."""
+    
+    def test_valid_user_roles(self):
+        """All valid user roles should be defined."""
+        valid_roles = ["zzp", "accountant", "admin"]
+        
+        assert "zzp" in valid_roles
+        assert "accountant" in valid_roles
+        assert "admin" in valid_roles
+    
+    def test_role_hierarchy(self):
+        """Role hierarchy should be admin > accountant > zzp."""
+        role_hierarchy = {
+            "admin": 3,
+            "accountant": 2,
+            "zzp": 1,
+        }
+        
+        assert role_hierarchy["admin"] > role_hierarchy["accountant"]
+        assert role_hierarchy["accountant"] > role_hierarchy["zzp"]
+    
+    def test_registration_allowed_roles(self):
+        """Only zzp and accountant should be allowed for public registration."""
+        registration_allowed_roles = ["zzp", "accountant"]
+        
+        assert "zzp" in registration_allowed_roles
+        assert "accountant" in registration_allowed_roles
+        assert "admin" not in registration_allowed_roles

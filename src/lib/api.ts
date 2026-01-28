@@ -54,14 +54,15 @@ const checkMisconfiguration = (): { isMisconfigured: boolean; reason: string } =
   return { isMisconfigured: false, reason: '' }
 }
 
-// Compute API_BASE_URL
+// Compute API_BASE_URL with /api/v1 suffix
 // In DEV: use env var or fallback to localhost:8000
 // In PROD: use env var (misconfiguration check already validates this)
 // If misconfigured in PROD, we still set the URL (possibly localhost) so the UI can display it,
 // but the misconfiguration banner will warn users
+// NOTE: All API routes are mounted under /api/v1, so we include it in the base URL
 const API_BASE_URL = isDev 
-  ? normalizeBaseUrl(envApiUrl || 'http://localhost:8000')
-  : (normalizedEnvApiUrl || 'http://api-not-configured.invalid')
+  ? `${normalizeBaseUrl(envApiUrl || 'http://localhost:8000')}/api/v1`
+  : `${normalizedEnvApiUrl || 'http://api-not-configured.invalid'}/api/v1`
 
 // Store misconfiguration result
 const misconfigurationCheck = checkMisconfiguration()
@@ -81,6 +82,7 @@ export const api = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 30000,
+  withCredentials: true,
 })
 
 // Add request interceptor to fail fast if API is misconfigured
@@ -247,7 +249,12 @@ export const authApi = {
     formData.append('username', credentials.username)
     formData.append('password', credentials.password)
 
-    const response = await api.post<TokenResponse>('/token', formData, {
+    // Dev-only logging: log the final request URL
+    if (isDev) {
+      console.log('[Auth] POST /auth/login ->', `${API_BASE_URL}/auth/login`)
+    }
+
+    const response = await api.post<TokenResponse>('/auth/login', formData, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
@@ -256,34 +263,59 @@ export const authApi = {
   },
 
   register: async (data: RegisterRequest): Promise<RegisterResponse> => {
-    const response = await api.post<RegisterResponse>('/api/v1/auth/register', data)
+    // Dev-only logging: log the final request URL
+    if (isDev) {
+      console.log('[Auth] POST /auth/register ->', `${API_BASE_URL}/auth/register`)
+    }
+
+    const response = await api.post<RegisterResponse>('/auth/register', data)
     return response.data
   },
 
   me: async (): Promise<User> => {
-    const response = await api.get<User>('/api/v1/auth/me')
+    const response = await api.get<User>('/auth/me')
     return response.data
   },
 
   verifyEmail: async (token: string): Promise<VerifyEmailResponse> => {
-    const response = await api.get<VerifyEmailResponse>('/api/v1/auth/verify-email', {
+    // Dev-only logging: log the final request URL
+    if (isDev) {
+      console.log('[Auth] GET /auth/verify-email ->', `${API_BASE_URL}/auth/verify-email`)
+    }
+
+    const response = await api.get<VerifyEmailResponse>('/auth/verify-email', {
       params: { token }
     })
     return response.data
   },
 
   resendVerification: async (email: string): Promise<GenericMessageResponse> => {
-    const response = await api.post<GenericMessageResponse>('/api/v1/auth/resend-verification', { email })
+    // Dev-only logging: log the final request URL
+    if (isDev) {
+      console.log('[Auth] POST /auth/resend-verification ->', `${API_BASE_URL}/auth/resend-verification`)
+    }
+
+    const response = await api.post<GenericMessageResponse>('/auth/resend-verification', { email })
     return response.data
   },
 
   forgotPassword: async (email: string): Promise<GenericMessageResponse> => {
-    const response = await api.post<GenericMessageResponse>('/api/v1/auth/forgot-password', { email })
+    // Dev-only logging: log the final request URL
+    if (isDev) {
+      console.log('[Auth] POST /auth/forgot-password ->', `${API_BASE_URL}/auth/forgot-password`)
+    }
+
+    const response = await api.post<GenericMessageResponse>('/auth/forgot-password', { email })
     return response.data
   },
 
   resetPassword: async (data: ResetPasswordRequest): Promise<ResetPasswordResponse> => {
-    const response = await api.post<ResetPasswordResponse>('/api/v1/auth/reset-password', data)
+    // Dev-only logging: log the final request URL
+    if (isDev) {
+      console.log('[Auth] POST /auth/reset-password ->', `${API_BASE_URL}/auth/reset-password`)
+    }
+
+    const response = await api.post<ResetPasswordResponse>('/auth/reset-password', data)
     return response.data
   },
 }
@@ -380,42 +412,42 @@ export const checkApiHealth = async (): Promise<HealthCheckResult> => {
 
 export const transactionApi = {
   getStats: async (): Promise<TransactionStats> => {
-    const response = await api.get<TransactionStats>('/api/v1/transactions/stats')
+    const response = await api.get<TransactionStats>('/transactions/stats')
     return response.data
   },
 
   getAll: async (status?: 'DRAFT' | 'POSTED'): Promise<TransactionListItem[]> => {
     const params = status ? { status } : {}
-    const response = await api.get<TransactionListItem[]>('/api/v1/transactions', { params })
+    const response = await api.get<TransactionListItem[]>('/transactions', { params })
     return response.data
   },
 
   getById: async (id: string): Promise<Transaction> => {
-    const response = await api.get<Transaction>(`/api/v1/transactions/${id}`)
+    const response = await api.get<Transaction>(`/transactions/${id}`)
     return response.data
   },
 
   update: async (id: string, data: TransactionUpdateRequest): Promise<Transaction> => {
-    const response = await api.put<Transaction>(`/api/v1/transactions/${id}`, data)
+    const response = await api.put<Transaction>(`/transactions/${id}`, data)
     return response.data
   },
 
   approve: async (id: string): Promise<Transaction> => {
-    const response = await api.post<Transaction>(`/api/v1/transactions/${id}/approve`)
+    const response = await api.post<Transaction>(`/transactions/${id}/approve`)
     return response.data
   },
 
   reject: async (id: string): Promise<Transaction> => {
-    const response = await api.post<Transaction>(`/api/v1/transactions/${id}/reject`)
+    const response = await api.post<Transaction>(`/transactions/${id}/reject`)
     return response.data
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/api/v1/transactions/${id}`)
+    await api.delete(`/transactions/${id}`)
   },
 
   post: async (id: string): Promise<Transaction> => {
-    const response = await api.post<Transaction>(`/api/v1/transactions/${id}/post`)
+    const response = await api.post<Transaction>(`/transactions/${id}/post`)
     return response.data
   },
 }
@@ -440,17 +472,17 @@ export interface AdministrationCreateRequest {
 
 export const administrationApi = {
   create: async (data: AdministrationCreateRequest): Promise<Administration> => {
-    const response = await api.post<Administration>('/api/v1/administrations', data)
+    const response = await api.post<Administration>('/administrations', data)
     return response.data
   },
 
   list: async (): Promise<Administration[]> => {
-    const response = await api.get<Administration[]>('/api/v1/administrations')
+    const response = await api.get<Administration[]>('/administrations')
     return response.data
   },
 
   get: async (id: string): Promise<Administration> => {
-    const response = await api.get<Administration>(`/api/v1/administrations/${id}`)
+    const response = await api.get<Administration>(`/administrations/${id}`)
     return response.data
   },
 }
@@ -477,7 +509,7 @@ export const documentApi = {
     }
 
     const response = await api.post<{ message: string; document_id: string }>(
-      '/api/v1/documents/upload',
+      '/documents/upload',
       formData,
       {
         headers: {
@@ -490,17 +522,17 @@ export const documentApi = {
 
   list: async (administrationId?: string): Promise<DocumentResponse[]> => {
     const params = administrationId ? { administration_id: administrationId } : {}
-    const response = await api.get<DocumentResponse[]>('/api/v1/documents', { params })
+    const response = await api.get<DocumentResponse[]>('/documents', { params })
     return response.data
   },
 
   get: async (id: string): Promise<DocumentResponse> => {
-    const response = await api.get<DocumentResponse>(`/api/v1/documents/${id}`)
+    const response = await api.get<DocumentResponse>(`/documents/${id}`)
     return response.data
   },
 
   reprocess: async (id: string): Promise<DocumentResponse> => {
-    const response = await api.post<DocumentResponse>(`/api/v1/documents/${id}/reprocess`)
+    const response = await api.post<DocumentResponse>(`/documents/${id}/reprocess`)
     return response.data
   },
 }
@@ -558,12 +590,12 @@ export interface ClientIssuesResponse {
 
 export const accountantDashboardApi = {
   getDashboard: async (): Promise<AccountantDashboardResponse> => {
-    const response = await api.get<AccountantDashboardResponse>('/api/v1/accountant/dashboard')
+    const response = await api.get<AccountantDashboardResponse>('/accountant/dashboard')
     return response.data
   },
 
   getClientIssues: async (clientId: string): Promise<ClientIssuesResponse> => {
-    const response = await api.get<ClientIssuesResponse>(`/api/v1/accountant/dashboard/client/${clientId}/issues`)
+    const response = await api.get<ClientIssuesResponse>(`/accountant/dashboard/client/${clientId}/issues`)
     return response.data
   },
 }
@@ -695,13 +727,13 @@ export interface SubledgerReportResponse {
 // Core Ledger API
 export const ledgerApi = {
   getClientOverview: async (clientId: string): Promise<LedgerClientOverview> => {
-    const response = await api.get<LedgerClientOverview>(`/api/v1/accountant/clients/${clientId}/overview`)
+    const response = await api.get<LedgerClientOverview>(`/accountant/clients/${clientId}/overview`)
     return response.data
   },
 
   getClientIssues: async (clientId: string, includeResolved = false): Promise<LedgerClientIssuesResponse> => {
     const response = await api.get<LedgerClientIssuesResponse>(
-      `/api/v1/accountant/clients/${clientId}/issues`,
+      `/accountant/clients/${clientId}/issues`,
       { params: { include_resolved: includeResolved } }
     )
     return response.data
@@ -709,7 +741,7 @@ export const ledgerApi = {
 
   recalculate: async (clientId: string, force = false): Promise<RecalculateResponse> => {
     const response = await api.post<RecalculateResponse>(
-      `/api/v1/accountant/clients/${clientId}/journal/recalculate`,
+      `/accountant/clients/${clientId}/journal/recalculate`,
       { force }
     )
     return response.data
@@ -718,7 +750,7 @@ export const ledgerApi = {
   getBalanceSheet: async (clientId: string, asOfDate?: string): Promise<BalanceSheetResponse> => {
     const params = asOfDate ? { as_of_date: asOfDate } : {}
     const response = await api.get<BalanceSheetResponse>(
-      `/api/v1/accountant/clients/${clientId}/reports/balance-sheet`,
+      `/accountant/clients/${clientId}/reports/balance-sheet`,
       { params }
     )
     return response.data
@@ -729,7 +761,7 @@ export const ledgerApi = {
     if (startDate) params.start_date = startDate
     if (endDate) params.end_date = endDate
     const response = await api.get<ProfitAndLossResponse>(
-      `/api/v1/accountant/clients/${clientId}/reports/pnl`,
+      `/accountant/clients/${clientId}/reports/pnl`,
       { params }
     )
     return response.data
@@ -738,7 +770,7 @@ export const ledgerApi = {
   getAccountsReceivable: async (clientId: string, asOfDate?: string): Promise<SubledgerReportResponse> => {
     const params = asOfDate ? { as_of_date: asOfDate } : {}
     const response = await api.get<SubledgerReportResponse>(
-      `/api/v1/accountant/clients/${clientId}/reports/ar`,
+      `/accountant/clients/${clientId}/reports/ar`,
       { params }
     )
     return response.data
@@ -747,7 +779,7 @@ export const ledgerApi = {
   getAccountsPayable: async (clientId: string, asOfDate?: string): Promise<SubledgerReportResponse> => {
     const params = asOfDate ? { as_of_date: asOfDate } : {}
     const response = await api.get<SubledgerReportResponse>(
-      `/api/v1/accountant/clients/${clientId}/reports/ap`,
+      `/accountant/clients/${clientId}/reports/ap`,
       { params }
     )
     return response.data
@@ -865,7 +897,7 @@ export interface ClientPatternsResponse {
 export const decisionApi = {
   getIssueSuggestions: async (issueId: string): Promise<IssueSuggestionsResponse> => {
     const response = await api.get<IssueSuggestionsResponse>(
-      `/api/v1/accountant/issues/${issueId}/suggestions`
+      `/accountant/issues/${issueId}/suggestions`
     )
     return response.data
   },
@@ -876,7 +908,7 @@ export const decisionApi = {
     autoExecute = true
   ): Promise<DecisionResponse> => {
     const response = await api.post<DecisionResponse>(
-      `/api/v1/accountant/issues/${issueId}/decide`,
+      `/accountant/issues/${issueId}/decide`,
       request,
       { params: { auto_execute: autoExecute } }
     )
@@ -885,14 +917,14 @@ export const decisionApi = {
 
   executeDecision: async (decisionId: string): Promise<ExecutionResultResponse> => {
     const response = await api.post<ExecutionResultResponse>(
-      `/api/v1/accountant/decisions/${decisionId}/execute`
+      `/accountant/decisions/${decisionId}/execute`
     )
     return response.data
   },
 
   reverseDecision: async (decisionId: string, reason?: string): Promise<{ decision_id: string; reversed_at: string; message: string }> => {
     const response = await api.post<{ decision_id: string; reversed_at: string; message: string }>(
-      `/api/v1/accountant/decisions/${decisionId}/reverse`,
+      `/accountant/decisions/${decisionId}/reverse`,
       { reason }
     )
     return response.data
@@ -904,7 +936,7 @@ export const decisionApi = {
     offset = 0
   ): Promise<DecisionHistoryResponse> => {
     const response = await api.get<DecisionHistoryResponse>(
-      `/api/v1/accountant/clients/${clientId}/decision-history`,
+      `/accountant/clients/${clientId}/decision-history`,
       { params: { limit, offset } }
     )
     return response.data
@@ -912,7 +944,7 @@ export const decisionApi = {
 
   getDecisionPatterns: async (clientId: string): Promise<ClientPatternsResponse> => {
     const response = await api.get<ClientPatternsResponse>(
-      `/api/v1/accountant/clients/${clientId}/decision-patterns`
+      `/accountant/clients/${clientId}/decision-patterns`
     )
     return response.data
   },
@@ -1155,7 +1187,7 @@ export const documentReviewApi = {
   ): Promise<DocumentReviewListResponse> => {
     const params = status ? { status } : {}
     const response = await api.get<DocumentReviewListResponse>(
-      `/api/v1/accountant/clients/${clientId}/documents`,
+      `/accountant/clients/${clientId}/documents`,
       { params }
     )
     return response.data
@@ -1163,7 +1195,7 @@ export const documentReviewApi = {
 
   getDocument: async (clientId: string, documentId: string): Promise<DocumentReviewItem> => {
     const response = await api.get<DocumentReviewItem>(
-      `/api/v1/accountant/clients/${clientId}/documents/${documentId}`
+      `/accountant/clients/${clientId}/documents/${documentId}`
     )
     return response.data
   },
@@ -1174,7 +1206,7 @@ export const documentReviewApi = {
     request: DocumentPostRequest = {}
   ): Promise<DocumentPostResponse> => {
     const response = await api.post<DocumentPostResponse>(
-      `/api/v1/accountant/clients/${clientId}/documents/${documentId}/post`,
+      `/accountant/clients/${clientId}/documents/${documentId}/post`,
       request
     )
     return response.data
@@ -1186,7 +1218,7 @@ export const documentReviewApi = {
     request: DocumentRejectRequest
   ): Promise<DocumentRejectResponse> => {
     const response = await api.post<DocumentRejectResponse>(
-      `/api/v1/accountant/clients/${clientId}/documents/${documentId}/reject`,
+      `/accountant/clients/${clientId}/documents/${documentId}/reject`,
       request
     )
     return response.data
@@ -1197,7 +1229,7 @@ export const documentReviewApi = {
     documentId: string
   ): Promise<DocumentReprocessResponse> => {
     const response = await api.post<DocumentReprocessResponse>(
-      `/api/v1/accountant/clients/${clientId}/documents/${documentId}/reprocess`
+      `/accountant/clients/${clientId}/documents/${documentId}/reprocess`
     )
     return response.data
   },
@@ -1212,14 +1244,14 @@ export const documentReviewApi = {
     message: string
   }> => {
     const response = await api.post(
-      `/api/v1/accountant/clients/${clientId}/documents/${documentId}/match`
+      `/accountant/clients/${clientId}/documents/${documentId}/match`
     )
     return response.data
   },
 
   getClosingChecklist: async (clientId: string, periodId: string): Promise<ClosingChecklistResponse> => {
     const response = await api.get<ClosingChecklistResponse>(
-      `/api/v1/accountant/clients/${clientId}/periods/${periodId}/closing-checklist`
+      `/accountant/clients/${clientId}/periods/${periodId}/closing-checklist`
     )
     return response.data
   },
@@ -1342,7 +1374,7 @@ export const observabilityApi = {
 
   getMetrics: async (administrationId?: string): Promise<MetricsResponse> => {
     const params = administrationId ? { administration_id: administrationId } : {}
-    const response = await api.get<MetricsResponse>('/api/v1/ops/metrics', { params })
+    const response = await api.get<MetricsResponse>('/ops/metrics', { params })
     return response.data
   },
 
@@ -1355,39 +1387,39 @@ export const observabilityApi = {
     const params: Record<string, unknown> = { include_resolved: includeResolved, limit }
     if (administrationId) params.administration_id = administrationId
     if (severity) params.severity = severity
-    const response = await api.get<AlertListResponse>('/api/v1/ops/alerts', { params })
+    const response = await api.get<AlertListResponse>('/ops/alerts', { params })
     return response.data
   },
 
   getAlertsGrouped: async (administrationId?: string): Promise<AlertGroupedResponse> => {
     const params = administrationId ? { administration_id: administrationId } : {}
-    const response = await api.get<AlertGroupedResponse>('/api/v1/ops/alerts/grouped', { params })
+    const response = await api.get<AlertGroupedResponse>('/ops/alerts/grouped', { params })
     return response.data
   },
 
   getAlertCounts: async (administrationId?: string): Promise<AlertCountsResponse> => {
     const params = administrationId ? { administration_id: administrationId } : {}
-    const response = await api.get<AlertCountsResponse>('/api/v1/ops/alerts/counts', { params })
+    const response = await api.get<AlertCountsResponse>('/ops/alerts/counts', { params })
     return response.data
   },
 
   getAlert: async (alertId: string): Promise<Alert> => {
-    const response = await api.get<Alert>(`/api/v1/ops/alerts/${alertId}`)
+    const response = await api.get<Alert>(`/ops/alerts/${alertId}`)
     return response.data
   },
 
   acknowledgeAlert: async (alertId: string): Promise<Alert> => {
-    const response = await api.post<Alert>(`/api/v1/ops/alerts/${alertId}/acknowledge`)
+    const response = await api.post<Alert>(`/ops/alerts/${alertId}/acknowledge`)
     return response.data
   },
 
   resolveAlert: async (alertId: string, notes?: string): Promise<Alert> => {
-    const response = await api.post<Alert>(`/api/v1/ops/alerts/${alertId}/resolve`, { notes })
+    const response = await api.post<Alert>(`/ops/alerts/${alertId}/resolve`, { notes })
     return response.data
   },
 
   runAlertChecks: async (administrationId: string): Promise<AlertListResponse> => {
-    const response = await api.post<AlertListResponse>(`/api/v1/ops/alerts/check/${administrationId}`)
+    const response = await api.post<AlertListResponse>(`/ops/alerts/check/${administrationId}`)
     return response.data
   },
 }
@@ -1525,7 +1557,7 @@ export interface BulkLockPeriodRequest {
 // Accountant Master Dashboard API
 export const accountantMasterDashboardApi = {
   getSummary: async (): Promise<DashboardSummary> => {
-    const response = await api.get<DashboardSummary>('/api/v1/accountant/dashboard/summary')
+    const response = await api.get<DashboardSummary>('/accountant/dashboard/summary')
     return response.data
   },
 
@@ -1538,37 +1570,37 @@ export const accountantMasterDashboardApi = {
     if (sort) params.sort = sort
     if (order) params.order = order
     if (filters && filters.length > 0) params.filter = filters
-    const response = await api.get<ClientsListResponse>('/api/v1/accountant/dashboard/clients', { params })
+    const response = await api.get<ClientsListResponse>('/accountant/dashboard/clients', { params })
     return response.data
   },
 
   bulkRecalculate: async (request: BulkRecalculateRequest): Promise<BulkOperationResponse> => {
-    const response = await api.post<BulkOperationResponse>('/api/v1/accountant/bulk/recalculate', request)
+    const response = await api.post<BulkOperationResponse>('/accountant/bulk/recalculate', request)
     return response.data
   },
 
   bulkAckYellow: async (request: BulkAckYellowRequest): Promise<BulkOperationResponse> => {
-    const response = await api.post<BulkOperationResponse>('/api/v1/accountant/bulk/ack-yellow', request)
+    const response = await api.post<BulkOperationResponse>('/accountant/bulk/ack-yellow', request)
     return response.data
   },
 
   bulkGenerateVatDraft: async (request: BulkGenerateVatDraftRequest): Promise<BulkOperationResponse> => {
-    const response = await api.post<BulkOperationResponse>('/api/v1/accountant/bulk/generate-vat-draft', request)
+    const response = await api.post<BulkOperationResponse>('/accountant/bulk/generate-vat-draft', request)
     return response.data
   },
 
   bulkSendReminders: async (request: BulkSendRemindersRequest): Promise<BulkOperationResponse> => {
-    const response = await api.post<BulkOperationResponse>('/api/v1/accountant/bulk/send-reminders', request)
+    const response = await api.post<BulkOperationResponse>('/accountant/bulk/send-reminders', request)
     return response.data
   },
 
   bulkLockPeriod: async (request: BulkLockPeriodRequest): Promise<BulkOperationResponse> => {
-    const response = await api.post<BulkOperationResponse>('/api/v1/accountant/bulk/lock-period', request)
+    const response = await api.post<BulkOperationResponse>('/accountant/bulk/lock-period', request)
     return response.data
   },
 
   getBulkOperation: async (operationId: string): Promise<BulkOperationResponse> => {
-    const response = await api.get<BulkOperationResponse>(`/api/v1/accountant/bulk/operations/${operationId}`)
+    const response = await api.get<BulkOperationResponse>(`/accountant/bulk/operations/${operationId}`)
     return response.data
   },
 
@@ -1576,7 +1608,7 @@ export const accountantMasterDashboardApi = {
     const params: Record<string, unknown> = {}
     if (limit) params.limit = limit
     if (operationType) params.operation_type = operationType
-    const response = await api.get<{ operations: BulkOperationResponse[], total_count: number }>('/api/v1/accountant/bulk/operations', { params })
+    const response = await api.get<{ operations: BulkOperationResponse[], total_count: number }>('/accountant/bulk/operations', { params })
     return response.data
   },
 }
@@ -1726,12 +1758,12 @@ export const workQueueApi = {
     if (limit) params.limit = limit
     if (sort) params.sort = sort
     if (order) params.order = order
-    const response = await api.get<WorkQueueResponse>('/api/v1/accountant/work-queue', { params })
+    const response = await api.get<WorkQueueResponse>('/accountant/work-queue', { params })
     return response.data
   },
 
   getSLASummary: async (): Promise<SLASummaryResponse> => {
-    const response = await api.get<SLASummaryResponse>('/api/v1/accountant/dashboard/sla-summary')
+    const response = await api.get<SLASummaryResponse>('/accountant/dashboard/sla-summary')
     return response.data
   },
 }
@@ -1740,12 +1772,12 @@ export const workQueueApi = {
 
 export const reminderApi = {
   send: async (request: ReminderSendRequest): Promise<ReminderResponse[]> => {
-    const response = await api.post<ReminderResponse[]>('/api/v1/accountant/reminders/send', request)
+    const response = await api.post<ReminderResponse[]>('/accountant/reminders/send', request)
     return response.data
   },
 
   schedule: async (request: ReminderScheduleRequest): Promise<ReminderResponse[]> => {
-    const response = await api.post<ReminderResponse[]>('/api/v1/accountant/reminders/schedule', request)
+    const response = await api.post<ReminderResponse[]>('/accountant/reminders/schedule', request)
     return response.data
   },
 
@@ -1754,7 +1786,7 @@ export const reminderApi = {
     if (clientId) params.client_id = clientId
     if (limit) params.limit = limit
     if (offset) params.offset = offset
-    const response = await api.get<ReminderHistoryResponse>('/api/v1/accountant/reminders/history', { params })
+    const response = await api.get<ReminderHistoryResponse>('/accountant/reminders/history', { params })
     return response.data
   },
 }
@@ -1770,7 +1802,7 @@ export const evidencePackApi = {
     const params: Record<string, unknown> = {}
     if (packType) params.pack_type = packType
     const response = await api.post<EvidencePackResponse>(
-      `/api/v1/accountant/clients/${clientId}/periods/${periodId}/evidence-pack`,
+      `/accountant/clients/${clientId}/periods/${periodId}/evidence-pack`,
       {},
       { params }
     )
@@ -1778,7 +1810,7 @@ export const evidencePackApi = {
   },
 
   download: async (packId: string): Promise<Blob> => {
-    const response = await api.get(`/api/v1/accountant/evidence-packs/${packId}/download`, {
+    const response = await api.get(`/accountant/evidence-packs/${packId}/download`, {
       responseType: 'blob'
     })
     return response.data
@@ -1795,7 +1827,7 @@ export const evidencePackApi = {
     if (periodId) params.period_id = periodId
     if (limit) params.limit = limit
     if (offset) params.offset = offset
-    const response = await api.get<EvidencePackListResponse>('/api/v1/accountant/evidence-packs', { params })
+    const response = await api.get<EvidencePackListResponse>('/accountant/evidence-packs', { params })
     return response.data
   },
 }

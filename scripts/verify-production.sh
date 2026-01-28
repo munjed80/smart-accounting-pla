@@ -146,7 +146,7 @@ CORS_HEADERS=$(curl -sS -I -X OPTIONS \
 if echo "$CORS_HEADERS" | grep -qi "access-control-allow-origin"; then
     ORIGIN_VALUE=$(echo "$CORS_HEADERS" | grep -i "access-control-allow-origin" | head -1)
     
-    if echo "$ORIGIN_VALUE" | grep -qi "$FRONTEND_URL\|^\*"; then
+    if echo "$ORIGIN_VALUE" | grep -qiE "$FRONTEND_URL|^\*"; then
         print_result "pass" "CORS Access-Control-Allow-Origin header present"
         echo "  Found: $ORIGIN_VALUE"
     else

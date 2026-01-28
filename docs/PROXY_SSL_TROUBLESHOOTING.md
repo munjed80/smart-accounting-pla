@@ -55,6 +55,11 @@ CORS_ORIGINS=https://zzpershub.nl,https://www.zzpershub.nl
 RESEND_API_KEY=re_xxxxxxxxxxxx
 RESEND_FROM_EMAIL=no-reply@zzpershub.nl
 SUPPORT_EMAIL=support@zzpershub.nl
+
+# Optional: Restrict which IPs can set X-Forwarded-* headers
+# For enhanced security, set to your Docker/Traefik network (e.g., 172.17.0.0/16)
+# Default '*' trusts all IPs (safe when behind Coolify's Traefik which filters headers)
+# FORWARDED_ALLOW_IPS=172.17.0.0/16
 ```
 
 Set this environment variable for the **frontend** service (at build time):
@@ -147,9 +152,11 @@ Run the verification script to check your production deployment:
 ```
 
 This script checks:
-- API health endpoint returns 200 with valid JSON
+- TLS/SSL certificate validity (can connect via HTTPS)
+- API health endpoint returns HTTP 200 with valid JSON
+- API health status is "healthy" (database, migrations, etc.)
 - CORS headers are correctly configured for the frontend origin
-- TLS certificate is valid
+- Auth endpoints (register, login) are accessible
 
 ## Quick Reset Procedure
 

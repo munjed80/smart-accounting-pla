@@ -6,6 +6,12 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 const isDev = import.meta.env.DEV
 const envApiUrl = import.meta.env.VITE_API_URL as string | undefined
 
+// Normalize URL: trim whitespace and remove trailing slash
+const normalizeBaseUrl = (url: string | undefined): string => {
+  if (!url) return ''
+  return url.trim().replace(/\/+$/, '')
+}
+
 // Check if the URL points to localhost by parsing the hostname
 const isLocalhostUrl = (url: string | undefined): boolean => {
   if (!url) return false
@@ -19,7 +25,11 @@ const isLocalhostUrl = (url: string | undefined): boolean => {
   }
 }
 
+// Normalize the env URL first (handles whitespace)
+const normalizedEnvApiUrl = envApiUrl ? normalizeBaseUrl(envApiUrl) : undefined
+
 // Determine if API is misconfigured (production with localhost or missing URL)
+// Uses normalized URL to ensure consistent validation
 const checkMisconfiguration = (): { isMisconfigured: boolean; reason: string } => {
   if (isDev) {
     // In DEV mode, anything goes (including localhost)
@@ -27,25 +37,22 @@ const checkMisconfiguration = (): { isMisconfigured: boolean; reason: string } =
   }
   
   // In PROD mode, VITE_API_URL must be set and must NOT point to localhost
-  if (!envApiUrl || envApiUrl.trim() === '') {
+  if (!normalizedEnvApiUrl || normalizedEnvApiUrl === '') {
     return { 
       isMisconfigured: true, 
       reason: 'VITE_API_URL environment variable is not set. The frontend cannot call the API.' 
     }
   }
   
-  if (isLocalhostUrl(envApiUrl)) {
+  if (isLocalhostUrl(normalizedEnvApiUrl)) {
     return { 
       isMisconfigured: true, 
-      reason: `VITE_API_URL is set to "${envApiUrl}" which points to localhost. In production, this must be the actual API URL (e.g., https://api.zzpershub.nl).` 
+      reason: `VITE_API_URL is set to "${normalizedEnvApiUrl}" which points to localhost. In production, this must be the actual API URL (e.g., https://api.zzpershub.nl).` 
     }
   }
   
   return { isMisconfigured: false, reason: '' }
 }
-
-// Store misconfiguration result
-const misconfigurationCheck = checkMisconfiguration()
 
 // Compute API_BASE_URL
 // In DEV: use env var or fallback to localhost:8000
@@ -53,8 +60,11 @@ const misconfigurationCheck = checkMisconfiguration()
 // If misconfigured in PROD, we still set the URL (possibly localhost) so the UI can display it,
 // but the misconfiguration banner will warn users
 const API_BASE_URL = isDev 
-  ? (envApiUrl || 'http://localhost:8000')
-  : (envApiUrl || 'http://api-not-configured.invalid')
+  ? normalizeBaseUrl(envApiUrl || 'http://localhost:8000')
+  : (normalizedEnvApiUrl || 'http://api-not-configured.invalid')
+
+// Store misconfiguration result
+const misconfigurationCheck = checkMisconfiguration()
 
 // Export API base for display purposes
 export const getApiBaseUrl = () => API_BASE_URL
@@ -276,6 +286,96 @@ export const authApi = {
     const response = await api.post<ResetPasswordResponse>('/api/v1/auth/reset-password', data)
     return response.data
   },
+}
+
+/**
+ * Health check result interface for the API connectivity test.
+ */
+export interface HealthCheckResult {
+  success: boolean
+  status: 'healthy' | 'unhealthy' | 'unreachable' | 'error'
+  message: string
+  details?: string
+  responseTime?: number
+}
+
+/**
+ * Test API connectivity by calling the /health endpoint.
+ * Returns detailed information about the connection status and any failures.
+ */
+export const checkApiHealth = async (): Promise<HealthCheckResult> => {
+  const startTime = Date.now()
+  
+  try {
+    const response = await api.get('/health', { timeout: 10000 })
+    const responseTime = Date.now() - startTime
+    
+    const healthData = response.data
+    const isHealthy = healthData?.status === 'healthy'
+    
+    return {
+      success: isHealthy,
+      status: isHealthy ? 'healthy' : 'unhealthy',
+      message: isHealthy 
+        ? `API is healthy (${responseTime}ms)` 
+        : `API reports unhealthy status: ${healthData?.status || 'unknown'}`,
+      details: healthData?.components 
+        ? `Components: ${Object.entries(healthData.components)
+            .map(([k, v]) => `${k}: ${(v as { status: string })?.status || 'unknown'}`)
+            .join(', ')}`
+        : undefined,
+      responseTime,
+    }
+  } catch (error) {
+    const responseTime = Date.now() - startTime
+    
+    if (axios.isAxiosError(error)) {
+      // Log detailed error for debugging
+      logApiError(error, 'Health Check')
+      
+      // Network error - could be CORS, TLS, DNS, or connectivity
+      if (error.message === 'Network Error') {
+        return {
+          success: false,
+          status: 'unreachable',
+          message: 'Cannot reach API server',
+          details: `Failed to connect to ${API_BASE_URL}. Possible causes: CORS policy blocking the request, invalid/expired TLS certificate, DNS resolution failure, or the server is down.`,
+          responseTime,
+        }
+      }
+      
+      // Timeout
+      if (error.code === 'ECONNABORTED') {
+        return {
+          success: false,
+          status: 'unreachable',
+          message: 'API request timed out',
+          details: `Request to ${API_BASE_URL}/health timed out after ${responseTime}ms. The server may be overloaded or unresponsive.`,
+          responseTime,
+        }
+      }
+      
+      // Server responded with an error status
+      if (error.response) {
+        return {
+          success: false,
+          status: 'error',
+          message: `API returned error: HTTP ${error.response.status}`,
+          details: error.response.data?.message || error.response.statusText || 'Unknown error',
+          responseTime,
+        }
+      }
+    }
+    
+    // Generic error
+    return {
+      success: false,
+      status: 'error',
+      message: 'Health check failed',
+      details: error instanceof Error ? error.message : 'Unknown error occurred',
+      responseTime,
+    }
+  }
 }
 
 export const transactionApi = {
@@ -824,21 +924,96 @@ export interface ApiError {
   status?: number
 }
 
+/**
+ * Log API error details.
+ * In development: logs full axios error details (status, response body) to console.
+ * In production: logs minimal info to avoid exposing sensitive data.
+ */
+export const logApiError = (error: unknown, context?: string): void => {
+  const prefix = context ? `[${context}]` : '[API Error]'
+  
+  if (axios.isAxiosError(error)) {
+    if (isDev) {
+      // Development: log detailed error information
+      console.error(`${prefix} Axios error details:`, {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+        method: error.config?.method,
+        message: error.message,
+        code: error.code,
+      })
+    } else {
+      // Production: log minimal info
+      console.error(`${prefix} API request failed:`, error.response?.status || error.code || 'Unknown')
+    }
+  } else if (error instanceof Error) {
+    if (isDev) {
+      console.error(`${prefix} Error:`, error.message, error.stack)
+    } else {
+      console.error(`${prefix} Error:`, error.message)
+    }
+  } else {
+    console.error(`${prefix} Unknown error type`)
+  }
+}
+
+/**
+ * Get a detailed error message suitable for display.
+ * Includes information about network, CORS, TLS, and HTTP status errors.
+ */
 export const getErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
+    // Log the error with appropriate detail level
+    logApiError(error)
+    
+    // Check for server response with error detail
     if (error.response?.data?.detail) {
       return typeof error.response.data.detail === 'string' 
         ? error.response.data.detail 
         : JSON.stringify(error.response.data.detail)
     }
+    
+    // Network error - could be CORS, TLS, or connectivity issue
     if (error.message === 'Network Error') {
-      return 'Cannot connect to server. Please ensure the backend is running at ' + API_BASE_URL
+      return `Cannot connect to server at ${API_BASE_URL}. This could be caused by: network connectivity issues, CORS misconfiguration, or invalid TLS certificate on the API server.`
     }
+    
+    // Timeout
+    if (error.code === 'ECONNABORTED') {
+      return `Request to ${API_BASE_URL} timed out. The server may be slow or unresponsive.`
+    }
+    
+    // HTTP status errors with better messages
+    const status = error.response?.status
+    if (status) {
+      if (status === 401) {
+        return 'Authentication failed. Your credentials are incorrect or your session has expired.'
+      }
+      if (status === 403) {
+        return 'Access denied. You do not have permission for this action.'
+      }
+      if (status === 404) {
+        return 'The requested resource was not found on the server.'
+      }
+      if (status === 422) {
+        return 'Invalid request data. Please check your input.'
+      }
+      if (status >= 500) {
+        return `Server error (${status}). Please try again later or contact support.`
+      }
+      return `Request failed with status ${status}: ${error.response?.statusText || error.message}`
+    }
+    
     return error.message
   }
+  
   if (error instanceof Error) {
+    logApiError(error)
     return error.message
   }
+  
   return 'An unexpected error occurred'
 }
 

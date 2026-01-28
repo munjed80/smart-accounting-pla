@@ -1,13 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth, isEmailNotVerifiedError, getEmailNotVerifiedMessage } from '@/lib/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Database, Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning } from '@phosphor-icons/react'
+import { Database, Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning, CircleNotch, WifiHigh, WifiSlash } from '@phosphor-icons/react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason } from '@/lib/api'
+import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason, checkApiHealth, getErrorMessage, HealthCheckResult } from '@/lib/api'
 
 interface LoginPageProps {
   onSuccess?: () => void
@@ -37,9 +37,39 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [registeredEmail, setRegisteredEmail] = useState('')
 
+  // State for visible error messages (in addition to toasts)
+  const [loginError, setLoginError] = useState<string | null>(null)
+  const [registerError, setRegisterError] = useState<string | null>(null)
+
+  // State for API health check
+  const [healthCheck, setHealthCheck] = useState<HealthCheckResult | null>(null)
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false)
+
+  // Run health check on mount to detect connectivity issues early
+  useEffect(() => {
+    runHealthCheck()
+  }, [])
+
+  const runHealthCheck = async () => {
+    setIsCheckingHealth(true)
+    try {
+      const result = await checkApiHealth()
+      setHealthCheck(result)
+    } catch {
+      setHealthCheck({
+        success: false,
+        status: 'error',
+        message: 'Health check failed unexpectedly',
+      })
+    } finally {
+      setIsCheckingHealth(false)
+    }
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setShowEmailNotVerified(false)
+    setLoginError(null)
     
     try {
       await login(loginForm)
@@ -48,6 +78,10 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
       if (isEmailNotVerifiedError(error)) {
         setShowEmailNotVerified(true)
         setUnverifiedEmail(loginForm.username)
+      } else {
+        // Set visible error message (in addition to toast)
+        const errorMessage = getErrorMessage(error)
+        setLoginError(errorMessage)
       }
     }
   }
@@ -65,8 +99,10 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
+    setRegisterError(null)
+    
     try {
-      const response = await register(registerForm)
+      await register(registerForm)
       setRegisteredEmail(registerForm.email)
       setRegistrationSuccess(true)
       setRegisterForm({
@@ -76,7 +112,9 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
         role: 'zzp',
       })
     } catch (error) {
-      console.error('Register error:', error)
+      // Set visible error message (in addition to toast)
+      const errorMessage = getErrorMessage(error)
+      setRegisterError(errorMessage)
     }
   }
 
@@ -211,6 +249,23 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                   </div>
                 )}
 
+                {/* Login Error Message - shown even if toast fails */}
+                {loginError && (
+                  <div role="alert" aria-live="polite" className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                    <div className="flex items-start gap-3">
+                      <Warning size={20} className="text-red-600 dark:text-red-400 mt-0.5" weight="fill" aria-hidden="true" />
+                      <div className="flex-1">
+                        <p className="text-red-700 dark:text-red-400 font-medium text-sm">
+                          Login Failed
+                        </p>
+                        <p className="text-red-600 dark:text-red-500 text-sm mt-1">
+                          {loginError}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="login-email">Email</Label>
@@ -272,6 +327,23 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                 <CardDescription>Register for a new accounting account</CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Register Error Message - shown even if toast fails */}
+                {registerError && (
+                  <div role="alert" aria-live="polite" className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                    <div className="flex items-start gap-3">
+                      <Warning size={20} className="text-red-600 dark:text-red-400 mt-0.5" weight="fill" aria-hidden="true" />
+                      <div className="flex-1">
+                        <p className="text-red-700 dark:text-red-400 font-medium text-sm">
+                          Registration Failed
+                        </p>
+                        <p className="text-red-600 dark:text-red-500 text-sm mt-1">
+                          {registerError}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <form onSubmit={handleRegister} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="register-name">Full Name</Label>
@@ -352,7 +424,66 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
           </TabsContent>
         </Tabs>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
+        {/* API Connectivity Test Panel */}
+        <div className="mt-6 p-4 bg-card/60 backdrop-blur-sm rounded-lg border border-border/50">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-muted-foreground">API Connectivity</span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={runHealthCheck}
+              disabled={isCheckingHealth}
+              className="h-7 px-2 text-xs"
+            >
+              {isCheckingHealth ? (
+                <CircleNotch size={14} className="mr-1 animate-spin" />
+              ) : (
+                <WifiHigh size={14} className="mr-1" />
+              )}
+              {isCheckingHealth ? 'Checking...' : 'Test'}
+            </Button>
+          </div>
+          
+          {healthCheck && (
+            <div className={`p-3 rounded-md text-sm ${
+              healthCheck.success 
+                ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
+                : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+            }`}>
+              <div className="flex items-center gap-2">
+                {healthCheck.success ? (
+                  <CheckCircle size={16} className="text-green-600 dark:text-green-400" weight="fill" />
+                ) : (
+                  <WifiSlash size={16} className="text-red-600 dark:text-red-400" weight="fill" />
+                )}
+                <span className={`font-medium ${
+                  healthCheck.success 
+                    ? 'text-green-700 dark:text-green-400' 
+                    : 'text-red-700 dark:text-red-400'
+                }`}>
+                  {healthCheck.message}
+                </span>
+              </div>
+              {healthCheck.details && (
+                <p className={`mt-1 text-xs ${
+                  healthCheck.success 
+                    ? 'text-green-600 dark:text-green-500' 
+                    : 'text-red-600 dark:text-red-500'
+                }`}>
+                  {healthCheck.details}
+                </p>
+              )}
+            </div>
+          )}
+          
+          {!healthCheck && !isCheckingHealth && (
+            <p className="text-xs text-muted-foreground">
+              Click "Test" to check API connectivity
+            </p>
+          )}
+        </div>
+
+        <p className="text-center text-xs text-muted-foreground mt-4">
           Backend API: <code className="bg-secondary px-2 py-1 rounded">{apiUrl}</code>
         </p>
       </div>

@@ -14,15 +14,19 @@ const envApiUrl = import.meta.env.VITE_API_URL as string | undefined
 const normalizeBaseUrl = (url: string | undefined): string => {
   if (!url) return ''
   
-  let normalized = url.trim()
+  const normalized = url.trim()
+  
+  // Return early if URL is empty after trimming
+  if (!normalized) return ''
   
   // If URL has no scheme, add one (https in prod, http in dev for localhost convenience)
-  if (normalized && !normalized.match(/^https?:\/\//i)) {
-    normalized = isDev ? `http://${normalized}` : `https://${normalized}`
+  let result = normalized
+  if (!normalized.match(/^https?:\/\//i)) {
+    result = isDev ? `http://${normalized}` : `https://${normalized}`
   }
   
   // Remove trailing slashes
-  return normalized.replace(/\/+$/, '')
+  return result.replace(/\/+$/, '')
 }
 
 // Check if the URL points to localhost by parsing the hostname

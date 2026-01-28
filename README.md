@@ -122,7 +122,7 @@ VITE_API_URL=https://api.zzpershub.nl
 ```
 
 > **Important:** 
-> - The URL must include the `https://` scheme. If omitted, the frontend will automatically prefix it with `https://` in production builds.
+> - The URL should include the `https://` scheme (e.g., `https://api.zzpershub.nl`), but if omitted, the frontend will automatically prefix it with `https://` during production builds.
 > - The frontend appends `/api/v1` to this base URL when making API calls (e.g., `https://api.zzpershub.nl/api/v1/auth/register`).
 > - Do NOT include a trailing slash in `VITE_API_URL`.
 

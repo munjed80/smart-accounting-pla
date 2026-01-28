@@ -6,10 +6,23 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 const isDev = import.meta.env.DEV
 const envApiUrl = import.meta.env.VITE_API_URL as string | undefined
 
-// Normalize URL: trim whitespace and remove trailing slash
+/**
+ * Normalize URL: trim whitespace, ensure scheme is present, and remove trailing slash.
+ * In production, URLs without a scheme are prefixed with "https://".
+ * In development, URLs without a scheme are prefixed with "http://".
+ */
 const normalizeBaseUrl = (url: string | undefined): string => {
   if (!url) return ''
-  return url.trim().replace(/\/+$/, '')
+  
+  let normalized = url.trim()
+  
+  // If URL has no scheme, add one (https in prod, http in dev for localhost convenience)
+  if (normalized && !normalized.match(/^https?:\/\//i)) {
+    normalized = isDev ? `http://${normalized}` : `https://${normalized}`
+  }
+  
+  // Remove trailing slashes
+  return normalized.replace(/\/+$/, '')
 }
 
 // Check if the URL points to localhost by parsing the hostname
@@ -66,6 +79,13 @@ const API_BASE_URL = isDev
 
 // Store misconfiguration result
 const misconfigurationCheck = checkMisconfiguration()
+
+// Dev mode: log the final API URL for debugging
+if (isDev) {
+  console.log('[API Config] VITE_API_URL:', envApiUrl ?? '(not set)')
+  console.log('[API Config] Normalized Base URL:', API_BASE_URL)
+  console.log('[API Config] Register endpoint:', `${API_BASE_URL}/auth/register`)
+}
 
 // Export API base for display purposes
 export const getApiBaseUrl = () => API_BASE_URL

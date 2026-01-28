@@ -113,6 +113,19 @@ The docker-compose setup uses the following networking model:
 | `DATABASE_URL` | Backend/Worker | PostgreSQL connection (uses `db` hostname) |
 | `REDIS_URL` | Backend/Worker | Redis connection (uses `redis` hostname) |
 
+### Production Environment Setup
+
+For production deployments, the following environment variable must be set at **build time**:
+
+```bash
+VITE_API_URL=https://api.zzpershub.nl
+```
+
+> **Important:** 
+> - The URL must include the `https://` scheme. If omitted, the frontend will automatically prefix it with `https://` in production builds.
+> - The frontend appends `/api/v1` to this base URL when making API calls (e.g., `https://api.zzpershub.nl/api/v1/auth/register`).
+> - Do NOT include a trailing slash in `VITE_API_URL`.
+
 ## Demo Flow
 
 1. **Register a new user**:

@@ -1,16 +1,60 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// Determine API_BASE_URL based on environment
+// In DEV mode: Allow fallback to localhost for development convenience
+// In PROD mode: VITE_API_URL must be set and must NOT point to localhost
+const isDev = import.meta.env.DEV
+const envApiUrl = import.meta.env.VITE_API_URL as string | undefined
+
+// Check if the URL points to localhost
+const isLocalhostUrl = (url: string | undefined): boolean => {
+  if (!url) return false
+  return url.includes('localhost') || url.includes('127.0.0.1')
+}
+
+// Determine if API is misconfigured (production with localhost or missing URL)
+const checkMisconfiguration = (): { isMisconfigured: boolean; reason: string } => {
+  if (isDev) {
+    // In DEV mode, anything goes (including localhost)
+    return { isMisconfigured: false, reason: '' }
+  }
+  
+  // In PROD mode, VITE_API_URL must be set and must NOT point to localhost
+  if (!envApiUrl || envApiUrl.trim() === '') {
+    return { 
+      isMisconfigured: true, 
+      reason: 'VITE_API_URL environment variable is not set. The frontend cannot call the API.' 
+    }
+  }
+  
+  if (isLocalhostUrl(envApiUrl)) {
+    return { 
+      isMisconfigured: true, 
+      reason: `VITE_API_URL is set to "${envApiUrl}" which points to localhost. In production, this must be the actual API URL (e.g., https://api.zzpershub.nl).` 
+    }
+  }
+  
+  return { isMisconfigured: false, reason: '' }
+}
+
+// Store misconfiguration result
+const misconfigurationCheck = checkMisconfiguration()
+
+// Compute API_BASE_URL
+// In DEV: use env var or fallback to localhost:8000
+// In PROD: use env var (misconfiguration check already validates this)
+const API_BASE_URL = isDev 
+  ? (envApiUrl || 'http://localhost:8000')
+  : (envApiUrl || '') // Empty string will cause requests to fail with clear error
 
 // Export API base for display purposes
 export const getApiBaseUrl = () => API_BASE_URL
 
-// Check if running in production with localhost API (likely misconfigured)
-export const isApiMisconfigured = () => {
-  const isProduction = import.meta.env.PROD
-  const hasLocalhost = API_BASE_URL.includes('localhost') || API_BASE_URL.includes('127.0.0.1')
-  return isProduction && hasLocalhost
-}
+// Export misconfiguration status for UI display
+export const isApiMisconfigured = () => misconfigurationCheck.isMisconfigured
+
+// Export the reason for misconfiguration
+export const getApiMisconfigurationReason = () => misconfigurationCheck.reason
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

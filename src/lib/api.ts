@@ -251,10 +251,10 @@ export const authApi = {
 
     // Dev-only logging: log the final request URL
     if (isDev) {
-      console.log('[Auth] POST /auth/login ->', `${API_BASE_URL}/auth/login`)
+      console.log('[Auth] POST /auth/token ->', `${API_BASE_URL}/auth/token`)
     }
 
-    const response = await api.post<TokenResponse>('/auth/login', formData, {
+    const response = await api.post<TokenResponse>('/auth/token', formData, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
@@ -332,14 +332,14 @@ export interface HealthCheckResult {
 }
 
 /**
- * Test API connectivity by calling the /health endpoint.
+ * Test API connectivity by calling the /ops/health endpoint.
  * Returns detailed information about the connection status and any failures.
  */
 export const checkApiHealth = async (): Promise<HealthCheckResult> => {
   const startTime = Date.now()
   
   try {
-    const response = await api.get('/health', { timeout: 10000 })
+    const response = await api.get('/ops/health', { timeout: 10000 })
     const responseTime = Date.now() - startTime
     
     const healthData = response.data

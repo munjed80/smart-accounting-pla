@@ -6,10 +6,17 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 const isDev = import.meta.env.DEV
 const envApiUrl = import.meta.env.VITE_API_URL as string | undefined
 
-// Check if the URL points to localhost
+// Check if the URL points to localhost by parsing the hostname
 const isLocalhostUrl = (url: string | undefined): boolean => {
   if (!url) return false
-  return url.includes('localhost') || url.includes('127.0.0.1')
+  try {
+    const parsed = new URL(url)
+    const hostname = parsed.hostname.toLowerCase()
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('127.')
+  } catch {
+    // If URL parsing fails, fall back to string check
+    return url.includes('localhost') || url.includes('127.0.0.1')
+  }
 }
 
 // Determine if API is misconfigured (production with localhost or missing URL)
@@ -43,9 +50,11 @@ const misconfigurationCheck = checkMisconfiguration()
 // Compute API_BASE_URL
 // In DEV: use env var or fallback to localhost:8000
 // In PROD: use env var (misconfiguration check already validates this)
+// If misconfigured in PROD, we still set the URL (possibly localhost) so the UI can display it,
+// but the misconfiguration banner will warn users
 const API_BASE_URL = isDev 
   ? (envApiUrl || 'http://localhost:8000')
-  : (envApiUrl || '') // Empty string will cause requests to fail with clear error
+  : (envApiUrl || 'http://api-not-configured.invalid')
 
 // Export API base for display purposes
 export const getApiBaseUrl = () => API_BASE_URL
@@ -64,8 +73,14 @@ export const api = axios.create({
   timeout: 30000,
 })
 
+// Add request interceptor to fail fast if API is misconfigured
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // In production, if API is misconfigured, reject requests immediately with clear error
+    if (misconfigurationCheck.isMisconfigured) {
+      return Promise.reject(new Error(`API Configuration Error: ${misconfigurationCheck.reason}`))
+    }
+    
     const token = localStorage.getItem('access_token')
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`

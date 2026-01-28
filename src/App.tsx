@@ -146,14 +146,19 @@ const AppContent = () => {
   }
 
   if (isLoading || isCheckingOnboarding) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center">
-        <div className="text-center">
-          <Database size={64} className="mx-auto mb-4 text-primary animate-pulse" weight="duotone" />
-          <p className="text-muted-foreground">Loading session...</p>
+    // Only show loading screen if user is authenticated (loading app content)
+    // Don't show loading for login/auth operations as it unmounts the LoginPage and loses error state
+    if (isAuthenticated) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center">
+          <div className="text-center">
+            <Database size={64} className="mx-auto mb-4 text-primary animate-pulse" weight="duotone" />
+            <p className="text-muted-foreground">Loading session...</p>
+          </div>
         </div>
-      </div>
-    )
+      )
+    }
+    // For unauthenticated users during login, let the LoginPage show with its own loading state
   }
 
   if (!isAuthenticated) {

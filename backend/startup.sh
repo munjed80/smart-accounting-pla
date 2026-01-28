@@ -22,5 +22,7 @@ echo "Running seed script..."
 python seed.py || echo "Seed script completed (may have skipped existing data)"
 
 # Start the application
-echo "Starting uvicorn server..."
-exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# --proxy-headers: Trust X-Forwarded-* headers from reverse proxy (Coolify/Traefik)
+# This ensures correct scheme (https) and client IP detection behind the proxy
+echo "Starting uvicorn server with proxy headers enabled..."
+exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'

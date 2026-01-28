@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
-import { documentApi, getErrorMessage, DocumentResponse } from '@/lib/api'
+import { documentApi, getErrorMessage, DocumentResponse, getApiBaseUrl } from '@/lib/api'
 import { 
   UploadSimple, 
   FileImage, 
@@ -522,7 +522,7 @@ export const IntelligentUploadPortal = () => {
       <Alert>
         <Sparkle size={16} weight="duotone" />
         <AlertDescription>
-          <strong>Backend Integration:</strong> Files are uploaded to <code className="bg-secondary px-2 py-0.5 rounded text-xs">http://localhost:8000/api/v1/documents/upload</code>. 
+          <strong>Backend Integration:</strong> Files are uploaded to <code className="bg-secondary px-2 py-0.5 rounded text-xs">{getApiBaseUrl()}/documents/upload</code>. 
           The Spark worker will automatically process uploaded documents and create draft transactions with AI-predicted ledger accounts.
         </AlertDescription>
       </Alert>

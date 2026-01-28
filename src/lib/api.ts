@@ -6,6 +6,12 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 const isDev = import.meta.env.DEV
 const envApiUrl = import.meta.env.VITE_API_URL as string | undefined
 
+// Normalize URL: trim whitespace and remove trailing slash
+const normalizeBaseUrl = (url: string | undefined): string => {
+  if (!url) return ''
+  return url.trim().replace(/\/+$/, '')
+}
+
 // Check if the URL points to localhost by parsing the hostname
 const isLocalhostUrl = (url: string | undefined): boolean => {
   if (!url) return false
@@ -19,7 +25,11 @@ const isLocalhostUrl = (url: string | undefined): boolean => {
   }
 }
 
+// Normalize the env URL first (handles whitespace)
+const normalizedEnvApiUrl = envApiUrl ? normalizeBaseUrl(envApiUrl) : undefined
+
 // Determine if API is misconfigured (production with localhost or missing URL)
+// Uses normalized URL to ensure consistent validation
 const checkMisconfiguration = (): { isMisconfigured: boolean; reason: string } => {
   if (isDev) {
     // In DEV mode, anything goes (including localhost)
@@ -27,30 +37,21 @@ const checkMisconfiguration = (): { isMisconfigured: boolean; reason: string } =
   }
   
   // In PROD mode, VITE_API_URL must be set and must NOT point to localhost
-  if (!envApiUrl || envApiUrl.trim() === '') {
+  if (!normalizedEnvApiUrl || normalizedEnvApiUrl === '') {
     return { 
       isMisconfigured: true, 
       reason: 'VITE_API_URL environment variable is not set. The frontend cannot call the API.' 
     }
   }
   
-  if (isLocalhostUrl(envApiUrl)) {
+  if (isLocalhostUrl(normalizedEnvApiUrl)) {
     return { 
       isMisconfigured: true, 
-      reason: `VITE_API_URL is set to "${envApiUrl}" which points to localhost. In production, this must be the actual API URL (e.g., https://api.zzpershub.nl).` 
+      reason: `VITE_API_URL is set to "${normalizedEnvApiUrl}" which points to localhost. In production, this must be the actual API URL (e.g., https://api.zzpershub.nl).` 
     }
   }
   
   return { isMisconfigured: false, reason: '' }
-}
-
-// Store misconfiguration result
-const misconfigurationCheck = checkMisconfiguration()
-
-// Normalize URL: trim whitespace and remove trailing slash
-const normalizeBaseUrl = (url: string | undefined): string => {
-  if (!url) return ''
-  return url.trim().replace(/\/+$/, '')
 }
 
 // Compute API_BASE_URL
@@ -58,11 +59,12 @@ const normalizeBaseUrl = (url: string | undefined): string => {
 // In PROD: use env var (misconfiguration check already validates this)
 // If misconfigured in PROD, we still set the URL (possibly localhost) so the UI can display it,
 // but the misconfiguration banner will warn users
-const rawApiUrl = isDev 
-  ? (envApiUrl || 'http://localhost:8000')
-  : (envApiUrl || 'http://api-not-configured.invalid')
+const API_BASE_URL = isDev 
+  ? normalizeBaseUrl(envApiUrl || 'http://localhost:8000')
+  : (normalizedEnvApiUrl || 'http://api-not-configured.invalid')
 
-const API_BASE_URL = normalizeBaseUrl(rawApiUrl)
+// Store misconfiguration result
+const misconfigurationCheck = checkMisconfiguration()
 
 // Export API base for display purposes
 export const getApiBaseUrl = () => API_BASE_URL
@@ -987,13 +989,13 @@ export const getErrorMessage = (error: unknown): string => {
     const status = error.response?.status
     if (status) {
       if (status === 401) {
-        return 'Authentication failed. Please check your credentials.'
+        return 'Authentication failed. Your credentials are incorrect or your session has expired.'
       }
       if (status === 403) {
         return 'Access denied. You do not have permission for this action.'
       }
       if (status === 404) {
-        return 'The requested resource was not found. Please check the API URL.'
+        return 'The requested resource was not found on the server.'
       }
       if (status === 422) {
         return 'Invalid request data. Please check your input.'

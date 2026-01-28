@@ -251,9 +251,9 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
 
                 {/* Login Error Message - shown even if toast fails */}
                 {loginError && (
-                  <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                  <div role="alert" aria-live="polite" className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
                     <div className="flex items-start gap-3">
-                      <Warning size={20} className="text-red-600 dark:text-red-400 mt-0.5" weight="fill" />
+                      <Warning size={20} className="text-red-600 dark:text-red-400 mt-0.5" weight="fill" aria-hidden="true" />
                       <div className="flex-1">
                         <p className="text-red-700 dark:text-red-400 font-medium text-sm">
                           Login Failed
@@ -329,9 +329,9 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
               <CardContent>
                 {/* Register Error Message - shown even if toast fails */}
                 {registerError && (
-                  <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                  <div role="alert" aria-live="polite" className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
                     <div className="flex items-start gap-3">
-                      <Warning size={20} className="text-red-600 dark:text-red-400 mt-0.5" weight="fill" />
+                      <Warning size={20} className="text-red-600 dark:text-red-400 mt-0.5" weight="fill" aria-hidden="true" />
                       <div className="flex-1">
                         <p className="text-red-700 dark:text-red-400 font-medium text-sm">
                           Registration Failed

@@ -12,8 +12,19 @@ RUN npm ci
 # Copy source
 COPY . .
 
-# Build argument for API URL
-ARG VITE_API_URL=http://localhost:8000
+# Build argument for API URL - REQUIRED, no default value
+# Must be set to production API URL (e.g., https://api.zzpershub.nl)
+ARG VITE_API_URL
+
+# Build-time check: Fail if VITE_API_URL is not set
+# This prevents accidentally deploying with a missing or empty API URL
+RUN if [ -z "$VITE_API_URL" ]; then \
+      echo "ERROR: VITE_API_URL build argument is required."; \
+      echo "Set it to your production API URL (e.g., https://api.zzpershub.nl)"; \
+      exit 1; \
+    fi
+
+# Make VITE_API_URL available as environment variable during build
 ENV VITE_API_URL=$VITE_API_URL
 
 # Build the app

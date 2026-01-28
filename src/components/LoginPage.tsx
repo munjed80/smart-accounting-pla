@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Database, Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning } from '@phosphor-icons/react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { getApiBaseUrl, isApiMisconfigured } from '@/lib/api'
+import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason } from '@/lib/api'
 
 interface LoginPageProps {
   onSuccess?: () => void
@@ -82,6 +82,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
 
   const apiUrl = getApiBaseUrl()
   const isMisconfigured = isApiMisconfigured()
+  const misconfigurationReason = getApiMisconfigurationReason()
 
   // Show registration success screen
   if (registrationSuccess) {
@@ -147,13 +148,19 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
       
       {/* API Misconfiguration Warning Banner */}
       {isMisconfigured && (
-        <div className="fixed top-0 left-0 right-0 bg-yellow-500 text-yellow-900 px-4 py-2 text-center text-sm font-medium z-50">
-          <Warning size={16} className="inline mr-2" />
-          Warning: API appears to be configured for localhost in production mode. Please check VITE_API_URL.
+        <div className="fixed top-0 left-0 right-0 bg-red-600 text-white px-4 py-3 text-center z-50">
+          <div className="flex items-center justify-center gap-2 font-medium">
+            <Warning size={20} weight="bold" />
+            <span>API Configuration Error</span>
+          </div>
+          <p className="text-sm mt-1">{misconfigurationReason}</p>
+          <p className="text-xs mt-1 opacity-90">
+            Current API URL: <code className="bg-red-800 px-2 py-0.5 rounded">{apiUrl || '(not set)'}</code>
+          </p>
         </div>
       )}
       
-      <div className={`relative w-full max-w-md ${isMisconfigured ? 'mt-12' : ''}`}>
+      <div className={`relative w-full max-w-md ${isMisconfigured ? 'mt-24' : ''}`}>
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <Database size={48} weight="duotone" className="text-primary" />

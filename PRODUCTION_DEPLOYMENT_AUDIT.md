@@ -91,7 +91,7 @@ No runtime-only environment variable usage detected. All environment variables a
 
 ### 3.1 Dockerfile.frontend
 
-#### ✅ **CONFIRMED CORRECT**
+#### ✅ **CONFIRMED CORRECT (Updated)**
 
 **File:** `Dockerfile.frontend`
 ```dockerfile
@@ -102,8 +102,12 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 
-# Build argument for API URL
-ARG VITE_API_URL=http://localhost:8000
+# Build argument for API URL - REQUIRED, no default
+ARG VITE_API_URL
+
+# Build-time check: Fail if VITE_API_URL is not set
+RUN test -n "$VITE_API_URL" || (echo "ERROR: VITE_API_URL build argument is required." && exit 1)
+
 ENV VITE_API_URL=$VITE_API_URL
 
 # Build the app
@@ -119,8 +123,8 @@ CMD ["nginx", "-g", "daemon off;"]
 
 **Analysis:**
 - ✅ Multi-stage build (efficient image size)
-- ✅ `VITE_API_URL` exposed as build argument (ARG) - Coolify can override this
-- ✅ Default value `http://localhost:8000` is safe (only for local development)
+- ✅ `VITE_API_URL` is a **required** build argument (no default value)
+- ✅ Build fails with clear error if `VITE_API_URL` is not set
 - ✅ Production stage uses nginx:alpine
 - ✅ Exposes port 80 correctly
 - ✅ Copies nginx.conf to correct location
@@ -337,30 +341,52 @@ The actual API calls use `import.meta.env.VITE_API_URL` which will be `https://a
 ## 7. Production Deployment Checklist
 
 ### Coolify Frontend Configuration
-- [ ] Set build argument: `VITE_API_URL=https://api.zzpershub.nl`
-- [ ] Verify port mapping: Container 80 → External 443 (via Coolify SSL)
-- [ ] Configure domain: `zzpershub.nl`
 
-### Coolify Backend Configuration  
-- [ ] Set environment variable: `CORS_ORIGINS=https://zzpershub.nl`
-- [ ] Set environment variable: `SECRET_KEY=<secure-random-value>`
-- [ ] Set database connection strings
-- [ ] Configure domain: `api.zzpershub.nl`
+| Setting | Value | Notes |
+|---------|-------|-------|
+| **Domain** | `zzpershub.nl` | Enter WITHOUT `https://` prefix |
+| **Domain** (www) | `www.zzpershub.nl` | Enter WITHOUT `https://` prefix |
+| **Force HTTPS** | ✅ Enabled | Coolify handles SSL certificates |
+| **Build Argument** | `VITE_API_URL=https://api.zzpershub.nl` | ⚠️ REQUIRED - Must be set as **Buildtime** variable |
+| **Inject Build Args** | ✅ Enabled | Ensures build args are passed to Docker build |
+| **Port** | `80` | Container port (Coolify maps to 443 via SSL) |
+
+**After updating settings:**
+1. Disable build cache (one-time only)
+2. Trigger a new deployment
+3. Re-enable build cache for future builds
+
+### Coolify Backend Configuration
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| **Domain** | `api.zzpershub.nl` | Enter WITHOUT `https://` prefix |
+| **Force HTTPS** | ✅ Enabled | Coolify handles SSL certificates |
+| **Environment Variable** | `CORS_ORIGINS=https://zzpershub.nl,https://www.zzpershub.nl` | Both domains for CORS |
+| **Environment Variable** | `SECRET_KEY=<secure-random-value>` | Generate with `openssl rand -hex 32` |
+| **Environment Variable** | `DATABASE_URL=postgresql://...` | Your PostgreSQL connection string |
+| **Environment Variable** | `REDIS_URL=redis://...` | Your Redis connection string |
+| **Port** | `8000` | Container port |
 
 ### Post-Deployment Verification
 - [ ] Test health endpoint: `curl https://api.zzpershub.nl/health`
-- [ ] Test login flow from frontend
+- [ ] Test login flow from frontend at https://zzpershub.nl
 - [ ] Verify API calls from browser (check Network tab for CORS errors)
 - [ ] Verify document upload functionality
+- [ ] Check browser console for any API configuration errors
 
 ---
 
 ## 8. Conclusion
 
-The codebase is **production-ready** with proper Vite conventions and environment variable handling. The main concerns are:
+The codebase is **production-ready** with proper Vite conventions and environment variable handling. The following safeguards are in place:
 
-1. **Configuration-dependent:** Production success depends on correctly setting `VITE_API_URL` (build-time) and `CORS_ORIGINS` (runtime) in Coolify.
+1. **Build-time validation:** `Dockerfile.frontend` now **requires** `VITE_API_URL` as a build argument (no default value). The build will fail with a clear error message if this is not set.
 
-2. **Cosmetic issues:** Two UI display strings show hardcoded localhost URLs. These do not affect functionality but may confuse users.
+2. **Runtime validation:** The frontend JavaScript checks if `VITE_API_URL` is missing or points to localhost in production mode, displaying a prominent error banner to users if misconfigured.
+
+3. **Configuration requirements:**
+   - **Frontend:** Set `VITE_API_URL=https://api.zzpershub.nl` as a **Buildtime** variable in Coolify with "Inject Build Args" enabled.
+   - **Backend:** Set `CORS_ORIGINS=https://zzpershub.nl,https://www.zzpershub.nl` as an environment variable.
 
 **Overall Assessment:** ✅ **READY FOR PRODUCTION** (with noted configuration requirements)

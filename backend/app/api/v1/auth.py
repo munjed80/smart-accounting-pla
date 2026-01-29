@@ -1,6 +1,7 @@
 from datetime import timedelta, datetime, timezone
 from typing import Annotated
 import logging
+import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.security import OAuth2PasswordRequestForm
@@ -36,6 +37,11 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _hash_for_logging(value: str) -> str:
+    """Create a truncated hash of a value for safe logging (prevents PII exposure)."""
+    return hashlib.sha256(value.encode()).hexdigest()[:12]
+
+
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     user_in: UserCreate,
@@ -46,61 +52,94 @@ async def register(
     Register a new user.
     
     Creates the user with email_verified_at=null and sends a verification email.
+    
+    Returns:
+        - 201: Registration successful
+        - 409: Email already registered
+        - 422: Validation error (invalid email, password too short, etc.)
+        - 429: Rate limit exceeded
     """
+    request_id = request.headers.get("X-Request-ID", "")
     check_rate_limit("register", request)
     
-    # Check if email already exists
-    result = await db.execute(select(User).where(User.email == user_in.email))
-    if result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=400,
-            detail="Email already registered"
+    try:
+        # Check if email already exists
+        result = await db.execute(select(User).where(User.email == user_in.email))
+        if result.scalar_one_or_none():
+            logger.warning(
+                "Registration attempted with existing email",
+                extra={
+                    "event": "registration_email_exists",
+                    "email": user_in.email,
+                    "request_id": request_id,
+                }
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered"
+            )
+        
+        # Create user with email_verified_at = None
+        user = User(
+            email=user_in.email,
+            hashed_password=get_password_hash(user_in.password),
+            full_name=user_in.full_name,
+            role=user_in.role,
+            email_verified_at=None,  # User starts unverified
         )
-    
-    # Create user with email_verified_at = None
-    user = User(
-        email=user_in.email,
-        hashed_password=get_password_hash(user_in.password),
-        full_name=user_in.full_name,
-        role=user_in.role,
-        email_verified_at=None,  # User starts unverified
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    
-    # Create verification token
-    ip_address = get_client_ip(request)
-    user_agent = request.headers.get("User-Agent", "")[:500]
-    
-    token = await create_auth_token(
-        db=db,
-        user_id=user.id,
-        token_type=TokenType.EMAIL_VERIFY,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
-    
-    # Send verification email
-    await email_service.send_verification_email(
-        to_email=user.email,
-        token=token,
-        user_name=user.full_name,
-    )
-    
-    logger.info(
-        f"User registered successfully",
-        extra={
-            "event": "user_registered",
-            "user_id": str(user.id),
-            "email": user.email,
-        }
-    )
-    
-    return RegisterResponse(
-        message="Check your email to verify your account",
-        user_id=user.id,
-    )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        
+        # Create verification token
+        ip_address = get_client_ip(request)
+        user_agent = request.headers.get("User-Agent", "")[:500]
+        
+        token = await create_auth_token(
+            db=db,
+            user_id=user.id,
+            token_type=TokenType.EMAIL_VERIFY,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        
+        # Send verification email
+        await email_service.send_verification_email(
+            to_email=user.email,
+            token=token,
+            user_name=user.full_name,
+        )
+        
+        logger.info(
+            "User registered successfully",
+            extra={
+                "event": "user_registered",
+                "user_id": str(user.id),
+                "email": user.email,
+                "request_id": request_id,
+            }
+        )
+        
+        return RegisterResponse(
+            message="Check your email to verify your account",
+            user_id=user.id,
+        )
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
+    except Exception as e:
+        logger.exception(
+            "Unexpected error during registration",
+            extra={
+                "event": "registration_error",
+                "email_hash": _hash_for_logging(user_in.email),
+                "request_id": request_id,
+                "error_type": type(e).__name__,
+            }
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during registration. Please try again."
+        )
 
 
 @router.post("/resend-verification", response_model=GenericMessageResponse)
@@ -214,75 +253,122 @@ async def login(
     """
     Login and get access token.
     
-    Returns 403 with code EMAIL_NOT_VERIFIED if email is not verified.
-    Returns 403 with code ADMIN_NOT_WHITELISTED if admin user is not in whitelist.
+    Returns:
+        - 200: Login successful, returns access token
+        - 401: Incorrect email or password
+        - 403: Email not verified (code: EMAIL_NOT_VERIFIED) or Admin not whitelisted (code: ADMIN_NOT_WHITELISTED)
+        - 429: Rate limit exceeded
     """
+    request_id = request.headers.get("X-Request-ID", "")
     check_rate_limit("login", request)
     
-    result = await db.execute(select(User).where(User.email == form_data.username))
-    user = result.scalar_one_or_none()
-    
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    
-    # Check if email is verified
-    if not user.is_email_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "message": "Please verify your email before logging in",
-                "code": "EMAIL_NOT_VERIFIED",
-                "hint": "Check your inbox for a verification email or request a new one",
-            },
-        )
-    
-    # Admin role safety: block admin login unless explicitly whitelisted
-    # This prevents unauthorized admin access even if someone gains admin role
-    if user.role == "admin":
-        whitelist = settings.admin_whitelist_list
-        if user.email.lower() not in whitelist:
+    try:
+        result = await db.execute(select(User).where(User.email == form_data.username))
+        user = result.scalar_one_or_none()
+        
+        if not user or not verify_password(form_data.password, user.hashed_password):
             logger.warning(
-                f"Admin login blocked - user not in whitelist",
+                "Failed login attempt",
                 extra={
-                    "event": "admin_login_blocked",
+                    "event": "login_failed_credentials",
+                    "email": form_data.username,
+                    "request_id": request_id,
+                }
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        if not user.is_active:
+            logger.warning(
+                "Login attempt by inactive user",
+                extra={
+                    "event": "login_inactive_user",
                     "user_id": str(user.id),
-                    "email": user.email,
+                    "request_id": request_id,
+                }
+            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is inactive")
+        
+        # Check if email is verified
+        if not user.is_email_verified:
+            logger.info(
+                "Login blocked - email not verified",
+                extra={
+                    "event": "login_email_not_verified",
+                    "user_id": str(user.id),
+                    "request_id": request_id,
                 }
             )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
-                    "message": "Admin access is restricted",
-                    "code": "ADMIN_NOT_WHITELISTED",
-                    "hint": "Contact your system administrator if you need admin access",
+                    "message": "Please verify your email before logging in",
+                    "code": "EMAIL_NOT_VERIFIED",
+                    "hint": "Check your inbox for a verification email or request a new one",
                 },
             )
-    
-    # Update last login time
-    user.last_login_at = datetime.now(timezone.utc)
-    await db.commit()
-    
-    access_token = create_access_token(
-        data={"sub": str(user.id)},
-        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
-    )
-    
-    logger.info(
-        f"User logged in",
-        extra={
-            "event": "user_login",
-            "user_id": str(user.id),
-        }
-    )
-    
-    return Token(access_token=access_token)
+        
+        # Admin role safety: block admin login unless explicitly whitelisted
+        # This prevents unauthorized admin access even if someone gains admin role
+        if user.role == "admin":
+            whitelist = settings.admin_whitelist_list
+            if user.email.lower() not in whitelist:
+                logger.warning(
+                    "Admin login blocked - user not in whitelist",
+                    extra={
+                        "event": "admin_login_blocked",
+                        "user_id": str(user.id),
+                        "email": user.email,
+                        "request_id": request_id,
+                    }
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "message": "Admin access is restricted",
+                        "code": "ADMIN_NOT_WHITELISTED",
+                        "hint": "Contact your system administrator if you need admin access",
+                    },
+                )
+        
+        # Update last login time
+        user.last_login_at = datetime.now(timezone.utc)
+        await db.commit()
+        
+        access_token = create_access_token(
+            data={"sub": str(user.id)},
+            expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        )
+        
+        logger.info(
+            "User logged in successfully",
+            extra={
+                "event": "user_login",
+                "user_id": str(user.id),
+                "request_id": request_id,
+            }
+        )
+        
+        return Token(access_token=access_token)
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
+    except Exception as e:
+        logger.exception(
+            "Unexpected error during login",
+            extra={
+                "event": "login_error",
+                "email_hash": _hash_for_logging(form_data.username),
+                "request_id": request_id,
+                "error_type": type(e).__name__,
+            }
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during login. Please try again."
+        )
 
 
 @router.post("/forgot-password", response_model=GenericMessageResponse)

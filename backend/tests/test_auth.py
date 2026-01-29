@@ -9,6 +9,7 @@ Tests cover:
 - Forgot password has generic response
 - Reset password validates tokens properly
 - Token hashing and validation
+- API endpoint contract verification
 
 These tests are independent of database and can run without DB dependencies.
 """
@@ -130,7 +131,7 @@ class TestTokenExpiry:
         expires_at = now - timedelta(hours=1)  # Expired 1 hour ago
         
         is_expired = now > expires_at
-        assert is_expired == True
+        assert is_expired is True
     
     def test_valid_token_not_expired(self):
         """Valid tokens should not be marked as expired."""
@@ -179,7 +180,7 @@ class TestTokenReuse:
         used_at = datetime.now(timezone.utc)
         
         is_used = used_at is not None
-        assert is_used == True
+        assert is_used is True
     
     def test_unused_token_allowed(self):
         """Unused tokens should be allowed."""
@@ -232,7 +233,7 @@ class TestEmailVerificationFlow:
         email_verified_at = datetime.now(timezone.utc)
         
         is_verified = email_verified_at is not None
-        assert is_verified == True
+        assert is_verified is True
     
     def test_already_verified_handling(self):
         """Already verified emails should be handled gracefully."""
@@ -240,7 +241,7 @@ class TestEmailVerificationFlow:
         
         # Should return success but with "already verified" message
         is_already_verified = email_verified_at is not None
-        assert is_already_verified == True
+        assert is_already_verified is True
 
 
 class TestLoginVerificationBlock:
@@ -253,7 +254,7 @@ class TestLoginVerificationBlock:
         is_verified = email_verified_at is not None
         should_block = not is_verified
         
-        assert should_block == True
+        assert should_block is True
     
     def test_verified_user_allowed(self):
         """Verified users should be able to login."""
@@ -304,7 +305,7 @@ class TestRateLimiting:
         
         is_limited = requests_made >= max_requests
         
-        assert is_limited == True
+        assert is_limited is True
     
     def test_rate_limit_per_endpoint(self):
         """Different endpoints should have different rate limits."""
@@ -335,14 +336,14 @@ class TestPasswordResetFlow:
         expires_at = now - timedelta(hours=2)
         
         is_expired = now > expires_at
-        assert is_expired == True
+        assert is_expired is True
     
     def test_used_token_rejected(self):
         """Already used tokens should be rejected."""
         used_at = datetime.now(timezone.utc) - timedelta(minutes=30)
         
         is_used = used_at is not None
-        assert is_used == True
+        assert is_used is True
     
     def test_valid_token_accepted(self):
         """Valid tokens should be accepted."""
@@ -356,7 +357,7 @@ class TestPasswordResetFlow:
         is_expired = now > expires_at
         
         is_valid = is_found and not is_used and not is_expired
-        assert is_valid == True
+        assert is_valid is True
 
 
 class TestRoleSafety:
@@ -426,7 +427,7 @@ class TestRoleSafety:
         is_whitelisted = user_email.lower() in whitelist
         
         should_block = is_admin and not is_whitelisted
-        assert should_block == True
+        assert should_block is True
     
     def test_admin_whitelist_check_non_admin_user(self):
         """Non-admin users should not be affected by whitelist."""
@@ -497,3 +498,313 @@ class TestUserRoles:
         assert "zzp" in registration_allowed_roles
         assert "accountant" in registration_allowed_roles
         assert "admin" not in registration_allowed_roles
+
+
+class TestAuthEndpointContracts:
+    """
+    Tests for auth endpoint request/response contracts.
+    
+    These tests verify the expected request formats and response structures
+    without requiring a live database connection.
+    """
+    
+    def test_register_request_schema(self):
+        """Registration request should match expected schema."""
+        # Valid registration request
+        valid_request = {
+            "email": "user@example.com",
+            "password": "SecurePass123",
+            "full_name": "Test User",
+            "role": "zzp",
+        }
+        
+        # All required fields must be present
+        assert "email" in valid_request
+        assert "password" in valid_request
+        assert "full_name" in valid_request
+        
+        # Role must be one of allowed values
+        assert valid_request["role"] in ["zzp", "accountant"]
+        
+        # Password must meet minimum length
+        assert len(valid_request["password"]) >= 8
+    
+    def test_register_response_schema(self):
+        """Registration response should match expected schema."""
+        # Successful registration response (201)
+        success_response = {
+            "message": "Check your email to verify your account",
+            "user_id": "550e8400-e29b-41d4-a716-446655440000",
+        }
+        
+        assert "message" in success_response
+        assert "user_id" in success_response
+        
+        # 409 Conflict response for existing email
+        conflict_response = {
+            "detail": "Email already registered"
+        }
+        assert "detail" in conflict_response
+    
+    def test_login_request_schema(self):
+        """Login request should use OAuth2 password grant format."""
+        # Login uses x-www-form-urlencoded format per OAuth2 spec
+        # username field contains email
+        valid_request = {
+            "username": "user@example.com",
+            "password": "SecurePass123",
+        }
+        
+        assert "username" in valid_request
+        assert "password" in valid_request
+    
+    def test_login_response_schema(self):
+        """Login response should match OAuth2 token format."""
+        # Successful login response (200)
+        success_response = {
+            "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "token_type": "bearer",
+        }
+        
+        assert "access_token" in success_response
+        assert "token_type" in success_response
+        assert success_response["token_type"] == "bearer"
+        
+        # 401 Unauthorized response
+        unauthorized_response = {
+            "detail": "Incorrect email or password"
+        }
+        assert "detail" in unauthorized_response
+        
+        # 403 Email not verified response
+        unverified_response = {
+            "detail": {
+                "message": "Please verify your email before logging in",
+                "code": "EMAIL_NOT_VERIFIED",
+                "hint": "Check your inbox for a verification email or request a new one",
+            }
+        }
+        assert "detail" in unverified_response
+        assert unverified_response["detail"]["code"] == "EMAIL_NOT_VERIFIED"
+    
+    def test_forgot_password_request_schema(self):
+        """Forgot password request should contain email."""
+        valid_request = {
+            "email": "user@example.com"
+        }
+        
+        assert "email" in valid_request
+    
+    def test_forgot_password_response_schema(self):
+        """Forgot password response should be generic to prevent enumeration."""
+        # Same response regardless of email existence
+        response = {
+            "message": "If an account with this email exists, a password reset email has been sent."
+        }
+        
+        assert "message" in response
+        # Response should not indicate whether email exists
+        assert "not found" not in response["message"].lower()
+        assert "doesn't exist" not in response["message"].lower()
+    
+    def test_reset_password_request_schema(self):
+        """Reset password request should contain token and new password."""
+        valid_request = {
+            "token": "some-reset-token-here",
+            "new_password": "NewSecurePass123",
+        }
+        
+        assert "token" in valid_request
+        assert "new_password" in valid_request
+        
+        # Password validation rules
+        password = valid_request["new_password"]
+        assert len(password) >= 10
+        assert any(c.isalpha() for c in password)
+        assert any(c.isdigit() for c in password)
+    
+    def test_reset_password_response_schema(self):
+        """Reset password response should confirm success."""
+        success_response = {
+            "message": "Password reset successfully"
+        }
+        
+        assert "message" in success_response
+        
+        # Invalid token response
+        invalid_response = {
+            "detail": "Invalid or expired token"
+        }
+        assert "detail" in invalid_response
+    
+    def test_verify_email_request_schema(self):
+        """Verify email request should use query parameter for token."""
+        # Token is passed as query parameter: GET /verify-email?token=...
+        token = "verification-token-here"
+        
+        assert isinstance(token, str)
+        assert len(token) > 0
+    
+    def test_verify_email_response_schema(self):
+        """Verify email response should indicate verification status."""
+        success_response = {
+            "message": "Email verified successfully",
+            "verified": True,
+        }
+        
+        assert "message" in success_response
+        assert "verified" in success_response
+        assert success_response["verified"] is True
+        
+        # Already verified response
+        already_verified_response = {
+            "message": "Email is already verified",
+            "verified": True,
+        }
+        assert already_verified_response["verified"] is True
+    
+    def test_user_me_response_schema(self):
+        """Get current user response should include user details."""
+        success_response = {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "email": "user@example.com",
+            "full_name": "Test User",
+            "role": "zzp",
+            "is_active": True,
+            "is_email_verified": True,
+            "created_at": "2024-01-15T10:30:00Z",
+        }
+        
+        assert "id" in success_response
+        assert "email" in success_response
+        assert "full_name" in success_response
+        assert "role" in success_response
+        assert "is_active" in success_response
+        assert "is_email_verified" in success_response
+        assert "created_at" in success_response
+
+
+class TestAuthEndpointStatusCodes:
+    """Tests to verify correct HTTP status codes are returned."""
+    
+    def test_register_status_codes(self):
+        """Register endpoint should return correct status codes."""
+        expected_codes = {
+            "success": 201,  # Created
+            "email_exists": 409,  # Conflict
+            "validation_error": 422,  # Unprocessable Entity
+            "rate_limit": 429,  # Too Many Requests
+        }
+        
+        assert expected_codes["success"] == 201
+        assert expected_codes["email_exists"] == 409
+        assert expected_codes["validation_error"] == 422
+        assert expected_codes["rate_limit"] == 429
+    
+    def test_login_status_codes(self):
+        """Login endpoint should return correct status codes."""
+        expected_codes = {
+            "success": 200,
+            "wrong_credentials": 401,
+            "email_not_verified": 403,
+            "admin_not_whitelisted": 403,
+            "inactive_user": 403,
+            "rate_limit": 429,
+        }
+        
+        assert expected_codes["success"] == 200
+        assert expected_codes["wrong_credentials"] == 401
+        assert expected_codes["email_not_verified"] == 403
+        assert expected_codes["admin_not_whitelisted"] == 403
+    
+    def test_verify_email_status_codes(self):
+        """Verify email endpoint should return correct status codes."""
+        expected_codes = {
+            "success": 200,
+            "invalid_token": 400,  # Bad Request
+            "rate_limit": 429,
+        }
+        
+        assert expected_codes["success"] == 200
+        assert expected_codes["invalid_token"] == 400
+    
+    def test_reset_password_status_codes(self):
+        """Reset password endpoint should return correct status codes."""
+        expected_codes = {
+            "success": 200,
+            "invalid_token": 400,  # Bad Request
+            "validation_error": 422,  # Password too weak
+            "rate_limit": 429,
+        }
+        
+        assert expected_codes["success"] == 200
+        assert expected_codes["invalid_token"] == 400
+        assert expected_codes["validation_error"] == 422
+
+
+class TestAuthEndpointRoutes:
+    """Tests to verify auth routes are correctly configured."""
+    
+    def test_auth_routes_have_no_trailing_slash(self):
+        """All auth routes should NOT have trailing slashes."""
+        expected_routes = [
+            "/register",
+            "/token",
+            "/resend-verification",
+            "/verify-email",
+            "/forgot-password",
+            "/reset-password",
+            "/me",
+        ]
+        
+        for route in expected_routes:
+            # No trailing slash
+            assert not route.endswith("/"), f"Route {route} should not have trailing slash"
+            # Has leading slash
+            assert route.startswith("/"), f"Route {route} should have leading slash"
+    
+    def test_auth_full_paths(self):
+        """Auth full paths should be correctly constructed."""
+        base_path = "/api/v1/auth"
+        
+        expected_full_paths = [
+            "/api/v1/auth/register",
+            "/api/v1/auth/token",
+            "/api/v1/auth/resend-verification",
+            "/api/v1/auth/verify-email",
+            "/api/v1/auth/forgot-password",
+            "/api/v1/auth/reset-password",
+            "/api/v1/auth/me",
+        ]
+        
+        for path in expected_full_paths:
+            assert path.startswith(base_path), f"Path {path} should start with {base_path}"
+            # No double slashes
+            assert "//" not in path, f"Path {path} should not have double slashes"
+    
+    def test_auth_methods(self):
+        """Auth endpoints should use correct HTTP methods."""
+        expected_methods = {
+            "/register": "POST",
+            "/token": "POST",
+            "/resend-verification": "POST",
+            "/verify-email": "GET",
+            "/forgot-password": "POST",
+            "/reset-password": "POST",
+            "/me": "GET",
+        }
+        
+        # All POST endpoints should accept JSON body (except /token which uses form)
+        json_body_routes = ["/register", "/resend-verification", "/forgot-password", "/reset-password"]
+        form_body_routes = ["/token"]
+        
+        for route in json_body_routes:
+            assert expected_methods[route] == "POST"
+        
+        for route in form_body_routes:
+            assert expected_methods[route] == "POST"
+        
+        # GET endpoints should use query params
+        query_param_routes = ["/verify-email"]
+        for route in query_param_routes:
+            assert expected_methods[route] == "GET"

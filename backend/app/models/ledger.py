@@ -240,7 +240,7 @@ class JournalEntry(Base):
     # Relationships
     administration = relationship("Administration", back_populates="journal_entries")
     period = relationship("AccountingPeriod", back_populates="journal_entries")
-    document = relationship("Document", back_populates="journal_entry")
+    document = relationship("Document", back_populates="journal_entry", foreign_keys=[document_id])
     lines = relationship("JournalLine", back_populates="journal_entry", cascade="all, delete-orphan")
     posted_by = relationship("User", foreign_keys=[posted_by_id])
     reversed_by = relationship("JournalEntry", foreign_keys=[reversed_by_id], remote_side=[id])

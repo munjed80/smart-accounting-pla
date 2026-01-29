@@ -54,7 +54,14 @@ async def create_auth_token(
         
     Returns:
         The raw token (to be sent to user, never stored)
+        
+    Raises:
+        TypeError: If token_type is not a valid TokenType enum member
     """
+    # Safety guard: ensure token_type is a valid enum member to prevent DB enum errors
+    if not isinstance(token_type, TokenType):
+        raise TypeError(f"token_type must be a TokenType enum member, got {type(token_type)}")
+    
     # Invalidate any existing unused tokens of the same type for this user
     await db.execute(
         update(AuthToken)
@@ -118,7 +125,14 @@ async def validate_and_consume_token(
         
     Returns:
         Tuple of (is_valid, user, error_message)
+        
+    Raises:
+        TypeError: If token_type is not a valid TokenType enum member
     """
+    # Safety guard: ensure token_type is a valid enum member to prevent DB enum errors
+    if not isinstance(token_type, TokenType):
+        raise TypeError(f"token_type must be a TokenType enum member, got {type(token_type)}")
+    
     token_hash = hash_token(raw_token)
     
     # Find the token

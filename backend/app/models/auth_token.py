@@ -37,7 +37,12 @@ class AuthToken(Base):
     )
     token_hash: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     token_type: Mapped[TokenType] = mapped_column(
-        SQLEnum(TokenType, name='authtoken_type', create_type=False),
+        SQLEnum(
+            TokenType,
+            name='authtoken_type',
+            create_type=False,
+            values_callable=lambda x: [e.value for e in x]
+        ),
         nullable=False
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

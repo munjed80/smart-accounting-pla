@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth, isEmailNotVerifiedError, getEmailNotVerifiedMessage } from '@/lib/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Database, Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning, CircleNotch, WifiHigh, WifiSlash } from '@phosphor-icons/react'
+import { Database, Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning, CircleNotch, WifiHigh, WifiSlash, Clock } from '@phosphor-icons/react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason, checkApiHealth, getErrorMessage, getValidationErrors, HealthCheckResult } from '@/lib/api'
+import { AxiosError } from 'axios'
 
 interface LoginPageProps {
   onSuccess?: () => void
@@ -47,6 +48,43 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   // State for API health check
   const [healthCheck, setHealthCheck] = useState<HealthCheckResult | null>(null)
   const [isCheckingHealth, setIsCheckingHealth] = useState(false)
+
+  // State for resend verification cooldown
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [isResending, setIsResending] = useState(false)
+  const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Cleanup cooldown timer on unmount
+  useEffect(() => {
+    return () => {
+      if (cooldownTimerRef.current) {
+        clearInterval(cooldownTimerRef.current)
+      }
+    }
+  }, [])
+
+  // Start cooldown timer
+  const startCooldownTimer = useCallback((seconds: number) => {
+    // Clear any existing timer
+    if (cooldownTimerRef.current) {
+      clearInterval(cooldownTimerRef.current)
+    }
+    
+    setResendCooldown(seconds)
+    
+    cooldownTimerRef.current = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          if (cooldownTimerRef.current) {
+            clearInterval(cooldownTimerRef.current)
+            cooldownTimerRef.current = null
+          }
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }, [])
 
   // Run health check on mount to detect connectivity issues early
   useEffect(() => {
@@ -91,12 +129,24 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
 
   const handleResendVerification = async () => {
     const email = showEmailNotVerified ? unverifiedEmail : registeredEmail
-    if (email) {
-      try {
-        await resendVerification(email)
-      } catch {
-        // Error handled in AuthContext
+    if (!email || isResending || resendCooldown > 0) {
+      return
+    }
+    
+    setIsResending(true)
+    try {
+      await resendVerification(email)
+      // Start cooldown after successful resend
+      startCooldownTimer(60)
+    } catch (error) {
+      // Handle 429 rate limit error - start cooldown
+      if (error instanceof AxiosError && error.response?.status === 429) {
+        // Start cooldown timer on rate limit
+        startCooldownTimer(60)
       }
+      // Other errors are handled in AuthContext
+    } finally {
+      setIsResending(false)
     }
   }
 
@@ -163,15 +213,28 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                 <p className="mt-2">The link will expire in 24 hours.</p>
               </div>
               
+              {resendCooldown > 0 && (
+                <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                  <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400 text-sm">
+                    <Clock size={16} />
+                    <span>Please wait {resendCooldown}s before resending</span>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex flex-col gap-2">
                 <Button
                   variant="outline"
                   onClick={handleResendVerification}
-                  disabled={isLoading}
+                  disabled={isResending || resendCooldown > 0}
                   className="w-full"
                 >
-                  <PaperPlaneTilt size={18} className="mr-2" />
-                  {isLoading ? 'Sending...' : 'Resend Verification Email'}
+                  {isResending ? (
+                    <CircleNotch size={18} className="mr-2 animate-spin" />
+                  ) : (
+                    <PaperPlaneTilt size={18} className="mr-2" />
+                  )}
+                  {isResending ? 'Sending...' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Verification Email'}
                 </Button>
                 
                 <Button
@@ -243,16 +306,27 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         <p className="text-yellow-600 dark:text-yellow-500 text-sm mt-1">
                           Please check your inbox for a verification email.
                         </p>
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="text-yellow-700 dark:text-yellow-400 p-0 h-auto mt-2"
-                          onClick={handleResendVerification}
-                          disabled={isLoading}
-                        >
-                          <PaperPlaneTilt size={14} className="mr-1" />
-                          Resend verification email
-                        </Button>
+                        {resendCooldown > 0 ? (
+                          <p className="text-yellow-600 dark:text-yellow-500 text-sm mt-2 flex items-center gap-1">
+                            <Clock size={14} />
+                            Wait {resendCooldown}s to resend
+                          </p>
+                        ) : (
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="text-yellow-700 dark:text-yellow-400 p-0 h-auto mt-2"
+                            onClick={handleResendVerification}
+                            disabled={isResending || resendCooldown > 0}
+                          >
+                            {isResending ? (
+                              <CircleNotch size={14} className="mr-1 animate-spin" />
+                            ) : (
+                              <PaperPlaneTilt size={14} className="mr-1" />
+                            )}
+                            {isResending ? 'Sending...' : 'Resend verification email'}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>

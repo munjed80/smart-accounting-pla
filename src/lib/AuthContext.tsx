@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { authApi, User, LoginRequest, RegisterRequest, getErrorMessage, RegisterResponse } from '@/lib/api'
 import { toast } from 'sonner'
 import { AxiosError } from 'axios'
@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  const checkSession = async () => {
+  const checkSession = useCallback(async () => {
     const token = localStorage.getItem('access_token')
     if (!token) {
       setIsLoading(false)
@@ -80,13 +80,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     checkSession()
-  }, [])
+  }, [checkSession])
 
-  const login = async (credentials: LoginRequest) => {
+  const login = useCallback(async (credentials: LoginRequest) => {
     try {
       setIsLoading(true)
       const tokenResponse = await authApi.login(credentials)
@@ -110,9 +110,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
-  const register = async (data: RegisterRequest): Promise<RegisterResponse> => {
+  const register = useCallback(async (data: RegisterRequest): Promise<RegisterResponse> => {
     try {
       setIsLoading(true)
       const response = await authApi.register(data)
@@ -127,9 +127,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
-  const resendVerification = async (email: string) => {
+  const resendVerification = useCallback(async (email: string) => {
     try {
       setIsLoading(true)
       await authApi.resendVerification(email)
@@ -141,9 +141,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
-  const forgotPassword = async (email: string) => {
+  const forgotPassword = useCallback(async (email: string) => {
     try {
       setIsLoading(true)
       await authApi.forgotPassword(email)
@@ -155,9 +155,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
-  const resetPassword = async (token: string, newPassword: string) => {
+  const resetPassword = useCallback(async (token: string, newPassword: string) => {
     try {
       setIsLoading(true)
       await authApi.resetPassword({ token, new_password: newPassword })
@@ -169,9 +169,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
-  const verifyEmail = async (token: string) => {
+  const verifyEmail = useCallback(async (token: string) => {
     try {
       setIsLoading(true)
       const response = await authApi.verifyEmail(token)
@@ -186,16 +186,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('access_token')
     localStorage.removeItem('user')
     setUser(null)
     toast.success('Logged out successfully')
-  }
+  }, [])
 
-  const hasPermission = (requiredRole: 'zzp' | 'accountant' | 'admin'): boolean => {
+  const hasPermission = useCallback((requiredRole: 'zzp' | 'accountant' | 'admin'): boolean => {
     if (!user) return false
 
     const roleHierarchy = {
@@ -205,9 +205,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
 
     return roleHierarchy[user.role] >= roleHierarchy[requiredRole]
-  }
+  }, [user])
 
-  const value: AuthContextType = {
+  const value = useMemo<AuthContextType>(() => ({
     user,
     isAuthenticated: !!user,
     isLoading,
@@ -220,7 +220,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     forgotPassword,
     resetPassword,
     verifyEmail,
-  }
+  }), [
+    user,
+    isLoading,
+    login,
+    register,
+    logout,
+    hasPermission,
+    checkSession,
+    resendVerification,
+    forgotPassword,
+    resetPassword,
+    verifyEmail,
+  ])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

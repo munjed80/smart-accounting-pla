@@ -169,7 +169,7 @@ def check_rate_limit(endpoint: str, request: Request):
     if is_limited:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many requests. Please try again later.",
+            detail=f"Rate limit exceeded for {endpoint}. Try again later.",
             headers={
                 "Retry-After": str(config["window_seconds"]),
                 "X-RateLimit-Limit": str(config["max_requests"]),

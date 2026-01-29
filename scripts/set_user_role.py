@@ -83,41 +83,44 @@ async def update_user_role(email: str = None, user_id: str = None, new_role: str
     engine = create_async_engine(database_url)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     
-    async with async_session() as session:
-        user = await find_user(session, email=email, user_id=user_id)
-        
-        if not user:
-            identifier = email or user_id
-            print(f"ERROR: User not found: {identifier}")
-            return False
-        
-        print(f"User found:")
-        print(f"  ID:    {user.id}")
-        print(f"  Email: {user.email}")
-        print(f"  Name:  {user.full_name}")
-        print(f"  Role:  {user.role}")
-        print()
-        
-        if user.role == new_role:
-            print(f"User already has role '{new_role}'. No changes needed.")
+    try:
+        async with async_session() as session:
+            user = await find_user(session, email=email, user_id=user_id)
+            
+            if not user:
+                identifier = email or user_id
+                print(f"ERROR: User not found: {identifier}")
+                return False
+            
+            print(f"User found:")
+            print(f"  ID:    {user.id}")
+            print(f"  Email: {user.email}")
+            print(f"  Name:  {user.full_name}")
+            print(f"  Role:  {user.role}")
+            print()
+            
+            if user.role == new_role:
+                print(f"User already has role '{new_role}'. No changes needed.")
+                return True
+            
+            if dry_run:
+                print(f"DRY RUN: Would change role from '{user.role}' to '{new_role}'")
+                return True
+            
+            # Confirmation
+            confirm = input(f"Change role from '{user.role}' to '{new_role}'? [y/N] ")
+            if confirm.lower() != 'y':
+                print("Cancelled.")
+                return False
+            
+            old_role = user.role
+            user.role = new_role
+            await session.commit()
+            
+            print(f"SUCCESS: Role updated from '{old_role}' to '{new_role}'")
             return True
-        
-        if dry_run:
-            print(f"DRY RUN: Would change role from '{user.role}' to '{new_role}'")
-            return True
-        
-        # Confirmation
-        confirm = input(f"Change role from '{user.role}' to '{new_role}'? [y/N] ")
-        if confirm.lower() != 'y':
-            print("Cancelled.")
-            return False
-        
-        old_role = user.role
-        user.role = new_role
-        await session.commit()
-        
-        print(f"SUCCESS: Role updated from '{old_role}' to '{new_role}'")
-        return True
+    finally:
+        await engine.dispose()
 
 
 async def list_users(role_filter: str = None):
@@ -129,31 +132,34 @@ async def list_users(role_filter: str = None):
     # Import User model here to avoid import issues
     from app.models.user import User
     
-    async with async_session() as session:
-        query = select(User)
-        if role_filter:
-            if role_filter not in VALID_ROLES:
-                print(f"ERROR: Invalid role filter '{role_filter}'")
-                print(f"Allowed roles: {', '.join(sorted(VALID_ROLES))}")
+    try:
+        async with async_session() as session:
+            query = select(User)
+            if role_filter:
+                if role_filter not in VALID_ROLES:
+                    print(f"ERROR: Invalid role filter '{role_filter}'")
+                    print(f"Allowed roles: {', '.join(sorted(VALID_ROLES))}")
+                    return
+                query = query.where(User.role == role_filter)
+        
+            query = query.order_by(User.created_at.desc())
+            result = await session.execute(query)
+            users = result.scalars().all()
+            
+            if not users:
+                print("No users found.")
                 return
-            query = query.where(User.role == role_filter)
-        
-        query = query.order_by(User.created_at.desc())
-        result = await session.execute(query)
-        users = result.scalars().all()
-        
-        if not users:
-            print("No users found.")
-            return
-        
-        print(f"Found {len(users)} user(s):")
-        print("-" * 80)
-        print(f"{'ID':<36}  {'Email':<30}  {'Role':<12}  {'Verified'}")
-        print("-" * 80)
-        
-        for user in users:
-            verified = "Yes" if user.is_email_verified else "No"
-            print(f"{str(user.id):<36}  {user.email:<30}  {user.role:<12}  {verified}")
+            
+            print(f"Found {len(users)} user(s):")
+            print("-" * 80)
+            print(f"{'ID':<36}  {'Email':<30}  {'Role':<12}  {'Verified'}")
+            print("-" * 80)
+            
+            for user in users:
+                verified = "Yes" if user.is_email_verified else "No"
+                print(f"{str(user.id):<36}  {user.email:<30}  {user.role:<12}  {verified}")
+    finally:
+        await engine.dispose()
 
 
 def main():

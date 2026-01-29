@@ -92,15 +92,17 @@ const AppContent = () => {
   useEffect(() => {
     if (user && isAuthenticated && !hasSetInitialTab) {
       // Set the correct initial tab based on the user's role
-      const defaultTab = isAccountant ? 'workqueue' : 'dashboard'
+      const userIsAccountant = user.role === 'accountant' || user.role === 'admin'
+      const defaultTab = userIsAccountant ? 'workqueue' : 'dashboard'
       setActiveTab(defaultTab)
       setHasSetInitialTab(true)
     }
-    // Reset the flag when user logs out
+    // Reset state when user logs out for clean state transition
     if (!isAuthenticated) {
       setHasSetInitialTab(false)
+      setActiveTab('dashboard')
     }
-  }, [user, isAuthenticated, isAccountant, hasSetInitialTab])
+  }, [user, isAuthenticated, hasSetInitialTab])
   
   // Check if user needs onboarding (first login - no administrations)
   useEffect(() => {

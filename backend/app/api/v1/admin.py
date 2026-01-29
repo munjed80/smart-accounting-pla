@@ -14,7 +14,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -201,21 +201,25 @@ async def list_users(
     # Validate and cap limit
     limit = min(limit, 500)
     
-    # Build query
-    query = select(User)
-    if role:
-        if role not in VALID_ROLES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid role filter. Must be one of: {', '.join(sorted(VALID_ROLES))}"
-            )
-        query = query.where(User.role == role)
+    # Build base query filter
+    base_filter = User.role == role if role else True
+    if role and role not in VALID_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid role filter. Must be one of: {', '.join(sorted(VALID_ROLES))}"
+        )
     
-    # Get total count
-    count_result = await db.execute(select(User.id).where(User.role == role if role else True))
-    total = len(count_result.all())
+    # Get total count efficiently using COUNT
+    count_query = select(func.count()).select_from(User)
+    if role:
+        count_query = count_query.where(User.role == role)
+    count_result = await db.execute(count_query)
+    total = count_result.scalar() or 0
     
     # Get paginated results
+    query = select(User)
+    if role:
+        query = query.where(User.role == role)
     query = query.order_by(User.created_at.desc()).offset(offset).limit(limit)
     result = await db.execute(query)
     users = result.scalars().all()

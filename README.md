@@ -306,6 +306,73 @@ After deployment, verify the end-to-end flow works correctly:
 
 MIT License - see LICENSE file
 
+## User Role Management
+
+The platform supports three user roles:
+- **zzp** - Self-employed users (default)
+- **accountant** - Accountants with client management capabilities
+- **admin** - System administrators
+
+### Role Selection During Registration
+
+Users can select their role (zzp or accountant) during registration. The admin role is not available via public registration for security reasons.
+
+### Fixing User Roles
+
+If a user was created with the wrong role, administrators can fix it using one of these methods:
+
+#### Method 1: Admin API Endpoint (Recommended)
+
+Use the admin API to update a user's role:
+
+```bash
+# Get a list of users
+curl -X GET "http://localhost:8000/api/v1/admin/users" \
+  -H "Authorization: Bearer ADMIN_TOKEN"
+
+# Update a user's role
+curl -X PATCH "http://localhost:8000/api/v1/admin/users/{user_id}/role" \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"role": "accountant"}'
+```
+
+**Requirements:**
+- Must be authenticated as an admin user
+- Admin must be in the `ADMIN_WHITELIST` environment variable
+
+#### Method 2: Management Script
+
+Use the management script for CLI-based role updates:
+
+```bash
+# Set DATABASE_URL environment variable
+export DATABASE_URL=postgresql+asyncpg://user:pass@localhost/smart_accounting
+
+# List all users
+python scripts/set_user_role.py --list
+
+# List users by role
+python scripts/set_user_role.py --list --role accountant
+
+# Update a user's role by email
+python scripts/set_user_role.py --email user@example.com --role accountant
+
+# Update a user's role by ID
+python scripts/set_user_role.py --user-id 550e8400-e29b-41d4-a716-446655440000 --role accountant
+
+# Dry run (preview changes without applying)
+python scripts/set_user_role.py --email user@example.com --role accountant --dry-run
+```
+
+### Admin Whitelist
+
+For security, admin users must be explicitly whitelisted to access admin endpoints and log in. Set the `ADMIN_WHITELIST` environment variable:
+
+```bash
+ADMIN_WHITELIST=admin@example.com,superuser@company.com
+```
+
 ## Operations Guide
 
 ### Running Migrations

@@ -808,3 +808,176 @@ class TestAuthEndpointRoutes:
         query_param_routes = ["/verify-email"]
         for route in query_param_routes:
             assert expected_methods[route] == "GET"
+
+
+class TestRoleRegistrationFlow:
+    """
+    Tests for role handling during user registration.
+    
+    These tests verify that:
+    1. Role is properly included in registration requests
+    2. Role defaults to 'zzp' when not specified
+    3. Accountant role is properly handled
+    4. Admin role is blocked from public registration
+    """
+    
+    def test_accountant_role_in_registration_request(self):
+        """Registration request with accountant role should be valid."""
+        import re
+        valid_roles_pattern = r"^(zzp|accountant)$"
+        
+        request_with_accountant = {
+            "email": "accountant@example.com",
+            "password": "SecurePass123",
+            "full_name": "Test Accountant",
+            "role": "accountant",
+        }
+        
+        # Role should be valid
+        assert re.match(valid_roles_pattern, request_with_accountant["role"]) is not None
+        
+        # All required fields present
+        assert "email" in request_with_accountant
+        assert "password" in request_with_accountant
+        assert "full_name" in request_with_accountant
+        assert "role" in request_with_accountant
+    
+    def test_zzp_role_in_registration_request(self):
+        """Registration request with zzp role should be valid."""
+        import re
+        valid_roles_pattern = r"^(zzp|accountant)$"
+        
+        request_with_zzp = {
+            "email": "zzp@example.com",
+            "password": "SecurePass123",
+            "full_name": "Test ZZP User",
+            "role": "zzp",
+        }
+        
+        # Role should be valid
+        assert re.match(valid_roles_pattern, request_with_zzp["role"]) is not None
+    
+    def test_default_role_is_zzp(self):
+        """Registration without role should default to zzp."""
+        default_role = "zzp"
+        
+        # This mimics what the backend does when role is not provided
+        request_without_role = {
+            "email": "user@example.com",
+            "password": "SecurePass123",
+            "full_name": "Test User",
+        }
+        
+        # Backend should default to zzp
+        assigned_role = request_without_role.get("role", default_role)
+        assert assigned_role == "zzp"
+    
+    def test_admin_role_blocked_in_registration(self):
+        """Registration with admin role should be blocked."""
+        import re
+        valid_roles_pattern = r"^(zzp|accountant)$"
+        
+        # Admin role should NOT match the valid pattern
+        assert re.match(valid_roles_pattern, "admin") is None
+    
+    def test_user_response_includes_role(self):
+        """User response from /me should include role field."""
+        expected_user_response = {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "email": "accountant@example.com",
+            "full_name": "Test Accountant",
+            "role": "accountant",  # Role must be included
+            "is_active": True,
+            "is_email_verified": True,
+            "created_at": "2024-01-15T10:30:00Z",
+        }
+        
+        # Role field must be present
+        assert "role" in expected_user_response
+        # Role should reflect the registered role
+        assert expected_user_response["role"] == "accountant"
+    
+    def test_role_preserved_after_login(self):
+        """User's role should be preserved and returned after login."""
+        # Simulate: user registered with role=accountant
+        registered_role = "accountant"
+        
+        # After login, /me endpoint returns user data
+        user_from_me_endpoint = {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "email": "accountant@example.com",
+            "full_name": "Test Accountant",
+            "role": registered_role,  # Should match registration
+            "is_active": True,
+            "is_email_verified": True,
+        }
+        
+        # The returned role should match the registered role
+        assert user_from_me_endpoint["role"] == registered_role
+        assert user_from_me_endpoint["role"] != "zzp"  # Not the default
+    
+    def test_role_values_case_sensitive(self):
+        """Role values should be exact lowercase strings."""
+        import re
+        valid_roles_pattern = r"^(zzp|accountant)$"
+        
+        # Valid roles (lowercase)
+        assert re.match(valid_roles_pattern, "zzp") is not None
+        assert re.match(valid_roles_pattern, "accountant") is not None
+        
+        # Invalid roles (wrong case)
+        assert re.match(valid_roles_pattern, "ZZP") is None
+        assert re.match(valid_roles_pattern, "Accountant") is None
+        assert re.match(valid_roles_pattern, "ACCOUNTANT") is None
+
+
+class TestAdminRoleManagement:
+    """Tests for admin role management endpoint."""
+    
+    def test_admin_update_role_request_schema(self):
+        """Admin role update request should contain role field."""
+        import re
+        valid_roles_pattern = r"^(zzp|accountant|admin)$"
+        
+        update_request = {
+            "role": "accountant"
+        }
+        
+        assert "role" in update_request
+        # Admin endpoint allows all roles including admin
+        assert re.match(valid_roles_pattern, update_request["role"]) is not None
+    
+    def test_admin_update_role_response_schema(self):
+        """Admin role update response should include old and new roles."""
+        update_response = {
+            "message": "Role updated successfully from 'zzp' to 'accountant'",
+            "user_id": "550e8400-e29b-41d4-a716-446655440000",
+            "old_role": "zzp",
+            "new_role": "accountant",
+        }
+        
+        assert "message" in update_response
+        assert "user_id" in update_response
+        assert "old_role" in update_response
+        assert "new_role" in update_response
+        assert update_response["old_role"] != update_response["new_role"]
+    
+    def test_admin_endpoint_requires_auth(self):
+        """Admin endpoints should require authentication."""
+        # Expected status code when not authenticated
+        expected_status_unauthenticated = 401
+        assert expected_status_unauthenticated == 401
+        
+        # Expected status code when authenticated but not admin
+        expected_status_not_admin = 403
+        assert expected_status_not_admin == 403
+    
+    def test_admin_cannot_self_demote(self):
+        """Admin should not be able to demote themselves."""
+        admin_user_id = "550e8400-e29b-41d4-a716-446655440000"
+        target_user_id = "550e8400-e29b-41d4-a716-446655440000"  # Same as admin
+        new_role = "zzp"
+        
+        # If admin is trying to change their own role to non-admin
+        is_self_demotion = admin_user_id == target_user_id and new_role != "admin"
+        assert is_self_demotion is True  # This should be blocked

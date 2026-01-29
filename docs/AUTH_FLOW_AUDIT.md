@@ -27,7 +27,7 @@ The backend uses FastAPI with the following route structure:
 - **200** - Success
 - **400** - Bad request (invalid/expired token)
 - **401** - Unauthorized (wrong credentials, expired session)
-- **403** - Forbidden (email not verified: `EMAIL_NOT_VERIFIED`, admin not whitelisted: `ADMIN_NOT_WHITELISTED`)
+- **403** - Forbidden (email not verified: `EMAIL_NOT_VERIFIED`, admin not whitelisted: `ADMIN_NOT_WHITELISTED`, inactive user)
 - **409** - Conflict (email already registered)
 - **422** - Validation error (invalid input data)
 - **429** - Rate limit exceeded

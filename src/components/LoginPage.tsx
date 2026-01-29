@@ -365,11 +365,13 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         value={registerForm.full_name}
                         onChange={(e) => setRegisterForm({ ...registerForm, full_name: e.target.value })}
                         className={`pl-10 ${registerFieldErrors.full_name ? 'border-red-500' : ''}`}
+                        aria-invalid={!!registerFieldErrors.full_name}
+                        aria-describedby={registerFieldErrors.full_name ? 'register-name-error' : undefined}
                         required
                       />
                     </div>
                     {registerFieldErrors.full_name && (
-                      <p className="text-xs text-red-500">{registerFieldErrors.full_name}</p>
+                      <p id="register-name-error" className="text-xs text-red-500" role="alert">{registerFieldErrors.full_name}</p>
                     )}
                   </div>
 
@@ -384,11 +386,13 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         value={registerForm.email}
                         onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
                         className={`pl-10 ${registerFieldErrors.email ? 'border-red-500' : ''}`}
+                        aria-invalid={!!registerFieldErrors.email}
+                        aria-describedby={registerFieldErrors.email ? 'register-email-error' : undefined}
                         required
                       />
                     </div>
                     {registerFieldErrors.email && (
-                      <p className="text-xs text-red-500">{registerFieldErrors.email}</p>
+                      <p id="register-email-error" className="text-xs text-red-500" role="alert">{registerFieldErrors.email}</p>
                     )}
                   </div>
 
@@ -403,14 +407,16 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         value={registerForm.password}
                         onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
                         className={`pl-10 ${registerFieldErrors.password ? 'border-red-500' : ''}`}
+                        aria-invalid={!!registerFieldErrors.password}
+                        aria-describedby={registerFieldErrors.password ? 'register-password-error' : 'register-password-hint'}
                         required
                         minLength={8}
                       />
                     </div>
                     {registerFieldErrors.password ? (
-                      <p className="text-xs text-red-500">{registerFieldErrors.password}</p>
+                      <p id="register-password-error" className="text-xs text-red-500" role="alert">{registerFieldErrors.password}</p>
                     ) : (
-                      <p className="text-xs text-muted-foreground">At least 8 characters</p>
+                      <p id="register-password-hint" className="text-xs text-muted-foreground">At least 8 characters</p>
                     )}
                   </div>
 
@@ -422,7 +428,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         setRegisterForm({ ...registerForm, role: value })
                       }
                     >
-                      <SelectTrigger id="register-role">
+                      <SelectTrigger id="register-role" aria-describedby={registerFieldErrors.role ? 'register-role-error' : undefined}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -433,7 +439,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                       </SelectContent>
                     </Select>
                     {registerFieldErrors.role && (
-                      <p className="text-xs text-red-500">{registerFieldErrors.role}</p>
+                      <p id="register-role-error" className="text-xs text-red-500" role="alert">{registerFieldErrors.role}</p>
                     )}
                   </div>
 

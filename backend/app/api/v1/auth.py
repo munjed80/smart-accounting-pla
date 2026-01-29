@@ -1,6 +1,7 @@
 from datetime import timedelta, datetime, timezone
 from typing import Annotated
 import logging
+import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.security import OAuth2PasswordRequestForm
@@ -34,6 +35,11 @@ from app.services.email import email_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _hash_for_logging(value: str) -> str:
+    """Create a truncated hash of a value for safe logging (prevents PII exposure)."""
+    return hashlib.sha256(value.encode()).hexdigest()[:12]
 
 
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
@@ -125,7 +131,7 @@ async def register(
             "Unexpected error during registration",
             extra={
                 "event": "registration_error",
-                "email": user_in.email,
+                "email_hash": _hash_for_logging(user_in.email),
                 "request_id": request_id,
                 "error_type": type(e).__name__,
             }
@@ -354,7 +360,7 @@ async def login(
             "Unexpected error during login",
             extra={
                 "event": "login_error",
-                "email": form_data.username,
+                "email_hash": _hash_for_logging(form_data.username),
                 "request_id": request_id,
                 "error_type": type(e).__name__,
             }

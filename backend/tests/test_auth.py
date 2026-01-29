@@ -131,7 +131,7 @@ class TestTokenExpiry:
         expires_at = now - timedelta(hours=1)  # Expired 1 hour ago
         
         is_expired = now > expires_at
-        assert is_expired == True
+        assert is_expired is True
     
     def test_valid_token_not_expired(self):
         """Valid tokens should not be marked as expired."""
@@ -180,7 +180,7 @@ class TestTokenReuse:
         used_at = datetime.now(timezone.utc)
         
         is_used = used_at is not None
-        assert is_used == True
+        assert is_used is True
     
     def test_unused_token_allowed(self):
         """Unused tokens should be allowed."""
@@ -233,7 +233,7 @@ class TestEmailVerificationFlow:
         email_verified_at = datetime.now(timezone.utc)
         
         is_verified = email_verified_at is not None
-        assert is_verified == True
+        assert is_verified is True
     
     def test_already_verified_handling(self):
         """Already verified emails should be handled gracefully."""
@@ -241,7 +241,7 @@ class TestEmailVerificationFlow:
         
         # Should return success but with "already verified" message
         is_already_verified = email_verified_at is not None
-        assert is_already_verified == True
+        assert is_already_verified is True
 
 
 class TestLoginVerificationBlock:
@@ -254,7 +254,7 @@ class TestLoginVerificationBlock:
         is_verified = email_verified_at is not None
         should_block = not is_verified
         
-        assert should_block == True
+        assert should_block is True
     
     def test_verified_user_allowed(self):
         """Verified users should be able to login."""
@@ -305,7 +305,7 @@ class TestRateLimiting:
         
         is_limited = requests_made >= max_requests
         
-        assert is_limited == True
+        assert is_limited is True
     
     def test_rate_limit_per_endpoint(self):
         """Different endpoints should have different rate limits."""
@@ -336,14 +336,14 @@ class TestPasswordResetFlow:
         expires_at = now - timedelta(hours=2)
         
         is_expired = now > expires_at
-        assert is_expired == True
+        assert is_expired is True
     
     def test_used_token_rejected(self):
         """Already used tokens should be rejected."""
         used_at = datetime.now(timezone.utc) - timedelta(minutes=30)
         
         is_used = used_at is not None
-        assert is_used == True
+        assert is_used is True
     
     def test_valid_token_accepted(self):
         """Valid tokens should be accepted."""
@@ -357,7 +357,7 @@ class TestPasswordResetFlow:
         is_expired = now > expires_at
         
         is_valid = is_found and not is_used and not is_expired
-        assert is_valid == True
+        assert is_valid is True
 
 
 class TestRoleSafety:
@@ -427,7 +427,7 @@ class TestRoleSafety:
         is_whitelisted = user_email.lower() in whitelist
         
         should_block = is_admin and not is_whitelisted
-        assert should_block == True
+        assert should_block is True
     
     def test_admin_whitelist_check_non_admin_user(self):
         """Non-admin users should not be affected by whitelist."""
@@ -654,14 +654,14 @@ class TestAuthEndpointContracts:
         
         assert "message" in success_response
         assert "verified" in success_response
-        assert success_response["verified"] == True
+        assert success_response["verified"] is True
         
         # Already verified response
         already_verified_response = {
             "message": "Email is already verified",
             "verified": True,
         }
-        assert already_verified_response["verified"] == True
+        assert already_verified_response["verified"] is True
     
     def test_user_me_response_schema(self):
         """Get current user response should include user details."""

@@ -1018,17 +1018,36 @@ export const logApiError = (error: unknown, context?: string): void => {
 /**
  * Get a detailed error message suitable for display.
  * Includes information about network, CORS, TLS, and HTTP status errors.
+ * Handles 422 validation errors with field-by-field messages.
  */
 export const getErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
     // Log the error with appropriate detail level
     logApiError(error)
     
+    const status = error.response?.status
+    const detail = error.response?.data?.detail
+    
+    // Handle 422 validation errors with field-by-field messages
+    if (status === 422 && Array.isArray(detail)) {
+      // FastAPI validation errors come as array of {loc, msg, type}
+      const messages = detail.map((err: { loc: string[]; msg: string }) => {
+        const field = err.loc?.[err.loc.length - 1] || 'field'
+        return `${field}: ${err.msg}`
+      })
+      return messages.join('; ')
+    }
+    
     // Check for server response with error detail
-    if (error.response?.data?.detail) {
-      return typeof error.response.data.detail === 'string' 
-        ? error.response.data.detail 
-        : JSON.stringify(error.response.data.detail)
+    if (detail) {
+      if (typeof detail === 'string') {
+        return detail
+      }
+      // Handle object detail (e.g., {message: "...", code: "..."})
+      if (typeof detail === 'object' && detail.message) {
+        return detail.message
+      }
+      return JSON.stringify(detail)
     }
     
     // Network error - could be CORS, TLS, or connectivity issue
@@ -1042,7 +1061,6 @@ export const getErrorMessage = (error: unknown): string => {
     }
     
     // HTTP status errors with better messages
-    const status = error.response?.status
     if (status) {
       if (status === 401) {
         return 'Authentication failed. Your credentials are incorrect or your session has expired.'
@@ -1052,6 +1070,9 @@ export const getErrorMessage = (error: unknown): string => {
       }
       if (status === 404) {
         return 'The requested resource was not found on the server.'
+      }
+      if (status === 409) {
+        return 'This resource already exists or conflicts with existing data.'
       }
       if (status === 422) {
         return 'Invalid request data. Please check your input.'
@@ -1071,6 +1092,25 @@ export const getErrorMessage = (error: unknown): string => {
   }
   
   return 'An unexpected error occurred'
+}
+
+/**
+ * Extract validation errors from a 422 response as a map of field names to error messages.
+ * Useful for displaying inline validation errors on forms.
+ */
+export const getValidationErrors = (error: unknown): Record<string, string> => {
+  if (axios.isAxiosError(error) && error.response?.status === 422) {
+    const detail = error.response?.data?.detail
+    if (Array.isArray(detail)) {
+      const errors: Record<string, string> = {}
+      for (const err of detail as Array<{ loc: string[]; msg: string }>) {
+        const field = err.loc?.[err.loc.length - 1] || 'general'
+        errors[field] = err.msg
+      }
+      return errors
+    }
+  }
+  return {}
 }
 
 // ============ Document Review Queue Types ============

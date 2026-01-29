@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Database, Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning, CircleNotch, WifiHigh, WifiSlash } from '@phosphor-icons/react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason, checkApiHealth, getErrorMessage, HealthCheckResult } from '@/lib/api'
+import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason, checkApiHealth, getErrorMessage, getValidationErrors, HealthCheckResult } from '@/lib/api'
 
 interface LoginPageProps {
   onSuccess?: () => void
@@ -40,6 +40,9 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   // State for visible error messages (in addition to toasts)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [registerError, setRegisterError] = useState<string | null>(null)
+  
+  // State for field-level validation errors (for 422 responses)
+  const [registerFieldErrors, setRegisterFieldErrors] = useState<Record<string, string>>({})
 
   // State for API health check
   const [healthCheck, setHealthCheck] = useState<HealthCheckResult | null>(null)
@@ -100,6 +103,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setRegisterError(null)
+    setRegisterFieldErrors({})
     
     try {
       await register(registerForm)
@@ -112,6 +116,11 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
         role: 'zzp',
       })
     } catch (error) {
+      // Extract field-level validation errors for inline display
+      const fieldErrors = getValidationErrors(error)
+      if (Object.keys(fieldErrors).length > 0) {
+        setRegisterFieldErrors(fieldErrors)
+      }
       // Set visible error message (in addition to toast)
       const errorMessage = getErrorMessage(error)
       setRegisterError(errorMessage)
@@ -355,10 +364,13 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         placeholder="John Doe"
                         value={registerForm.full_name}
                         onChange={(e) => setRegisterForm({ ...registerForm, full_name: e.target.value })}
-                        className="pl-10"
+                        className={`pl-10 ${registerFieldErrors.full_name ? 'border-red-500' : ''}`}
                         required
                       />
                     </div>
+                    {registerFieldErrors.full_name && (
+                      <p className="text-xs text-red-500">{registerFieldErrors.full_name}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -371,10 +383,13 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         placeholder="your@email.com"
                         value={registerForm.email}
                         onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                        className="pl-10"
+                        className={`pl-10 ${registerFieldErrors.email ? 'border-red-500' : ''}`}
                         required
                       />
                     </div>
+                    {registerFieldErrors.email && (
+                      <p className="text-xs text-red-500">{registerFieldErrors.email}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -387,12 +402,16 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         placeholder="••••••••"
                         value={registerForm.password}
                         onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                        className="pl-10"
+                        className={`pl-10 ${registerFieldErrors.password ? 'border-red-500' : ''}`}
                         required
                         minLength={8}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">At least 8 characters</p>
+                    {registerFieldErrors.password ? (
+                      <p className="text-xs text-red-500">{registerFieldErrors.password}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">At least 8 characters</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -413,6 +432,9 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         {/* Admin users can only be created via database seed */}
                       </SelectContent>
                     </Select>
+                    {registerFieldErrors.role && (
+                      <p className="text-xs text-red-500">{registerFieldErrors.role}</p>
+                    )}
                   </div>
 
                   <Button type="submit" className="w-full" disabled={isLoading}>

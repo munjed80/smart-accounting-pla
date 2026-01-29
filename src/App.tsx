@@ -69,14 +69,15 @@ const getRouteFromURL = (): Route => {
 const AppContent = () => {
   const { user, isAuthenticated, isLoading, logout } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'transactions' | 'upload'>(
-    isAccountant ? 'workqueue' : 'dashboard'
-  )
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'transactions' | 'upload'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
   // Onboarding state - tracks if user needs onboarding (no administrations)
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null)
   const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(false)
+  
+  // Track if we've set the initial tab based on role (to avoid resetting on every render)
+  const [hasSetInitialTab, setHasSetInitialTab] = useState(false)
 
   // Listen for URL changes
   useEffect(() => {
@@ -86,6 +87,22 @@ const AppContent = () => {
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
+  
+  // Update active tab when user role becomes available (after login)
+  useEffect(() => {
+    if (user && isAuthenticated && !hasSetInitialTab) {
+      // Set the correct initial tab based on the user's role
+      const userIsAccountant = user.role === 'accountant' || user.role === 'admin'
+      const defaultTab = userIsAccountant ? 'workqueue' : 'dashboard'
+      setActiveTab(defaultTab)
+      setHasSetInitialTab(true)
+    }
+    // Reset state when user logs out for clean state transition
+    if (!isAuthenticated) {
+      setHasSetInitialTab(false)
+      setActiveTab('dashboard')
+    }
+  }, [user, isAuthenticated, hasSetInitialTab])
   
   // Check if user needs onboarding (first login - no administrations)
   useEffect(() => {
@@ -165,8 +182,8 @@ const AppContent = () => {
     return (
       <LoginPage 
         onSuccess={() => {
+          // Navigate to home - the useEffect will set the correct tab based on the user's role
           navigateTo('/')
-          setActiveTab(isAccountant ? 'workqueue' : 'dashboard')
         }}
         onForgotPassword={() => navigateTo('/forgot-password')}
       />

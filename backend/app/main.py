@@ -1,20 +1,81 @@
-from fastapi import FastAPI, APIRouter
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, APIRouter, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from sqlalchemy.orm import configure_mappers
 from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.core.database import engine
 from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue
 
+logger = logging.getLogger(__name__)
+
+
+def verify_orm_mappings() -> None:
+    """
+    Verify all SQLAlchemy ORM mappings are valid at startup.
+    
+    This catches relationship configuration errors early before
+    any requests are processed, preventing cryptic 500 errors.
+    """
+    # Import all models to ensure they are registered
+    from app.models import (
+        User, Administration, AdministrationMember,
+        Document, ExtractedField, DocumentSuggestedAction, DocumentAuditLog,
+        Transaction, TransactionLine,
+        ChartOfAccount, VatCode, VatCategory,
+        AccountingPeriod, JournalEntry, JournalLine,
+        Party, OpenItem, OpenItemAllocation,
+        FixedAsset, DepreciationSchedule,
+        ClientIssue, ValidationRun,
+        SuggestedAction, AccountantDecision, DecisionPattern,
+        Alert,
+        AccountantClientAssignment, BulkOperation, ClientReminder,
+        AuthToken,
+    )
+    
+    # This will raise InvalidRequestError if any relationships are misconfigured
+    configure_mappers()
+    logger.info("ORM mapper configuration verified successfully")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan events.
+    
+    Startup:
+    - Verify ORM mappings to fail fast if models are misconfigured
+    
+    Shutdown:
+    - Cleanup resources if needed
+    """
+    # Startup
+    try:
+        verify_orm_mappings()
+    except Exception as e:
+        logger.critical(f"ORM mapper configuration failed: {e}")
+        raise RuntimeError(f"Application cannot start: ORM mapping error - {e}") from e
+    
+    yield
+    
+    # Shutdown (cleanup if needed)
+    logger.info("Application shutdown complete")
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
-# CORS middleware
+# CORS middleware - must be added FIRST to ensure headers on all responses including errors
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -22,6 +83,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Global exception handler to ensure JSON responses with proper CORS headers.
+    
+    CORSMiddleware will add CORS headers to this response, so browser
+    will see a proper error rather than a misleading CORS error.
+    """
+    logger.exception(f"Unhandled exception: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "type": type(exc).__name__,
+        },
+    )
 
 # API v1 router
 api_v1_router = APIRouter(prefix="/api/v1")

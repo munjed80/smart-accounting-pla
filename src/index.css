@@ -5,6 +5,19 @@
   * {
     @apply border-border
   }
+  
+  /* Ensure body and html allow scrolling - fix for drawer/menu issues */
+  html, body {
+    overflow-x: hidden;
+    overflow-y: auto;
+    min-height: 100vh;
+    -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
+  }
+  
+  /* Improve tap targets for iOS Safari */
+  button, a, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 :root {

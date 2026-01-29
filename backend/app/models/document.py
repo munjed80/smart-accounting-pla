@@ -102,7 +102,7 @@ class Document(Base):
     administration = relationship("Administration", back_populates="documents")
     extracted_fields = relationship("ExtractedField", back_populates="document", cascade="all, delete-orphan")
     transaction = relationship("Transaction", back_populates="document", uselist=False)
-    journal_entry = relationship("JournalEntry", back_populates="document", uselist=False, foreign_keys=["JournalEntry.document_id"])
+    journal_entry = relationship("JournalEntry", back_populates="document", uselist=False, foreign_keys="JournalEntry.document_id")
     issues = relationship("ClientIssue", back_populates="document")
     matched_party = relationship("Party", foreign_keys=[matched_party_id])
     matched_open_item = relationship("OpenItem", foreign_keys=[matched_open_item_id])

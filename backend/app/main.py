@@ -92,13 +92,17 @@ async def global_exception_handler(request: Request, exc: Exception):
     
     CORSMiddleware will add CORS headers to this response, so browser
     will see a proper error rather than a misleading CORS error.
+    
+    Note: HTTPException is handled by FastAPI's default handler and will
+    not reach this handler, preserving intended status codes.
     """
+    # HTTPException is handled by FastAPI's default handler, not this one
+    # This only catches truly unhandled exceptions
     logger.exception(f"Unhandled exception: {exc}")
     return JSONResponse(
         status_code=500,
         content={
             "detail": "Internal server error",
-            "type": type(exc).__name__,
         },
     )
 

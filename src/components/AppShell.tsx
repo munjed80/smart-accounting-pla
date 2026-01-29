@@ -18,8 +18,6 @@ import {
   List, 
   Brain,
   Sparkle,
-  Gear,
-  Question,
   UsersThree,
   Stack,
   CaretLeft
@@ -28,8 +26,7 @@ import {
 // Menu item configuration with role-based access
 interface MenuItem {
   label: string
-  path?: string
-  tabValue?: string
+  tabValue: string
   icon: ReactNode
   rolesAllowed: Array<'zzp' | 'accountant' | 'admin'>
 }
@@ -66,18 +63,6 @@ const menuItems: MenuItem[] = [
     icon: <Sparkle size={20} weight="duotone" />,
     rolesAllowed: ['zzp', 'accountant', 'admin'],
   },
-  {
-    label: 'Settings',
-    path: '/settings',
-    icon: <Gear size={20} weight="duotone" />,
-    rolesAllowed: ['zzp'],
-  },
-  {
-    label: 'Support',
-    path: '/support',
-    icon: <Question size={20} weight="duotone" />,
-    rolesAllowed: ['zzp', 'accountant', 'admin'],
-  },
 ]
 
 interface AppShellProps {
@@ -92,31 +77,19 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   const isDev = import.meta.env.DEV
 
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
+  
+  // Determine the home tab based on user role
+  const homeTab = isAccountant ? 'workqueue' : 'dashboard'
+  const homeLabel = isAccountant ? 'Back to Work Queue' : 'Back to Dashboard'
 
   // Filter menu items based on user role
   const visibleMenuItems = menuItems.filter(item => 
     user?.role && item.rolesAllowed.includes(user.role as 'zzp' | 'accountant' | 'admin')
   )
 
-  // Handle logout: clear all auth tokens and redirect
+  // Handle logout: use centralized logout from AuthContext and redirect
   const handleLogout = () => {
-    // Clear all possible storage locations
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('user')
-    sessionStorage.removeItem('access_token')
-    sessionStorage.removeItem('user')
-    
-    // Clear any cookies (best effort, httpOnly cookies must be cleared server-side)
-    document.cookie.split(';').forEach(cookie => {
-      const eqPos = cookie.indexOf('=')
-      const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim()
-      document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/'
-    })
-    
-    // Call the auth context logout (which also clears state)
     logout()
-    
-    // Navigate to login page
     navigateTo('/login')
   }
 
@@ -124,17 +97,15 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   const handleMenuClick = (item: MenuItem) => {
     if (item.tabValue && onTabChange) {
       onTabChange(item.tabValue)
-    } else if (item.path) {
-      navigateTo(item.path)
     }
     // Close mobile menu after navigation
     setSidebarOpen(false)
   }
 
-  // Navigate back to dashboard
-  const handleBackToDashboard = () => {
+  // Navigate back to home (Work Queue for accountants, Dashboard for ZZP)
+  const handleBackToHome = () => {
     if (onTabChange) {
-      onTabChange(isAccountant ? 'workqueue' : 'dashboard')
+      onTabChange(homeTab)
     }
     setSidebarOpen(false)
   }
@@ -164,42 +135,48 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
       </div>
 
       {/* Navigation Menu */}
-      <nav className="flex-1 overflow-y-auto p-2">
-        <ul className="space-y-1">
-          {visibleMenuItems.map((item) => (
-            <li key={item.label}>
-              <button
-                onClick={() => handleMenuClick(item)}
-                className={`
-                  w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm
-                  transition-colors duration-150
-                  ${(item.tabValue && activeTab === item.tabValue) 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'hover:bg-secondary text-foreground'
-                  }
-                  touch-action-manipulation
-                `}
-                style={{ minHeight: '44px' }} // iOS tap target minimum
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </button>
-            </li>
-          ))}
+      <nav className="flex-1 overflow-y-auto p-2" aria-label="Main navigation">
+        <ul className="space-y-1" role="menu">
+          {visibleMenuItems.map((item) => {
+            const isActive = item.tabValue && activeTab === item.tabValue
+            return (
+              <li key={item.label} role="none">
+                <button
+                  role="menuitem"
+                  onClick={() => handleMenuClick(item)}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`
+                    w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm
+                    transition-colors duration-150
+                    ${isActive 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'hover:bg-secondary text-foreground'
+                    }
+                  `}
+                  style={{ minHeight: '44px' }} // iOS tap target minimum
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </button>
+              </li>
+            )
+          })}
         </ul>
       </nav>
 
-      {/* Back to Dashboard Link */}
-      <div className="p-2 border-t border-border">
-        <button
-          onClick={handleBackToDashboard}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-          style={{ minHeight: '44px' }}
-        >
-          <CaretLeft size={18} />
-          <span>Back to Dashboard</span>
-        </button>
-      </div>
+      {/* Back to Home Link - only render if onTabChange is available */}
+      {onTabChange && (
+        <div className="p-2 border-t border-border">
+          <button
+            onClick={handleBackToHome}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            style={{ minHeight: '44px' }}
+          >
+            <CaretLeft size={18} />
+            <span>{homeLabel}</span>
+          </button>
+        </div>
+      )}
 
       {/* Dev Mode Debug Indicator */}
       {isDev && (

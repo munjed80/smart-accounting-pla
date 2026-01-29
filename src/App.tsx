@@ -18,7 +18,6 @@ import { Database } from '@phosphor-icons/react'
 // Simple URL-based routing
 type Route = 
   | { type: 'login' }
-  | { type: 'auth' }
   | { type: 'forgot-password' }
   | { type: 'verify-email'; token: string }
   | { type: 'reset-password'; token: string }

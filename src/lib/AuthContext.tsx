@@ -189,8 +189,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, [])
 
   const logout = useCallback(() => {
+    // Clear localStorage tokens and user data
     localStorage.removeItem('access_token')
     localStorage.removeItem('user')
+    
+    // Clear sessionStorage (in case tokens are stored there)
+    sessionStorage.removeItem('access_token')
+    sessionStorage.removeItem('user')
+    
+    // Clear any auth-related cookies (best effort - httpOnly cookies require server-side logout)
+    // This handles client-accessible cookies only
+    document.cookie.split(';').forEach(cookie => {
+      const eqPos = cookie.indexOf('=')
+      const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim()
+      document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/'
+    })
+    
     setUser(null)
     toast.success('Logged out successfully')
   }, [])

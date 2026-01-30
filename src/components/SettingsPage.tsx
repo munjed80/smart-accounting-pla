@@ -28,15 +28,16 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 
-// Build timestamp - injected at build time or fallback to current
+// Build timestamp - injected at build time or fallback
 const BUILD_VERSION = import.meta.env.VITE_BUILD_VERSION || 'dev'
-const BUILD_TIMESTAMP = import.meta.env.VITE_BUILD_TIMESTAMP || new Date().toISOString()
+const BUILD_TIMESTAMP = import.meta.env.VITE_BUILD_TIMESTAMP || 'development'
 
 export const SettingsPage = () => {
   const { user } = useAuth()
   const [administrations, setAdministrations] = useState<Administration[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   
   // Notification preferences (local state - would be stored in backend in full implementation)
   const [notifications, setNotifications] = useState({
@@ -49,11 +50,13 @@ export const SettingsPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true)
+      setLoadError(null)
       try {
         const admins = await administrationApi.list()
         setAdministrations(admins)
       } catch (error) {
         console.error('Failed to fetch administrations:', error)
+        setLoadError('Failed to load company information')
       } finally {
         setIsLoading(false)
       }
@@ -341,7 +344,7 @@ export const SettingsPage = () => {
                     <strong>Version:</strong> {BUILD_VERSION}
                   </span>
                   <span>
-                    <strong>Build:</strong> {new Date(BUILD_TIMESTAMP).toLocaleString('nl-NL')}
+                    <strong>Build:</strong> {BUILD_TIMESTAMP === 'development' ? 'development' : new Date(BUILD_TIMESTAMP).toLocaleString('nl-NL')}
                   </span>
                 </div>
                 <div className="flex items-center gap-4">

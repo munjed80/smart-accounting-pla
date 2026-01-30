@@ -18,9 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/lib/AuthContext'
-import { api, getErrorMessage } from '@/lib/api'
+import { api } from '@/lib/api'
 import { 
   Envelope,
   Phone,
@@ -30,10 +30,7 @@ import {
   CheckCircle,
   Info,
   ArrowsClockwise,
-  Question,
-  Bug,
-  Lightbulb,
-  WarningCircle
+  Question
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 
@@ -67,7 +64,7 @@ export const SupportPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!formData.subject || !formData.category || !formData.message) {
+    if (!formData.subject || !formData.category || !formData.message || !formData.email || !formData.name) {
       toast.error('Please fill in all required fields')
       return
     }
@@ -84,6 +81,8 @@ export const SupportPage = () => {
       console.log('API support endpoint not available, using mailto fallback')
       const mailtoLink = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`[${formData.category}] ${formData.subject}`)}&body=${encodeURIComponent(`Name: ${formData.name}\nEmail: ${formData.email}\n\n${formData.message}`)}`
       window.location.href = mailtoLink
+      // Mark as submitted since we're using fallback
+      setIsSubmitted(true)
       toast.info('Opening email client...', {
         description: 'If your email client doesn\'t open, please email us directly at ' + SUPPORT_EMAIL
       })
@@ -249,30 +248,10 @@ export const SupportPage = () => {
                           <SelectValue placeholder="Select a category" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="general">
-                            <span className="flex items-center gap-2">
-                              <Question size={16} />
-                              General Question
-                            </span>
-                          </SelectItem>
-                          <SelectItem value="technical">
-                            <span className="flex items-center gap-2">
-                              <Bug size={16} />
-                              Technical Issue
-                            </span>
-                          </SelectItem>
-                          <SelectItem value="billing">
-                            <span className="flex items-center gap-2">
-                              <WarningCircle size={16} />
-                              Billing & Account
-                            </span>
-                          </SelectItem>
-                          <SelectItem value="feature">
-                            <span className="flex items-center gap-2">
-                              <Lightbulb size={16} />
-                              Feature Request
-                            </span>
-                          </SelectItem>
+                          <SelectItem value="general">General Question</SelectItem>
+                          <SelectItem value="technical">Technical Issue</SelectItem>
+                          <SelectItem value="billing">Billing & Account</SelectItem>
+                          <SelectItem value="feature">Feature Request</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

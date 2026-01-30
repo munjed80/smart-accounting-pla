@@ -175,10 +175,16 @@ const AppContent = () => {
   }
   
   // Check if user needs onboarding (first login - no administrations)
+  // Only run once when user authenticates, not on every route change
   useEffect(() => {
     const checkOnboarding = async () => {
       if (!isAuthenticated || !user) {
         setNeedsOnboarding(null)
+        return
+      }
+      
+      // Skip if already checked
+      if (needsOnboarding !== null) {
         return
       }
       
@@ -189,8 +195,8 @@ const AppContent = () => {
         const needsSetup = administrations.length === 0
         setNeedsOnboarding(needsSetup)
         
-        // Auto-redirect to onboarding if needed and not already there
-        if (needsSetup && route.type === 'app') {
+        // Auto-redirect to onboarding if needed
+        if (needsSetup) {
           navigateTo('/onboarding')
         }
       } catch (error) {
@@ -203,7 +209,7 @@ const AppContent = () => {
     }
     
     checkOnboarding()
-  }, [isAuthenticated, user, route])
+  }, [isAuthenticated, user, needsOnboarding])
 
   // Handle special auth routes first (before checking authentication)
   if (route.type === 'verify-email') {
@@ -278,9 +284,10 @@ const AppContent = () => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'workqueue':
-        return isAccountant ? <AccountantHomePage /> : null
+        // Redirect ZZP users to dashboard if they try to access accountant-only pages
+        return isAccountant ? <AccountantHomePage /> : <SmartDashboard />
       case 'clients':
-        return isAccountant ? <AccountantDashboard /> : null
+        return isAccountant ? <AccountantDashboard /> : <SmartDashboard />
       case 'dashboard':
         return <SmartDashboard />
       case 'transactions':

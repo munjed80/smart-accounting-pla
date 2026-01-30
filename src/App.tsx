@@ -10,19 +10,21 @@ import { AccountantDashboard } from '@/components/AccountantDashboard'
 import { AccountantHomePage } from '@/components/AccountantHomePage'
 import { IntelligentUploadPortal } from '@/components/IntelligentUploadPortal'
 import { SmartTransactionList } from '@/components/SmartTransactionList'
+import { SettingsPage } from '@/components/SettingsPage'
+import { SupportPage } from '@/components/SupportPage'
 import { AppShell } from '@/components/AppShell'
 import { administrationApi } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { Database } from '@phosphor-icons/react'
 
-// Simple URL-based routing
+// URL-based routing with path support
 type Route = 
   | { type: 'login' }
   | { type: 'forgot-password' }
   | { type: 'verify-email'; token: string }
   | { type: 'reset-password'; token: string }
   | { type: 'onboarding' }
-  | { type: 'app' }
+  | { type: 'app'; path: string }
 
 const getRouteFromURL = (): Route => {
   const path = window.location.pathname
@@ -50,13 +52,66 @@ const getRouteFromURL = (): Route => {
     return { type: 'onboarding' }
   }
   
-  return { type: 'app' }
+  // Return app route with current path for navigation
+  return { type: 'app', path: path || '/' }
+}
+
+// Map URL paths to tab values
+const pathToTab = (path: string, isAccountant: boolean): string => {
+  // Normalize path
+  const normalizedPath = path.toLowerCase().replace(/\/$/, '') || '/'
+  
+  switch (normalizedPath) {
+    case '/dashboard':
+      return 'dashboard'
+    case '/transactions':
+      return 'transactions'
+    case '/accountant/review':
+    case '/accountant':
+    case '/workqueue':
+      return 'workqueue'
+    case '/clients':
+      return 'clients'
+    case '/ai-upload':
+    case '/upload':
+      return 'upload'
+    case '/settings':
+      return 'settings'
+    case '/support':
+      return 'support'
+    case '/':
+    default:
+      // Default based on role
+      return isAccountant ? 'workqueue' : 'dashboard'
+  }
+}
+
+// Map tab values to URL paths
+const tabToPath = (tab: string, isAccountant: boolean): string => {
+  switch (tab) {
+    case 'dashboard':
+      return '/dashboard'
+    case 'transactions':
+      return '/transactions'
+    case 'workqueue':
+      return isAccountant ? '/accountant/review' : '/dashboard'
+    case 'clients':
+      return '/clients'
+    case 'upload':
+      return '/ai-upload'
+    case 'settings':
+      return '/settings'
+    case 'support':
+      return '/support'
+    default:
+      return isAccountant ? '/accountant/review' : '/dashboard'
+  }
 }
 
 const AppContent = () => {
   const { user, isAuthenticated, isLoading } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'transactions' | 'upload'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'transactions' | 'upload' | 'settings' | 'support'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
   // Onboarding state - tracks if user needs onboarding (no administrations)
@@ -66,30 +121,58 @@ const AppContent = () => {
   // Track if we've set the initial tab based on role (to avoid resetting on every render)
   const [hasSetInitialTab, setHasSetInitialTab] = useState(false)
 
-  // Listen for URL changes
+  // Listen for URL changes and sync with tab
   useEffect(() => {
     const handlePopState = () => {
-      setRoute(getRouteFromURL())
+      const newRoute = getRouteFromURL()
+      setRoute(newRoute)
+      
+      // Update active tab based on URL path
+      if (newRoute.type === 'app' && user) {
+        const newTab = pathToTab(newRoute.path, isAccountant)
+        setActiveTab(newTab as typeof activeTab)
+      }
     }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
-  }, [])
+  }, [user, isAccountant])
   
-  // Update active tab when user role becomes available (after login)
+  // Update active tab when user role becomes available (after login) or route changes
   useEffect(() => {
-    if (user && isAuthenticated && !hasSetInitialTab) {
-      // Set the correct initial tab based on the user's role
+    if (user && isAuthenticated) {
       const userIsAccountant = user.role === 'accountant' || user.role === 'admin'
-      const defaultTab = userIsAccountant ? 'workqueue' : 'dashboard'
-      setActiveTab(defaultTab)
-      setHasSetInitialTab(true)
+      
+      if (!hasSetInitialTab) {
+        // Set initial tab based on URL path or default to role-appropriate tab
+        if (route.type === 'app') {
+          const tabFromPath = pathToTab(route.path, userIsAccountant)
+          setActiveTab(tabFromPath as typeof activeTab)
+        } else {
+          const defaultTab = userIsAccountant ? 'workqueue' : 'dashboard'
+          setActiveTab(defaultTab)
+        }
+        setHasSetInitialTab(true)
+      } else if (route.type === 'app') {
+        // Sync tab with route when URL changes
+        const tabFromPath = pathToTab(route.path, userIsAccountant)
+        if (tabFromPath !== activeTab) {
+          setActiveTab(tabFromPath as typeof activeTab)
+        }
+      }
     }
     // Reset state when user logs out for clean state transition
     if (!isAuthenticated) {
       setHasSetInitialTab(false)
       setActiveTab('dashboard')
     }
-  }, [user, isAuthenticated, hasSetInitialTab])
+  }, [user, isAuthenticated, hasSetInitialTab, route, isAccountant])
+  
+  // Handle tab change - update URL
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab as typeof activeTab)
+    const path = tabToPath(tab, isAccountant)
+    navigateTo(path)
+  }
   
   // Check if user needs onboarding (first login - no administrations)
   useEffect(() => {
@@ -204,6 +287,10 @@ const AppContent = () => {
         return <SmartTransactionList />
       case 'upload':
         return <IntelligentUploadPortal />
+      case 'settings':
+        return <SettingsPage />
+      case 'support':
+        return <SupportPage />
       default:
         return <SmartDashboard />
     }
@@ -212,7 +299,7 @@ const AppContent = () => {
   return (
     <AppShell 
       activeTab={activeTab} 
-      onTabChange={(tab) => setActiveTab(tab as 'dashboard' | 'clients' | 'workqueue' | 'transactions' | 'upload')}
+      onTabChange={handleTabChange}
     >
       {renderTabContent()}
     </AppShell>

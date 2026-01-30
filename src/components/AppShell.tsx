@@ -4,6 +4,7 @@ import { navigateTo } from '@/lib/navigation'
 import { getApiBaseUrl } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 import { 
   Sheet, 
   SheetContent, 
@@ -20,7 +21,9 @@ import {
   Sparkle,
   UsersThree,
   Stack,
-  CaretLeft
+  CaretLeft,
+  Gear,
+  Headset
 } from '@phosphor-icons/react'
 
 // Menu item configuration with role-based access
@@ -29,39 +32,62 @@ interface MenuItem {
   tabValue: string
   icon: ReactNode
   rolesAllowed: Array<'zzp' | 'accountant' | 'admin'>
+  section?: 'main' | 'secondary'
 }
 
 // Define menu items for both roles
 const menuItems: MenuItem[] = [
+  // Accountant main items
   {
     label: 'Work Queue',
     tabValue: 'workqueue',
     icon: <Stack size={20} weight="duotone" />,
     rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
   },
   {
     label: 'Clients',
     tabValue: 'clients',
     icon: <UsersThree size={20} weight="duotone" />,
     rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
   },
+  // Shared main items
   {
     label: 'Dashboard',
     tabValue: 'dashboard',
     icon: <House size={20} weight="duotone" />,
     rolesAllowed: ['zzp', 'accountant', 'admin'],
+    section: 'main',
   },
   {
     label: 'Smart Transactions',
     tabValue: 'transactions',
     icon: <Brain size={20} weight="duotone" />,
     rolesAllowed: ['zzp', 'accountant', 'admin'],
+    section: 'main',
   },
   {
     label: 'AI Upload',
     tabValue: 'upload',
     icon: <Sparkle size={20} weight="duotone" />,
     rolesAllowed: ['zzp', 'accountant', 'admin'],
+    section: 'main',
+  },
+  // Secondary items (Settings & Support)
+  {
+    label: 'Settings',
+    tabValue: 'settings',
+    icon: <Gear size={20} weight="duotone" />,
+    rolesAllowed: ['zzp', 'accountant', 'admin'],
+    section: 'secondary',
+  },
+  {
+    label: 'Support',
+    tabValue: 'support',
+    icon: <Headset size={20} weight="duotone" />,
+    rolesAllowed: ['zzp', 'accountant', 'admin'],
+    section: 'secondary',
   },
 ]
 
@@ -134,10 +160,10 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
         </Badge>
       </div>
 
-      {/* Navigation Menu */}
+      {/* Navigation Menu - Main Items */}
       <nav className="flex-1 overflow-y-auto p-2" aria-label="Main navigation">
         <ul className="space-y-1" role="menu">
-          {visibleMenuItems.map((item) => {
+          {visibleMenuItems.filter(item => item.section !== 'secondary').map((item) => {
             const isActive = item.tabValue && activeTab === item.tabValue
             return (
               <li key={item.label} role="none">
@@ -154,6 +180,35 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
                     }
                   `}
                   style={{ minHeight: '44px' }} // iOS tap target minimum
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+        
+        {/* Secondary Navigation - Settings & Support */}
+        <Separator className="my-3" />
+        <ul className="space-y-1" role="menu">
+          {visibleMenuItems.filter(item => item.section === 'secondary').map((item) => {
+            const isActive = item.tabValue && activeTab === item.tabValue
+            return (
+              <li key={item.label} role="none">
+                <button
+                  role="menuitem"
+                  onClick={() => handleMenuClick(item)}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`
+                    w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm
+                    transition-colors duration-150
+                    ${isActive 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'hover:bg-secondary text-foreground'
+                    }
+                  `}
+                  style={{ minHeight: '44px' }}
                 >
                   {item.icon}
                   <span>{item.label}</span>

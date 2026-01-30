@@ -302,6 +302,82 @@ After deployment, verify the end-to-end flow works correctly:
    - If a document fails processing, verify error message is shown
    - Click "Reprocess" to retry processing
 
+## How to Test Sections
+
+The platform includes the following pages/sections that can be accessed via URL or menu navigation:
+
+### ZZP User Menu
+
+| Page | URL Path | Description |
+|------|----------|-------------|
+| Dashboard | `/dashboard` | Overview with stats, recent transactions |
+| Smart Transactions | `/transactions` | List transactions with status filter (Draft/Posted) |
+| AI Upload | `/ai-upload` | Upload invoices/receipts for AI processing |
+| Settings | `/settings` | Profile info, company details, notification preferences |
+| Support | `/support` | Contact form and support information |
+
+### Accountant User Menu
+
+| Page | URL Path | Description |
+|------|----------|-------------|
+| Work Queue | `/accountant/review` | Review queue of pending transactions |
+| Clients | `/clients` | Client management dashboard |
+| Dashboard | `/dashboard` | Overview with stats |
+| Smart Transactions | `/transactions` | Transaction list |
+| AI Upload | `/ai-upload` | Document upload |
+| Settings | `/settings` | Profile and preferences |
+| Support | `/support` | Support contact form |
+
+### Implemented API Endpoints
+
+The frontend uses the following backend endpoints:
+
+**Authentication:**
+- `POST /api/v1/auth/token` - Login
+- `POST /api/v1/auth/register` - Register
+- `GET /api/v1/auth/me` - Get current user profile
+
+**Transactions:**
+- `GET /api/v1/transactions` - List transactions (supports `?status=DRAFT` or `?status=POSTED`)
+- `GET /api/v1/transactions/{id}` - Get transaction details
+- `GET /api/v1/transactions/stats` - Get transaction statistics
+- `POST /api/v1/transactions/{id}/approve` - Approve transaction (post to ledger)
+- `POST /api/v1/transactions/{id}/reject` - Reject/delete draft transaction
+
+**Documents:**
+- `POST /api/v1/documents/upload` - Upload document (multipart)
+- `GET /api/v1/documents` - List documents
+- `GET /api/v1/documents/{id}` - Get document details
+- `POST /api/v1/documents/{id}/reprocess` - Reprocess failed document
+
+**Administrations:**
+- `POST /api/v1/administrations` - Create administration
+- `GET /api/v1/administrations` - List user's administrations
+- `GET /api/v1/administrations/{id}` - Get administration details
+
+**Accountant:**
+- `GET /api/v1/accountant/dashboard` - Accountant dashboard overview
+- `GET /api/v1/accountant/work-queue` - Work queue items
+- `GET /api/v1/accountant/clients/{id}/overview` - Client overview
+
+**Health:**
+- `GET /api/v1/ops/health` - API health check
+
+### Testing Navigation
+
+1. **URL-based routing:** Directly navigate to any URL (e.g., `/dashboard`, `/settings`)
+2. **Menu navigation:** Use the sidebar menu - clicking items updates both URL and content
+3. **Mobile:** On mobile, the drawer closes automatically after navigation
+4. **Active state:** The current page is highlighted in the menu
+5. **Role-based filtering:** Menu shows only items accessible to your role
+
+### Data States
+
+All pages implement proper loading, empty, and error states:
+- **Loading:** Skeleton loaders while fetching data
+- **Empty:** Clear messages with CTAs when no data exists
+- **Error:** Error messages with retry buttons
+
 ## License
 
 MIT License - see LICENSE file

@@ -5,6 +5,7 @@ import { VerifyEmailPage } from '@/components/VerifyEmailPage'
 import { ForgotPasswordPage } from '@/components/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/components/ResetPasswordPage'
 import { OnboardingPage } from '@/components/OnboardingPage'
+import { AccountantOnboardingPage } from '@/components/AccountantOnboardingPage'
 import { SmartDashboard } from '@/components/SmartDashboard'
 import { AccountantDashboard } from '@/components/AccountantDashboard'
 import { AccountantHomePage } from '@/components/AccountantHomePage'
@@ -13,7 +14,7 @@ import { SmartTransactionList } from '@/components/SmartTransactionList'
 import { SettingsPage } from '@/components/SettingsPage'
 import { SupportPage } from '@/components/SupportPage'
 import { AppShell } from '@/components/AppShell'
-import { administrationApi } from '@/lib/api'
+import { administrationApi, accountantClientApi } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { Database } from '@phosphor-icons/react'
 
@@ -24,6 +25,7 @@ type Route =
   | { type: 'verify-email'; token: string }
   | { type: 'reset-password'; token: string }
   | { type: 'onboarding' }
+  | { type: 'accountant-onboarding' }
   | { type: 'app'; path: string }
 
 const getRouteFromURL = (): Route => {
@@ -50,6 +52,10 @@ const getRouteFromURL = (): Route => {
   
   if (path === '/onboarding') {
     return { type: 'onboarding' }
+  }
+  
+  if (path === '/accountant/onboarding') {
+    return { type: 'accountant-onboarding' }
   }
   
   // Return app route with current path for navigation
@@ -117,8 +123,9 @@ const AppContent = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'transactions' | 'upload' | 'settings' | 'support'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
-  // Onboarding state - tracks if user needs onboarding (no administrations)
+  // Onboarding state - tracks if user needs onboarding (no administrations for ZZP, no clients for accountants)
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null)
+  const [needsAccountantOnboarding, setNeedsAccountantOnboarding] = useState<boolean | null>(null)
   const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(false)
   
   // Track if we've set the initial tab based on role (to avoid resetting on every render)
@@ -177,42 +184,61 @@ const AppContent = () => {
     navigateTo(path)
   }
   
-  // Check if user needs onboarding (first login - no administrations)
-  // Only run once when user authenticates, not on every route change
+  // Check if user needs onboarding (first login)
+  // ZZP users: check for no administrations
+  // Accountants: check for no assigned clients
   useEffect(() => {
     const checkOnboarding = async () => {
       if (!isAuthenticated || !user) {
         setNeedsOnboarding(null)
+        setNeedsAccountantOnboarding(null)
         return
       }
       
       // Skip if already checked
-      if (needsOnboarding !== null) {
+      if (needsOnboarding !== null || needsAccountantOnboarding !== null) {
         return
       }
       
       setIsCheckingOnboarding(true)
       try {
-        const administrations = await administrationApi.list()
-        // User needs onboarding if they have no administrations
-        const needsSetup = administrations.length === 0
-        setNeedsOnboarding(needsSetup)
+        const userIsAccountant = user.role === 'accountant' || user.role === 'admin'
         
-        // Auto-redirect to onboarding if needed
-        if (needsSetup) {
-          navigateTo('/onboarding')
+        if (userIsAccountant) {
+          // For accountants, check if they have any assigned clients
+          const clientsResponse = await accountantClientApi.listClients()
+          const needsSetup = clientsResponse.clients.length === 0
+          setNeedsAccountantOnboarding(needsSetup)
+          setNeedsOnboarding(false) // ZZP onboarding not needed
+          
+          // Auto-redirect to accountant onboarding if needed
+          if (needsSetup) {
+            navigateTo('/accountant/onboarding')
+          }
+        } else {
+          // For ZZP users, check if they have any administrations
+          const administrations = await administrationApi.list()
+          const needsSetup = administrations.length === 0
+          setNeedsOnboarding(needsSetup)
+          setNeedsAccountantOnboarding(false) // Accountant onboarding not needed
+          
+          // Auto-redirect to onboarding if needed
+          if (needsSetup) {
+            navigateTo('/onboarding')
+          }
         }
       } catch (error) {
-        console.error('Failed to check administrations:', error)
+        console.error('Failed to check onboarding status:', error)
         // Don't block user if check fails, let them proceed
         setNeedsOnboarding(false)
+        setNeedsAccountantOnboarding(false)
       } finally {
         setIsCheckingOnboarding(false)
       }
     }
     
     checkOnboarding()
-  }, [isAuthenticated, user, needsOnboarding])
+  }, [isAuthenticated, user, needsOnboarding, needsAccountantOnboarding])
 
   // Handle special auth routes first (before checking authentication)
   if (route.type === 'verify-email') {
@@ -249,7 +275,7 @@ const AppContent = () => {
         <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center">
           <div className="text-center">
             <Database size={64} className="mx-auto mb-4 text-primary animate-pulse" weight="duotone" />
-            <p className="text-muted-foreground">Loading session...</p>
+            <p className="text-muted-foreground">Laden...</p>
           </div>
         </div>
       )
@@ -271,12 +297,29 @@ const AppContent = () => {
     )
   }
   
-  // Show onboarding if user needs it (first login, no administrations)
+  // Show accountant-specific onboarding if needed (no assigned clients)
+  if (route.type === 'accountant-onboarding' || needsAccountantOnboarding === true) {
+    return (
+      <AccountantOnboardingPage
+        userName={user?.full_name || 'boekhouder'}
+        onComplete={() => {
+          setNeedsAccountantOnboarding(false)
+          navigateTo('/accountant')
+        }}
+        onSkip={() => {
+          setNeedsAccountantOnboarding(false)
+          navigateTo('/accountant/clients')
+        }}
+      />
+    )
+  }
+  
+  // Show ZZP onboarding if user needs it (first login, no administrations)
   if (route.type === 'onboarding' || needsOnboarding === true) {
     return (
       <OnboardingPage
         userRole={user?.role as 'zzp' | 'accountant' | 'admin'}
-        userName={user?.full_name || 'there'}
+        userName={user?.full_name || 'daar'}
         onComplete={() => {
           setNeedsOnboarding(false)
           // Navigate to role-appropriate landing page - no "/" fallback

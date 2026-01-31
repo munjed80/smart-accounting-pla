@@ -59,7 +59,7 @@ import {
   CheckCircle,
   Warning,
   Users,
-  FileSearch,
+  MagnifyingGlass,
   Calendar,
   Lightning,
   Bell,
@@ -479,7 +479,7 @@ export const AccountantHomePage = () => {
             isLoading={isLoading}
           />
           <KPICard 
-            icon={FileSearch} 
+            icon={MagnifyingGlass} 
             label="In Review" 
             value={summary?.clients_in_review || 0}
             color="yellow"
@@ -573,7 +573,7 @@ export const AccountantHomePage = () => {
                   Red Issues
                 </TabsTrigger>
                 <TabsTrigger value="needs_review">
-                  <FileSearch size={16} className="mr-1" />
+                  <MagnifyingGlass size={16} className="mr-1" />
                   Needs Review
                 </TabsTrigger>
                 <TabsTrigger value="vat_due">

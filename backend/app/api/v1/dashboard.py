@@ -24,6 +24,7 @@ from app.models.administration import Administration, AdministrationMember, Memb
 from app.models.document import Document, DocumentStatus
 from app.models.transaction import Transaction, TransactionStatus
 from app.models.user import User
+from app.models.accountant_dashboard import AccountantClientAssignment
 from app.schemas.dashboard import (
     ClientStatus,
     BTWQuarterStatus,
@@ -34,7 +35,7 @@ from app.schemas.dashboard import (
     AccountantDashboardResponse,
     ClientIssuesResponse,
 )
-from app.api.v1.deps import CurrentUser
+from app.api.v1.deps import CurrentUser, require_accountant
 
 router = APIRouter()
 
@@ -259,14 +260,10 @@ async def get_accountant_dashboard(
     Clients are sorted by status: RED first, then YELLOW, then GREEN.
     """
     # Verify user is an accountant
-    if current_user.role not in ["accountant", "admin"]:
-        raise HTTPException(
-            status_code=403,
-            detail="This dashboard is only available for accountants"
-        )
+    require_accountant(current_user)
     
-    # Get all administrations where user is a member with appropriate role
-    result = await db.execute(
+    # Get administrations via direct membership
+    member_result = await db.execute(
         select(Administration)
         .join(AdministrationMember)
         .where(AdministrationMember.user_id == current_user.id)
@@ -276,9 +273,32 @@ async def get_accountant_dashboard(
             selectinload(Administration.documents),
             selectinload(Administration.transactions),
         )
-        .order_by(Administration.name)
     )
-    administrations = result.scalars().all()
+    member_administrations = member_result.scalars().all()
+    
+    # Also get administrations via AccountantClientAssignment
+    assignment_result = await db.execute(
+        select(Administration)
+        .join(AccountantClientAssignment, AccountantClientAssignment.administration_id == Administration.id)
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+        .where(Administration.is_active == True)
+        .options(
+            selectinload(Administration.documents),
+            selectinload(Administration.transactions),
+        )
+    )
+    assigned_administrations = assignment_result.scalars().all()
+    
+    # Combine and deduplicate
+    admin_ids_seen = set()
+    administrations = []
+    for admin in list(member_administrations) + list(assigned_administrations):
+        if admin.id not in admin_ids_seen:
+            admin_ids_seen.add(admin.id)
+            administrations.append(admin)
+    
+    # Sort by name
+    administrations.sort(key=lambda a: a.name)
     
     # Build client overviews
     clients = []
@@ -366,13 +386,9 @@ async def get_client_issues(
     This provides the full list of issues (not just top 3 from overview).
     """
     # Verify user is an accountant
-    if current_user.role not in ["accountant", "admin"]:
-        raise HTTPException(
-            status_code=403,
-            detail="This endpoint is only available for accountants"
-        )
+    require_accountant(current_user)
     
-    # Get administration with documents and transactions
+    # Check via direct membership first
     result = await db.execute(
         select(Administration)
         .join(AdministrationMember)
@@ -385,6 +401,20 @@ async def get_client_issues(
         )
     )
     administration = result.scalar_one_or_none()
+    
+    # Also check via assignment
+    if not administration:
+        assignment_result = await db.execute(
+            select(Administration)
+            .join(AccountantClientAssignment, AccountantClientAssignment.administration_id == Administration.id)
+            .where(Administration.id == client_id)
+            .where(AccountantClientAssignment.accountant_id == current_user.id)
+            .options(
+                selectinload(Administration.documents),
+                selectinload(Administration.transactions),
+            )
+        )
+        administration = assignment_result.scalar_one_or_none()
     
     if not administration:
         raise HTTPException(status_code=404, detail="Client not found or access denied")

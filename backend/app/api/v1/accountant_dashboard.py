@@ -12,13 +12,14 @@ from typing import Annotated, Optional, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.models.user import User
-from app.models.administration import Administration
+from app.models.administration import Administration, AdministrationMember, MemberRole
+from app.models.issues import ClientIssue, IssueSeverity
 from app.models.accountant_dashboard import (
     AccountantClientAssignment,
     BulkOperation,
@@ -45,8 +46,11 @@ from app.schemas.accountant_dashboard import (
     BulkOperationResultItem,
     BulkOperationListResponse,
     AccountantAssignmentCreate,
+    AccountantAssignmentByEmailRequest,
     AccountantAssignmentResponse,
     AccountantAssignmentsListResponse,
+    AccountantClientListItem,
+    AccountantClientListResponse,
 )
 from app.services.accountant_dashboard import (
     AccountantDashboardService,
@@ -55,18 +59,18 @@ from app.services.accountant_dashboard import (
     RateLimitExceededError,
     UnauthorizedClientError,
 )
-from app.api.v1.deps import CurrentUser
+from app.api.v1.deps import CurrentUser, require_accountant
 
 router = APIRouter()
 
 
 def verify_accountant_role(current_user: User) -> None:
-    """Verify user has accountant or admin role."""
-    if current_user.role not in ["accountant", "admin"]:
-        raise HTTPException(
-            status_code=403,
-            detail="This endpoint is only available for accountants"
-        )
+    """
+    Verify user has accountant or admin role.
+    
+    Uses the centralized require_accountant helper for consistent error handling.
+    """
+    require_accountant(current_user)
 
 
 # ============ Dashboard Aggregation Endpoints ============
@@ -616,10 +620,10 @@ async def delete_assignment(
     """
     Remove an accountant-client assignment.
     
-    Requires admin role.
+    Accountants can delete their own assignments.
+    Admins can delete any assignment.
     """
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Only admins can delete assignments")
+    verify_accountant_role(current_user)
     
     result = await db.execute(
         select(AccountantClientAssignment)
@@ -630,7 +634,202 @@ async def delete_assignment(
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
     
+    # Accountants can only delete their own assignments
+    if current_user.role != "admin" and assignment.accountant_id != current_user.id:
+        raise HTTPException(
+            status_code=403, 
+            detail={"code": "FORBIDDEN_ROLE", "message": "Can only delete your own assignments"}
+        )
+    
     await db.delete(assignment)
     await db.commit()
     
     return {"message": "Assignment deleted successfully"}
+
+
+@router.post("/assignments/by-email", response_model=AccountantAssignmentResponse)
+async def create_assignment_by_email(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: AccountantAssignmentByEmailRequest,
+):
+    """
+    Assign a client to the current accountant by their email address.
+    
+    - Finds the user by email
+    - User must be a ZZP role user
+    - Finds their administration (the accountant will be assigned to it)
+    - Creates assignment linking accountant to client's administration
+    - Idempotent: if assignment exists, returns existing one
+    
+    Returns error codes:
+    - USER_NOT_FOUND: if no user with that email exists
+    - NOT_ZZP_USER: if user exists but is not a ZZP user
+    - NO_ADMINISTRATION: if user has no administration
+    """
+    verify_accountant_role(current_user)
+    
+    # Find the user by email
+    user_result = await db.execute(
+        select(User).where(User.email == request.client_email.lower().strip())
+    )
+    client_user = user_result.scalar_one_or_none()
+    
+    if not client_user:
+        raise HTTPException(
+            status_code=404, 
+            detail={"code": "USER_NOT_FOUND", "message": f"No user found with email: {request.client_email}"}
+        )
+    
+    # Verify user is a ZZP user
+    if client_user.role != "zzp":
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "NOT_ZZP_USER", "message": "This user is not a ZZP client"}
+        )
+    
+    # Find user's administration (they should be owner of at least one)
+    admin_member_result = await db.execute(
+        select(AdministrationMember)
+        .options(selectinload(AdministrationMember.administration))
+        .where(AdministrationMember.user_id == client_user.id)
+        .where(AdministrationMember.role == MemberRole.OWNER)
+        .limit(1)
+    )
+    admin_member = admin_member_result.scalar_one_or_none()
+    
+    if not admin_member or not admin_member.administration:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "NO_ADMINISTRATION", "message": "This user has no administration to assign"}
+        )
+    
+    administration = admin_member.administration
+    
+    # Check if assignment already exists - return existing if so (idempotent)
+    existing_result = await db.execute(
+        select(AccountantClientAssignment)
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+        .where(AccountantClientAssignment.administration_id == administration.id)
+    )
+    existing_assignment = existing_result.scalar_one_or_none()
+    
+    if existing_assignment:
+        # Return existing assignment (idempotent)
+        return AccountantAssignmentResponse(
+            id=existing_assignment.id,
+            accountant_id=existing_assignment.accountant_id,
+            accountant_name=current_user.full_name,
+            administration_id=existing_assignment.administration_id,
+            administration_name=administration.name,
+            is_primary=existing_assignment.is_primary,
+            assigned_at=existing_assignment.assigned_at,
+            assigned_by_name=current_user.full_name,
+            notes=existing_assignment.notes,
+        )
+    
+    # Create new assignment
+    assignment = AccountantClientAssignment(
+        accountant_id=current_user.id,
+        administration_id=administration.id,
+        is_primary=True,
+        assigned_by_id=current_user.id,
+        notes=f"Self-assigned by accountant via email lookup",
+    )
+    db.add(assignment)
+    await db.commit()
+    await db.refresh(assignment)
+    
+    return AccountantAssignmentResponse(
+        id=assignment.id,
+        accountant_id=assignment.accountant_id,
+        accountant_name=current_user.full_name,
+        administration_id=assignment.administration_id,
+        administration_name=administration.name,
+        is_primary=assignment.is_primary,
+        assigned_at=assignment.assigned_at,
+        assigned_by_name=current_user.full_name,
+        notes=assignment.notes,
+    )
+
+
+@router.get("/clients", response_model=AccountantClientListResponse)
+async def list_assigned_clients(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Get list of assigned clients for the current accountant.
+    
+    Returns:
+    - Client user info (id, email, name)
+    - Status (active/pending)
+    - Last activity timestamp
+    - Open RED and YELLOW issue counts
+    - Administration info
+    """
+    verify_accountant_role(current_user)
+    
+    # Get all assignments for current accountant
+    assignments_result = await db.execute(
+        select(AccountantClientAssignment)
+        .options(selectinload(AccountantClientAssignment.administration))
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+        .order_by(AccountantClientAssignment.assigned_at.desc())
+    )
+    assignments = assignments_result.scalars().all()
+    
+    clients = []
+    for assignment in assignments:
+        admin = assignment.administration
+        if not admin:
+            continue
+        
+        # Find the owner of this administration (the client)
+        owner_result = await db.execute(
+            select(AdministrationMember)
+            .options(selectinload(AdministrationMember.user))
+            .where(AdministrationMember.administration_id == admin.id)
+            .where(AdministrationMember.role == MemberRole.OWNER)
+            .limit(1)
+        )
+        owner_member = owner_result.scalar_one_or_none()
+        
+        if not owner_member or not owner_member.user:
+            continue
+        
+        client_user = owner_member.user
+        
+        # Get issue counts for this administration
+        red_count_result = await db.execute(
+            select(func.count(ClientIssue.id))
+            .where(ClientIssue.administration_id == admin.id)
+            .where(ClientIssue.severity == IssueSeverity.RED)
+            .where(ClientIssue.is_resolved == False)
+        )
+        red_count = red_count_result.scalar() or 0
+        
+        yellow_count_result = await db.execute(
+            select(func.count(ClientIssue.id))
+            .where(ClientIssue.administration_id == admin.id)
+            .where(ClientIssue.severity == IssueSeverity.YELLOW)
+            .where(ClientIssue.is_resolved == False)
+        )
+        yellow_count = yellow_count_result.scalar() or 0
+        
+        clients.append(AccountantClientListItem(
+            id=client_user.id,
+            email=client_user.email,
+            name=client_user.full_name,
+            status="active",
+            last_activity=client_user.last_login_at,
+            open_red_count=red_count,
+            open_yellow_count=yellow_count,
+            administration_id=admin.id,
+            administration_name=admin.name,
+        ))
+    
+    return AccountantClientListResponse(
+        clients=clients,
+        total_count=len(clients),
+    )

@@ -22,6 +22,7 @@ from app.models.document import Document, DocumentStatus
 from app.models.ledger import JournalEntry, JournalEntryStatus
 from app.models.subledger import OpenItem, OpenItemStatus
 from app.models.issues import ClientIssue, IssueSeverity, ValidationRun
+from app.models.accountant_dashboard import AccountantClientAssignment
 from app.schemas.issues import (
     ClientOverviewResponse,
     ClientIssueResponse,
@@ -41,7 +42,7 @@ from app.schemas.reports import (
 )
 from app.services.validation import ConsistencyEngine
 from app.services.reports import ReportService
-from app.api.v1.deps import CurrentUser
+from app.api.v1.deps import CurrentUser, require_accountant
 
 router = APIRouter()
 
@@ -51,13 +52,14 @@ async def verify_accountant_access(
     current_user: CurrentUser,
     db: AsyncSession,
 ) -> Administration:
-    """Verify user has accountant access to the client."""
-    if current_user.role not in ["accountant", "admin"]:
-        raise HTTPException(
-            status_code=403,
-            detail="This endpoint is only available for accountants"
-        )
+    """
+    Verify user has accountant access to the client.
     
+    Checks both AdministrationMember and AccountantClientAssignment tables.
+    """
+    require_accountant(current_user)
+    
+    # First check via AdministrationMember (direct membership)
     result = await db.execute(
         select(Administration)
         .join(AdministrationMember)
@@ -66,6 +68,18 @@ async def verify_accountant_access(
         .where(AdministrationMember.role.in_([MemberRole.OWNER, MemberRole.ADMIN, MemberRole.ACCOUNTANT]))
     )
     administration = result.scalar_one_or_none()
+    
+    if administration:
+        return administration
+    
+    # Also check via AccountantClientAssignment (assignment-based access)
+    assignment_result = await db.execute(
+        select(Administration)
+        .join(AccountantClientAssignment, AccountantClientAssignment.administration_id == Administration.id)
+        .where(Administration.id == client_id)
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+    )
+    administration = assignment_result.scalar_one_or_none()
     
     if not administration:
         raise HTTPException(status_code=404, detail="Client not found or access denied")

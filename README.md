@@ -393,6 +393,69 @@ The platform supports three user roles:
 
 Users can select their role (zzp or accountant) during registration. The admin role is not available via public registration for security reasons.
 
+### Testing Accountant Role Flow
+
+Follow this checklist to verify the accountant registration and login flow works correctly:
+
+1. **Register as Accountant**
+   - Go to the login page (http://localhost:3000 or your deployment URL)
+   - Click the "Register" tab
+   - Fill in your details
+   - Select "Accountant" from the Role dropdown
+   - Click "Create Account"
+   - You should see "Check your email to verify your account"
+
+2. **Verify Email**
+   - Check your email for the verification link
+   - Click the verification link
+   - You should see "Email verified successfully"
+
+3. **Login**
+   - Go back to the login page
+   - Enter your credentials
+   - Click "Login"
+   - **Expected**: You should be redirected to `/accountant/review` (Work Queue)
+
+4. **Verify Role Badge**
+   - Check the header badge shows "accountant" (not "ZZP")
+   - In the sidebar, you should see: Work Queue, Clients, Dashboard, etc.
+
+5. **Verify Navigation**
+   - Click "Work Queue" → Should show the accountant work queue page
+   - Click "Clients" → Should show the client management dashboard
+   - All accountant-specific features should be accessible
+
+6. **Logout**
+   - Click the Logout button (header or sidebar)
+   - You should be redirected to `/login`
+   - localStorage should be cleared (no access_token)
+
+### Troubleshooting Role Issues
+
+If the role badge shows "ZZP" instead of "accountant" after registering as an accountant:
+
+1. **Check Browser Console**
+   - Open Developer Tools (F12)
+   - Look for `[AuthContext] ME endpoint response:` log
+   - Verify the `role` field in the response
+
+2. **Check Network Tab**
+   - Look at the `/api/v1/auth/me` response
+   - The `role` field should be "accountant"
+
+3. **Check Backend Logs**
+   - Look for "Role persistence check" log during registration
+   - Look for "User profile fetched via /me" log during login
+
+4. **Fix Using Admin API**
+   - If role is wrong in DB, use the admin endpoint to fix it:
+   ```bash
+   curl -X PATCH "http://localhost:8000/api/v1/admin/users/{user_id}/role" \
+     -H "Authorization: Bearer ADMIN_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"role": "accountant"}'
+   ```
+
 ### Fixing User Roles
 
 If a user was created with the wrong role, administrators can fix it using one of these methods:

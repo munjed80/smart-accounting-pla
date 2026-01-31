@@ -44,6 +44,7 @@ import {
   IssueSeverity,
   BTWQuarterStatus,
   AccountantClientListItem,
+  AccountantAssignmentResponse,
   getErrorMessage 
 } from '@/lib/api'
 import { 
@@ -205,6 +206,7 @@ export const AccountantDashboard = () => {
   const { user } = useAuth()
   const [dashboard, setDashboard] = useState<AccountantDashboardResponse | null>(null)
   const [assignedClients, setAssignedClients] = useState<AccountantClientListItem[]>([])
+  const [assignments, setAssignments] = useState<AccountantAssignmentResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
@@ -246,6 +248,15 @@ export const AccountantDashboard = () => {
       console.error('Failed to fetch assigned clients:', err)
     }
   }
+  
+  const fetchAssignments = async () => {
+    try {
+      const data = await accountantClientApi.listAssignments()
+      setAssignments(data.assignments)
+    } catch (err) {
+      console.error('Failed to fetch assignments:', err)
+    }
+  }
 
   const fetchClientIssues = async (clientId: string) => {
     try {
@@ -262,6 +273,7 @@ export const AccountantDashboard = () => {
   useEffect(() => {
     fetchDashboard()
     fetchAssignedClients()
+    fetchAssignments()
   }, [])
 
   const handleReviewIssues = async (client: ClientOverview) => {
@@ -325,23 +337,28 @@ export const AccountantDashboard = () => {
     }
   }
   
-  const handleRemoveClient = async (clientId: string) => {
-    // Find the assignment by matching administration_id to client
-    // Note: We need the assignment ID, not the user ID
-    // The current API doesn't expose assignment ID directly, so we'll need to handle this
-    // For now, show a confirmation and try to remove
+  const handleRemoveClient = async (client: AccountantClientListItem) => {
+    // Find the assignment by matching administration_id
+    const assignment = assignments.find(
+      a => a.administration_id === client.administration_id
+    )
+    
+    if (!assignment) {
+      setError('Kan toewijzing niet vinden. Ververs de pagina.')
+      return
+    }
+    
     if (!window.confirm(t('clientList.confirmRemove'))) {
       return
     }
     
     try {
-      // Note: We're using user ID here, but the API expects assignment ID
-      // This may need adjustment based on actual API behavior
-      await accountantClientApi.removeAssignment(clientId)
+      await accountantClientApi.removeAssignment(assignment.id)
       
       // Refresh both dashboard and clients list
       await fetchDashboard()
       await fetchAssignedClients()
+      await fetchAssignments()
     } catch (err) {
       setError(getErrorMessage(err))
     }
@@ -607,7 +624,7 @@ export const AccountantDashboard = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleRemoveClient(client.id)}
+                            onClick={() => handleRemoveClient(client)}
                             className="text-destructive hover:text-destructive"
                           >
                             <Trash size={14} className="mr-1" />

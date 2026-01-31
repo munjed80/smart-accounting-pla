@@ -1712,6 +1712,11 @@ export interface AccountantAssignmentResponse {
   notes: string | null
 }
 
+export interface AccountantAssignmentsListResponse {
+  assignments: AccountantAssignmentResponse[]
+  total_count: number
+}
+
 // Accountant Client Assignment API
 export const accountantClientApi = {
   /**
@@ -1719,6 +1724,14 @@ export const accountantClientApi = {
    */
   listClients: async (): Promise<AccountantClientListResponse> => {
     const response = await api.get<AccountantClientListResponse>('/accountant/clients')
+    return response.data
+  },
+  
+  /**
+   * Get list of assignments for the current accountant
+   */
+  listAssignments: async (): Promise<AccountantAssignmentsListResponse> => {
+    const response = await api.get<AccountantAssignmentsListResponse>('/accountant/assignments')
     return response.data
   },
 

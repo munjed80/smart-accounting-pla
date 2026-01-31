@@ -1,10 +1,11 @@
-import { ReactNode, useState } from 'react'
+import { ReactNode, useState, useEffect } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { navigateTo } from '@/lib/navigation'
 import { getApiBaseUrl } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Sheet, 
   SheetContent, 
@@ -23,7 +24,11 @@ import {
   Stack,
   CaretLeft,
   Gear,
-  Headset
+  Headset,
+  User,
+  WarningCircle,
+  ArrowsLeftRight,
+  MagnifyingGlass,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 
@@ -50,6 +55,13 @@ const menuItems: MenuItem[] = [
     label: t('sidebar.accountantClients'),
     tabValue: 'clients',
     icon: <UsersThree size={20} weight="duotone" />,
+    rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
+  },
+  {
+    label: t('sidebar.reviewQueue'),
+    tabValue: 'reviewqueue',
+    icon: <MagnifyingGlass size={20} weight="duotone" />,
     rolesAllowed: ['accountant', 'admin'],
     section: 'main',
   },
@@ -105,6 +117,33 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
 
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
   
+  // Selected client state (for accountants) - stored in localStorage
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
+  const [selectedClientName, setSelectedClientName] = useState<string | null>(null)
+  
+  // Sync selected client from localStorage
+  useEffect(() => {
+    if (isAccountant) {
+      const storedId = localStorage.getItem('selectedClientId')
+      const storedName = localStorage.getItem('selectedClientName')
+      setSelectedClientId(storedId)
+      setSelectedClientName(storedName)
+      
+      // Listen for storage changes (when another tab updates it)
+      const handleStorageChange = (e: StorageEvent) => {
+        if (e.key === 'selectedClientId') {
+          setSelectedClientId(e.newValue)
+        }
+        if (e.key === 'selectedClientName') {
+          setSelectedClientName(e.newValue)
+        }
+      }
+      
+      window.addEventListener('storage', handleStorageChange)
+      return () => window.removeEventListener('storage', handleStorageChange)
+    }
+  }, [isAccountant])
+  
   // Determine the home tab based on user role
   const homeTab = isAccountant ? 'workqueue' : 'dashboard'
   const homeLabel = isAccountant ? t('sidebar.backToWorkQueue') : t('sidebar.backToDashboard')
@@ -117,6 +156,9 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   // Handle logout: use centralized logout from AuthContext and redirect
   const handleLogout = () => {
     logout()
+    // Clear selected client on logout
+    localStorage.removeItem('selectedClientId')
+    localStorage.removeItem('selectedClientName')
     navigateTo('/login')
   }
 
@@ -133,6 +175,14 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   const handleBackToHome = () => {
     if (onTabChange) {
       onTabChange(homeTab)
+    }
+    setSidebarOpen(false)
+  }
+  
+  // Handle changing client (go to clients page)
+  const handleChangeClient = () => {
+    if (onTabChange) {
+      onTabChange('clients')
     }
     setSidebarOpen(false)
   }
@@ -289,6 +339,30 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
                 </h1>
               </div>
             </div>
+            
+            {/* Center: Client Switcher (for accountants only) */}
+            {isAccountant && (
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-md bg-secondary/50 border border-border">
+                <User size={16} className="text-muted-foreground" />
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{t('clientSwitcher.activeClient')}:</span>
+                  {selectedClientName ? (
+                    <span className="text-sm font-medium">{selectedClientName}</span>
+                  ) : (
+                    <span className="text-sm text-amber-600">{t('clientSwitcher.noClientSelected')}</span>
+                  )}
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 px-2 text-xs"
+                  onClick={handleChangeClient}
+                >
+                  <ArrowsLeftRight size={14} className="mr-1" />
+                  {t('clientSwitcher.change')}
+                </Button>
+              </div>
+            )}
 
             {/* Right: Role Badge + Logout */}
             <div className="flex items-center gap-2 sm:gap-4">
@@ -316,6 +390,29 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
               </Button>
             </div>
           </div>
+          
+          {/* Mobile Client Switcher (below header on mobile for accountants) */}
+          {isAccountant && (
+            <div className="md:hidden flex items-center justify-between py-2 border-t border-border/50">
+              <div className="flex items-center gap-2">
+                <User size={14} className="text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">{t('clientSwitcher.activeClient')}:</span>
+                {selectedClientName ? (
+                  <span className="text-xs font-medium">{selectedClientName}</span>
+                ) : (
+                  <span className="text-xs text-amber-600">{t('clientSwitcher.noClientSelected')}</span>
+                )}
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 px-2 text-xs"
+                onClick={handleChangeClient}
+              >
+                {t('clientSwitcher.change')}
+              </Button>
+            </div>
+          )}
         </div>
       </header>
 

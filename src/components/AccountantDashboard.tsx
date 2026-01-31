@@ -44,6 +44,7 @@ import {
   IssueSeverity,
   BTWQuarterStatus,
   AccountantClientListItem,
+  AccountantAssignmentResponse,
   getErrorMessage 
 } from '@/lib/api'
 import { 
@@ -53,12 +54,15 @@ import {
   Warning,
   CaretRight,
   Users,
+  UsersThree,
   FileX,
   ClockCountdown,
   Eye,
   Plus,
   EnvelopeSimple,
   UserPlus,
+  Trash,
+  Check,
 } from '@phosphor-icons/react'
 import { format, formatDistanceToNow } from 'date-fns'
 import { navigateTo } from '@/lib/navigation'
@@ -202,6 +206,7 @@ export const AccountantDashboard = () => {
   const { user } = useAuth()
   const [dashboard, setDashboard] = useState<AccountantDashboardResponse | null>(null)
   const [assignedClients, setAssignedClients] = useState<AccountantClientListItem[]>([])
+  const [assignments, setAssignments] = useState<AccountantAssignmentResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
@@ -243,6 +248,15 @@ export const AccountantDashboard = () => {
       console.error('Failed to fetch assigned clients:', err)
     }
   }
+  
+  const fetchAssignments = async () => {
+    try {
+      const data = await accountantClientApi.listAssignments()
+      setAssignments(data.assignments)
+    } catch (err) {
+      console.error('Failed to fetch assignments:', err)
+    }
+  }
 
   const fetchClientIssues = async (clientId: string) => {
     try {
@@ -259,6 +273,7 @@ export const AccountantDashboard = () => {
   useEffect(() => {
     fetchDashboard()
     fetchAssignedClients()
+    fetchAssignments()
   }, [])
 
   const handleReviewIssues = async (client: ClientOverview) => {
@@ -312,11 +327,41 @@ export const AccountantDashboard = () => {
     }
   }
   
-  const handleSelectClient = (administrationId: string) => {
-    // Store selected client in localStorage for review queue
-    localStorage.setItem('selectedClientId', administrationId)
-    // Navigate to review queue
-    navigateTo('/accountant/review-queue')
+  const handleSelectClient = (client: AccountantClientListItem) => {
+    if (client.administration_id) {
+      // Store selected client in localStorage
+      localStorage.setItem('selectedClientId', client.administration_id)
+      localStorage.setItem('selectedClientName', client.name || client.email)
+      // Navigate to review queue / work queue
+      navigateTo('/accountant')
+    }
+  }
+  
+  const handleRemoveClient = async (client: AccountantClientListItem) => {
+    // Find the assignment by matching administration_id
+    const assignment = assignments.find(
+      a => a.administration_id === client.administration_id
+    )
+    
+    if (!assignment) {
+      setError('Kan toewijzing niet vinden. Ververs de pagina.')
+      return
+    }
+    
+    if (!window.confirm(t('clientList.confirmRemove'))) {
+      return
+    }
+    
+    try {
+      await accountantClientApi.removeAssignment(assignment.id)
+      
+      // Refresh both dashboard and clients list
+      await fetchDashboard()
+      await fetchAssignedClients()
+      await fetchAssignments()
+    } catch (err) {
+      setError(getErrorMessage(err))
+    }
   }
   
   // Duration to show success message before closing dialog
@@ -505,6 +550,95 @@ export const AccountantDashboard = () => {
             )}
           </CardContent>
         </Card>
+        
+        {/* Assigned Clients Management Card */}
+        {assignedClients.length > 0 && (
+          <Card className="bg-card/80 backdrop-blur-sm mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UsersThree size={24} />
+                {t('clientList.addClientForm')}
+              </CardTitle>
+              <CardDescription>
+                {t('accountant.selectClient')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t('accountant.client')}</TableHead>
+                    <TableHead>{t('clientList.status')}</TableHead>
+                    <TableHead>{t('accountant.issues')}</TableHead>
+                    <TableHead className="text-right">{t('accountant.actions')}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {assignedClients.map((client) => (
+                    <TableRow key={client.id}>
+                      <TableCell className="font-medium">
+                        <div>
+                          <p className="font-semibold">{client.name || client.email}</p>
+                          <p className="text-xs text-muted-foreground">{client.email}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant="outline" 
+                          className={client.status === 'active' 
+                            ? 'bg-green-500/20 text-green-700 dark:text-green-400' 
+                            : 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                          }
+                        >
+                          {client.status === 'active' ? t('clientList.active') : t('clientList.pending')}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {client.open_red_count > 0 && (
+                            <Badge variant="destructive" className="text-xs">
+                              {client.open_red_count} rood
+                            </Badge>
+                          )}
+                          {client.open_yellow_count > 0 && (
+                            <Badge variant="outline" className="text-xs bg-amber-500/20 text-amber-700">
+                              {client.open_yellow_count} geel
+                            </Badge>
+                          )}
+                          {client.open_red_count === 0 && client.open_yellow_count === 0 && (
+                            <span className="text-sm text-green-600">✓ OK</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleSelectClient(client)}
+                            disabled={!client.administration_id}
+                          >
+                            <Check size={14} className="mr-1" />
+                            {t('clientList.select')}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRemoveClient(client)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash size={14} className="mr-1" />
+                            {t('clientList.remove')}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Issues Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

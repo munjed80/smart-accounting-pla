@@ -47,7 +47,7 @@ import {
   ArrowsClockwise,
   WarningCircle,
   Warning,
-  FileSearch,
+  MagnifyingGlass,
   Calendar,
   ClockCountdown,
   CaretUp,
@@ -268,7 +268,7 @@ const ClientDetailDrawer = ({
                 View Issues
               </Button>
               <Button variant="outline" size="sm" onClick={() => onAction('vat_draft')}>
-                <FileSearch size={16} className="mr-2" />
+                <MagnifyingGlass size={16} className="mr-2" />
                 VAT Draft
               </Button>
               <Button variant="outline" size="sm" onClick={() => onAction('send_reminder')}>
@@ -456,7 +456,7 @@ export const AccountantWorkQueue = () => {
                 )}
               </TabsTrigger>
               <TabsTrigger value="review">
-                <FileSearch size={16} className="mr-1" />
+                <MagnifyingGlass size={16} className="mr-1" />
                 Needs Review
               </TabsTrigger>
               <TabsTrigger value="vat_due">

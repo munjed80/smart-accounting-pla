@@ -517,7 +517,58 @@ export const nl = {
   onboarding: {
     welcome: "Welkom",
     letsGetStarted: "Laten we beginnen met het opzetten van je administratie.",
-    // Add more onboarding strings as needed
+    // Accountant-specific onboarding
+    welcomeAccountant: "Welkom, boekhouder",
+    accountantDescription: "Laten we je account instellen zodat je direct aan de slag kunt met je klanten.",
+    step1Title: "Koppel je eerste klant",
+    step1Description: "Voeg een ZZP-klant toe via hun e-mailadres om te beginnen.",
+    clientEmail: "E-mailadres klant",
+    linkClient: "Klant koppelen",
+    step2Title: "Selecteer een klant",
+    step2Description: "Kies een klant om mee te werken vanuit je klantenlijst.",
+    selectClientButton: "Selecteren",
+    openDossier: "Open dossier",
+    step3Title: "Ga naar Te beoordelen",
+    step3Description: "Bekijk de documenten en transacties die op je beoordeling wachten.",
+    goToReviewQueue: "Naar Te beoordelen",
+    noClientsYet: "Nog geen klanten",
+    addYourFirstClient: "Voeg je eerste klant toe om te beginnen.",
+    clientLinkedSuccess: "Klant succesvol gekoppeld!",
+    clientLinkError: "Kon klant niet koppelen",
+    skipForNow: "Later doen",
+    continueWithoutClients: "Je kunt later klanten toevoegen vanuit het klantenportaal.",
+  },
+
+  // Client switcher
+  clientSwitcher: {
+    activeClient: "Actieve klant",
+    noClientSelected: "Geen klant geselecteerd",
+    selectClientFirst: "Selecteer eerst een klant.",
+    change: "Wijzigen",
+    goToClients: "Ga naar Klanten",
+  },
+
+  // Review queue tabs
+  reviewQueue: {
+    redIssues: "Rode issues",
+    toReview: "Te beoordelen",
+    vatSoon: "BTW binnenkort",
+    documentBacklog: "Achterstand documenten",
+    noItems: "Geen items om te beoordelen. Mooi zo!",
+    selectClientCta: "Selecteer eerst een klant om de beoordelingslijst te bekijken.",
+  },
+
+  // Client list
+  clientList: {
+    status: "Status",
+    active: "Actief",
+    pending: "In afwachting",
+    select: "Selecteren",
+    remove: "Verwijderen",
+    addClientForm: "Klant toevoegen",
+    confirmRemove: "Weet je zeker dat je deze klant wilt verwijderen?",
+    removeSuccess: "Klant succesvol verwijderd",
+    removeError: "Kon klant niet verwijderen",
   },
 
   // Validation errors

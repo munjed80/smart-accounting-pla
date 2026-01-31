@@ -91,18 +91,6 @@ async def register(
         await db.commit()
         await db.refresh(user)
         
-        # DEBUG: Log role persistence
-        logger.info(
-            "Role persistence check",
-            extra={
-                "event": "role_persistence_check",
-                "user_id": str(user.id),
-                "input_role": user_in.role,
-                "saved_role": user.role,
-                "request_id": request_id,
-            }
-        )
-        
         # Create verification token
         ip_address = get_client_ip(request)
         user_agent = request.headers.get("User-Agent", "")[:500]
@@ -479,13 +467,4 @@ async def reset_password(
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: CurrentUser):
     """Get current user info"""
-    # DEBUG: Log role retrieval
-    logger.info(
-        "User profile fetched via /me",
-        extra={
-            "event": "me_endpoint_called",
-            "user_id": str(current_user.id),
-            "db_role": current_user.role,
-        }
-    )
     return current_user

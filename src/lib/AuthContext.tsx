@@ -94,13 +94,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       localStorage.setItem('access_token', tokenResponse.access_token)
       
       const userData = await authApi.me()
-      // DEBUG: Log role from /auth/me endpoint
-      console.log('[AuthContext] ME endpoint response:', {
-        id: userData.id,
-        email: userData.email,
-        role: userData.role,
-        full_name: userData.full_name,
-      })
       setUser(userData)
       
       toast.success(`Welcome back, ${userData.full_name}!`)
@@ -122,13 +115,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const register = useCallback(async (data: RegisterRequest): Promise<RegisterResponse> => {
     try {
       setIsLoading(true)
-      // DEBUG: Log registration data being sent
-      console.log('[AuthContext] Registering with data:', {
-        email: data.email,
-        full_name: data.full_name,
-        role: data.role,
-        passwordLength: data.password?.length || 0,
-      })
       const response = await authApi.register(data)
       
       toast.success('Registration successful! Check your email to verify your account.')

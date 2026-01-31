@@ -284,7 +284,7 @@ export const AccountantDashboard = () => {
       setTimeout(() => {
         setIsAddClientOpen(false)
         setAddClientSuccess(null)
-      }, 2000)
+      }, SUCCESS_MESSAGE_DISPLAY_MS)
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err)
       // Try to extract code from the error
@@ -317,6 +317,9 @@ export const AccountantDashboard = () => {
     // Navigate to review queue
     navigateTo('/accountant/review-queue')
   }
+  
+  // Duration to show success message before closing dialog
+  const SUCCESS_MESSAGE_DISPLAY_MS = 2000
 
   const handleCloseDialog = () => {
     setIsDialogOpen(false)

@@ -638,7 +638,7 @@ async def delete_assignment(
     if current_user.role != "admin" and assignment.accountant_id != current_user.id:
         raise HTTPException(
             status_code=403, 
-            detail={"code": "FORBIDDEN_ROLE", "message": "Can only delete your own assignments"}
+            detail={"code": "NOT_ASSIGNMENT_OWNER", "message": "Can only delete your own assignments"}
         )
     
     await db.delete(assignment)
@@ -734,7 +734,7 @@ async def create_assignment_by_email(
         administration_id=administration.id,
         is_primary=True,
         assigned_by_id=current_user.id,
-        notes=f"Self-assigned by accountant via email lookup",
+        notes=f"Self-assigned via email lookup for {request.client_email}",
     )
     db.add(assignment)
     await db.commit()

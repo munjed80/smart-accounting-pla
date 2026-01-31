@@ -11,12 +11,12 @@ import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason, checkA
 import { AxiosError } from 'axios'
 
 interface LoginPageProps {
-  onSuccess?: () => void
+  onSuccess?: (user: { role: string } | null) => void
   onForgotPassword?: () => void
 }
 
 export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
-  const { login, register, resendVerification, isLoading } = useAuth()
+  const { login, register, resendVerification, isLoading, user } = useAuth()
   
   const [loginForm, setLoginForm] = useState({
     username: '',
@@ -113,8 +113,8 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
     setLoginError(null)
     
     try {
-      await login(loginForm)
-      onSuccess?.()
+      const loggedInUser = await login(loginForm)
+      onSuccess?.(loggedInUser)
     } catch (error) {
       if (isEmailNotVerifiedError(error)) {
         setShowEmailNotVerified(true)

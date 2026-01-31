@@ -67,10 +67,13 @@ const pathToTab = (path: string, isAccountant: boolean): string => {
     case '/transactions':
       return 'transactions'
     case '/accountant/review':
+    case '/accountant/review-queue':
     case '/accountant':
+    case '/accountant/overview':
     case '/workqueue':
       return 'workqueue'
     case '/clients':
+    case '/accountant/clients':
       return 'clients'
     case '/ai-upload':
     case '/upload':
@@ -94,9 +97,9 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
     case 'transactions':
       return '/transactions'
     case 'workqueue':
-      return isAccountant ? '/accountant/review' : '/dashboard'
+      return isAccountant ? '/accountant' : '/dashboard'
     case 'clients':
-      return '/clients'
+      return isAccountant ? '/accountant/clients' : '/clients'
     case 'upload':
       return '/ai-upload'
     case 'settings':
@@ -104,7 +107,7 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
     case 'support':
       return '/support'
     default:
-      return isAccountant ? '/accountant/review' : '/dashboard'
+      return isAccountant ? '/accountant' : '/dashboard'
   }
 }
 
@@ -257,9 +260,11 @@ const AppContent = () => {
   if (!isAuthenticated) {
     return (
       <LoginPage 
-        onSuccess={() => {
-          // Navigate to home - the useEffect will set the correct tab based on the user's role
-          navigateTo('/')
+        onSuccess={(loggedInUser) => {
+          // Navigate to the role-appropriate landing page - no "/" fallback
+          const userIsAccountant = loggedInUser?.role === 'accountant' || loggedInUser?.role === 'admin'
+          const landingPath = userIsAccountant ? '/accountant' : '/dashboard'
+          navigateTo(landingPath)
         }}
         onForgotPassword={() => navigateTo('/forgot-password')}
       />
@@ -274,7 +279,10 @@ const AppContent = () => {
         userName={user?.full_name || 'there'}
         onComplete={() => {
           setNeedsOnboarding(false)
-          navigateTo('/')
+          // Navigate to role-appropriate landing page - no "/" fallback
+          const userIsAccountant = user?.role === 'accountant' || user?.role === 'admin'
+          const landingPath = userIsAccountant ? '/accountant' : '/dashboard'
+          navigateTo(landingPath)
         }}
       />
     )

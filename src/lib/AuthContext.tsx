@@ -14,7 +14,7 @@ interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (credentials: LoginRequest) => Promise<void>
+  login: (credentials: LoginRequest) => Promise<User>
   register: (data: RegisterRequest) => Promise<RegisterResponse>
   logout: () => void
   hasPermission: (role: 'zzp' | 'accountant' | 'admin') => boolean
@@ -86,7 +86,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     checkSession()
   }, [checkSession])
 
-  const login = useCallback(async (credentials: LoginRequest) => {
+  const login = useCallback(async (credentials: LoginRequest): Promise<User> => {
     try {
       setIsLoading(true)
       const tokenResponse = await authApi.login(credentials)
@@ -97,6 +97,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setUser(userData)
       
       toast.success(`Welcome back, ${userData.full_name}!`)
+      return userData
     } catch (error) {
       // Check for EMAIL_NOT_VERIFIED error specifically
       if (isEmailNotVerifiedError(error)) {

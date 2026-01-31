@@ -37,9 +37,9 @@ interface MenuItem {
 
 // Define menu items for both roles
 const menuItems: MenuItem[] = [
-  // Accountant main items
+  // Accountant-only main items (shown at top for accountants)
   {
-    label: 'Work Queue',
+    label: 'Overview',
     tabValue: 'workqueue',
     icon: <Stack size={20} weight="duotone" />,
     rolesAllowed: ['accountant', 'admin'],
@@ -52,29 +52,29 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['accountant', 'admin'],
     section: 'main',
   },
-  // Shared main items
+  // ZZP main items (Dashboard first for ZZP users)
   {
     label: 'Dashboard',
     tabValue: 'dashboard',
     icon: <House size={20} weight="duotone" />,
-    rolesAllowed: ['zzp', 'accountant', 'admin'],
+    rolesAllowed: ['zzp'],
     section: 'main',
   },
   {
     label: 'Smart Transactions',
     tabValue: 'transactions',
     icon: <Brain size={20} weight="duotone" />,
-    rolesAllowed: ['zzp', 'accountant', 'admin'],
+    rolesAllowed: ['zzp'],
     section: 'main',
   },
   {
     label: 'AI Upload',
     tabValue: 'upload',
     icon: <Sparkle size={20} weight="duotone" />,
-    rolesAllowed: ['zzp', 'accountant', 'admin'],
+    rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // Secondary items (Settings & Support)
+  // Secondary items (Settings & Support for all roles)
   {
     label: 'Settings',
     tabValue: 'settings',
@@ -86,7 +86,7 @@ const menuItems: MenuItem[] = [
     label: 'Support',
     tabValue: 'support',
     icon: <Headset size={20} weight="duotone" />,
-    rolesAllowed: ['zzp', 'accountant', 'admin'],
+    rolesAllowed: ['zzp'],
     section: 'secondary',
   },
 ]

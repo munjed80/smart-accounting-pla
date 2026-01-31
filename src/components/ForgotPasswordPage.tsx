@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Database, Envelope, ArrowLeft, CheckCircle } from '@phosphor-icons/react'
+import { t } from '@/i18n'
 
 interface ForgotPasswordPageProps {
   onNavigateToLogin: () => void
@@ -34,7 +35,7 @@ export const ForgotPasswordPage = ({ onNavigateToLogin }: ForgotPasswordPageProp
           <div className="flex items-center justify-center gap-3 mb-4">
             <Database size={48} weight="duotone" className="text-primary" />
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-              Smart Accounting
+              {t('brand.name')}
             </h1>
           </div>
         </div>
@@ -43,21 +44,21 @@ export const ForgotPasswordPage = ({ onNavigateToLogin }: ForgotPasswordPageProp
           {!submitted ? (
             <>
               <CardHeader>
-                <CardTitle>Forgot Password</CardTitle>
+                <CardTitle>{t('auth.forgotPasswordTitle')}</CardTitle>
                 <CardDescription>
-                  Enter your email address and we'll send you a link to reset your password.
+                  {t('auth.forgotPasswordDescription')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">{t('auth.email')}</Label>
                     <div className="relative">
                       <Envelope className="absolute left-3 top-3 text-muted-foreground" size={18} />
                       <Input
                         id="email"
                         type="email"
-                        placeholder="your@email.com"
+                        placeholder="uw@email.nl"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="pl-10"
@@ -67,7 +68,7 @@ export const ForgotPasswordPage = ({ onNavigateToLogin }: ForgotPasswordPageProp
                   </div>
 
                   <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Sending...' : 'Send Reset Link'}
+                    {isLoading ? t('common.sending') : t('auth.sendResetLink')}
                   </Button>
                   
                   <Button
@@ -77,7 +78,7 @@ export const ForgotPasswordPage = ({ onNavigateToLogin }: ForgotPasswordPageProp
                     onClick={onNavigateToLogin}
                   >
                     <ArrowLeft size={18} className="mr-2" />
-                    Back to Login
+                    {t('auth.backToLogin')}
                   </Button>
                 </form>
               </CardContent>
@@ -88,22 +89,22 @@ export const ForgotPasswordPage = ({ onNavigateToLogin }: ForgotPasswordPageProp
                 <div className="flex justify-center mb-4">
                   <CheckCircle size={48} weight="fill" className="text-green-500" />
                 </div>
-                <CardTitle>Check Your Email</CardTitle>
+                <CardTitle>{t('auth.resetEmailSent')}</CardTitle>
                 <CardDescription>
-                  If an account with this email exists, you'll receive a password reset link shortly.
+                  {t('auth.resetEmailSentDescription')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="p-4 bg-secondary/50 rounded-lg text-sm text-muted-foreground text-center">
-                  <p>Didn't receive an email?</p>
-                  <p className="mt-1">Check your spam folder or try again with a different email address.</p>
+                  <p>{t('auth.didntReceiveEmail')}</p>
+                  <p className="mt-1">{t('auth.checkSpamFolder')}</p>
                 </div>
                 <Button
                   variant="outline"
                   className="w-full"
                   onClick={() => setSubmitted(false)}
                 >
-                  Try Again
+                  {t('auth.tryAgain')}
                 </Button>
                 <Button
                   variant="ghost"
@@ -111,7 +112,7 @@ export const ForgotPasswordPage = ({ onNavigateToLogin }: ForgotPasswordPageProp
                   onClick={onNavigateToLogin}
                 >
                   <ArrowLeft size={18} className="mr-2" />
-                  Back to Login
+                  {t('auth.backToLogin')}
                 </Button>
               </CardContent>
             </>

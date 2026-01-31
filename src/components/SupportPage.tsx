@@ -33,6 +33,7 @@ import {
   Question
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { t } from '@/i18n'
 
 const SUPPORT_EMAIL = 'support@zzpershub.nl'
 const SUPPORT_PHONE = '+31 (0)20 123 4567'
@@ -65,7 +66,7 @@ export const SupportPage = () => {
     e.preventDefault()
     
     if (!formData.subject || !formData.category || !formData.message || !formData.email || !formData.name) {
-      toast.error('Please fill in all required fields')
+      toast.error(t('support.fillAllFields'))
       return
     }
 
@@ -75,7 +76,7 @@ export const SupportPage = () => {
       // Try to submit via API first
       await api.post('/support/contact', formData)
       setIsSubmitted(true)
-      toast.success('Support request submitted successfully')
+      toast.success(t('support.messageSent'))
     } catch (error) {
       // Fallback to mailto if API fails
       console.log('API support endpoint not available, using mailto fallback')
@@ -83,8 +84,8 @@ export const SupportPage = () => {
       window.location.href = mailtoLink
       // Mark as submitted since we're using fallback
       setIsSubmitted(true)
-      toast.info('Opening email client...', {
-        description: 'If your email client doesn\'t open, please email us directly at ' + SUPPORT_EMAIL
+      toast.info(t('support.openingEmailClient'), {
+        description: t('support.emailClientFallback') + ' ' + SUPPORT_EMAIL
       })
     } finally {
       setIsSubmitting(false)
@@ -111,10 +112,10 @@ export const SupportPage = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
             <Headset size={32} weight="duotone" className="text-primary" />
-            Support
+            {t('support.title')}
           </h1>
           <p className="text-muted-foreground">
-            Get help with your account or report an issue
+            {t('support.subtitle')}
           </p>
         </div>
 
@@ -123,14 +124,14 @@ export const SupportPage = () => {
           <div className="lg:col-span-1 space-y-4">
             <Card className="bg-card/80 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-lg">Contact Information</CardTitle>
-                <CardDescription>Ways to reach our support team</CardDescription>
+                <CardTitle className="text-lg">{t('support.contactInfo')}</CardTitle>
+                <CardDescription>{t('support.contactDescription')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-start gap-3">
                   <Envelope size={20} className="text-primary mt-0.5" weight="duotone" />
                   <div>
-                    <p className="font-medium text-sm">Email Support</p>
+                    <p className="font-medium text-sm">{t('support.emailSupport')}</p>
                     <a 
                       href={`mailto:${SUPPORT_EMAIL}`}
                       className="text-sm text-muted-foreground hover:text-primary transition-colors"
@@ -143,7 +144,7 @@ export const SupportPage = () => {
                 <div className="flex items-start gap-3">
                   <Phone size={20} className="text-primary mt-0.5" weight="duotone" />
                   <div>
-                    <p className="font-medium text-sm">Phone Support</p>
+                    <p className="font-medium text-sm">{t('support.phoneSupport')}</p>
                     <a 
                       href={`tel:${SUPPORT_PHONE.replace(/\s/g, '')}`}
                       className="text-sm text-muted-foreground hover:text-primary transition-colors"
@@ -151,7 +152,7 @@ export const SupportPage = () => {
                       {SUPPORT_PHONE}
                     </a>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Mon-Fri, 9:00 - 17:00 CET
+                      {t('support.phoneHours')}
                     </p>
                   </div>
                 </div>
@@ -159,9 +160,9 @@ export const SupportPage = () => {
                 <div className="flex items-start gap-3">
                   <ChatCircle size={20} className="text-primary mt-0.5" weight="duotone" />
                   <div>
-                    <p className="font-medium text-sm">Response Time</p>
+                    <p className="font-medium text-sm">{t('support.responseTime')}</p>
                     <p className="text-sm text-muted-foreground">
-                      Usually within 24 hours
+                      {t('support.responseTimeValue')}
                     </p>
                   </div>
                 </div>
@@ -171,19 +172,19 @@ export const SupportPage = () => {
             {/* Quick Links */}
             <Card className="bg-card/80 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-lg">Quick Help</CardTitle>
+                <CardTitle className="text-lg">{t('support.quickHelp')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <Button variant="ghost" className="w-full justify-start gap-2" asChild>
                   <a href="https://docs.zzpershub.nl" target="_blank" rel="noopener noreferrer">
                     <Question size={18} />
-                    Documentation
+                    {t('support.documentation')}
                   </a>
                 </Button>
                 <Button variant="ghost" className="w-full justify-start gap-2" asChild>
                   <a href="https://status.zzpershub.nl" target="_blank" rel="noopener noreferrer">
                     <Info size={18} />
-                    System Status
+                    {t('support.systemStatus')}
                   </a>
                 </Button>
               </CardContent>
@@ -196,84 +197,84 @@ export const SupportPage = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <PaperPlaneTilt size={20} weight="duotone" />
-                  Send a Message
+                  {t('support.sendMessage')}
                 </CardTitle>
                 <CardDescription>
-                  Describe your issue or question and we'll get back to you
+                  {t('support.sendMessageDescription')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {isSubmitted ? (
                   <div className="text-center py-8">
                     <CheckCircle size={64} className="mx-auto mb-4 text-green-500" weight="duotone" />
-                    <h3 className="text-xl font-semibold mb-2">Message Sent!</h3>
+                    <h3 className="text-xl font-semibold mb-2">{t('support.messageSent')}</h3>
                     <p className="text-muted-foreground mb-6">
-                      Thank you for contacting us. We'll respond within 24 hours.
+                      {t('support.thankYou')}
                     </p>
                     <Button onClick={handleReset} variant="outline">
-                      Send Another Message
+                      {t('support.sendAnotherMessage')}
                     </Button>
                   </div>
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="name">Your Name</Label>
+                        <Label htmlFor="name">{t('support.yourName')}</Label>
                         <Input
                           id="name"
                           value={formData.name}
                           onChange={(e) => handleInputChange('name', e.target.value)}
-                          placeholder="Your full name"
+                          placeholder={t('auth.fullName')}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="email">Email Address</Label>
+                        <Label htmlFor="email">{t('support.emailAddress')}</Label>
                         <Input
                           id="email"
                           type="email"
                           value={formData.email}
                           onChange={(e) => handleInputChange('email', e.target.value)}
-                          placeholder="your@email.com"
+                          placeholder="uw@email.nl"
                         />
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="category">Category *</Label>
+                      <Label htmlFor="category">{t('support.category')} *</Label>
                       <Select 
                         value={formData.category} 
                         onValueChange={(value) => handleInputChange('category', value)}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a category" />
+                          <SelectValue placeholder={t('support.selectCategory')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="general">General Question</SelectItem>
-                          <SelectItem value="technical">Technical Issue</SelectItem>
-                          <SelectItem value="billing">Billing & Account</SelectItem>
-                          <SelectItem value="feature">Feature Request</SelectItem>
+                          <SelectItem value="general">{t('support.generalQuestion')}</SelectItem>
+                          <SelectItem value="technical">{t('support.technicalIssue')}</SelectItem>
+                          <SelectItem value="billing">{t('support.billingAccount')}</SelectItem>
+                          <SelectItem value="feature">{t('support.featureRequest')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="subject">Subject *</Label>
+                      <Label htmlFor="subject">{t('support.subject')} *</Label>
                       <Input
                         id="subject"
                         value={formData.subject}
                         onChange={(e) => handleInputChange('subject', e.target.value)}
-                        placeholder="Brief description of your inquiry"
+                        placeholder={t('support.subjectPlaceholder')}
                         required
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="message">Message *</Label>
+                      <Label htmlFor="message">{t('support.message')} *</Label>
                       <Textarea
                         id="message"
                         value={formData.message}
                         onChange={(e) => handleInputChange('message', e.target.value)}
-                        placeholder="Please provide as much detail as possible..."
+                        placeholder={t('support.messagePlaceholder')}
                         rows={6}
                         required
                       />
@@ -282,8 +283,7 @@ export const SupportPage = () => {
                     <Alert>
                       <Info size={16} />
                       <AlertDescription>
-                        Include any relevant details like error messages, steps to reproduce, 
-                        or screenshots to help us assist you faster.
+                        {t('support.helpTip')}
                       </AlertDescription>
                     </Alert>
 
@@ -292,12 +292,12 @@ export const SupportPage = () => {
                         {isSubmitting ? (
                           <>
                             <ArrowsClockwise size={18} className="animate-spin" />
-                            Sending...
+                            {t('common.sending')}
                           </>
                         ) : (
                           <>
                             <PaperPlaneTilt size={18} />
-                            Send Message
+                            {t('common.send')}
                           </>
                         )}
                       </Button>

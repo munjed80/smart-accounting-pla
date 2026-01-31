@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Database, CheckCircle, XCircle, Spinner, Warning, Clock } from '@phosphor-icons/react'
 import { AxiosError } from 'axios'
+import { t } from '@/i18n'
 
 interface VerifyEmailPageProps {
   token: string
@@ -90,7 +91,7 @@ export const VerifyEmailPage = ({ token, onNavigateToLogin }: VerifyEmailPagePro
           <div className="flex items-center justify-center gap-3 mb-4">
             <Database size={48} weight="duotone" className="text-primary" />
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-              Smart Accounting
+              {t('brand.name')}
             </h1>
           </div>
         </div>
@@ -102,8 +103,8 @@ export const VerifyEmailPage = ({ token, onNavigateToLogin }: VerifyEmailPagePro
                 <div className="flex justify-center mb-4">
                   <Spinner size={48} className="text-primary animate-spin" />
                 </div>
-                <CardTitle>Verifying Your Email</CardTitle>
-                <CardDescription>Please wait while we verify your email address...</CardDescription>
+                <CardTitle>{t('auth.verifyEmail')}</CardTitle>
+                <CardDescription>{t('auth.verifyingEmail')}</CardDescription>
               </>
             )}
             
@@ -112,8 +113,8 @@ export const VerifyEmailPage = ({ token, onNavigateToLogin }: VerifyEmailPagePro
                 <div className="flex justify-center mb-4">
                   <CheckCircle size={48} weight="fill" className="text-green-500" />
                 </div>
-                <CardTitle className="text-green-600">Email Verified!</CardTitle>
-                <CardDescription>Your email has been verified successfully. You can now log in to your account.</CardDescription>
+                <CardTitle className="text-green-600">{t('auth.emailVerified')}</CardTitle>
+                <CardDescription>{t('auth.emailVerifiedDescription')}</CardDescription>
               </>
             )}
             
@@ -122,8 +123,8 @@ export const VerifyEmailPage = ({ token, onNavigateToLogin }: VerifyEmailPagePro
                 <div className="flex justify-center mb-4">
                   <CheckCircle size={48} weight="fill" className="text-blue-500" />
                 </div>
-                <CardTitle className="text-blue-600">Already Verified</CardTitle>
-                <CardDescription>Your email address is already verified. You can log in to your account.</CardDescription>
+                <CardTitle className="text-blue-600">{t('auth.alreadyVerified')}</CardTitle>
+                <CardDescription>{t('auth.alreadyVerifiedDescription')}</CardDescription>
               </>
             )}
             
@@ -132,8 +133,8 @@ export const VerifyEmailPage = ({ token, onNavigateToLogin }: VerifyEmailPagePro
                 <div className="flex justify-center mb-4">
                   <Clock size={48} weight="fill" className="text-orange-500" />
                 </div>
-                <CardTitle className="text-orange-600">Too Many Requests</CardTitle>
-                <CardDescription>{errorMessage}</CardDescription>
+                <CardTitle className="text-orange-600">{t('auth.tooManyRequests')}</CardTitle>
+                <CardDescription>{t('auth.tooManyRequestsDescription')}</CardDescription>
               </>
             )}
             
@@ -142,8 +143,8 @@ export const VerifyEmailPage = ({ token, onNavigateToLogin }: VerifyEmailPagePro
                 <div className="flex justify-center mb-4">
                   <XCircle size={48} weight="fill" className="text-red-500" />
                 </div>
-                <CardTitle className="text-red-600">Verification Failed</CardTitle>
-                <CardDescription>{errorMessage}</CardDescription>
+                <CardTitle className="text-red-600">{t('auth.verificationFailed')}</CardTitle>
+                <CardDescription>{t('auth.verificationFailedDescription')}</CardDescription>
               </>
             )}
           </CardHeader>
@@ -151,7 +152,7 @@ export const VerifyEmailPage = ({ token, onNavigateToLogin }: VerifyEmailPagePro
           <CardContent className="text-center">
             {!showSpinner && (state === 'success' || state === 'already_verified') && (
               <Button onClick={onNavigateToLogin} className="w-full">
-                Go to Login
+                {t('auth.goToLogin')}
               </Button>
             )}
             
@@ -160,11 +161,11 @@ export const VerifyEmailPage = ({ token, onNavigateToLogin }: VerifyEmailPagePro
                 <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
                   <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400 text-sm">
                     <Warning size={16} />
-                    <span>Please wait and try clicking the verification link again.</span>
+                    <span>{t('auth.tooManyRequestsDescription')}</span>
                   </div>
                 </div>
                 <Button onClick={onNavigateToLogin} variant="outline" className="w-full">
-                  Back to Login
+                  {t('auth.backToLogin')}
                 </Button>
               </div>
             )}
@@ -174,11 +175,11 @@ export const VerifyEmailPage = ({ token, onNavigateToLogin }: VerifyEmailPagePro
                 <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
                   <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400 text-sm">
                     <Warning size={16} />
-                    <span>The link may have expired or already been used.</span>
+                    <span>{t('auth.verificationFailedDescription')}</span>
                   </div>
                 </div>
                 <Button onClick={onNavigateToLogin} variant="outline" className="w-full">
-                  Back to Login
+                  {t('auth.backToLogin')}
                 </Button>
               </div>
             )}

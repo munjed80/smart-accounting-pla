@@ -27,6 +27,7 @@ import {
   ArrowsClockwise
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { t } from '@/i18n'
 
 // Build timestamp - injected at build time or fallback
 const BUILD_VERSION = import.meta.env.VITE_BUILD_VERSION || 'dev'
@@ -68,7 +69,7 @@ export const SettingsPage = () => {
     setIsSaving(true)
     // Simulate save - in full implementation this would call an API
     await new Promise(resolve => setTimeout(resolve, 500))
-    toast.success('Notification preferences saved')
+    toast.success(t('settings.preferencesSaved'))
     setIsSaving(false)
   }
 
@@ -83,10 +84,10 @@ export const SettingsPage = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
             <Gear size={32} weight="duotone" className="text-primary" />
-            Settings
+            {t('settings.title')}
           </h1>
           <p className="text-muted-foreground">
-            Manage your profile, company information, and preferences
+            {t('settings.subtitle')}
           </p>
         </div>
 
@@ -96,10 +97,10 @@ export const SettingsPage = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User size={20} weight="duotone" />
-                Profile Information
+                {t('settings.profileInfo')}
               </CardTitle>
               <CardDescription>
-                Your account details and contact information
+                {t('settings.profileDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -112,7 +113,7 @@ export const SettingsPage = () => {
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="fullName">Full Name</Label>
+                      <Label htmlFor="fullName">{t('auth.fullName')}</Label>
                       <Input 
                         id="fullName" 
                         value={user?.full_name || ''} 
@@ -121,7 +122,7 @@ export const SettingsPage = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="email">Email Address</Label>
+                      <Label htmlFor="email">{t('auth.email')}</Label>
                       <Input 
                         id="email" 
                         type="email"
@@ -133,19 +134,19 @@ export const SettingsPage = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="capitalize">
-                      {user?.role === 'zzp' ? 'ZZP' : user?.role}
+                      {user?.role === 'zzp' ? t('roles.zzp') : user?.role === 'accountant' ? t('roles.accountant') : user?.role}
                     </Badge>
                     {user?.is_email_verified && (
                       <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/40">
                         <CheckCircle size={14} className="mr-1" />
-                        Email Verified
+                        {t('settings.emailVerified')}
                       </Badge>
                     )}
                   </div>
                   <Alert>
                     <Info size={16} />
                     <AlertDescription>
-                      Contact support to update your profile information.
+                      {t('settings.contactSupport')}
                     </AlertDescription>
                   </Alert>
                 </>
@@ -159,10 +160,10 @@ export const SettingsPage = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Buildings size={20} weight="duotone" />
-                  Company Information
+                  {t('settings.companyInfo')}
                 </CardTitle>
                 <CardDescription>
-                  Your business administration details
+                  {t('settings.companyDescription')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -176,7 +177,7 @@ export const SettingsPage = () => {
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="companyName">Company Name</Label>
+                        <Label htmlFor="companyName">{t('settings.companyName')}</Label>
                         <Input 
                           id="companyName" 
                           value={primaryAdmin.name} 
@@ -185,10 +186,10 @@ export const SettingsPage = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="kvkNumber">KVK Number</Label>
+                        <Label htmlFor="kvkNumber">{t('settings.kvkNumber')}</Label>
                         <Input 
                           id="kvkNumber" 
-                          value={primaryAdmin.kvk_number || 'Not set'} 
+                          value={primaryAdmin.kvk_number || t('settings.notSet')} 
                           readOnly 
                           className="bg-secondary/50"
                         />
@@ -196,19 +197,19 @@ export const SettingsPage = () => {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="btwNumber">BTW Number</Label>
+                        <Label htmlFor="btwNumber">{t('settings.btwNumber')}</Label>
                         <Input 
                           id="btwNumber" 
-                          value={primaryAdmin.btw_number || 'Not set'} 
+                          value={primaryAdmin.btw_number || t('settings.notSet')} 
                           readOnly 
                           className="bg-secondary/50"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="description">Description</Label>
+                        <Label htmlFor="description">{t('settings.description')}</Label>
                         <Input 
                           id="description" 
-                          value={primaryAdmin.description || 'No description'} 
+                          value={primaryAdmin.description || t('settings.noDescription')} 
                           readOnly 
                           className="bg-secondary/50"
                         />
@@ -217,16 +218,16 @@ export const SettingsPage = () => {
                     <Alert>
                       <Info size={16} />
                       <AlertDescription>
-                        Company information can be updated during onboarding or by contacting support.
+                        {t('settings.companyInfoUpdate')}
                       </AlertDescription>
                     </Alert>
                   </>
                 ) : (
                   <div className="text-center py-8">
                     <Buildings size={48} className="mx-auto mb-4 text-muted-foreground opacity-50" weight="duotone" />
-                    <p className="text-muted-foreground">No administration set up yet</p>
+                    <p className="text-muted-foreground">{t('settings.noAdministrationSetup')}</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Complete onboarding to add your company information
+                      {t('settings.completeOnboarding')}
                     </p>
                   </div>
                 )}
@@ -239,19 +240,19 @@ export const SettingsPage = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Bell size={20} weight="duotone" />
-                Notification Preferences
+                {t('settings.notificationPreferences')}
               </CardTitle>
               <CardDescription>
-                Control how and when you receive notifications
+                {t('settings.notificationDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="emailDigest">Weekly Email Digest</Label>
+                    <Label htmlFor="emailDigest">{t('settings.weeklyEmailDigest')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Receive a weekly summary of your transactions
+                      {t('settings.weeklyEmailDescription')}
                     </p>
                   </div>
                   <Switch
@@ -267,9 +268,9 @@ export const SettingsPage = () => {
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="transactionAlerts">Transaction Alerts</Label>
+                    <Label htmlFor="transactionAlerts">{t('settings.transactionAlerts')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Get notified when transactions need review
+                      {t('settings.transactionAlertsDescription')}
                     </p>
                   </div>
                   <Switch
@@ -285,9 +286,9 @@ export const SettingsPage = () => {
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="vatReminders">VAT Deadline Reminders</Label>
+                    <Label htmlFor="vatReminders">{t('settings.vatReminders')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Remind me before BTW aangifte deadlines
+                      {t('settings.vatRemindersDescription')}
                     </p>
                   </div>
                   <Switch
@@ -303,9 +304,9 @@ export const SettingsPage = () => {
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="documentProcessed">Document Processed</Label>
+                    <Label htmlFor="documentProcessed">{t('settings.documentProcessed')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Notify me when document processing completes
+                      {t('settings.documentProcessedDescription')}
                     </p>
                   </div>
                   <Switch
@@ -321,15 +322,14 @@ export const SettingsPage = () => {
               <div className="flex justify-end pt-4">
                 <Button onClick={handleSaveNotifications} disabled={isSaving}>
                   {isSaving && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                  Save Preferences
+                  {t('settings.savePreferences')}
                 </Button>
               </div>
 
               <Alert>
                 <Info size={16} />
                 <AlertDescription>
-                  <span className="font-medium">Coming soon:</span> Email notifications are being finalized. 
-                  Your preferences are saved and will be applied once available.
+                  <span className="font-medium">{t('settings.comingSoon')}</span> {t('settings.emailNotificationsFinalized')}
                 </AlertDescription>
               </Alert>
             </CardContent>
@@ -341,18 +341,18 @@ export const SettingsPage = () => {
               <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-muted-foreground">
                 <div className="flex items-center gap-4">
                   <span>
-                    <strong>Version:</strong> {BUILD_VERSION}
+                    <strong>{t('settings.version')}:</strong> {BUILD_VERSION}
                   </span>
                   <span>
-                    <strong>Build:</strong> {BUILD_TIMESTAMP === 'development' ? 'development' : new Date(BUILD_TIMESTAMP).toLocaleString('nl-NL')}
+                    <strong>{t('settings.build')}:</strong> {BUILD_TIMESTAMP === 'development' ? t('settings.development') : new Date(BUILD_TIMESTAMP).toLocaleString('nl-NL')}
                   </span>
                 </div>
                 <div className="flex items-center gap-4">
                   <span>
-                    <strong>API:</strong> {getApiBaseUrl().replace('/api/v1', '')}
+                    <strong>{t('settings.api')}:</strong> {getApiBaseUrl().replace('/api/v1', '')}
                   </span>
                   <Badge variant="outline" className="text-xs">
-                    {import.meta.env.DEV ? 'Development' : 'Production'}
+                    {import.meta.env.DEV ? t('settings.development') : t('settings.production')}
                   </Badge>
                 </div>
               </div>

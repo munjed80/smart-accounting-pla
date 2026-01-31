@@ -167,3 +167,53 @@ export const NoDocumentsEmptyState = ({
     />
   )
 }
+
+/**
+ * Empty state for accountant clients page when there are no clients assigned
+ */
+interface NoClientsAssignedEmptyStateProps {
+  onRefresh?: () => void
+}
+
+export const NoClientsAssignedEmptyState = ({
+  onRefresh,
+}: NoClientsAssignedEmptyStateProps) => {
+  return (
+    <EmptyState
+      title="No Clients Assigned"
+      description="You don't have any clients assigned to you yet. Contact your administrator to get client assignments."
+      actionLabel="Refresh"
+      onAction={onRefresh}
+      tips={[
+        'Clients are assigned by administrators',
+        'Once assigned, you can review their documents',
+        'Track VAT deadlines and manage bookkeeping',
+      ]}
+    />
+  )
+}
+
+/**
+ * Empty state for review queue when there are no items to review
+ */
+interface NoReviewItemsEmptyStateProps {
+  onRefresh?: () => void
+}
+
+export const NoReviewItemsEmptyState = ({
+  onRefresh,
+}: NoReviewItemsEmptyStateProps) => {
+  return (
+    <EmptyState
+      title="No Items to Review"
+      description="There are no documents or transactions waiting for your review. Great job staying on top of things!"
+      actionLabel="Refresh"
+      onAction={onRefresh}
+      tips={[
+        'New items will appear when clients upload documents',
+        'AI-processed transactions may need verification',
+        'Check back later for new review items',
+      ]}
+    />
+  )
+}

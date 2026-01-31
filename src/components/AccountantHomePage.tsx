@@ -590,7 +590,10 @@ export const AccountantHomePage = () => {
             ) : (
               <div className="text-center py-12 text-muted-foreground">
                 <Users size={48} className="mx-auto mb-4 opacity-50" />
-                <p>No clients found matching criteria</p>
+                <p className="text-lg font-medium">No clients yet</p>
+                <p className="text-sm mt-2">
+                  Clients will appear here once they're assigned to you.
+                </p>
               </div>
             )}
           </CardContent>

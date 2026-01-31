@@ -9,6 +9,7 @@ import { AccountantOnboardingPage } from '@/components/AccountantOnboardingPage'
 import { SmartDashboard } from '@/components/SmartDashboard'
 import { AccountantDashboard } from '@/components/AccountantDashboard'
 import { AccountantHomePage } from '@/components/AccountantHomePage'
+import { AccountantReviewQueuePage } from '@/components/AccountantReviewQueuePage'
 import { IntelligentUploadPortal } from '@/components/IntelligentUploadPortal'
 import { SmartTransactionList } from '@/components/SmartTransactionList'
 import { SettingsPage } from '@/components/SettingsPage'
@@ -74,6 +75,7 @@ const pathToTab = (path: string, isAccountant: boolean): string => {
       return 'transactions'
     case '/accountant/review':
     case '/accountant/review-queue':
+      return 'reviewqueue'
     case '/accountant':
     case '/accountant/overview':
     case '/workqueue':
@@ -104,6 +106,8 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
       return '/transactions'
     case 'workqueue':
       return isAccountant ? '/accountant' : '/dashboard'
+    case 'reviewqueue':
+      return '/accountant/review-queue'
     case 'clients':
       return isAccountant ? '/accountant/clients' : '/clients'
     case 'upload':
@@ -120,7 +124,7 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
 const AppContent = () => {
   const { user, isAuthenticated, isLoading } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'transactions' | 'upload' | 'settings' | 'support'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'transactions' | 'upload' | 'settings' | 'support'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
   // Onboarding state - tracks if user needs onboarding (no administrations for ZZP, no clients for accountants)
@@ -339,6 +343,8 @@ const AppContent = () => {
         return isAccountant ? <AccountantHomePage /> : <SmartDashboard />
       case 'clients':
         return isAccountant ? <AccountantDashboard /> : <SmartDashboard />
+      case 'reviewqueue':
+        return isAccountant ? <AccountantReviewQueuePage /> : <SmartDashboard />
       case 'dashboard':
         return <SmartDashboard />
       case 'transactions':

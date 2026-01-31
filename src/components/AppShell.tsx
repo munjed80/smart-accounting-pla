@@ -28,6 +28,7 @@ import {
   User,
   WarningCircle,
   ArrowsLeftRight,
+  MagnifyingGlass,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 
@@ -54,6 +55,13 @@ const menuItems: MenuItem[] = [
     label: t('sidebar.accountantClients'),
     tabValue: 'clients',
     icon: <UsersThree size={20} weight="duotone" />,
+    rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
+  },
+  {
+    label: t('sidebar.reviewQueue'),
+    tabValue: 'reviewqueue',
+    icon: <MagnifyingGlass size={20} weight="duotone" />,
     rolesAllowed: ['accountant', 'admin'],
     section: 'main',
   },

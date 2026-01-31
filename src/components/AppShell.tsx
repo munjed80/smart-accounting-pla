@@ -25,6 +25,7 @@ import {
   Gear,
   Headset
 } from '@phosphor-icons/react'
+import { t } from '@/i18n'
 
 // Menu item configuration with role-based access
 interface MenuItem {
@@ -39,14 +40,14 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   // Accountant-only main items (shown at top for accountants)
   {
-    label: 'Overview',
+    label: t('sidebar.accountantOverview'),
     tabValue: 'workqueue',
     icon: <Stack size={20} weight="duotone" />,
     rolesAllowed: ['accountant', 'admin'],
     section: 'main',
   },
   {
-    label: 'Clients',
+    label: t('sidebar.accountantClients'),
     tabValue: 'clients',
     icon: <UsersThree size={20} weight="duotone" />,
     rolesAllowed: ['accountant', 'admin'],
@@ -54,21 +55,21 @@ const menuItems: MenuItem[] = [
   },
   // ZZP main items (Dashboard first for ZZP users)
   {
-    label: 'Dashboard',
+    label: t('sidebar.dashboard'),
     tabValue: 'dashboard',
     icon: <House size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',
   },
   {
-    label: 'Smart Transactions',
+    label: t('sidebar.smartTransactions'),
     tabValue: 'transactions',
     icon: <Brain size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',
   },
   {
-    label: 'AI Upload',
+    label: t('sidebar.aiUpload'),
     tabValue: 'upload',
     icon: <Sparkle size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
@@ -76,14 +77,14 @@ const menuItems: MenuItem[] = [
   },
   // Secondary items (Settings & Support for all roles)
   {
-    label: 'Settings',
+    label: t('sidebar.settings'),
     tabValue: 'settings',
     icon: <Gear size={20} weight="duotone" />,
     rolesAllowed: ['zzp', 'accountant', 'admin'],
     section: 'secondary',
   },
   {
-    label: 'Support',
+    label: t('sidebar.support'),
     tabValue: 'support',
     icon: <Headset size={20} weight="duotone" />,
     rolesAllowed: ['zzp', 'accountant', 'admin'],
@@ -106,7 +107,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   
   // Determine the home tab based on user role
   const homeTab = isAccountant ? 'workqueue' : 'dashboard'
-  const homeLabel = isAccountant ? 'Back to Work Queue' : 'Back to Dashboard'
+  const homeLabel = isAccountant ? t('sidebar.backToWorkQueue') : t('sidebar.backToDashboard')
 
   // Filter menu items based on user role
   const visibleMenuItems = menuItems.filter(item => 
@@ -144,7 +145,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
         <div className="flex items-center gap-3">
           <Database size={28} weight="duotone" className="text-primary" />
           <span className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Smart Accounting
+            {t('brand.name')}
           </span>
         </div>
       </div>
@@ -156,7 +157,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
           <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
         </div>
         <Badge variant="outline" className="mt-2 capitalize">
-          {user?.role === 'zzp' ? 'ZZP' : user?.role}
+          {user?.role === 'zzp' ? t('roles.zzp') : user?.role === 'accountant' ? t('roles.accountant') : user?.role}
         </Badge>
       </div>
 
@@ -257,7 +258,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
           size="default"
         >
           <SignOut size={18} className="mr-2" />
-          Logout
+          {t('common.logout')}
         </Button>
       </div>
     </div>
@@ -284,7 +285,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
               <div className="flex items-center gap-2">
                 <Database size={28} weight="duotone" className="text-primary hidden sm:block" />
                 <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  Smart Accounting
+                  {t('brand.name')}
                 </h1>
               </div>
             </div>
@@ -292,7 +293,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
             {/* Right: Role Badge + Logout */}
             <div className="flex items-center gap-2 sm:gap-4">
               <Badge variant="outline" className="capitalize text-xs sm:text-sm">
-                {user?.role === 'zzp' ? 'ZZP' : user?.role}
+                {user?.role === 'zzp' ? t('roles.zzp') : user?.role === 'accountant' ? t('roles.accountant') : user?.role}
               </Badge>
               <Button 
                 onClick={handleLogout} 
@@ -301,7 +302,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
                 className="hidden sm:flex"
               >
                 <SignOut size={18} className="mr-2" />
-                Logout
+                {t('common.logout')}
               </Button>
               {/* Mobile Logout - Icon only */}
               <Button 
@@ -309,7 +310,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
                 variant="ghost" 
                 size="icon"
                 className="sm:hidden"
-                aria-label="Logout"
+                aria-label={t('common.logout')}
               >
                 <SignOut size={20} />
               </Button>
@@ -326,8 +327,8 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
           style={{ zIndex: 100 }}
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>Navigation Menu</SheetTitle>
-            <SheetDescription>Navigate through the application</SheetDescription>
+            <SheetTitle>{t('sidebar.navigationMenu')}</SheetTitle>
+            <SheetDescription>{t('sidebar.navigateApp')}</SheetDescription>
           </SheetHeader>
           {renderSidebarContent()}
         </SheetContent>

@@ -62,6 +62,7 @@ import {
 } from '@phosphor-icons/react'
 import { format, formatDistanceToNow } from 'date-fns'
 import { navigateTo } from '@/lib/navigation'
+import { t } from '@/i18n'
 
 // Status indicator colors
 const statusColors: Record<ClientStatus, { bg: string; text: string; border: string }> = {
@@ -77,11 +78,11 @@ const severityColors: Record<IssueSeverity, { bg: string; text: string; border: 
 }
 
 const btwStatusLabels: Record<BTWQuarterStatus, { label: string; color: string }> = {
-  ON_TRACK: { label: 'On Track', color: 'text-green-600 dark:text-green-400' },
-  PENDING_DOCS: { label: 'Pending Docs', color: 'text-amber-600 dark:text-amber-400' },
-  DEADLINE_APPROACHING: { label: 'Deadline Soon', color: 'text-orange-600 dark:text-orange-400' },
-  OVERDUE: { label: 'Overdue', color: 'text-red-600 dark:text-red-400' },
-  NOT_APPLICABLE: { label: 'N/A', color: 'text-gray-500' },
+  ON_TRACK: { label: t('vat.onTrack'), color: 'text-green-600 dark:text-green-400' },
+  PENDING_DOCS: { label: t('vat.pendingDocs'), color: 'text-amber-600 dark:text-amber-400' },
+  DEADLINE_APPROACHING: { label: t('vat.deadlineApproaching'), color: 'text-orange-600 dark:text-orange-400' },
+  OVERDUE: { label: t('vat.overdue'), color: 'text-red-600 dark:text-red-400' },
+  NOT_APPLICABLE: { label: t('vat.notApplicable'), color: 'text-gray-500' },
 }
 
 // Status badge component
@@ -148,7 +149,7 @@ const ClientRow = ({
             {formatDistanceToNow(new Date(client.last_document_upload), { addSuffix: true })}
           </span>
         ) : (
-          <span className="text-sm text-muted-foreground">No uploads</span>
+          <span className="text-sm text-muted-foreground">{t('accountant.noUploads')}</span>
         )}
       </TableCell>
       <TableCell>
@@ -164,12 +165,12 @@ const ClientRow = ({
           <div className="flex gap-2">
             {client.error_count > 0 && (
               <Badge variant="destructive" className="text-xs">
-                {client.error_count} error{client.error_count > 1 ? 's' : ''}
+                {client.error_count} {client.error_count === 1 ? 'fout' : 'fouten'}
               </Badge>
             )}
             {client.warning_count > 0 && (
               <Badge variant="outline" className="text-xs bg-amber-500/20 text-amber-700 dark:text-amber-400">
-                {client.warning_count} warning{client.warning_count > 1 ? 's' : ''}
+                {client.warning_count} {client.warning_count === 1 ? 'waarschuwing' : 'waarschuwingen'}
               </Badge>
             )}
           </div>
@@ -186,11 +187,11 @@ const ClientRow = ({
             className="text-xs"
           >
             <Eye size={14} className="mr-1" />
-            Review issues
+            {t('accountant.reviewIssues')}
             <CaretRight size={14} className="ml-1" />
           </Button>
         ) : (
-          <span className="text-sm text-green-600 dark:text-green-400">✓ OK</span>
+          <span className="text-sm text-green-600 dark:text-green-400">{t('accountant.ok')}</span>
         )}
       </TableCell>
     </TableRow>
@@ -294,13 +295,13 @@ export const AccountantDashboard = () => {
         if (typeof detail === 'object' && detail?.code) {
           switch (detail.code) {
             case 'USER_NOT_FOUND':
-              setAddClientError('No user found with this email address. They need to register first.')
+              setAddClientError(t('accountant.userNotFound'))
               return
             case 'NOT_ZZP_USER':
-              setAddClientError('This user is not a ZZP client (they may be an accountant).')
+              setAddClientError(t('accountant.notZzpUser'))
               return
             case 'NO_ADMINISTRATION':
-              setAddClientError('This user has not created an administration yet.')
+              setAddClientError(t('accountant.noAdministration'))
               return
           }
         }
@@ -334,9 +335,9 @@ export const AccountantDashboard = () => {
         <div className="max-w-7xl mx-auto">
           <Alert className="bg-amber-500/10 border-amber-500/40">
             <Warning className="h-5 w-5 text-amber-600" />
-            <AlertTitle>Access Restricted</AlertTitle>
+            <AlertTitle>{t('accountant.accessRestricted')}</AlertTitle>
             <AlertDescription>
-              This dashboard is only available for accountants managing ZZP clients.
+              {t('accountant.accountantOnly')}
             </AlertDescription>
           </Alert>
         </div>
@@ -351,11 +352,11 @@ export const AccountantDashboard = () => {
           <Alert className="bg-destructive/10 border-destructive/40">
             <WarningCircle className="h-5 w-5 text-destructive" />
             <AlertDescription className="ml-2">
-              <div className="font-semibold mb-2">Failed to load dashboard</div>
+              <div className="font-semibold mb-2">{t('accountant.failedToLoadDashboard')}</div>
               <div className="text-sm text-muted-foreground mb-4">{error}</div>
               <Button onClick={fetchDashboard} size="sm" variant="outline">
                 <ArrowsClockwise size={16} className="mr-2" />
-                Retry
+                {t('common.retry')}
               </Button>
             </AlertDescription>
           </Alert>
@@ -373,21 +374,21 @@ export const AccountantDashboard = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-1">
-              Client Overview
+              {t('accountant.clientOverview')}
             </h1>
             <p className="text-muted-foreground">
-              {dashboard?.total_clients || 0} clients • 
-              {dashboard?.clients_needing_attention || 0} need attention
+              {dashboard?.total_clients || 0} {t('accountant.clientsCount')} • 
+              {dashboard?.clients_needing_attention || 0} {t('accountant.needsAttention')}
             </p>
           </div>
           <div className="flex items-center gap-3">
             <Button onClick={() => setIsAddClientOpen(true)} size="sm">
               <UserPlus size={18} className="mr-2" />
-              Add Client
+              {t('accountant.addClient')}
             </Button>
             <Button onClick={fetchDashboard} variant="outline" size="sm" disabled={isLoading}>
               <ArrowsClockwise size={18} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
+              {t('common.refresh')}
             </Button>
           </div>
         </div>
@@ -398,7 +399,7 @@ export const AccountantDashboard = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <CheckCircle size={18} weight="fill" className="text-green-500" />
-                No Action Needed
+                {t('accountant.noActionNeeded')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -416,7 +417,7 @@ export const AccountantDashboard = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Warning size={18} weight="fill" className="text-amber-500" />
-                Attention Soon
+                {t('accountant.attentionSoon')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -434,7 +435,7 @@ export const AccountantDashboard = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <WarningCircle size={18} weight="fill" className="text-red-500" />
-                Immediate Action
+                {t('accountant.immediateAction')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -454,10 +455,10 @@ export const AccountantDashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users size={24} />
-              All Clients
+              {t('accountant.allClients')}
             </CardTitle>
             <CardDescription>
-              Sorted by status: clients requiring action appear first
+              {t('accountant.sortedByStatus')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -471,12 +472,12 @@ export const AccountantDashboard = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Client</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last Upload</TableHead>
+                    <TableHead>{t('accountant.client')}</TableHead>
+                    <TableHead>{t('accountant.clientStatus')}</TableHead>
+                    <TableHead>{t('accountant.lastUpload')}</TableHead>
                     <TableHead>BTW {dashboard.clients[0]?.current_quarter}</TableHead>
-                    <TableHead>Issues</TableHead>
-                    <TableHead>Action</TableHead>
+                    <TableHead>{t('accountant.issues')}</TableHead>
+                    <TableHead>{t('accountant.action')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -492,13 +493,13 @@ export const AccountantDashboard = () => {
             ) : (
               <div className="text-center py-12 text-muted-foreground">
                 <Users size={48} className="mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium">No clients yet</p>
+                <p className="text-lg font-medium">{t('accountant.noClients')}</p>
                 <p className="text-sm mt-2 mb-4">
-                  Add ZZP clients by their email address to start managing their accounts.
+                  {t('accountant.noClientsDescription')}
                 </p>
                 <Button onClick={() => setIsAddClientOpen(true)}>
                   <UserPlus size={18} className="mr-2" />
-                  Add Your First Client
+                  {t('accountant.addFirstClient')}
                 </Button>
               </div>
             )}
@@ -514,7 +515,7 @@ export const AccountantDashboard = () => {
                 {selectedClient?.name}
               </DialogTitle>
               <DialogDescription>
-                {clientIssues?.total_issues || 0} issues requiring attention
+                {clientIssues?.total_issues || 0} {t('accountant.issuesRequiringAttention')}
               </DialogDescription>
             </DialogHeader>
             
@@ -532,14 +533,14 @@ export const AccountantDashboard = () => {
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <CheckCircle size={48} className="mx-auto mb-4 text-green-500 opacity-50" />
-                  <p>No issues found</p>
+                  <p>{t('accountant.noIssuesFound')}</p>
                 </div>
               )}
             </div>
 
             <div className="flex justify-end mt-6">
               <Button variant="outline" onClick={handleCloseDialog}>
-                Close
+                {t('common.close')}
               </Button>
             </div>
           </DialogContent>
@@ -558,24 +559,23 @@ export const AccountantDashboard = () => {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <UserPlus size={20} />
-                Add Client by Email
+                {t('accountant.addClientByEmail')}
               </DialogTitle>
               <DialogDescription>
-                Enter the email address of a ZZP client to add them to your client list.
-                They must have already registered and created an administration.
+                {t('accountant.addClientDescription')}
               </DialogDescription>
             </DialogHeader>
             
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="client-email">Client Email</Label>
+                <Label htmlFor="client-email">{t('accountant.clientEmail')}</Label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <EnvelopeSimple size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       id="client-email"
                       type="email"
-                      placeholder="client@example.com"
+                      placeholder="klant@email.nl"
                       value={newClientEmail}
                       onChange={(e) => setNewClientEmail(e.target.value)}
                       className="pl-9"
@@ -611,7 +611,7 @@ export const AccountantDashboard = () => {
                 onClick={() => setIsAddClientOpen(false)}
                 disabled={isAddingClient}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button 
                 onClick={handleAddClient}
@@ -620,12 +620,12 @@ export const AccountantDashboard = () => {
                 {isAddingClient ? (
                   <>
                     <ArrowsClockwise size={16} className="mr-2 animate-spin" />
-                    Adding...
+                    {t('common.loading')}
                   </>
                 ) : (
                   <>
                     <Plus size={16} className="mr-2" />
-                    Add Client
+                    {t('accountant.addClient')}
                   </>
                 )}
               </Button>

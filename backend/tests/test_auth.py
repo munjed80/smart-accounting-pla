@@ -16,7 +16,11 @@ These tests are independent of database and can run without DB dependencies.
 import pytest
 import hashlib
 import secrets
+import re
 from datetime import datetime, timedelta, timezone
+
+# Role validation pattern - matches schema validation
+ROLE_PATTERN = r"^(zzp|accountant)$"
 
 
 # Inline implementations for testing without importing app modules
@@ -986,44 +990,37 @@ class TestAdminRoleManagement:
 class TestRolePersistence:
     """Tests for role persistence during registration and login flow."""
     
+    @staticmethod
+    def is_accountant_or_admin(role: str) -> bool:
+        """Helper to check if role is accountant or admin (mirrors frontend logic)."""
+        return role in ("accountant", "admin")
+    
     def test_role_validation_accepts_zzp(self):
         """ZZP role should be accepted during registration."""
-        import re
-        role_pattern = r"^(zzp|accountant)$"
-        
         role = "zzp"
-        is_valid = bool(re.match(role_pattern, role))
+        is_valid = bool(re.match(ROLE_PATTERN, role))
         
         assert is_valid is True
     
     def test_role_validation_accepts_accountant(self):
         """Accountant role should be accepted during registration."""
-        import re
-        role_pattern = r"^(zzp|accountant)$"
-        
         role = "accountant"
-        is_valid = bool(re.match(role_pattern, role))
+        is_valid = bool(re.match(ROLE_PATTERN, role))
         
         assert is_valid is True
     
     def test_role_validation_rejects_admin(self):
         """Admin role should be rejected during public registration."""
-        import re
-        role_pattern = r"^(zzp|accountant)$"
-        
         role = "admin"
-        is_valid = bool(re.match(role_pattern, role))
+        is_valid = bool(re.match(ROLE_PATTERN, role))
         
         assert is_valid is False
     
     def test_role_validation_rejects_invalid(self):
         """Invalid roles should be rejected during registration."""
-        import re
-        role_pattern = r"^(zzp|accountant)$"
-        
         invalid_roles = ["superuser", "manager", "owner", "", "  ", "ZZP", "ACCOUNTANT"]
         for role in invalid_roles:
-            is_valid = bool(re.match(role_pattern, role))
+            is_valid = bool(re.match(ROLE_PATTERN, role))
             assert is_valid is False, f"Role '{role}' should be rejected"
     
     def test_role_default_is_zzp(self):
@@ -1080,7 +1077,7 @@ class TestRolePersistence:
         """Frontend should correctly detect accountant role."""
         user_role = "accountant"
         
-        is_accountant = user_role == "accountant" or user_role == "admin"
+        is_accountant = self.is_accountant_or_admin(user_role)
         
         assert is_accountant is True
     
@@ -1088,20 +1085,17 @@ class TestRolePersistence:
         """Frontend should correctly detect ZZP role (not accountant)."""
         user_role = "zzp"
         
-        is_accountant = user_role == "accountant" or user_role == "admin"
+        is_accountant = self.is_accountant_or_admin(user_role)
         
         assert is_accountant is False
     
     def test_role_case_sensitive(self):
         """Role validation should be case-sensitive."""
-        import re
-        role_pattern = r"^(zzp|accountant)$"
-        
         # Uppercase should fail
-        assert bool(re.match(role_pattern, "ZZP")) is False
-        assert bool(re.match(role_pattern, "ACCOUNTANT")) is False
-        assert bool(re.match(role_pattern, "Accountant")) is False
+        assert bool(re.match(ROLE_PATTERN, "ZZP")) is False
+        assert bool(re.match(ROLE_PATTERN, "ACCOUNTANT")) is False
+        assert bool(re.match(ROLE_PATTERN, "Accountant")) is False
         
         # Lowercase should pass
-        assert bool(re.match(role_pattern, "zzp")) is True
-        assert bool(re.match(role_pattern, "accountant")) is True
+        assert bool(re.match(ROLE_PATTERN, "zzp")) is True
+        assert bool(re.match(ROLE_PATTERN, "accountant")) is True

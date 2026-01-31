@@ -165,12 +165,12 @@ const ClientRow = ({
           <div className="flex gap-2">
             {client.error_count > 0 && (
               <Badge variant="destructive" className="text-xs">
-                {client.error_count} fout{client.error_count > 1 ? 'en' : ''}
+                {client.error_count} {client.error_count === 1 ? 'fout' : 'fouten'}
               </Badge>
             )}
             {client.warning_count > 0 && (
               <Badge variant="outline" className="text-xs bg-amber-500/20 text-amber-700 dark:text-amber-400">
-                {client.warning_count} waarschuwing{client.warning_count > 1 ? 'en' : ''}
+                {client.warning_count} {client.warning_count === 1 ? 'waarschuwing' : 'waarschuwingen'}
               </Badge>
             )}
           </div>

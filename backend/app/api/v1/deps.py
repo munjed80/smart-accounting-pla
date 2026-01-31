@@ -12,6 +12,20 @@ from app.models.user import User
 from app.models.administration import Administration, AdministrationMember, MemberRole
 
 
+def require_accountant(current_user: User) -> None:
+    """
+    Reusable dependency to verify user has accountant or admin role.
+    
+    Raises HTTPException with 403 status and FORBIDDEN_ROLE code if user
+    is not an accountant or admin.
+    """
+    if current_user.role not in ["accountant", "admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "FORBIDDEN_ROLE", "message": "This endpoint is only available for accountants"}
+        )
+
+
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     db: Annotated[AsyncSession, Depends(get_db)],

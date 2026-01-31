@@ -1677,6 +1677,67 @@ export const accountantMasterDashboardApi = {
   },
 }
 
+// ============ Client Assignment Types ============
+
+export interface AccountantClientListItem {
+  id: string
+  email: string
+  name: string
+  status: string
+  last_activity: string | null
+  open_red_count: number
+  open_yellow_count: number
+  administration_id: string | null
+  administration_name: string | null
+}
+
+export interface AccountantClientListResponse {
+  clients: AccountantClientListItem[]
+  total_count: number
+}
+
+export interface AccountantAssignmentByEmailRequest {
+  client_email: string
+}
+
+export interface AccountantAssignmentResponse {
+  id: string
+  accountant_id: string
+  accountant_name: string
+  administration_id: string
+  administration_name: string
+  is_primary: boolean
+  assigned_at: string
+  assigned_by_name: string | null
+  notes: string | null
+}
+
+// Accountant Client Assignment API
+export const accountantClientApi = {
+  /**
+   * Get list of clients assigned to the current accountant
+   */
+  listClients: async (): Promise<AccountantClientListResponse> => {
+    const response = await api.get<AccountantClientListResponse>('/accountant/clients')
+    return response.data
+  },
+
+  /**
+   * Assign a client by their email address
+   */
+  assignByEmail: async (request: AccountantAssignmentByEmailRequest): Promise<AccountantAssignmentResponse> => {
+    const response = await api.post<AccountantAssignmentResponse>('/accountant/assignments/by-email', request)
+    return response.data
+  },
+
+  /**
+   * Remove an assignment
+   */
+  removeAssignment: async (assignmentId: string): Promise<void> => {
+    await api.delete(`/accountant/assignments/${assignmentId}`)
+  },
+}
+
 // ============ Work Queue Types ============
 
 export interface WorkQueueCounts {

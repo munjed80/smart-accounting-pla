@@ -12,6 +12,8 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { 
   Table, 
   TableBody, 
@@ -26,12 +28,14 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/lib/AuthContext'
 import { 
   accountantDashboardApi, 
+  accountantClientApi,
   AccountantDashboardResponse, 
   ClientOverview, 
   DashboardIssue,
@@ -39,6 +43,7 @@ import {
   ClientStatus,
   IssueSeverity,
   BTWQuarterStatus,
+  AccountantClientListItem,
   getErrorMessage 
 } from '@/lib/api'
 import { 
@@ -50,9 +55,13 @@ import {
   Users,
   FileX,
   ClockCountdown,
-  Eye
+  Eye,
+  Plus,
+  EnvelopeSimple,
+  UserPlus,
 } from '@phosphor-icons/react'
 import { format, formatDistanceToNow } from 'date-fns'
+import { navigateTo } from '@/lib/navigation'
 
 // Status indicator colors
 const statusColors: Record<ClientStatus, { bg: string; text: string; border: string }> = {
@@ -191,6 +200,7 @@ const ClientRow = ({
 export const AccountantDashboard = () => {
   const { user } = useAuth()
   const [dashboard, setDashboard] = useState<AccountantDashboardResponse | null>(null)
+  const [assignedClients, setAssignedClients] = useState<AccountantClientListItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
@@ -200,6 +210,13 @@ export const AccountantDashboard = () => {
   const [clientIssues, setClientIssues] = useState<ClientIssuesResponse | null>(null)
   const [isLoadingIssues, setIsLoadingIssues] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  
+  // Add client dialog state
+  const [isAddClientOpen, setIsAddClientOpen] = useState(false)
+  const [newClientEmail, setNewClientEmail] = useState('')
+  const [isAddingClient, setIsAddingClient] = useState(false)
+  const [addClientError, setAddClientError] = useState<string | null>(null)
+  const [addClientSuccess, setAddClientSuccess] = useState<string | null>(null)
 
   const fetchDashboard = async () => {
     try {
@@ -214,6 +231,15 @@ export const AccountantDashboard = () => {
       console.error('Failed to fetch dashboard:', err)
     } finally {
       setIsLoading(false)
+    }
+  }
+  
+  const fetchAssignedClients = async () => {
+    try {
+      const data = await accountantClientApi.listClients()
+      setAssignedClients(data.clients)
+    } catch (err) {
+      console.error('Failed to fetch assigned clients:', err)
     }
   }
 
@@ -231,6 +257,7 @@ export const AccountantDashboard = () => {
 
   useEffect(() => {
     fetchDashboard()
+    fetchAssignedClients()
   }, [])
 
   const handleReviewIssues = async (client: ClientOverview) => {
@@ -238,6 +265,61 @@ export const AccountantDashboard = () => {
     setIsDialogOpen(true)
     await fetchClientIssues(client.id)
   }
+  
+  const handleAddClient = async () => {
+    if (!newClientEmail.trim()) return
+    
+    setIsAddingClient(true)
+    setAddClientError(null)
+    setAddClientSuccess(null)
+    
+    try {
+      const result = await accountantClientApi.assignByEmail({ client_email: newClientEmail.trim() })
+      setAddClientSuccess(`Successfully added ${result.administration_name}`)
+      setNewClientEmail('')
+      // Refresh both dashboard and clients list
+      await fetchDashboard()
+      await fetchAssignedClients()
+      // Close dialog after short delay to show success message
+      setTimeout(() => {
+        setIsAddClientOpen(false)
+        setAddClientSuccess(null)
+      }, SUCCESS_MESSAGE_DISPLAY_MS)
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err)
+      // Try to extract code from the error
+      if (typeof err === 'object' && err !== null && 'response' in err) {
+        const response = (err as { response?: { data?: { detail?: { code?: string, message?: string } | string } } }).response
+        const detail = response?.data?.detail
+        if (typeof detail === 'object' && detail?.code) {
+          switch (detail.code) {
+            case 'USER_NOT_FOUND':
+              setAddClientError('No user found with this email address. They need to register first.')
+              return
+            case 'NOT_ZZP_USER':
+              setAddClientError('This user is not a ZZP client (they may be an accountant).')
+              return
+            case 'NO_ADMINISTRATION':
+              setAddClientError('This user has not created an administration yet.')
+              return
+          }
+        }
+      }
+      setAddClientError(errorMessage)
+    } finally {
+      setIsAddingClient(false)
+    }
+  }
+  
+  const handleSelectClient = (administrationId: string) => {
+    // Store selected client in localStorage for review queue
+    localStorage.setItem('selectedClientId', administrationId)
+    // Navigate to review queue
+    navigateTo('/accountant/review-queue')
+  }
+  
+  // Duration to show success message before closing dialog
+  const SUCCESS_MESSAGE_DISPLAY_MS = 2000
 
   const handleCloseDialog = () => {
     setIsDialogOpen(false)
@@ -298,14 +380,15 @@ export const AccountantDashboard = () => {
               {dashboard?.clients_needing_attention || 0} need attention
             </p>
           </div>
-          <div className="text-right">
+          <div className="flex items-center gap-3">
+            <Button onClick={() => setIsAddClientOpen(true)} size="sm">
+              <UserPlus size={18} className="mr-2" />
+              Add Client
+            </Button>
             <Button onClick={fetchDashboard} variant="outline" size="sm" disabled={isLoading}>
               <ArrowsClockwise size={18} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-            <p className="text-xs text-muted-foreground mt-2">
-              Updated: {format(lastRefresh, 'HH:mm:ss')}
-            </p>
           </div>
         </div>
 
@@ -409,8 +492,14 @@ export const AccountantDashboard = () => {
             ) : (
               <div className="text-center py-12 text-muted-foreground">
                 <Users size={48} className="mx-auto mb-4 opacity-50" />
-                <p>No clients found</p>
-                <p className="text-sm mt-2">Create administrations to manage ZZP clients</p>
+                <p className="text-lg font-medium">No clients yet</p>
+                <p className="text-sm mt-2 mb-4">
+                  Add ZZP clients by their email address to start managing their accounts.
+                </p>
+                <Button onClick={() => setIsAddClientOpen(true)}>
+                  <UserPlus size={18} className="mr-2" />
+                  Add Your First Client
+                </Button>
               </div>
             )}
           </CardContent>
@@ -453,6 +542,94 @@ export const AccountantDashboard = () => {
                 Close
               </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Add Client Dialog */}
+        <Dialog open={isAddClientOpen} onOpenChange={(open) => {
+          setIsAddClientOpen(open)
+          if (!open) {
+            setNewClientEmail('')
+            setAddClientError(null)
+            setAddClientSuccess(null)
+          }
+        }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <UserPlus size={20} />
+                Add Client by Email
+              </DialogTitle>
+              <DialogDescription>
+                Enter the email address of a ZZP client to add them to your client list.
+                They must have already registered and created an administration.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="client-email">Client Email</Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <EnvelopeSimple size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="client-email"
+                      type="email"
+                      placeholder="client@example.com"
+                      value={newClientEmail}
+                      onChange={(e) => setNewClientEmail(e.target.value)}
+                      className="pl-9"
+                      disabled={isAddingClient}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddClient()
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {addClientError && (
+                <Alert className="bg-destructive/10 border-destructive/40">
+                  <WarningCircle className="h-4 w-4" />
+                  <AlertDescription className="ml-2">{addClientError}</AlertDescription>
+                </Alert>
+              )}
+              
+              {addClientSuccess && (
+                <Alert className="bg-green-500/10 border-green-500/40">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="ml-2 text-green-700">{addClientSuccess}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsAddClientOpen(false)}
+                disabled={isAddingClient}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAddClient}
+                disabled={isAddingClient || !newClientEmail.trim()}
+              >
+                {isAddingClient ? (
+                  <>
+                    <ArrowsClockwise size={16} className="mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus size={16} className="mr-2" />
+                    Add Client
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

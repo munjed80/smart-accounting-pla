@@ -248,6 +248,11 @@ class AccountantAssignmentCreate(BaseModel):
     notes: Optional[str] = None
 
 
+class AccountantAssignmentByEmailRequest(BaseModel):
+    """Request to assign a client by their email address."""
+    client_email: str = Field(..., description="Email of the ZZP client to assign")
+
+
 class AccountantAssignmentResponse(BaseModel):
     """Response for an accountant-client assignment."""
     id: UUID
@@ -262,6 +267,29 @@ class AccountantAssignmentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AccountantClientListItem(BaseModel):
+    """
+    Client list item for accountant's assignment list.
+    
+    Includes client info and status counts.
+    """
+    id: UUID
+    email: str
+    name: str
+    status: str = "active"
+    last_activity: Optional[datetime] = None
+    open_red_count: int = 0
+    open_yellow_count: int = 0
+    administration_id: Optional[UUID] = None
+    administration_name: Optional[str] = None
+
+
+class AccountantClientListResponse(BaseModel):
+    """Response for listing assigned clients."""
+    clients: List[AccountantClientListItem]
+    total_count: int
 
 
 class AccountantAssignmentsListResponse(BaseModel):

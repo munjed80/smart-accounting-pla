@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Sparkle
 } from '@phosphor-icons/react'
+import { t } from '@/i18n'
 
 interface EmptyStateProps {
   title: string
@@ -49,7 +50,7 @@ export const EmptyState = ({
           <div className="bg-secondary/50 rounded-lg p-4 space-y-2">
             <h4 className="text-sm font-medium flex items-center gap-2">
               <Sparkle size={16} className="text-primary" />
-              Getting Started
+              {t('emptyStates.gettingStarted')}
             </h4>
             <ul className="text-sm text-muted-foreground space-y-1">
               {tips.map((tip, index) => (
@@ -99,20 +100,20 @@ export const NoAdministrationsEmptyState = ({
   
   return (
     <EmptyState
-      title={isAccountant ? 'No Clients Yet' : 'No Administration Yet'}
+      title={isAccountant ? t('emptyStates.noClientsYetAccountant') : t('emptyStates.noAdministrationYet')}
       description={
         isAccountant
-          ? 'Add your first client administration to start managing their bookkeeping.'
-          : 'Create your business administration to start tracking invoices and expenses.'
+          ? t('emptyStates.noClientsAccountant')
+          : t('emptyStates.noAdministrationZzp')
       }
-      actionLabel={isAccountant ? 'Add First Client' : 'Create Administration'}
+      actionLabel={isAccountant ? t('emptyStates.addFirstClientAccountant') : t('emptyStates.createAdministration')}
       onAction={onCreateAdministration}
       tips={[
         isAccountant
-          ? 'Each client gets their own separate administration'
-          : 'Your administration keeps all your financial data organized',
-        'Upload invoices and receipts for automatic AI processing',
-        'Track VAT obligations and generate BTW reports',
+          ? t('emptyStates.eachClientSeparate')
+          : t('emptyStates.adminOrganized'),
+        t('emptyStates.uploadInvoices'),
+        t('emptyStates.trackVat'),
       ]}
     />
   )
@@ -130,14 +131,14 @@ export const NoTransactionsEmptyState = ({
 }: NoTransactionsEmptyStateProps) => {
   return (
     <EmptyState
-      title="No Transactions Yet"
-      description="Upload your first invoice or receipt to create transactions automatically."
-      actionLabel="Upload Document"
+      title={t('emptyStates.noTransactionsYet')}
+      description={t('emptyStates.noTransactionsDescription')}
+      actionLabel={t('emptyStates.uploadDocument')}
       onAction={onUploadDocument}
       tips={[
-        'Upload PDFs, images, or scanned documents',
-        'AI will extract data and create transactions',
-        'Review and approve before posting to ledger',
+        t('emptyStates.uploadFormats'),
+        t('emptyStates.aiExtract'),
+        t('emptyStates.reviewBeforePost'),
       ]}
     />
   )
@@ -155,14 +156,14 @@ export const NoDocumentsEmptyState = ({
 }: NoDocumentsEmptyStateProps) => {
   return (
     <EmptyState
-      title="No Documents Uploaded"
-      description="Start by uploading your invoices, receipts, or bank statements."
-      actionLabel="Upload First Document"
+      title={t('emptyStates.noDocumentsUploaded')}
+      description={t('emptyStates.noDocumentsDescription')}
+      actionLabel={t('emptyStates.uploadFirstDocument')}
       onAction={onUploadDocument}
       tips={[
-        'Supported formats: PDF, PNG, JPG, JPEG',
-        'AI processes documents in seconds',
-        'All documents are securely stored',
+        t('emptyStates.supportedFormats'),
+        t('emptyStates.aiProcesses'),
+        t('emptyStates.secureStorage'),
       ]}
     />
   )
@@ -180,14 +181,14 @@ export const NoClientsAssignedEmptyState = ({
 }: NoClientsAssignedEmptyStateProps) => {
   return (
     <EmptyState
-      title="No Clients Assigned"
-      description="You don't have any clients assigned to you yet. Contact your administrator to get client assignments."
-      actionLabel="Refresh"
+      title={t('emptyStates.noClientsAssigned')}
+      description={t('emptyStates.noClientsAssignedDescription')}
+      actionLabel={t('common.refresh')}
       onAction={onRefresh}
       tips={[
-        'Clients are assigned by administrators',
-        'Once assigned, you can review their documents',
-        'Track VAT deadlines and manage bookkeeping',
+        t('emptyStates.clientsAssignedByAdmin'),
+        t('emptyStates.onceAssigned'),
+        t('emptyStates.trackVatDeadlines'),
       ]}
     />
   )
@@ -205,14 +206,14 @@ export const NoReviewItemsEmptyState = ({
 }: NoReviewItemsEmptyStateProps) => {
   return (
     <EmptyState
-      title="No Items to Review"
-      description="There are no documents or transactions waiting for your review. Great job staying on top of things!"
-      actionLabel="Refresh"
+      title={t('emptyStates.noReviewItems')}
+      description={t('emptyStates.noReviewItemsDescription')}
+      actionLabel={t('common.refresh')}
       onAction={onRefresh}
       tips={[
-        'New items will appear when clients upload documents',
-        'AI-processed transactions may need verification',
-        'Check back later for new review items',
+        t('emptyStates.newItemsAppear'),
+        t('emptyStates.aiTransactionsNeedVerification'),
+        t('emptyStates.checkBackLater'),
       ]}
     />
   )

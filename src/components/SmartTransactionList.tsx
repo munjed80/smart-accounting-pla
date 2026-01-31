@@ -15,6 +15,7 @@ import {
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
+import { t } from '@/i18n'
 
 export const SmartTransactionList = () => {
   const [transactions, setTransactions] = useState<TransactionListItem[]>([])
@@ -30,7 +31,7 @@ export const SmartTransactionList = () => {
       setTransactions(data)
     } catch (error) {
       console.error('Failed to fetch transactions:', error)
-      toast.error('Failed to load transactions')
+      toast.error(t('smartTransactions.failedToLoad'))
     } finally {
       setIsLoading(false)
     }
@@ -79,9 +80,9 @@ export const SmartTransactionList = () => {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'DRAFT':
-        return 'Draft'
+        return t('transactionStatus.draft')
       case 'POSTED':
-        return 'Posted'
+        return t('transactionStatus.posted')
       default:
         return status
     }
@@ -99,15 +100,15 @@ export const SmartTransactionList = () => {
         <div>
           <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-2">
             <Brain size={32} weight="duotone" className="text-primary" />
-            Smart Transactions
+            {t('smartTransactions.title')}
           </h2>
           <p className="text-muted-foreground mt-1">
-            AI-processed and auto-categorized transactions
+            {t('smartTransactions.subtitle')}
           </p>
         </div>
         <Button onClick={fetchTransactions} variant="outline" size="sm" disabled={isLoading}>
           <ArrowsClockwise size={18} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
+          {t('common.refresh')}
         </Button>
       </div>
 
@@ -115,7 +116,7 @@ export const SmartTransactionList = () => {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardDescription>Total Transactions</CardDescription>
+              <CardDescription>{t('smartTransactions.totalTransactions')}</CardDescription>
               <Receipt size={20} className="text-primary" weight="duotone" />
             </div>
             <CardTitle className="text-3xl">{transactions.length}</CardTitle>
@@ -125,7 +126,7 @@ export const SmartTransactionList = () => {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardDescription>Total Amount</CardDescription>
+              <CardDescription>{t('smartTransactions.totalAmount')}</CardDescription>
               <TrendDown size={20} className="text-destructive" weight="duotone" />
             </div>
             <CardTitle className="text-3xl">{formatCurrency(totalExpenses)}</CardTitle>
@@ -135,7 +136,7 @@ export const SmartTransactionList = () => {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardDescription>Avg. AI Confidence</CardDescription>
+              <CardDescription>{t('smartTransactions.avgAiConfidence')}</CardDescription>
               <Sparkle size={20} className="text-primary" weight="duotone" />
             </div>
             <CardTitle className="text-3xl">{avgConfidence.toFixed(0)}%</CardTitle>
@@ -149,10 +150,10 @@ export const SmartTransactionList = () => {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Receipt size={24} weight="duotone" />
-                All Transactions
+                {t('smartTransactions.allTransactions')}
               </CardTitle>
               <CardDescription>
-                {filteredTransactions.length} of {(transactions || []).length} transactions
+                {filteredTransactions.length} {t('smartTransactions.transactionsOf')} {(transactions || []).length} {t('smartTransactions.transactions')}
               </CardDescription>
             </div>
           </div>
@@ -161,7 +162,7 @@ export const SmartTransactionList = () => {
             <div className="relative flex-1">
               <MagnifyingGlass size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search transactions..."
+                placeholder={t('smartTransactions.searchTransactions')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -170,12 +171,12 @@ export const SmartTransactionList = () => {
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-[200px]">
-                <SelectValue placeholder="Filter by status" />
+                <SelectValue placeholder={t('smartTransactions.filterByStatus')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="DRAFT">Draft</SelectItem>
-                <SelectItem value="POSTED">Posted</SelectItem>
+                <SelectItem value="all">{t('smartTransactions.allStatus')}</SelectItem>
+                <SelectItem value="DRAFT">{t('transactionStatus.draft')}</SelectItem>
+                <SelectItem value="POSTED">{t('transactionStatus.posted')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -185,14 +186,14 @@ export const SmartTransactionList = () => {
           {isLoading ? (
             <div className="text-center py-12">
               <ArrowsClockwise size={48} className="mx-auto mb-4 text-primary animate-spin" />
-              <p className="text-muted-foreground">Loading transactions...</p>
+              <p className="text-muted-foreground">{t('smartTransactions.loadingTransactions')}</p>
             </div>
           ) : filteredTransactions.length === 0 ? (
             <div className="text-center py-12">
               <Receipt size={64} className="mx-auto mb-4 text-muted-foreground" weight="duotone" />
-              <p className="text-lg font-medium mb-2">No transactions yet</p>
+              <p className="text-lg font-medium mb-2">{t('smartTransactions.noTransactionsYet')}</p>
               <p className="text-sm text-muted-foreground">
-                Upload invoices in the AI Upload tab to create transactions automatically
+                {t('smartTransactions.uploadToCreate')}
               </p>
             </div>
           ) : (
@@ -221,7 +222,7 @@ export const SmartTransactionList = () => {
                       <p className="font-medium text-lg mb-1">{transaction.description}</p>
                       
                       <div className="text-sm mt-3">
-                        <span className="text-muted-foreground">Date:</span>
+                        <span className="text-muted-foreground">{t('smartTransactions.date')}:</span>
                         <span className="ml-2 font-medium">
                           {format(new Date(transaction.transaction_date), 'dd-MM-yyyy')}
                         </span>

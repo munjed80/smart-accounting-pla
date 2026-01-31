@@ -86,7 +86,7 @@ const menuItems: MenuItem[] = [
     label: 'Support',
     tabValue: 'support',
     icon: <Headset size={20} weight="duotone" />,
-    rolesAllowed: ['zzp'],
+    rolesAllowed: ['zzp', 'accountant', 'admin'],
     section: 'secondary',
   },
 ]

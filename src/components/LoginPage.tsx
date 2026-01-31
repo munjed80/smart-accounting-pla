@@ -16,7 +16,7 @@ interface LoginPageProps {
 }
 
 export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
-  const { login, register, resendVerification, isLoading, user } = useAuth()
+  const { login, register, resendVerification, isLoading } = useAuth()
   
   const [loginForm, setLoginForm] = useState({
     username: '',

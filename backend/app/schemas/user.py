@@ -1,27 +1,32 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Literal
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field, field_validator
 import re
 
 
 class UserBase(BaseModel):
+    """Base schema for user data - shared between create and response."""
     email: EmailStr
     full_name: str = Field(..., min_length=1, max_length=255)
+
+
+class UserCreate(UserBase):
+    """Schema for user registration - only allows zzp and accountant roles."""
+    password: str = Field(..., min_length=8, max_length=128)
     # Role validation: admin role is NOT allowed via public registration
     # Admin users can only be created via database seed or protected internal commands
     role: str = Field(default="zzp", pattern="^(zzp|accountant)$")
 
 
-class UserCreate(UserBase):
-    password: str = Field(..., min_length=8, max_length=128)
-
-
 class UserResponse(UserBase):
+    """Schema for user response - includes role field that allows all valid roles."""
     id: UUID
     is_active: bool
     is_email_verified: bool = False
     created_at: datetime
+    # Response schema allows all valid roles including admin (for admin users reading their profile)
+    role: str = Field(default="zzp")
 
     class Config:
         from_attributes = True

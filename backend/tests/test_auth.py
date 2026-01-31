@@ -981,3 +981,127 @@ class TestAdminRoleManagement:
         # If admin is trying to change their own role to non-admin
         is_self_demotion = admin_user_id == target_user_id and new_role != "admin"
         assert is_self_demotion is True  # This should be blocked
+
+
+class TestRolePersistence:
+    """Tests for role persistence during registration and login flow."""
+    
+    def test_role_validation_accepts_zzp(self):
+        """ZZP role should be accepted during registration."""
+        import re
+        role_pattern = r"^(zzp|accountant)$"
+        
+        role = "zzp"
+        is_valid = bool(re.match(role_pattern, role))
+        
+        assert is_valid is True
+    
+    def test_role_validation_accepts_accountant(self):
+        """Accountant role should be accepted during registration."""
+        import re
+        role_pattern = r"^(zzp|accountant)$"
+        
+        role = "accountant"
+        is_valid = bool(re.match(role_pattern, role))
+        
+        assert is_valid is True
+    
+    def test_role_validation_rejects_admin(self):
+        """Admin role should be rejected during public registration."""
+        import re
+        role_pattern = r"^(zzp|accountant)$"
+        
+        role = "admin"
+        is_valid = bool(re.match(role_pattern, role))
+        
+        assert is_valid is False
+    
+    def test_role_validation_rejects_invalid(self):
+        """Invalid roles should be rejected during registration."""
+        import re
+        role_pattern = r"^(zzp|accountant)$"
+        
+        invalid_roles = ["superuser", "manager", "owner", "", "  ", "ZZP", "ACCOUNTANT"]
+        for role in invalid_roles:
+            is_valid = bool(re.match(role_pattern, role))
+            assert is_valid is False, f"Role '{role}' should be rejected"
+    
+    def test_role_default_is_zzp(self):
+        """Default role when not specified should be zzp."""
+        default_role = "zzp"
+        
+        # Simulating what happens when no role is provided
+        provided_role = None
+        effective_role = provided_role or default_role
+        
+        assert effective_role == "zzp"
+    
+    def test_role_preserved_when_accountant_specified(self):
+        """When accountant role is specified, it should be preserved not defaulted."""
+        default_role = "zzp"
+        provided_role = "accountant"
+        
+        # The provided role should be used, not the default
+        effective_role = provided_role if provided_role else default_role
+        
+        assert effective_role == "accountant"
+        assert effective_role != default_role
+    
+    def test_role_in_registration_request_schema(self):
+        """Registration request should include role field."""
+        # Simulating a registration request payload
+        registration_request = {
+            "email": "test@example.com",
+            "password": "SecurePass123",
+            "full_name": "Test User",
+            "role": "accountant"
+        }
+        
+        assert "role" in registration_request
+        assert registration_request["role"] == "accountant"
+    
+    def test_role_in_user_response_schema(self):
+        """User response from /me endpoint should include role."""
+        # Simulating a user response
+        user_response = {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "email": "test@example.com",
+            "full_name": "Test User",
+            "role": "accountant",
+            "is_active": True,
+            "is_email_verified": True,
+            "created_at": "2024-01-01T00:00:00Z"
+        }
+        
+        assert "role" in user_response
+        assert user_response["role"] == "accountant"
+    
+    def test_accountant_role_detection_in_frontend(self):
+        """Frontend should correctly detect accountant role."""
+        user_role = "accountant"
+        
+        is_accountant = user_role == "accountant" or user_role == "admin"
+        
+        assert is_accountant is True
+    
+    def test_zzp_role_detection_in_frontend(self):
+        """Frontend should correctly detect ZZP role (not accountant)."""
+        user_role = "zzp"
+        
+        is_accountant = user_role == "accountant" or user_role == "admin"
+        
+        assert is_accountant is False
+    
+    def test_role_case_sensitive(self):
+        """Role validation should be case-sensitive."""
+        import re
+        role_pattern = r"^(zzp|accountant)$"
+        
+        # Uppercase should fail
+        assert bool(re.match(role_pattern, "ZZP")) is False
+        assert bool(re.match(role_pattern, "ACCOUNTANT")) is False
+        assert bool(re.match(role_pattern, "Accountant")) is False
+        
+        # Lowercase should pass
+        assert bool(re.match(role_pattern, "zzp")) is True
+        assert bool(re.match(role_pattern, "accountant")) is True

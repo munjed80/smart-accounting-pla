@@ -17,6 +17,7 @@ import {
   WarningCircle
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
+import { t } from '@/i18n'
 
 export const Dashboard = () => {
   const { user } = useAuth()
@@ -84,9 +85,9 @@ export const Dashboard = () => {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'DRAFT':
-        return 'Draft'
+        return t('transactionStatus.draft')
       case 'POSTED':
-        return 'Posted'
+        return t('transactionStatus.posted')
       default:
         return status
     }
@@ -99,11 +100,11 @@ export const Dashboard = () => {
           <Alert className="bg-destructive/10 border-destructive/40">
             <WarningCircle className="h-5 w-5 text-destructive" />
             <AlertDescription className="ml-2">
-              <div className="font-semibold mb-2">Failed to connect to backend</div>
+              <div className="font-semibold mb-2">{t('dashboard.failedToConnect')}</div>
               <div className="text-sm text-muted-foreground mb-4">{error}</div>
               <Button onClick={fetchStats} size="sm" variant="outline">
                 <ArrowsClockwise size={16} className="mr-2" />
-                Retry
+                {t('common.retry')}
               </Button>
             </AlertDescription>
           </Alert>
@@ -120,19 +121,19 @@ export const Dashboard = () => {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2">
-              Dashboard
+              {t('dashboard.title')}
             </h1>
             <p className="text-muted-foreground">
-              Welcome back, <span className="font-semibold">{user?.full_name}</span>
+              {t('dashboard.welcomeBack')}, <span className="font-semibold">{user?.full_name}</span>
             </p>
           </div>
           <div className="text-right">
             <Button onClick={fetchStats} variant="outline" size="sm" disabled={isLoading}>
               <ArrowsClockwise size={18} className="mr-2" />
-              Refresh
+              {t('common.refresh')}
             </Button>
             <p className="text-xs text-muted-foreground mt-2">
-              Last updated: {format(lastRefresh, 'HH:mm:ss')}
+              {t('dashboard.lastUpdated')}: {format(lastRefresh, 'HH:mm:ss')}
             </p>
           </div>
         </div>
@@ -142,7 +143,7 @@ export const Dashboard = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <FileText size={18} />
-                Total Transactions
+                {t('dashboard.totalTransactions')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -160,7 +161,7 @@ export const Dashboard = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Clock size={18} />
-                Draft Bookings
+                {t('dashboard.draftBookings')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -178,7 +179,7 @@ export const Dashboard = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <CheckCircle size={18} />
-                Posted Bookings
+                {t('dashboard.postedBookings')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -196,7 +197,7 @@ export const Dashboard = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <TrendUp size={18} />
-                Balance
+                {t('dashboard.balance')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -205,10 +206,10 @@ export const Dashboard = () => {
               ) : (
                 <div className="space-y-1">
                   <div className="text-sm text-muted-foreground">
-                    Debit: {formatCurrency(stats?.total_debit || 0)}
+                    {t('dashboard.debit')}: {formatCurrency(stats?.total_debit || 0)}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Credit: {formatCurrency(stats?.total_credit || 0)}
+                    {t('dashboard.credit')}: {formatCurrency(stats?.total_credit || 0)}
                   </div>
                 </div>
               )}
@@ -220,9 +221,9 @@ export const Dashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Receipt size={24} className="text-primary" />
-              Recent Transactions
+              {t('dashboard.recentTransactions')}
             </CardTitle>
-            <CardDescription>Latest bookings from the system</CardDescription>
+            <CardDescription>{t('dashboard.recentTransactionsDescription')}</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -272,8 +273,8 @@ export const Dashboard = () => {
             ) : (
               <div className="text-center py-12 text-muted-foreground">
                 <Receipt size={48} className="mx-auto mb-4 opacity-50" />
-                <p>No transactions found</p>
-                <p className="text-sm mt-2">Upload invoices to get started</p>
+                <p>{t('dashboard.noTransactions')}</p>
+                <p className="text-sm mt-2">{t('dashboard.noTransactionsDescription')}</p>
               </div>
             )}
           </CardContent>

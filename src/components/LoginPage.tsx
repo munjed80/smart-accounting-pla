@@ -9,6 +9,7 @@ import { Database, Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning, C
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason, checkApiHealth, getErrorMessage, getValidationErrors, HealthCheckResult } from '@/lib/api'
 import { AxiosError } from 'axios'
+import { t } from '@/i18n'
 
 interface LoginPageProps {
   onSuccess?: (user: { role: string } | null) => void
@@ -192,7 +193,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
             <div className="flex items-center justify-center gap-3 mb-4">
               <Database size={48} weight="duotone" className="text-primary" />
               <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-                Smart Accounting
+                {t('brand.name')}
               </h1>
             </div>
           </div>
@@ -202,22 +203,22 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
               <div className="flex justify-center mb-4">
                 <CheckCircle size={48} weight="fill" className="text-green-500" />
               </div>
-              <CardTitle className="text-green-600">Check Your Email</CardTitle>
+              <CardTitle className="text-green-600">{t('auth.checkEmail')}</CardTitle>
               <CardDescription>
-                We've sent a verification link to <strong>{registeredEmail}</strong>
+                {t('auth.checkEmailDescription')} <strong>{registeredEmail}</strong>
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="p-4 bg-secondary/50 rounded-lg text-sm text-muted-foreground text-center">
-                <p>Click the link in the email to verify your account.</p>
-                <p className="mt-2">The link will expire in 24 hours.</p>
+                <p>{t('auth.verificationLinkInfo')}</p>
+                <p className="mt-2">{t('auth.linkExpires')}</p>
               </div>
               
               {resendCooldown > 0 && (
                 <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
                   <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400 text-sm">
                     <Clock size={16} />
-                    <span>Please wait {resendCooldown}s before resending</span>
+                    <span>{t('auth.resendIn')} {resendCooldown}s</span>
                   </div>
                 </div>
               )}
@@ -234,7 +235,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                   ) : (
                     <PaperPlaneTilt size={18} className="mr-2" />
                   )}
-                  {isResending ? 'Sending...' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Verification Email'}
+                  {isResending ? t('common.sending') : resendCooldown > 0 ? `${t('auth.resendIn')} ${resendCooldown}s` : t('auth.resendVerificationEmail')}
                 </Button>
                 
                 <Button
@@ -242,7 +243,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                   onClick={() => setRegistrationSuccess(false)}
                   className="w-full"
                 >
-                  Back to Login
+                  {t('auth.backToLogin')}
                 </Button>
               </div>
             </CardContent>
@@ -261,11 +262,11 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
         <div className="fixed top-0 left-0 right-0 bg-red-600 text-white px-4 py-3 text-center z-50">
           <div className="flex items-center justify-center gap-2 font-medium">
             <Warning size={20} weight="bold" />
-            <span>API Configuration Error</span>
+            <span>{t('api.configError')}</span>
           </div>
           <p className="text-sm mt-1">{misconfigurationReason}</p>
           <p className="text-xs mt-1 opacity-90">
-            Current API URL: <code className="bg-red-800 px-2 py-0.5 rounded">{apiUrl || '(not set)'}</code>
+            {t('api.currentApiUrl')}: <code className="bg-red-800 px-2 py-0.5 rounded">{apiUrl || '(not set)'}</code>
           </p>
         </div>
       )}
@@ -275,23 +276,23 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
           <div className="flex items-center justify-center gap-3 mb-4">
             <Database size={48} weight="duotone" className="text-primary" />
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-              Smart Accounting
+              {t('brand.name')}
             </h1>
           </div>
-          <p className="text-muted-foreground">Professional accounting platform</p>
+          <p className="text-muted-foreground">{t('brand.tagline')}</p>
         </div>
 
         <Tabs defaultValue="login" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="login">Login</TabsTrigger>
-            <TabsTrigger value="register">Register</TabsTrigger>
+            <TabsTrigger value="login">{t('auth.login')}</TabsTrigger>
+            <TabsTrigger value="register">{t('auth.register')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="login">
             <Card className="bg-card/80 backdrop-blur-sm border-2 border-primary/20">
               <CardHeader>
-                <CardTitle>Welcome Back</CardTitle>
-                <CardDescription>Login to your accounting dashboard</CardDescription>
+                <CardTitle>{t('auth.welcomeBack')}</CardTitle>
+                <CardDescription>{t('auth.loginDescription')}</CardDescription>
               </CardHeader>
               <CardContent>
                 {/* Email Not Verified Warning */}
@@ -301,15 +302,15 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                       <Warning size={20} className="text-yellow-600 dark:text-yellow-400 mt-0.5" />
                       <div className="flex-1">
                         <p className="text-yellow-700 dark:text-yellow-400 font-medium text-sm">
-                          Email not verified
+                          {t('auth.emailNotVerified')}
                         </p>
                         <p className="text-yellow-600 dark:text-yellow-500 text-sm mt-1">
-                          Please check your inbox for a verification email.
+                          {t('auth.emailNotVerifiedDescription')}
                         </p>
                         {resendCooldown > 0 ? (
                           <p className="text-yellow-600 dark:text-yellow-500 text-sm mt-2 flex items-center gap-1">
                             <Clock size={14} />
-                            Wait {resendCooldown}s to resend
+                            {t('auth.waitToResend').replace('{seconds}', String(resendCooldown))}
                           </p>
                         ) : (
                           <Button
@@ -324,7 +325,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                             ) : (
                               <PaperPlaneTilt size={14} className="mr-1" />
                             )}
-                            {isResending ? 'Sending...' : 'Resend verification email'}
+                            {isResending ? t('common.sending') : t('auth.resendVerificationEmail')}
                           </Button>
                         )}
                       </div>
@@ -339,7 +340,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                       <Warning size={20} className="text-red-600 dark:text-red-400 mt-0.5" weight="fill" aria-hidden="true" />
                       <div className="flex-1">
                         <p className="text-red-700 dark:text-red-400 font-medium text-sm">
-                          Login Failed
+                          {t('auth.loginFailed')}
                         </p>
                         <p className="text-red-600 dark:text-red-500 text-sm mt-1">
                           {loginError}
@@ -351,13 +352,13 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
 
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
+                    <Label htmlFor="login-email">{t('auth.email')}</Label>
                     <div className="relative">
                       <Envelope className="absolute left-3 top-3 text-muted-foreground" size={18} />
                       <Input
                         id="login-email"
                         type="email"
-                        placeholder="your@email.com"
+                        placeholder="uw@email.nl"
                         value={loginForm.username}
                         onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
                         className="pl-10"
@@ -368,7 +369,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
 
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <Label htmlFor="login-password">Password</Label>
+                      <Label htmlFor="login-password">{t('auth.password')}</Label>
                       {onForgotPassword && (
                         <Button
                           type="button"
@@ -377,7 +378,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                           className="text-xs p-0 h-auto"
                           onClick={onForgotPassword}
                         >
-                          Forgot password?
+                          {t('auth.forgotPassword')}
                         </Button>
                       )}
                     </div>
@@ -396,7 +397,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                   </div>
 
                   <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Logging in...' : 'Login'}
+                    {isLoading ? t('auth.loggingIn') : t('auth.login')}
                   </Button>
                 </form>
               </CardContent>
@@ -406,8 +407,8 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
           <TabsContent value="register">
             <Card className="bg-card/80 backdrop-blur-sm border-2 border-primary/20">
               <CardHeader>
-                <CardTitle>Create Account</CardTitle>
-                <CardDescription>Register for a new accounting account</CardDescription>
+                <CardTitle>{t('auth.createAccount')}</CardTitle>
+                <CardDescription>{t('auth.registerDescription')}</CardDescription>
               </CardHeader>
               <CardContent>
                 {/* Register Error Message - shown even if toast fails */}
@@ -417,7 +418,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                       <Warning size={20} className="text-red-600 dark:text-red-400 mt-0.5" weight="fill" aria-hidden="true" />
                       <div className="flex-1">
                         <p className="text-red-700 dark:text-red-400 font-medium text-sm">
-                          Registration Failed
+                          {t('auth.registrationFailed')}
                         </p>
                         <p className="text-red-600 dark:text-red-500 text-sm mt-1">
                           {registerError}
@@ -429,13 +430,13 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
 
                 <form onSubmit={handleRegister} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="register-name">Full Name</Label>
+                    <Label htmlFor="register-name">{t('auth.fullName')}</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-3 text-muted-foreground" size={18} />
                       <Input
                         id="register-name"
                         type="text"
-                        placeholder="John Doe"
+                        placeholder="Jan de Vries"
                         value={registerForm.full_name}
                         onChange={(e) => setRegisterForm({ ...registerForm, full_name: e.target.value })}
                         className={`pl-10 ${registerFieldErrors.full_name ? 'border-red-500' : ''}`}
@@ -450,13 +451,13 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-email">Email</Label>
+                    <Label htmlFor="register-email">{t('auth.email')}</Label>
                     <div className="relative">
                       <Envelope className="absolute left-3 top-3 text-muted-foreground" size={18} />
                       <Input
                         id="register-email"
                         type="email"
-                        placeholder="your@email.com"
+                        placeholder="uw@email.nl"
                         value={registerForm.email}
                         onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
                         className={`pl-10 ${registerFieldErrors.email ? 'border-red-500' : ''}`}
@@ -471,7 +472,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-password">Password</Label>
+                    <Label htmlFor="register-password">{t('auth.password')}</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 text-muted-foreground" size={18} />
                       <Input
@@ -490,12 +491,12 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                     {registerFieldErrors.password ? (
                       <p id="register-password-error" className="text-xs text-red-500" role="alert">{registerFieldErrors.password}</p>
                     ) : (
-                      <p id="register-password-hint" className="text-xs text-muted-foreground">At least 8 characters</p>
+                      <p id="register-password-hint" className="text-xs text-muted-foreground">{t('auth.passwordHint')}</p>
                     )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-role">Role</Label>
+                    <Label htmlFor="register-role">{t('auth.role')}</Label>
                     <Select
                       value={registerForm.role}
                       onValueChange={(value: 'zzp' | 'accountant') => 
@@ -506,8 +507,8 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="zzp">ZZP (Self-Employed)</SelectItem>
-                        <SelectItem value="accountant">Accountant</SelectItem>
+                        <SelectItem value="zzp">{t('roles.zzpDescription')}</SelectItem>
+                        <SelectItem value="accountant">{t('roles.accountant')}</SelectItem>
                         {/* Admin role is NOT available via public registration for security */}
                         {/* Admin users can only be created via database seed */}
                       </SelectContent>
@@ -518,7 +519,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                   </div>
 
                   <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Creating account...' : 'Create Account'}
+                    {isLoading ? t('auth.creatingAccount') : t('auth.createAccount')}
                   </Button>
                 </form>
               </CardContent>
@@ -529,7 +530,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
         {/* API Connectivity Test Panel */}
         <div className="mt-6 p-4 bg-card/60 backdrop-blur-sm rounded-lg border border-border/50">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-muted-foreground">API Connectivity</span>
+            <span className="text-sm font-medium text-muted-foreground">{t('api.connectivity')}</span>
             <Button 
               variant="ghost" 
               size="sm" 
@@ -542,7 +543,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
               ) : (
                 <WifiHigh size={14} className="mr-1" />
               )}
-              {isCheckingHealth ? 'Checking...' : 'Test'}
+              {isCheckingHealth ? t('api.checking') : t('api.test')}
             </Button>
           </div>
           
@@ -580,7 +581,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
           
           {!healthCheck && !isCheckingHealth && (
             <p className="text-xs text-muted-foreground">
-              Click "Test" to check API connectivity
+              {t('api.testConnectivity')}
             </p>
           )}
         </div>

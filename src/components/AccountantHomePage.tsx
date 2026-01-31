@@ -6,6 +6,7 @@
  * - Tabs: "Needs Review", "VAT Due", "Red Issues", "Backlog", "Alerts"
  * - Multi-select clients + bulk actions
  * - Per-client result statuses
+ * - Review Queue for selected client
  */
 
 import { useEffect, useState, useCallback } from 'react'
@@ -68,8 +69,12 @@ import {
   Lock,
   CaretUp,
   CaretDown,
+  CaretLeft,
+  Eye,
 } from '@phosphor-icons/react'
 import { format, formatDistanceToNow } from 'date-fns'
+import { ReviewQueue } from './ReviewQueue'
+import { navigateTo } from '@/lib/navigation'
 
 // KPI Card Component
 const KPICard = ({ 
@@ -118,10 +123,12 @@ const ClientRow = ({
   client, 
   isSelected,
   onSelect,
+  onViewReviewQueue,
 }: { 
   client: ClientStatusCard
   isSelected: boolean
   onSelect: (id: string, selected: boolean) => void
+  onViewReviewQueue: (client: ClientStatusCard) => void
 }) => {
   const scoreColor = client.readiness_score >= 80 ? 'text-green-600' : 
                      client.readiness_score >= 50 ? 'text-amber-600' : 'text-red-600'
@@ -189,6 +196,16 @@ const ClientRow = ({
           <span className="text-muted-foreground">Never</span>
         )}
       </TableCell>
+      <TableCell>
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => onViewReviewQueue(client)}
+        >
+          <Eye size={16} className="mr-1" />
+          Review
+        </Button>
+      </TableCell>
     </TableRow>
   )
 }
@@ -204,6 +221,9 @@ export const AccountantHomePage = () => {
   
   // Selection state
   const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set())
+  
+  // Review Queue state - for viewing a specific client's documents
+  const [reviewQueueClient, setReviewQueueClient] = useState<ClientStatusCard | null>(null)
   
   // Sorting state
   const [sortBy, setSortBy] = useState('readiness_score')
@@ -222,6 +242,19 @@ export const AccountantHomePage = () => {
   const [reminderTitle, setReminderTitle] = useState('')
   const [reminderMessage, setReminderMessage] = useState('')
   const [reminderType, setReminderType] = useState('ACTION_REQUIRED')
+  
+  // Check for selectedClientId in localStorage on mount
+  useEffect(() => {
+    const storedClientId = localStorage.getItem('selectedClientId')
+    if (storedClientId && clients.length > 0) {
+      const client = clients.find(c => c.id === storedClientId)
+      if (client) {
+        setReviewQueueClient(client)
+        // Clear from localStorage after use
+        localStorage.removeItem('selectedClientId')
+      }
+    }
+  }, [clients])
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -352,6 +385,16 @@ export const AccountantHomePage = () => {
     if (sortBy !== field) return null
     return sortOrder === 'asc' ? <CaretUp size={14} /> : <CaretDown size={14} />
   }
+  
+  // Handle view review queue for a client
+  const handleViewReviewQueue = (client: ClientStatusCard) => {
+    setReviewQueueClient(client)
+  }
+  
+  // Close review queue and go back to client list
+  const handleCloseReviewQueue = () => {
+    setReviewQueueClient(null)
+  }
 
   // Check access
   if (user?.role !== 'accountant' && user?.role !== 'admin') {
@@ -365,6 +408,29 @@ export const AccountantHomePage = () => {
               This page is only available for accountants managing ZZP clients.
             </AlertDescription>
           </Alert>
+        </div>
+      </div>
+    )
+  }
+  
+  // If a client is selected for review queue, show that view
+  if (reviewQueueClient) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Back button */}
+          <div className="mb-4">
+            <Button variant="ghost" onClick={handleCloseReviewQueue}>
+              <CaretLeft size={18} className="mr-2" />
+              Back to Client List
+            </Button>
+          </div>
+          
+          <ReviewQueue
+            clientId={reviewQueueClient.id}
+            clientName={reviewQueueClient.name}
+            onClose={handleCloseReviewQueue}
+          />
         </div>
       </div>
     )
@@ -574,6 +640,9 @@ export const AccountantHomePage = () => {
                     >
                       Activity <SortIcon field="last_activity" />
                     </TableHead>
+                    <TableHead>
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -583,6 +652,7 @@ export const AccountantHomePage = () => {
                       client={client}
                       isSelected={selectedClientIds.has(client.id)}
                       onSelect={handleSelectClient}
+                      onViewReviewQueue={handleViewReviewQueue}
                     />
                   ))}
                 </TableBody>

@@ -16,6 +16,7 @@ import { AccountantActionsPage } from '@/components/AccountantActionsPage'
 import { AccountantClientsPage } from '@/components/AccountantClientsPage'
 import { ZZPAccountantLinksPage } from '@/components/ZZPAccountantLinksPage'
 import { ClientDossierPage } from '@/components/ClientDossierPage'
+import { BulkOperationsHistoryPage } from '@/components/BulkOperationsHistoryPage'
 import { IntelligentUploadPortal } from '@/components/IntelligentUploadPortal'
 import { SmartTransactionList } from '@/components/SmartTransactionList'
 import { SettingsPage } from '@/components/SettingsPage'
@@ -35,6 +36,7 @@ type Route =
   | { type: 'accountant-onboarding' }
   | { type: 'app'; path: string }
   | { type: 'client-dossier'; clientId: string; tab: 'issues' | 'periods' | 'decisions' }
+  | { type: 'bulk-operations-history' }
 
 // Parse client dossier route
 const parseClientDossierRoute = (path: string): { clientId: string; tab: 'issues' | 'periods' | 'decisions' } | null => {
@@ -78,6 +80,11 @@ const getRouteFromURL = (): Route => {
   
   if (path === '/accountant/onboarding') {
     return { type: 'accountant-onboarding' }
+  }
+  
+  // Check for bulk operations history route
+  if (path === '/accountant/bulk-operations') {
+    return { type: 'bulk-operations-history' }
   }
   
   // Check for client dossier routes: /accountant/clients/:clientId[/:tab]
@@ -387,6 +394,18 @@ const AppContent = () => {
           clientId={route.clientId} 
           initialTab={route.tab}
         />
+      </AppShell>
+    )
+  }
+  
+  // Show bulk operations history page for accountants
+  if (route.type === 'bulk-operations-history' && isAccountant) {
+    return (
+      <AppShell 
+        activeTab="workqueue" 
+        onTabChange={handleTabChange}
+      >
+        <BulkOperationsHistoryPage />
       </AppShell>
     )
   }

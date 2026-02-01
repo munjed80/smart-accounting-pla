@@ -102,7 +102,7 @@ export const ClientAccessError = ({
           
           {clientName && type !== 'no_client' && (
             <p className="text-sm text-muted-foreground">
-              <strong>Klant:</strong> {clientName}
+              <strong>{t('clientSwitcher.client')}:</strong> {clientName}
             </p>
           )}
 

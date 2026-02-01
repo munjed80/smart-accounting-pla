@@ -816,6 +816,7 @@ export const nl = {
     selectClientFirst: "Selecteer eerst een klant.",
     change: "Wijzigen",
     goToClients: "Ga naar Klanten",
+    client: "Klant",
   },
 
   // Review queue tabs

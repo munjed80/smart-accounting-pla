@@ -189,7 +189,6 @@ export const ZZPAccountantLinksPage = () => {
   const [pendingRequests, setPendingRequests] = useState<PendingLinkRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
   const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set())
   const [rejectingIds, setRejectingIds] = useState<Set<string>>(new Set())
 

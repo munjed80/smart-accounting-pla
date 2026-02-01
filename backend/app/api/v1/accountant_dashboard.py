@@ -22,6 +22,8 @@ from app.models.administration import Administration, AdministrationMember, Memb
 from app.models.issues import ClientIssue, IssueSeverity
 from app.models.accountant_dashboard import (
     AccountantClientAssignment,
+    AssignmentStatus,
+    InvitedBy,
     BulkOperation,
     BulkOperationType as ModelBulkOperationType,
     BulkOperationResult,
@@ -51,6 +53,10 @@ from app.schemas.accountant_dashboard import (
     AccountantAssignmentsListResponse,
     AccountantClientListItem,
     AccountantClientListResponse,
+    InviteClientRequest,
+    InviteClientResponse,
+    ClientLinkItem,
+    AccountantClientLinksResponse,
 )
 from app.services.accountant_dashboard import (
     AccountantDashboardService,
@@ -751,6 +757,218 @@ async def create_assignment_by_email(
         assigned_by_name=current_user.full_name,
         notes=assignment.notes,
     )
+
+
+# ============ Client Consent Workflow Endpoints ============
+
+@router.post("/clients/invite", response_model=InviteClientResponse)
+async def invite_client(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: InviteClientRequest,
+):
+    """
+    Invite a ZZP client by email (accountant self-serve).
+    
+    This creates a PENDING assignment that requires client approval.
+    
+    Flow:
+    1. Find ZZP user by email
+    2. Find their administration
+    3. Create PENDING assignment (idempotent: returns existing if found)
+    
+    Error codes:
+    - USER_NOT_FOUND: No user with that email
+    - NOT_ZZP_USER: User is not a ZZP client
+    - NO_ADMINISTRATION: User has no administration
+    """
+    verify_accountant_role(current_user)
+    
+    # Find the user by email
+    user_result = await db.execute(
+        select(User).where(User.email == request.email.lower().strip())
+    )
+    client_user = user_result.scalar_one_or_none()
+    
+    if not client_user:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "USER_NOT_FOUND",
+                "message": f"Geen gebruiker gevonden met e-mail: {request.email}"
+            }
+        )
+    
+    # Verify user is a ZZP user
+    if client_user.role != "zzp":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "NOT_ZZP_USER",
+                "message": "Deze gebruiker is geen ZZP klant."
+            }
+        )
+    
+    # Find user's administration (they should be owner of at least one)
+    admin_member_result = await db.execute(
+        select(AdministrationMember)
+        .options(selectinload(AdministrationMember.administration))
+        .where(AdministrationMember.user_id == client_user.id)
+        .where(AdministrationMember.role == MemberRole.OWNER)
+        .limit(1)
+    )
+    admin_member = admin_member_result.scalar_one_or_none()
+    
+    if not admin_member or not admin_member.administration:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "NO_ADMINISTRATION",
+                "message": "Deze gebruiker heeft geen administratie om toe te wijzen."
+            }
+        )
+    
+    administration = admin_member.administration
+    
+    # Check if assignment already exists (idempotent)
+    existing_result = await db.execute(
+        select(AccountantClientAssignment)
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+        .where(AccountantClientAssignment.administration_id == administration.id)
+        .where(AccountantClientAssignment.status.in_([AssignmentStatus.PENDING, AssignmentStatus.ACTIVE]))
+    )
+    existing_assignment = existing_result.scalar_one_or_none()
+    
+    if existing_assignment:
+        # Return existing assignment (idempotent)
+        return InviteClientResponse(
+            assignment_id=existing_assignment.id,
+            status=existing_assignment.status.value,
+            client_name=client_user.full_name,
+            client_email=client_user.email,
+            message=f"Uitnodiging al verstuurd. Status: {existing_assignment.status.value}",
+        )
+    
+    # Create new PENDING assignment
+    assignment = AccountantClientAssignment(
+        accountant_id=current_user.id,
+        client_user_id=client_user.id,
+        administration_id=administration.id,
+        status=AssignmentStatus.PENDING,
+        invited_by=InvitedBy.ACCOUNTANT,
+        is_primary=True,
+        assigned_by_id=current_user.id,
+        notes=f"Accountant-initiated invitation for {request.email}",
+    )
+    db.add(assignment)
+    await db.commit()
+    await db.refresh(assignment)
+    
+    return InviteClientResponse(
+        assignment_id=assignment.id,
+        status="PENDING",
+        client_name=client_user.full_name,
+        client_email=client_user.email,
+        message="Uitnodiging succesvol verstuurd. Wacht op goedkeuring van de klant.",
+    )
+
+
+@router.get("/clients/links", response_model=AccountantClientLinksResponse)
+async def list_client_links(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Get list of client links with consent status for the current accountant.
+    
+    Returns:
+    - PENDING: Awaiting client approval
+    - ACTIVE: Approved and accessible
+    - REVOKED: Rejected or revoked (excluded from this list)
+    
+    Each link includes:
+    - Client user info (id, email, name)
+    - Status and timestamps
+    - Open issue counts
+    - Administration info
+    """
+    verify_accountant_role(current_user)
+    
+    # Get all non-revoked assignments for current accountant
+    assignments_result = await db.execute(
+        select(AccountantClientAssignment)
+        .options(
+            selectinload(AccountantClientAssignment.client_user),
+            selectinload(AccountantClientAssignment.administration),
+        )
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+        .where(AccountantClientAssignment.status != AssignmentStatus.REVOKED)
+        .order_by(AccountantClientAssignment.assigned_at.desc())
+    )
+    assignments = assignments_result.scalars().all()
+    
+    links = []
+    pending_count = 0
+    active_count = 0
+    
+    for assignment in assignments:
+        client_user = assignment.client_user
+        admin = assignment.administration
+        
+        if not client_user or not admin:
+            continue
+        
+        # Count status
+        if assignment.status == AssignmentStatus.PENDING:
+            pending_count += 1
+        elif assignment.status == AssignmentStatus.ACTIVE:
+            active_count += 1
+        
+        # Get issue counts for ACTIVE assignments
+        red_count = 0
+        yellow_count = 0
+        if assignment.status == AssignmentStatus.ACTIVE:
+            red_count_result = await db.execute(
+                select(func.count(ClientIssue.id))
+                .where(ClientIssue.administration_id == admin.id)
+                .where(ClientIssue.severity == IssueSeverity.RED)
+                .where(ClientIssue.is_resolved == False)
+            )
+            red_count = red_count_result.scalar() or 0
+            
+            yellow_count_result = await db.execute(
+                select(func.count(ClientIssue.id))
+                .where(ClientIssue.administration_id == admin.id)
+                .where(ClientIssue.severity == IssueSeverity.YELLOW)
+                .where(ClientIssue.is_resolved == False)
+            )
+            yellow_count = yellow_count_result.scalar() or 0
+        
+        links.append(
+            ClientLinkItem(
+                assignment_id=assignment.id,
+                client_user_id=client_user.id,
+                client_email=client_user.email,
+                client_name=client_user.full_name,
+                administration_id=admin.id,
+                administration_name=admin.name,
+                status=assignment.status.value,
+                invited_by=assignment.invited_by.value,
+                assigned_at=assignment.assigned_at,
+                approved_at=assignment.approved_at,
+                revoked_at=assignment.revoked_at,
+                open_red_count=red_count,
+                open_yellow_count=yellow_count,
+            )
+        )
+    
+    return AccountantClientLinksResponse(
+        links=links,
+        pending_count=pending_count,
+        active_count=active_count,
+        total_count=len(links),
+    )
+
 
 
 @router.get("/clients", response_model=AccountantClientListResponse)

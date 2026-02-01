@@ -663,9 +663,15 @@ export const AccountantHomePage = () => {
               <div className="text-center py-12 text-muted-foreground">
                 <Users size={48} className="mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium">{t('accountantDashboard.noClientsTitle')}</p>
-                <p className="text-sm mt-2">
+                <p className="text-sm mt-2 mb-4">
                   {t('accountantDashboard.noClientsDesc')}
                 </p>
+                <Button 
+                  variant="outline"
+                  onClick={() => navigateTo('/accountant/onboarding')}
+                >
+                  {t('accountantDashboard.goToOnboarding')}
+                </Button>
               </div>
             )}
           </CardContent>

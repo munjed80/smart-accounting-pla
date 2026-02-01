@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models.administration import Administration, AdministrationMember, MemberRole
 from app.models.issues import ClientIssue
 from app.models.decisions import (
     SuggestedAction,
@@ -39,36 +38,9 @@ from app.schemas.decisions import (
     ReverseActionResponse,
 )
 from app.services.decisions import SuggestionService, DecisionService, ActionExecutor
-from app.api.v1.deps import CurrentUser
+from app.api.v1.deps import CurrentUser, require_assigned_client
 
 router = APIRouter()
-
-
-async def verify_accountant_access(
-    client_id: UUID,
-    current_user: CurrentUser,
-    db: AsyncSession,
-) -> Administration:
-    """Verify user has accountant access to the client."""
-    if current_user.role not in ["accountant", "admin"]:
-        raise HTTPException(
-            status_code=403,
-            detail="This endpoint is only available for accountants"
-        )
-    
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(Administration.id == client_id)
-        .where(AdministrationMember.user_id == current_user.id)
-        .where(AdministrationMember.role.in_([MemberRole.OWNER, MemberRole.ADMIN, MemberRole.ACCOUNTANT]))
-    )
-    administration = result.scalar_one_or_none()
-    
-    if not administration:
-        raise HTTPException(status_code=404, detail="Client not found or access denied")
-    
-    return administration
 
 
 async def verify_issue_access(
@@ -86,8 +58,8 @@ async def verify_issue_access(
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
     
-    # Verify access to the administration
-    await verify_accountant_access(issue.administration_id, current_user, db)
+    # Verify access to the administration using reusable guard
+    await require_assigned_client(issue.administration_id, current_user, db)
     
     return issue
 
@@ -225,7 +197,7 @@ async def execute_decision(
         raise HTTPException(status_code=404, detail="Decision not found")
     
     # Verify access
-    await verify_accountant_access(
+    await require_assigned_client(
         decision.issue.administration_id,
         current_user,
         db
@@ -295,7 +267,7 @@ async def reverse_decision(
         raise HTTPException(status_code=404, detail="Decision not found")
     
     # Verify access
-    await verify_accountant_access(
+    await require_assigned_client(
         decision.issue.administration_id,
         current_user,
         db
@@ -349,7 +321,7 @@ async def get_decision_history(
     Returns all decisions made on issues for this client,
     sorted by most recent first.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     decision_service = DecisionService(db)
     decisions = await decision_service.get_decision_history(
@@ -395,7 +367,7 @@ async def get_decision_patterns(
     Shows which issue+action combinations have been frequently
     approved or rejected, and their confidence adjustments.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     decision_service = DecisionService(db)
     patterns = await decision_service.get_patterns(client_id)

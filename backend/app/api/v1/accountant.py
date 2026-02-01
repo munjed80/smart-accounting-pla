@@ -17,12 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models.administration import Administration, AdministrationMember, MemberRole
 from app.models.document import Document, DocumentStatus
 from app.models.ledger import JournalEntry, JournalEntryStatus
 from app.models.subledger import OpenItem, OpenItemStatus
 from app.models.issues import ClientIssue, IssueSeverity, ValidationRun
-from app.models.accountant_dashboard import AccountantClientAssignment
 from app.schemas.issues import (
     ClientOverviewResponse,
     ClientIssueResponse,
@@ -42,49 +40,9 @@ from app.schemas.reports import (
 )
 from app.services.validation import ConsistencyEngine
 from app.services.reports import ReportService
-from app.api.v1.deps import CurrentUser, require_accountant
+from app.api.v1.deps import CurrentUser, require_assigned_client
 
 router = APIRouter()
-
-
-async def verify_accountant_access(
-    client_id: UUID,
-    current_user: CurrentUser,
-    db: AsyncSession,
-) -> Administration:
-    """
-    Verify user has accountant access to the client.
-    
-    Checks both AdministrationMember and AccountantClientAssignment tables.
-    """
-    require_accountant(current_user)
-    
-    # First check via AdministrationMember (direct membership)
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(Administration.id == client_id)
-        .where(AdministrationMember.user_id == current_user.id)
-        .where(AdministrationMember.role.in_([MemberRole.OWNER, MemberRole.ADMIN, MemberRole.ACCOUNTANT]))
-    )
-    administration = result.scalar_one_or_none()
-    
-    if administration:
-        return administration
-    
-    # Also check via AccountantClientAssignment (assignment-based access)
-    assignment_result = await db.execute(
-        select(Administration)
-        .join(AccountantClientAssignment, AccountantClientAssignment.administration_id == Administration.id)
-        .where(Administration.id == client_id)
-        .where(AccountantClientAssignment.accountant_id == current_user.id)
-    )
-    administration = assignment_result.scalar_one_or_none()
-    
-    if not administration:
-        raise HTTPException(status_code=404, detail="Client not found or access denied")
-    
-    return administration
 
 
 @router.get("/clients/{client_id}/overview", response_model=ClientOverviewResponse)
@@ -102,7 +60,7 @@ async def get_client_overview(
     - Warnings
     - Upcoming deadlines (placeholder)
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     # Count missing/failed documents
     doc_result = await db.execute(
@@ -193,7 +151,7 @@ async def get_client_issues(
     - Suggested action
     - References (document_id, journal_entry_id, account_id)
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     # Build query
     query = (
@@ -235,7 +193,7 @@ async def recalculate_journal(
     This is idempotent and safe to run multiple times.
     It runs all consistency checks and updates the issues list.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     # Check for recent validation run (prevent spam)
     if not request.force:
@@ -280,7 +238,7 @@ async def get_balance_sheet(
     """
     Get Balance Sheet (Activa/Passiva) report for a client.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     report_date = as_of_date or date.today()
     report_service = ReportService(db, client_id)
@@ -332,7 +290,7 @@ async def get_profit_and_loss(
     """
     Get Profit & Loss (Winst- en verliesrekening) report for a client.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     today = date.today()
     report_start = start_date or date(today.year, 1, 1)
@@ -389,7 +347,7 @@ async def get_accounts_receivable(
     
     Shows all open items with aging information.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     report_service = ReportService(db, client_id)
     report = await report_service.get_accounts_receivable(as_of_date)
@@ -432,7 +390,7 @@ async def get_accounts_payable(
     
     Shows all open items with aging information.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     report_service = ReportService(db, client_id)
     report = await report_service.get_accounts_payable(as_of_date)

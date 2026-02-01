@@ -24,6 +24,14 @@ import {
 import { DashboardSummary, ClientStatusCard } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 
+// Business logic thresholds for task prioritization
+// VAT deadlines within this many days are considered urgent ("Nu doen")
+const VAT_URGENT_DAYS = 5
+// VAT deadlines within this many days are considered upcoming ("Vandaag")
+const VAT_UPCOMING_DAYS = 14
+// Document backlog above this threshold is marked as urgent
+const BACKLOG_URGENT_THRESHOLD = 20
+
 // Priority levels for tasks
 type Priority = 'nu_doen' | 'vandaag' | 'kan_wachten'
 
@@ -156,9 +164,9 @@ export const TodayCommandPanel = ({ summary, clients, isLoading }: TodayCommandP
       })
     }
     
-    // 2. VAT deadlines within 5 days - critical
+    // 2. VAT deadlines within urgent threshold - critical
     const urgentVatClients = clients.filter(c => 
-      c.days_to_vat_deadline !== null && c.days_to_vat_deadline <= 5
+      c.days_to_vat_deadline !== null && c.days_to_vat_deadline <= VAT_URGENT_DAYS
     ).length
     
     if (urgentVatClients > 0) {
@@ -167,8 +175,8 @@ export const TodayCommandPanel = ({ summary, clients, isLoading }: TodayCommandP
         icon: Calendar,
         iconColor: 'red',
         text: urgentVatClients === 1
-          ? '1 klant met BTW-deadline binnen 5 dagen'
-          : `${urgentVatClients} klanten met BTW-deadline binnen 5 dagen`,
+          ? `1 klant met BTW-deadline binnen ${VAT_URGENT_DAYS} dagen`
+          : `${urgentVatClients} klanten met BTW-deadline binnen ${VAT_URGENT_DAYS} dagen`,
         priority: 'nu_doen',
         link: '/accountant?tab=vat_due',
         count: urgentVatClients,
@@ -191,11 +199,11 @@ export const TodayCommandPanel = ({ summary, clients, isLoading }: TodayCommandP
       })
     }
     
-    // 4. VAT deadlines within 7-14 days - today priority
+    // 4. VAT deadlines within upcoming threshold - today priority
     const upcomingVatClients = clients.filter(c => 
       c.days_to_vat_deadline !== null && 
-      c.days_to_vat_deadline > 5 && 
-      c.days_to_vat_deadline <= 14
+      c.days_to_vat_deadline > VAT_URGENT_DAYS && 
+      c.days_to_vat_deadline <= VAT_UPCOMING_DAYS
     ).length
     
     if (upcomingVatClients > 0) {
@@ -217,11 +225,11 @@ export const TodayCommandPanel = ({ summary, clients, isLoading }: TodayCommandP
       allTasks.push({
         id: 'backlog',
         icon: Stack,
-        iconColor: summary.document_backlog_total > 20 ? 'yellow' : 'green',
+        iconColor: summary.document_backlog_total > BACKLOG_URGENT_THRESHOLD ? 'yellow' : 'green',
         text: summary.document_backlog_total === 1
           ? '1 document in achterstand'
           : `${summary.document_backlog_total} documenten in achterstand`,
-        priority: summary.document_backlog_total > 20 ? 'vandaag' : 'kan_wachten',
+        priority: summary.document_backlog_total > BACKLOG_URGENT_THRESHOLD ? 'vandaag' : 'kan_wachten',
         link: '/accountant?tab=all',
         count: summary.document_backlog_total,
       })
@@ -244,8 +252,17 @@ export const TodayCommandPanel = ({ summary, clients, isLoading }: TodayCommandP
     incrementCompletedActions()
     
     // Parse tab from link and set active tab
-    const url = new URL(task.link, window.location.origin)
-    const tab = url.searchParams.get('tab')
+    // Since our links are always relative paths like '/accountant?tab=xxx',
+    // we can safely parse them with URL constructor
+    let tab: string | null = null
+    try {
+      const url = new URL(task.link, window.location.origin)
+      tab = url.searchParams.get('tab')
+    } catch {
+      // If URL parsing fails, try to extract tab parameter manually
+      const tabMatch = task.link.match(/[?&]tab=([^&]+)/)
+      tab = tabMatch ? tabMatch[1] : null
+    }
     
     if (tab) {
       // Store the tab in sessionStorage for the page to pick up

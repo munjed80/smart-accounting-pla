@@ -10,6 +10,7 @@ import { SmartDashboard } from '@/components/SmartDashboard'
 import { AccountantDashboard } from '@/components/AccountantDashboard'
 import { AccountantHomePage } from '@/components/AccountantHomePage'
 import { AccountantReviewQueuePage } from '@/components/AccountantReviewQueuePage'
+import { AccountantRemindersPage } from '@/components/AccountantRemindersPage'
 import { ClientDossierPage } from '@/components/ClientDossierPage'
 import { IntelligentUploadPortal } from '@/components/IntelligentUploadPortal'
 import { SmartTransactionList } from '@/components/SmartTransactionList'
@@ -105,6 +106,8 @@ const pathToTab = (path: string, isAccountant: boolean): string => {
     case '/clients':
     case '/accountant/clients':
       return 'clients'
+    case '/accountant/reminders':
+      return 'reminders'
     case '/ai-upload':
     case '/upload':
       return 'upload'
@@ -130,6 +133,8 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
       return isAccountant ? '/accountant' : '/dashboard'
     case 'reviewqueue':
       return '/accountant/review-queue'
+    case 'reminders':
+      return '/accountant/reminders'
     case 'clients':
       return isAccountant ? '/accountant/clients' : '/clients'
     case 'upload':
@@ -146,7 +151,7 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
 const AppContent = () => {
   const { user, isAuthenticated, isLoading } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'transactions' | 'upload' | 'settings' | 'support'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'transactions' | 'upload' | 'settings' | 'support'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
   // Onboarding state - tracks if user needs onboarding (no administrations for ZZP, no clients for accountants)
@@ -382,6 +387,8 @@ const AppContent = () => {
         return isAccountant ? <AccountantDashboard /> : <SmartDashboard />
       case 'reviewqueue':
         return isAccountant ? <AccountantReviewQueuePage /> : <SmartDashboard />
+      case 'reminders':
+        return isAccountant ? <AccountantRemindersPage /> : <SmartDashboard />
       case 'dashboard':
         return <SmartDashboard />
       case 'transactions':

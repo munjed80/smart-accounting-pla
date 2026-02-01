@@ -41,6 +41,22 @@ import { ClientIssuesTab } from '@/components/ClientIssuesTab'
 import { ClientPeriodsTab } from '@/components/ClientPeriodsTab'
 import { ClientDecisionsTab } from '@/components/ClientDecisionsTab'
 
+/**
+ * Check if an error is a CLIENT_NOT_ASSIGNED error (403).
+ * Returns true if the user is not assigned to the requested client.
+ */
+function isClientNotAssignedError(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null || !('response' in err)) {
+    return false
+  }
+  const response = (err as { response?: { status?: number; data?: { detail?: { code?: string } | string } } }).response
+  if (response?.status !== 403) {
+    return false
+  }
+  const detail = response?.data?.detail
+  return typeof detail === 'object' && detail?.code === 'CLIENT_NOT_ASSIGNED'
+}
+
 interface ClientDossierPageProps {
   clientId: string
   initialTab?: 'issues' | 'periods' | 'decisions'
@@ -74,16 +90,12 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
       }
     } catch (err: unknown) {
       // Check if it's a CLIENT_NOT_ASSIGNED error (403)
-      if (typeof err === 'object' && err !== null && 'response' in err) {
-        const response = (err as { response?: { status?: number; data?: { detail?: { code?: string } | string } } }).response
-        const detail = response?.data?.detail
-        if (response?.status === 403 && typeof detail === 'object' && detail?.code === 'CLIENT_NOT_ASSIGNED') {
-          setIsAccessDenied(true)
-          // Clear localStorage since user doesn't have access
-          localStorage.removeItem('selectedClientId')
-          localStorage.removeItem('selectedClientName')
-          return
-        }
+      if (isClientNotAssignedError(err)) {
+        setIsAccessDenied(true)
+        // Clear localStorage since user doesn't have access
+        localStorage.removeItem('selectedClientId')
+        localStorage.removeItem('selectedClientName')
+        return
       }
       const message = getErrorMessage(err)
       setError(message)

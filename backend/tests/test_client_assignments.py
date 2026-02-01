@@ -392,7 +392,7 @@ class TestRequireAssignedClientGuard:
         assert expected_error["code"] == "FORBIDDEN_ROLE"
     
     def test_admin_can_access_any_client(self):
-        """Admin should have access to clients via admin role (but still needs assignment or membership)."""
+        """Admin role check passes (first step of access control)."""
         admin_user_role = "admin"
         
         # Admin role check passes

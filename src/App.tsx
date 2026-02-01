@@ -10,6 +10,7 @@ import { SmartDashboard } from '@/components/SmartDashboard'
 import { AccountantDashboard } from '@/components/AccountantDashboard'
 import { AccountantHomePage } from '@/components/AccountantHomePage'
 import { AccountantReviewQueuePage } from '@/components/AccountantReviewQueuePage'
+import { ClientDossierPage } from '@/components/ClientDossierPage'
 import { IntelligentUploadPortal } from '@/components/IntelligentUploadPortal'
 import { SmartTransactionList } from '@/components/SmartTransactionList'
 import { SettingsPage } from '@/components/SettingsPage'
@@ -28,6 +29,21 @@ type Route =
   | { type: 'onboarding' }
   | { type: 'accountant-onboarding' }
   | { type: 'app'; path: string }
+  | { type: 'client-dossier'; clientId: string; tab: 'issues' | 'periods' | 'decisions' }
+
+// Parse client dossier route
+const parseClientDossierRoute = (path: string): { clientId: string; tab: 'issues' | 'periods' | 'decisions' } | null => {
+  // Match /accountant/clients/:clientId or /accountant/clients/:clientId/:tab
+  const match = path.match(/^\/accountant\/clients\/([^/]+)(?:\/([^/]+))?$/)
+  if (match) {
+    const clientId = match[1]
+    const tabParam = match[2] || 'issues'
+    const validTabs = ['issues', 'periods', 'decisions']
+    const tab = validTabs.includes(tabParam) ? tabParam as 'issues' | 'periods' | 'decisions' : 'issues'
+    return { clientId, tab }
+  }
+  return null
+}
 
 const getRouteFromURL = (): Route => {
   const path = window.location.pathname
@@ -57,6 +73,12 @@ const getRouteFromURL = (): Route => {
   
   if (path === '/accountant/onboarding') {
     return { type: 'accountant-onboarding' }
+  }
+  
+  // Check for client dossier routes: /accountant/clients/:clientId[/:tab]
+  const clientDossierRoute = parseClientDossierRoute(path)
+  if (clientDossierRoute) {
+    return { type: 'client-dossier', ...clientDossierRoute }
   }
   
   // Return app route with current path for navigation
@@ -332,6 +354,21 @@ const AppContent = () => {
           navigateTo(landingPath)
         }}
       />
+    )
+  }
+
+  // Show client dossier page for accountants
+  if (route.type === 'client-dossier' && isAccountant) {
+    return (
+      <AppShell 
+        activeTab="clients" 
+        onTabChange={handleTabChange}
+      >
+        <ClientDossierPage 
+          clientId={route.clientId} 
+          initialTab={route.tab}
+        />
+      </AppShell>
     )
   }
 

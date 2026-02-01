@@ -508,6 +508,92 @@ export const nl = {
     totalProcessed: "{count} verwerkt",
   },
 
+  // Pagination
+  pagination: {
+    showing: "Toon",
+    of: "van",
+    clients: "klanten",
+    page: "Pagina",
+    previous: "Vorige",
+    next: "Volgende",
+    first: "Eerste",
+    last: "Laatste",
+    rowsPerPage: "Rijen per pagina",
+    xToYOfZ: "{start}–{end} van {total}",
+  },
+
+  // Bulk Operations History
+  bulkHistory: {
+    title: "Bulkbewerkingen",
+    subtitle: "Overzicht van alle uitgevoerde bulkacties",
+    dateTime: "Datum/tijd",
+    action: "Actie",
+    status: "Status",
+    clients: "Klanten",
+    details: "Details",
+    viewDetails: "Details bekijken",
+    total: "totaal",
+    success: "gelukt",
+    failed: "mislukt",
+    skipped: "overgeslagen",
+    // Status labels
+    statusPending: "Wachtend",
+    statusInProgress: "Bezig",
+    statusCompleted: "Voltooid",
+    statusCompletedWithErrors: "Voltooid met fouten",
+    statusFailed: "Mislukt",
+    // Action types
+    actionRecalculate: "Herberekening",
+    actionAckYellow: "Geel bevestigen",
+    actionVatDraft: "BTW concept",
+    actionSendReminders: "Herinneringen",
+    actionLockPeriod: "Periode vergrendelen",
+    // Empty state
+    noHistory: "Nog geen bulkbewerkingen",
+    noHistoryDesc: "Uitgevoerde bulkbewerkingen verschijnen hier zodra je bulk acties uitvoert op je klanten.",
+    goToClients: "Ga naar klantenlijst",
+    // Detail drawer
+    operationDetails: "Bewerking details",
+    startedAt: "Gestart op",
+    completedAt: "Voltooid op",
+    initiatedBy: "Geïnitieerd door",
+    filterByStatus: "Filter op status",
+    allResults: "Alle resultaten",
+    successOnly: "Alleen gelukt",
+    failedOnly: "Alleen mislukt",
+    skippedOnly: "Alleen overgeslagen",
+    clientName: "Klant",
+    resultStatus: "Status",
+    errorMessage: "Foutmelding",
+    processedAt: "Verwerkt op",
+  },
+
+  // Today Command Panel
+  todayPanel: {
+    title: "Vandaag – Overzicht",
+    noTasks: "Alles is op orde. Geen urgente taken vandaag.",
+    todayCompleted: "Vandaag afgerond",
+    actions: "acties",
+    action: "actie",
+    // Priority labels
+    nuDoen: "Nu doen",
+    vandaag: "Vandaag",
+    kanWachten: "Kan wachten",
+    // Task messages
+    clientsRedIssues: "{count} klanten met rode issues",
+    clientRedIssue: "1 klant met rode issues",
+    vatDeadlineUrgent: "{count} klanten met BTW-deadline binnen {days} dagen",
+    vatDeadlineUrgentSingle: "1 klant met BTW-deadline binnen {days} dagen",
+    docsWaiting: "{count} documenten wachten op beoordeling",
+    docWaiting: "1 document wacht op beoordeling",
+    vatUpcoming: "{count} klanten met BTW-deadline binnen 2 weken",
+    vatUpcomingSingle: "1 klant met BTW-deadline binnen 2 weken",
+    docsBacklog: "{count} documenten in achterstand",
+    docBacklog: "1 document in achterstand",
+    inactiveClients: "{count} klanten inactief > 30 dagen",
+    inactiveClient: "1 klant inactief > 30 dagen",
+  },
+
   // Empty states
   emptyStates: {
     noData: "Nog geen gegevens beschikbaar",

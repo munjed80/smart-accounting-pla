@@ -1,19 +1,30 @@
 /**
- * Accountant Home Page - Daily Work Queue
+ * Accountant Home Page - Daily Work Queue (Master Dashboard)
  * 
  * Main dashboard for accountants managing 20-200 clients:
  * - Top summary KPIs
- * - Tabs: "Needs Review", "VAT Due", "Red Issues", "Backlog", "Alerts"
+ * - Debounced search by name/email
+ * - Filter chips: Alle / Rood / Geel / OK / Inactief
+ * - Sorting dropdown: Risico, BTW deadline, Achterstand, Laatste activiteit
+ * - Pagination with page size selector (10/25/50)
  * - Multi-select clients + bulk actions
  * - Per-client result statuses
  * - Review Queue for selected client
  */
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   Table, 
@@ -47,7 +58,12 @@ import {
   CaretUp,
   CaretDown,
   CaretLeft,
+  CaretRight,
   Eye,
+  X,
+  Funnel,
+  SortAscending,
+  Clock,
 } from '@phosphor-icons/react'
 import { format, formatDistanceToNow } from 'date-fns'
 import { nl as nlLocale } from 'date-fns/locale'
@@ -60,6 +76,37 @@ import { BulkActionBar, BulkActionType } from './BulkActionBar'
 import { BulkOperationModal } from './BulkOperationModal'
 import { RecentActionsPanel } from './RecentActionsPanel'
 import { useClientSelection } from '@/hooks/useClientSelection'
+
+// Local storage keys for user preferences
+const PREF_SEARCH = 'accountant_search'
+const PREF_FILTER = 'accountant_filter'
+const PREF_SORT = 'accountant_sort'
+const PREF_SORT_ORDER = 'accountant_sort_order'
+const PREF_PAGE_SIZE = 'accountant_page_size'
+
+// Filter options
+type FilterType = 'all' | 'has_red' | 'has_yellow' | 'ok' | 'stale_30d'
+
+// Sort options  
+type SortField = 'readiness_score' | 'deadline' | 'backlog' | 'last_activity' | 'red_issues' | 'name'
+type SortOrder = 'asc' | 'desc'
+
+// Debounce helper hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+  
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+    
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+  
+  return debouncedValue
+}
 
 // KPI Card Component
 const KPICard = ({ 
@@ -200,9 +247,35 @@ export const AccountantHomePage = () => {
   
   // Data state
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
-  const [clients, setClients] = useState<ClientStatusCard[]>([])
+  const [allClients, setAllClients] = useState<ClientStatusCard[]>([]) // All fetched clients
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Search state with debounce
+  const [searchText, setSearchText] = useState(() => 
+    localStorage.getItem(PREF_SEARCH) || ''
+  )
+  const debouncedSearch = useDebounce(searchText, 300)
+  
+  // Filter state (chips)
+  const [activeFilter, setActiveFilter] = useState<FilterType>(() => 
+    (localStorage.getItem(PREF_FILTER) as FilterType) || 'all'
+  )
+  
+  // Sort state
+  const [sortBy, setSortBy] = useState<SortField>(() => 
+    (localStorage.getItem(PREF_SORT) as SortField) || 'readiness_score'
+  )
+  const [sortOrder, setSortOrder] = useState<SortOrder>(() => 
+    (localStorage.getItem(PREF_SORT_ORDER) as SortOrder) || 'asc'
+  )
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(() => {
+    const stored = localStorage.getItem(PREF_PAGE_SIZE)
+    return stored ? parseInt(stored, 10) : 25
+  })
   
   // Use shared selection hook
   const { 
@@ -212,48 +285,180 @@ export const AccountantHomePage = () => {
     toggleSelect,
     selectAll: selectAllClients,
     clearAll: clearSelection,
-    selectOnlyFailed 
+    selectOnlyFailed,
+    selectMany,
   } = useClientSelection()
   
   // Review Queue state - for viewing a specific client's documents
   const [reviewQueueClient, setReviewQueueClient] = useState<ClientStatusCard | null>(null)
   
-  // Sorting state
-  const [sortBy, setSortBy] = useState('readiness_score')
-  const [sortOrder, setSortOrder] = useState('asc')
+  // Track if "select all results" mode is active
+  const [selectAllResultsMode, setSelectAllResultsMode] = useState(false)
   
-  // Active tab
+  // Active tab (for legacy tab handling from TodayCommandPanel)
   const [activeTab, setActiveTab] = useState('all')
   
   // Bulk operation state
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
   const [bulkOperationType, setBulkOperationType] = useState<BulkActionType | null>(null)
   
+  // Persist user preferences to localStorage
+  useEffect(() => {
+    localStorage.setItem(PREF_SEARCH, searchText)
+  }, [searchText])
+  
+  useEffect(() => {
+    localStorage.setItem(PREF_FILTER, activeFilter)
+  }, [activeFilter])
+  
+  useEffect(() => {
+    localStorage.setItem(PREF_SORT, sortBy)
+  }, [sortBy])
+  
+  useEffect(() => {
+    localStorage.setItem(PREF_SORT_ORDER, sortOrder)
+  }, [sortOrder])
+  
+  useEffect(() => {
+    localStorage.setItem(PREF_PAGE_SIZE, String(pageSize))
+  }, [pageSize])
+  
+  // Filter, search, and sort clients (client-side for now)
+  const filteredClients = useMemo(() => {
+    let result = [...allClients]
+    
+    // Apply search filter (name or email-like patterns in name)
+    if (debouncedSearch.trim()) {
+      const searchLower = debouncedSearch.toLowerCase().trim()
+      result = result.filter(c => 
+        c.name.toLowerCase().includes(searchLower) ||
+        (c.kvk_number && c.kvk_number.includes(searchLower)) ||
+        (c.btw_number && c.btw_number.toLowerCase().includes(searchLower))
+      )
+    }
+    
+    // Apply filter chip
+    switch (activeFilter) {
+      case 'has_red':
+        result = result.filter(c => c.red_issue_count > 0)
+        break
+      case 'has_yellow':
+        result = result.filter(c => c.yellow_issue_count > 0 && c.red_issue_count === 0)
+        break
+      case 'ok':
+        result = result.filter(c => c.red_issue_count === 0 && c.yellow_issue_count === 0)
+        break
+      case 'stale_30d':
+        result = result.filter(c => {
+          if (!c.last_activity_at) return true // Never active = stale
+          const lastActivity = new Date(c.last_activity_at)
+          const daysSince = (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24)
+          return daysSince >= 30
+        })
+        break
+      // 'all' shows everything
+    }
+    
+    // Apply sorting
+    result.sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'readiness_score':
+          comparison = a.readiness_score - b.readiness_score
+          break
+        case 'deadline':
+          // null deadlines go to the end
+          if (a.days_to_vat_deadline === null && b.days_to_vat_deadline === null) comparison = 0
+          else if (a.days_to_vat_deadline === null) comparison = 1
+          else if (b.days_to_vat_deadline === null) comparison = -1
+          else comparison = a.days_to_vat_deadline - b.days_to_vat_deadline
+          break
+        case 'backlog':
+          comparison = (a.backlog_age_max_days ?? 0) - (b.backlog_age_max_days ?? 0)
+          break
+        case 'last_activity':
+          if (!a.last_activity_at && !b.last_activity_at) comparison = 0
+          else if (!a.last_activity_at) comparison = 1
+          else if (!b.last_activity_at) comparison = -1
+          else comparison = new Date(a.last_activity_at).getTime() - new Date(b.last_activity_at).getTime()
+          break
+        case 'red_issues':
+          comparison = b.red_issue_count - a.red_issue_count // desc by default
+          break
+        case 'name':
+          comparison = a.name.localeCompare(b.name, 'nl')
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return result
+  }, [allClients, debouncedSearch, activeFilter, sortBy, sortOrder])
+  
+  // Paginated clients
+  const paginatedClients = useMemo(() => {
+    const startIdx = (currentPage - 1) * pageSize
+    return filteredClients.slice(startIdx, startIdx + pageSize)
+  }, [filteredClients, currentPage, pageSize])
+  
+  // Total pages
+  const totalPages = Math.ceil(filteredClients.length / pageSize)
+  
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [debouncedSearch, activeFilter, sortBy, sortOrder, pageSize])
+  
   // Get selected clients with their names for the modal
   const selectedClients = useMemo(() => {
-    return clients
+    // If "select all results" mode, use filtered clients
+    if (selectAllResultsMode) {
+      return filteredClients.map(c => ({ id: c.id, name: c.name }))
+    }
+    return allClients
       .filter(c => selectedClientIds.has(c.id))
       .map(c => ({ id: c.id, name: c.name }))
-  }, [clients, selectedClientIds])
+  }, [allClients, filteredClients, selectedClientIds, selectAllResultsMode])
   
   // Check for selectedClientId in localStorage on mount
   useEffect(() => {
     const storedClientId = localStorage.getItem('selectedClientId')
-    if (storedClientId && clients.length > 0) {
-      const client = clients.find(c => c.id === storedClientId)
+    if (storedClientId && allClients.length > 0) {
+      const client = allClients.find(c => c.id === storedClientId)
       if (client) {
         setReviewQueueClient(client)
         // Clear from localStorage after use
         localStorage.removeItem('selectedClientId')
       }
     }
-  }, [clients])
+  }, [allClients])
 
-  // Listen for tab changes from TodayCommandPanel
+  // Listen for tab changes from TodayCommandPanel (legacy support)
   useEffect(() => {
     const handleTabChange = (event: CustomEvent<{ tab: string | null }>) => {
       if (event.detail.tab) {
         setActiveTab(event.detail.tab)
+        // Map legacy tabs to new filter chips
+        switch (event.detail.tab) {
+          case 'red_issues':
+            setActiveFilter('has_red')
+            break
+          case 'needs_review':
+            // needs_review doesn't map directly, use 'all'
+            setActiveFilter('all')
+            break
+          case 'vat_due':
+            // Sort by deadline instead of filter
+            setSortBy('deadline')
+            setSortOrder('asc')
+            setActiveFilter('all')
+            break
+          case 'stale':
+            setActiveFilter('stale_30d')
+            break
+          default:
+            setActiveFilter('all')
+        }
       }
     }
     
@@ -262,13 +467,22 @@ export const AccountantHomePage = () => {
     if (storedTab) {
       setActiveTab(storedTab)
       sessionStorage.removeItem('accountantActiveTab')
+      // Apply same mapping
+      switch (storedTab) {
+        case 'red_issues':
+          setActiveFilter('has_red')
+          break
+        case 'stale':
+          setActiveFilter('stale_30d')
+          break
+      }
     }
     
     window.addEventListener('accountantTabChange', handleTabChange as EventListener)
     return () => window.removeEventListener('accountantTabChange', handleTabChange as EventListener)
   }, [])
 
-  // Fetch data
+  // Fetch data - now fetches all clients and handles filtering/sorting client-side
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true)
@@ -278,29 +492,21 @@ export const AccountantHomePage = () => {
       const summaryRes = await api.get<DashboardSummary>('/accountant/dashboard/summary')
       setSummary(summaryRes.data)
       
-      // Determine filters based on active tab
-      let filters: string[] = []
-      if (activeTab === 'needs_review') filters = ['needs_review']
-      else if (activeTab === 'vat_due') filters = ['deadline_7d']
-      else if (activeTab === 'red_issues') filters = ['has_red']
-      else if (activeTab === 'stale') filters = ['stale_30d']
-      
-      // Fetch clients
+      // Fetch all clients (no server-side filters for better client-side UX)
       const clientsRes = await api.get<ClientsListResponse>('/accountant/dashboard/clients', {
         params: {
-          sort: sortBy,
-          order: sortOrder,
-          filter: filters.length > 0 ? filters : undefined,
+          sort: 'readiness_score',
+          order: 'asc',
         },
       })
-      setClients(clientsRes.data.clients)
+      setAllClients(clientsRes.data.clients)
       
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
       setIsLoading(false)
     }
-  }, [activeTab, sortBy, sortOrder])
+  }, [])
 
   useEffect(() => {
     fetchData()
@@ -308,15 +514,30 @@ export const AccountantHomePage = () => {
 
   // Selection handlers
   const handleSelectClient = (id: string, selected: boolean) => {
+    setSelectAllResultsMode(false) // Exit "select all results" mode
     toggleSelect(id)
   }
 
   const handleSelectAll = (selected: boolean) => {
+    setSelectAllResultsMode(false)
     if (selected) {
-      selectAllClients(clients.map(c => c.id))
+      // Select all visible (paginated) clients
+      selectAllClients(paginatedClients.map(c => c.id))
     } else {
       clearSelection()
     }
+  }
+  
+  // Select all results (across all pages)
+  const handleSelectAllResults = () => {
+    setSelectAllResultsMode(true)
+    selectAllClients(filteredClients.map(c => c.id))
+  }
+  
+  // Clear selection and exit select-all-results mode
+  const handleClearSelection = () => {
+    setSelectAllResultsMode(false)
+    clearSelection()
   }
 
   // Bulk operation handlers
@@ -328,19 +549,22 @@ export const AccountantHomePage = () => {
   const closeBulkModal = () => {
     setIsBulkModalOpen(false)
     setBulkOperationType(null)
+    setSelectAllResultsMode(false) // Clear select all results mode after operation
   }
 
   const handleOperationComplete = () => {
     // Refresh data after bulk operation
     fetchData()
+    setSelectAllResultsMode(false)
   }
 
   const handleRetryFailed = (failedClientIds: string[]) => {
+    setSelectAllResultsMode(false)
     selectOnlyFailed(failedClientIds)
   }
 
-  // Toggle sort
-  const toggleSort = (field: string) => {
+  // Toggle sort from column header (legacy)
+  const toggleSort = (field: SortField) => {
     if (sortBy === field) {
       setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
     } else {
@@ -356,14 +580,50 @@ export const AccountantHomePage = () => {
   
   // Handle view review queue for a client - navigate to client dossier
   const handleViewReviewQueue = (client: ClientStatusCard) => {
-    // Navigate to client dossier issues page
-    navigateTo(`/accountant/clients/${client.administration_id}/issues`)
+    // Navigate to client dossier issues page - id is the administration ID
+    navigateTo(`/accountant/clients/${client.id}/issues`)
   }
   
   // Close review queue and go back to client list
   const handleCloseReviewQueue = () => {
     setReviewQueueClient(null)
   }
+  
+  // Pagination handlers
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+  }
+  
+  const goToPrevPage = () => {
+    goToPage(currentPage - 1)
+  }
+  
+  const goToNextPage = () => {
+    goToPage(currentPage + 1)
+  }
+  
+  const handlePageSizeChange = (newSize: string) => {
+    setPageSize(parseInt(newSize, 10))
+    setCurrentPage(1) // Reset to first page
+  }
+  
+  // Filter chip helper
+  const filterChips: { value: FilterType; label: string; color?: string }[] = [
+    { value: 'all', label: t('filters.all') },
+    { value: 'has_red', label: t('filters.red'), color: 'text-red-600' },
+    { value: 'has_yellow', label: t('filters.yellow'), color: 'text-amber-600' },
+    { value: 'ok', label: t('filters.ok'), color: 'text-green-600' },
+    { value: 'stale_30d', label: t('filters.inactive') },
+  ]
+  
+  // Sort options
+  const sortOptions: { value: SortField; label: string }[] = [
+    { value: 'readiness_score', label: t('filters.sortPriority') },
+    { value: 'deadline', label: t('filters.sortDeadline') },
+    { value: 'backlog', label: t('filters.sortBacklog') },
+    { value: 'last_activity', label: t('filters.sortActivity') },
+    { value: 'name', label: t('filters.sortName') },
+  ]
 
   // Check access
   if (user?.role !== 'accountant' && user?.role !== 'admin') {
@@ -427,13 +687,13 @@ export const AccountantHomePage = () => {
         {/* Accountant Command Layer - "Vandaag – Overzicht" */}
         <TodayCommandPanel 
           summary={summary} 
-          clients={clients} 
+          clients={allClients} 
           isLoading={isLoading} 
         />
 
         {/* Priority Clients Panel - "Top prioriteit klanten" */}
         <PriorityClientsPanel 
-          clients={clients} 
+          clients={allClients} 
           isLoading={isLoading} 
         />
 
@@ -490,116 +750,251 @@ export const AccountantHomePage = () => {
           />
         </div>
 
-        {/* Bulk Actions Bar - New Component */}
+        {/* Bulk Actions Bar - Updated with new selection features */}
         <BulkActionBar
-          selectedCount={selectedCount}
-          visibleClientCount={clients.length}
-          onSelectAll={() => selectAllClients(clients.map(c => c.id))}
-          onClearSelection={clearSelection}
+          selectedCount={selectAllResultsMode ? filteredClients.length : selectedCount}
+          visibleClientCount={paginatedClients.length}
+          onSelectAll={handleSelectAllResults}
+          onClearSelection={handleClearSelection}
           onAction={openBulkModal}
         />
+        
+        {/* Select All Results Banner */}
+        {selectedCount > 0 && selectedCount === paginatedClients.length && !selectAllResultsMode && filteredClients.length > paginatedClients.length && (
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-4 flex items-center justify-between">
+            <span className="text-sm">
+              {t('filters.onPageSelected').replace('{count}', String(paginatedClients.length))}
+            </span>
+            <Button variant="link" size="sm" onClick={handleSelectAllResults}>
+              {t('filters.selectAll')} {filteredClients.length} {t('filters.resultsFound')}
+            </Button>
+          </div>
+        )}
+        
+        {selectAllResultsMode && (
+          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4 flex items-center justify-between">
+            <span className="text-sm text-blue-700 dark:text-blue-300">
+              ✓ {t('filters.allFilteredSelected').replace('{count}', String(filteredClients.length))}
+            </span>
+            <Button variant="link" size="sm" className="text-blue-600" onClick={handleClearSelection}>
+              {t('bulkOps.clearSelection')}
+            </Button>
+          </div>
+        )}
 
         {/* Recent Actions Panel */}
         <RecentActionsPanel />
 
-        {/* Main Content with Tabs */}
+        {/* Main Content Card with Search, Filters, Sorting, and Pagination */}
         <Card className="bg-card/80 backdrop-blur-sm">
-          <CardHeader className="pb-0">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="all">
-                  {t('accountantDashboard.tabAllClients')}
-                </TabsTrigger>
-                <TabsTrigger value="red_issues" className="text-red-600">
-                  <WarningCircle size={16} className="mr-1" />
-                  {t('accountantDashboard.tabRedIssues')}
-                </TabsTrigger>
-                <TabsTrigger value="needs_review">
-                  <MagnifyingGlass size={16} className="mr-1" />
-                  {t('accountantDashboard.tabToReview')}
-                </TabsTrigger>
-                <TabsTrigger value="vat_due">
-                  <Calendar size={16} className="mr-1" />
-                  {t('accountantDashboard.tabVatSoon')}
-                </TabsTrigger>
-                <TabsTrigger value="stale">
-                  <Warning size={16} className="mr-1" />
-                  {t('accountantDashboard.tabInactive')}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+          <CardHeader className="pb-4">
+            <div className="flex flex-col gap-4">
+              {/* Search and Sort Row */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                {/* Search Input */}
+                <div className="relative flex-1">
+                  <MagnifyingGlass size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder={t('filters.searchPlaceholder')}
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    className="pl-10 pr-10"
+                  />
+                  {searchText && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                      onClick={() => setSearchText('')}
+                    >
+                      <X size={14} />
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Sort Dropdown */}
+                <div className="flex items-center gap-2">
+                  <SortAscending size={18} className="text-muted-foreground" />
+                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortField)}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder={t('filters.sortBy')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sortOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    className="h-10 w-10"
+                    onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    title={sortOrder === 'asc' ? t('filters.sortAscending') : t('filters.sortDescending')}
+                  >
+                    {sortOrder === 'asc' ? <CaretUp size={16} /> : <CaretDown size={16} />}
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Filter Chips */}
+              <div className="flex flex-wrap gap-2">
+                {filterChips.map(chip => (
+                  <Button
+                    key={chip.value}
+                    variant={activeFilter === chip.value ? 'default' : 'outline'}
+                    size="sm"
+                    className={`${activeFilter === chip.value ? '' : chip.color || ''}`}
+                    onClick={() => setActiveFilter(chip.value)}
+                  >
+                    {chip.value === 'has_red' && <WarningCircle size={14} className="mr-1" />}
+                    {chip.value === 'has_yellow' && <Warning size={14} className="mr-1" />}
+                    {chip.value === 'ok' && <CheckCircle size={14} className="mr-1" />}
+                    {chip.value === 'stale_30d' && <Clock size={14} className="mr-1" />}
+                    {chip.label}
+                    {chip.value !== 'all' && activeFilter === chip.value && (
+                      <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                        {filteredClients.length}
+                      </Badge>
+                    )}
+                  </Button>
+                ))}
+              </div>
+              
+              {/* Results count */}
+              <div className="text-sm text-muted-foreground">
+                {filteredClients.length} {t('filters.resultsFound')}
+                {debouncedSearch && ` "${debouncedSearch}"`}
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="pt-4">
+          
+          <CardContent className="pt-0">
             {isLoading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
                   <Skeleton key={i} className="h-12 w-full" />
                 ))}
               </div>
-            ) : clients.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox 
-                        checked={selectedCount === clients.length && clients.length > 0}
-                        onCheckedChange={handleSelectAll}
+            ) : paginatedClients.length > 0 ? (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox 
+                          checked={
+                            (paginatedClients.length > 0 && 
+                             paginatedClients.every(c => isSelected(c.id))) ||
+                            selectAllResultsMode
+                          }
+                          onCheckedChange={handleSelectAll}
+                        />
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => toggleSort('name')}
+                      >
+                        {t('accountantDashboard.tableClient')} <SortIcon field="name" />
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => toggleSort('readiness_score')}
+                      >
+                        {t('accountantDashboard.tableScore')} <SortIcon field="readiness_score" />
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => toggleSort('red_issues')}
+                      >
+                        {t('accountantDashboard.tableIssues')} <SortIcon field="red_issues" />
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => toggleSort('backlog')}
+                      >
+                        {t('accountantDashboard.tableBacklog')} <SortIcon field="backlog" />
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => toggleSort('deadline')}
+                      >
+                        {t('accountantDashboard.tableVat')} <SortIcon field="deadline" />
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => toggleSort('last_activity')}
+                      >
+                        {t('accountantDashboard.tableActivity')} <SortIcon field="last_activity" />
+                      </TableHead>
+                      <TableHead>
+                        {t('accountantDashboard.tableActions')}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedClients.map((client) => (
+                      <ClientRow
+                        key={client.id}
+                        client={client}
+                        isSelected={isSelected(client.id) || selectAllResultsMode}
+                        onSelect={handleSelectClient}
+                        onViewReviewQueue={handleViewReviewQueue}
                       />
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer"
-                      onClick={() => toggleSort('name')}
-                    >
-                      {t('accountantDashboard.tableClient')} <SortIcon field="name" />
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer"
-                      onClick={() => toggleSort('readiness_score')}
-                    >
-                      {t('accountantDashboard.tableScore')} <SortIcon field="readiness_score" />
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer"
-                      onClick={() => toggleSort('red_issues')}
-                    >
-                      {t('accountantDashboard.tableIssues')} <SortIcon field="red_issues" />
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer"
-                      onClick={() => toggleSort('backlog')}
-                    >
-                      {t('accountantDashboard.tableBacklog')} <SortIcon field="backlog" />
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer"
-                      onClick={() => toggleSort('deadline')}
-                    >
-                      {t('accountantDashboard.tableVat')} <SortIcon field="deadline" />
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer"
-                      onClick={() => toggleSort('last_activity')}
-                    >
-                      {t('accountantDashboard.tableActivity')} <SortIcon field="last_activity" />
-                    </TableHead>
-                    <TableHead>
-                      {t('accountantDashboard.tableActions')}
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {clients.map((client) => (
-                    <ClientRow
-                      key={client.id}
-                      client={client}
-                      isSelected={isSelected(client.id)}
-                      onSelect={handleSelectClient}
-                      onViewReviewQueue={handleViewReviewQueue}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
+                    ))}
+                  </TableBody>
+                </Table>
+                
+                {/* Pagination Controls */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 pt-4 border-t">
+                  {/* Page size selector */}
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>{t('pagination.rowsPerPage')}:</span>
+                    <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
+                      <SelectTrigger className="w-[70px] h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Page info and navigation */}
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-muted-foreground">
+                      {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, filteredClients.length)} {t('pagination.of')} {filteredClients.length}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToPrevPage}
+                        disabled={currentPage === 1}
+                      >
+                        <CaretLeft size={16} />
+                        {t('pagination.previous')}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToNextPage}
+                        disabled={currentPage === totalPages}
+                      >
+                        {t('pagination.next')}
+                        <CaretRight size={16} />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : allClients.length === 0 ? (
+              // No clients at all - show onboarding CTA
               <div className="text-center py-12 text-muted-foreground">
                 <Users size={48} className="mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium">{t('accountantDashboard.noClientsTitle')}</p>
@@ -612,6 +1007,27 @@ export const AccountantHomePage = () => {
                 >
                   {t('accountantDashboard.goToOnboarding')}
                 </Button>
+              </div>
+            ) : (
+              // Clients exist but none match filter - show clear filter CTA
+              <div className="text-center py-12 text-muted-foreground">
+                <Funnel size={48} className="mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">{t('filters.noResultsFound')}</p>
+                <p className="text-sm mt-2 mb-4">
+                  {t('filters.adjustFilters')}
+                </p>
+                <div className="flex gap-2 justify-center">
+                  {searchText && (
+                    <Button variant="outline" onClick={() => setSearchText('')}>
+                      {t('filters.clearSearch')}
+                    </Button>
+                  )}
+                  {activeFilter !== 'all' && (
+                    <Button variant="outline" onClick={() => setActiveFilter('all')}>
+                      {t('priorityClients.clearFilter')}
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
           </CardContent>

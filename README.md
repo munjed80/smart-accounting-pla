@@ -840,3 +840,92 @@ This checklist is for testing the accountant bulk operations feature on mobile d
   "due_date": "2026-02-15"
 }
 ```
+
+---
+
+## Master Dashboard Verification Checklist
+
+This checklist verifies the accountant master dashboard features for managing 20-100 clients.
+
+### Pre-requisites
+- [ ] Logged in as accountant role
+- [ ] At least 3-5 test clients assigned (ideally mix of RED/YELLOW/OK statuses)
+
+### Step 1: Empty State Verification
+- [ ] **Accountant with 0 clients**: Shows "Nog geen klanten" message with onboarding CTA
+- [ ] **Pending only state**: If only pending invites exist, explanation is shown
+
+### Step 2: Invite and Approve Consent
+- [ ] Navigate to `/accountant/clients`
+- [ ] Click "Klant uitnodigen" button
+- [ ] Enter a ZZP user's email address
+- [ ] Verify invite is sent and shows in "In afwachting" section
+- [ ] As ZZP user: navigate to `/dashboard/boekhouder` and approve request
+- [ ] As accountant: verify client appears in active list
+
+### Step 3: Dashboard Shows Client
+- [ ] Navigate to `/accountant` (main dashboard)
+- [ ] Verify new client appears in client list table
+- [ ] Verify KPIs update (total clients count)
+- [ ] Verify "Vandaag – Overzicht" panel shows relevant tasks
+
+### Step 4: Search/Filter/Sort Works
+- [ ] **Search**: Type client name in search box, verify debounce (300ms delay)
+- [ ] **Filter chips**: Click "Rood" filter, verify only red-issue clients shown
+- [ ] **Filter chips**: Click "Geel" filter, verify only yellow-issue clients shown
+- [ ] **Filter chips**: Click "OK" filter, verify only green clients shown
+- [ ] **Filter chips**: Click "Inactief" filter, verify only 30+ days inactive shown
+- [ ] **Filter chips**: Click "Alle" to reset
+- [ ] **Sort dropdown**: Change sort to "Deadline", verify list reorders
+- [ ] **Sort order**: Click sort direction button, verify ascending/descending toggle
+- [ ] **Preferences persist**: Refresh page, verify search/filter/sort preserved
+
+### Step 5: Pagination Works
+- [ ] **Page size selector**: Change from 25 to 10, verify fewer rows shown
+- [ ] **Page navigation**: Click "Volgende" button, verify next page loads
+- [ ] **Page info**: Verify "X–Y van Z" display is accurate
+- [ ] **First page**: On page 2, click "Vorige", returns to page 1
+- [ ] **Page reset on filter**: Change filter, verify returns to page 1
+
+### Step 6: Bulk Action Works on 5 Clients
+- [ ] Select 5 clients using checkboxes
+- [ ] Verify "Geselecteerd: 5 klanten" badge appears
+- [ ] Click "Herberekenen" button
+- [ ] Modal opens with selection summary (5 client names)
+- [ ] Click "Uitvoeren" button
+- [ ] Verify progress spinner shows
+- [ ] Verify results display (Gelukt/Mislukt/Overgeslagen counts)
+- [ ] Click "Sluiten" to close modal
+
+### Step 7: Bulk Operation Appears in History
+- [ ] Navigate to `/accountant/bulk-operations`
+- [ ] Verify recent operation appears in table
+- [ ] Verify status badge (Voltooid or Voltooid met fouten)
+- [ ] Verify client counts are accurate
+
+### Step 8: Details Show Per-Client Results
+- [ ] Click "Details bekijken" on the operation row
+- [ ] Drawer opens with operation summary
+- [ ] Verify counts: Gelukt / Mislukt / Overgeslagen
+- [ ] Verify per-client result list shows
+- [ ] Filter by "Alleen gelukt", verify list filters
+- [ ] Close drawer
+
+### Step 9: No Regressions to ZZP Flow
+- [ ] Login as ZZP user
+- [ ] Navigate to `/dashboard` - works correctly
+- [ ] Navigate to `/ai-upload` - works correctly
+- [ ] Navigate to `/transactions` - works correctly
+- [ ] Navigate to `/dashboard/boekhouder` - can manage accountant links
+
+### Cross-Page Selection Test
+- [ ] As accountant, go to dashboard
+- [ ] Set page size to 10
+- [ ] Select all 10 clients on page
+- [ ] Verify "Selecteer alle X resultaten" banner appears
+- [ ] Click to select all results
+- [ ] Verify "Alle X gefilterde klanten geselecteerd" banner shows
+- [ ] Navigate to page 2
+- [ ] Verify clients are still selected (checkmarks shown)
+- [ ] Execute a bulk action
+- [ ] Verify action applies to ALL clients, not just page 1

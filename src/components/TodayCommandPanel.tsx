@@ -23,6 +23,7 @@ import {
 } from '@phosphor-icons/react'
 import { DashboardSummary, ClientStatusCard } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
+import { t } from '@/i18n'
 
 // Business logic thresholds for task prioritization
 // VAT deadlines within this many days are considered urgent ("Nu doen")
@@ -233,6 +234,30 @@ export const TodayCommandPanel = ({ summary, clients, isLoading }: TodayCommandP
         link: '/accountant?tab=all',
         count: summary.document_backlog_total,
       })
+    }
+    
+    // 6. Inactive clients (30+ days) - lowest priority, only if space
+    if (allTasks.length < 5) {
+      const inactiveClients = clients.filter(c => {
+        if (!c.last_activity_at) return true // Never active = inactive
+        const lastActivity = new Date(c.last_activity_at)
+        const daysSince = (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24)
+        return daysSince >= 30
+      }).length
+      
+      if (inactiveClients > 0) {
+        allTasks.push({
+          id: 'inactive',
+          icon: Stack,
+          iconColor: 'yellow',
+          text: inactiveClients === 1
+            ? t('todayPanel.inactiveClient')
+            : t('todayPanel.inactiveClients').replace('{count}', String(inactiveClients)),
+          priority: 'kan_wachten',
+          link: '/accountant?tab=stale',
+          count: inactiveClients,
+        })
+      }
     }
     
     // Return max 5 tasks, sorted by priority

@@ -9,7 +9,7 @@
  * - Review Queue for selected client
  */
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,26 +23,8 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { useAuth } from '@/lib/AuthContext'
 import { 
   api, 
@@ -50,8 +32,6 @@ import {
   DashboardSummary,
   ClientStatusCard,
   ClientsListResponse,
-  BulkOperationResponse,
-  BulkOperationResultItem,
 } from '@/lib/api'
 import { 
   ArrowsClockwise,
@@ -61,12 +41,9 @@ import {
   Users,
   MagnifyingGlass,
   Calendar,
-  Lightning,
   Bell,
   Gauge,
   Stack,
-  PaperPlaneTilt,
-  Lock,
   CaretUp,
   CaretDown,
   CaretLeft,
@@ -79,6 +56,10 @@ import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
 import { TodayCommandPanel } from './TodayCommandPanel'
 import { PriorityClientsPanel } from './PriorityClientsPanel'
+import { BulkActionBar, BulkActionType } from './BulkActionBar'
+import { BulkOperationModal } from './BulkOperationModal'
+import { RecentActionsPanel } from './RecentActionsPanel'
+import { useClientSelection } from '@/hooks/useClientSelection'
 
 // KPI Card Component
 const KPICard = ({ 
@@ -223,8 +204,16 @@ export const AccountantHomePage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  // Selection state
-  const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set())
+  // Use shared selection hook
+  const { 
+    selectedIds: selectedClientIds, 
+    count: selectedCount,
+    isSelected,
+    toggleSelect,
+    selectAll: selectAllClients,
+    clearAll: clearSelection,
+    selectOnlyFailed 
+  } = useClientSelection()
   
   // Review Queue state - for viewing a specific client's documents
   const [reviewQueueClient, setReviewQueueClient] = useState<ClientStatusCard | null>(null)
@@ -238,14 +227,14 @@ export const AccountantHomePage = () => {
   
   // Bulk operation state
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
-  const [bulkOperationType, setBulkOperationType] = useState<string | null>(null)
-  const [bulkOperationResult, setBulkOperationResult] = useState<BulkOperationResponse | null>(null)
-  const [isBulkProcessing, setIsBulkProcessing] = useState(false)
+  const [bulkOperationType, setBulkOperationType] = useState<BulkActionType | null>(null)
   
-  // Reminder form state
-  const [reminderTitle, setReminderTitle] = useState('')
-  const [reminderMessage, setReminderMessage] = useState('')
-  const [reminderType, setReminderType] = useState('ACTION_REQUIRED')
+  // Get selected clients with their names for the modal
+  const selectedClients = useMemo(() => {
+    return clients
+      .filter(c => selectedClientIds.has(c.id))
+      .map(c => ({ id: c.id, name: c.name }))
+  }, [clients, selectedClientIds])
   
   // Check for selectedClientId in localStorage on mount
   useEffect(() => {
@@ -319,79 +308,35 @@ export const AccountantHomePage = () => {
 
   // Selection handlers
   const handleSelectClient = (id: string, selected: boolean) => {
-    setSelectedClientIds(prev => {
-      const next = new Set(prev)
-      if (selected) {
-        next.add(id)
-      } else {
-        next.delete(id)
-      }
-      return next
-    })
+    toggleSelect(id)
   }
 
   const handleSelectAll = (selected: boolean) => {
     if (selected) {
-      setSelectedClientIds(new Set(clients.map(c => c.id)))
+      selectAllClients(clients.map(c => c.id))
     } else {
-      setSelectedClientIds(new Set())
+      clearSelection()
     }
   }
 
   // Bulk operation handlers
-  const openBulkModal = (operationType: string) => {
-    setBulkOperationType(operationType)
-    setBulkOperationResult(null)
+  const openBulkModal = (actionType: BulkActionType) => {
+    setBulkOperationType(actionType)
     setIsBulkModalOpen(true)
   }
 
-  const executeBulkOperation = async () => {
-    if (!bulkOperationType || selectedClientIds.size === 0) return
-    
-    setIsBulkProcessing(true)
-    setBulkOperationResult(null)
-    
-    try {
-      let endpoint = ''
-      let payload: Record<string, unknown> = {
-        client_ids: Array.from(selectedClientIds),
-      }
-      
-      switch (bulkOperationType) {
-        case 'recalculate':
-          endpoint = '/accountant/bulk/recalculate'
-          payload.force = true
-          break
-        case 'ack_yellow':
-          endpoint = '/accountant/bulk/ack-yellow'
-          break
-        case 'send_reminders':
-          endpoint = '/accountant/bulk/send-reminders'
-          payload.reminder_type = reminderType
-          payload.title = reminderTitle
-          payload.message = reminderMessage
-          break
-        case 'generate_vat':
-          endpoint = '/accountant/bulk/generate-vat-draft'
-          const now = new Date()
-          payload.period_year = now.getFullYear()
-          payload.period_quarter = Math.ceil((now.getMonth() + 1) / 3)
-          break
-        default:
-          return
-      }
-      
-      const response = await api.post<BulkOperationResponse>(endpoint, payload)
-      setBulkOperationResult(response.data)
-      
-      // Refresh data after bulk operation
-      await fetchData()
-      
-    } catch (err) {
-      setError(getErrorMessage(err))
-    } finally {
-      setIsBulkProcessing(false)
-    }
+  const closeBulkModal = () => {
+    setIsBulkModalOpen(false)
+    setBulkOperationType(null)
+  }
+
+  const handleOperationComplete = () => {
+    // Refresh data after bulk operation
+    fetchData()
+  }
+
+  const handleRetryFailed = (failedClientIds: string[]) => {
+    selectOnlyFailed(failedClientIds)
   }
 
   // Toggle sort
@@ -545,57 +490,17 @@ export const AccountantHomePage = () => {
           />
         </div>
 
-        {/* Bulk Actions Bar */}
-        {selectedClientIds.size > 0 && (
-          <Card className="mb-4 bg-primary/5 border-primary/20">
-            <CardContent className="p-3 flex flex-wrap items-center gap-4">
-              <span className="font-medium">
-                {selectedClientIds.size} {t('bulkOps.selected')}
-              </span>
-              <div className="flex flex-wrap gap-2 ml-auto">
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => openBulkModal('recalculate')}
-                >
-                  <ArrowsClockwise size={16} className="mr-1" />
-                  {t('bulkOps.recalculate')}
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => openBulkModal('ack_yellow')}
-                >
-                  <CheckCircle size={16} className="mr-1" />
-                  {t('bulkOps.ackYellow')}
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => openBulkModal('generate_vat')}
-                >
-                  <Gauge size={16} className="mr-1" />
-                  {t('bulkOps.vatDraft')}
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => openBulkModal('send_reminders')}
-                >
-                  <PaperPlaneTilt size={16} className="mr-1" />
-                  {t('bulkOps.sendReminder')}
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost"
-                  onClick={() => setSelectedClientIds(new Set())}
-                >
-                  {t('common.clear')}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Bulk Actions Bar - New Component */}
+        <BulkActionBar
+          selectedCount={selectedCount}
+          visibleClientCount={clients.length}
+          onSelectAll={() => selectAllClients(clients.map(c => c.id))}
+          onClearSelection={clearSelection}
+          onAction={openBulkModal}
+        />
+
+        {/* Recent Actions Panel */}
+        <RecentActionsPanel />
 
         {/* Main Content with Tabs */}
         <Card className="bg-card/80 backdrop-blur-sm">
@@ -637,7 +542,7 @@ export const AccountantHomePage = () => {
                   <TableRow>
                     <TableHead className="w-10">
                       <Checkbox 
-                        checked={selectedClientIds.size === clients.length && clients.length > 0}
+                        checked={selectedCount === clients.length && clients.length > 0}
                         onCheckedChange={handleSelectAll}
                       />
                     </TableHead>
@@ -687,7 +592,7 @@ export const AccountantHomePage = () => {
                     <ClientRow
                       key={client.id}
                       client={client}
-                      isSelected={selectedClientIds.has(client.id)}
+                      isSelected={isSelected(client.id)}
                       onSelect={handleSelectClient}
                       onViewReviewQueue={handleViewReviewQueue}
                     />
@@ -712,169 +617,15 @@ export const AccountantHomePage = () => {
           </CardContent>
         </Card>
 
-        {/* Bulk Operation Modal */}
-        <Dialog open={isBulkModalOpen} onOpenChange={setIsBulkModalOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                {bulkOperationType === 'recalculate' && t('accountant.bulkRecalculate')}
-                {bulkOperationType === 'ack_yellow' && t('accountant.bulkAckYellow')}
-                {bulkOperationType === 'generate_vat' && t('accountant.bulkGenerateVat')}
-                {bulkOperationType === 'send_reminders' && t('accountant.bulkSendReminders')}
-              </DialogTitle>
-              <DialogDescription>
-                {t('bulkOps.confirmDesc').replace('{count}', String(selectedClientIds.size))}
-              </DialogDescription>
-            </DialogHeader>
-
-            {/* Reminder form fields */}
-            {bulkOperationType === 'send_reminders' && !bulkOperationResult && (
-              <div className="space-y-4 py-4">
-                <div>
-                  <Label htmlFor="reminder-type">{t('bulkOps.reminderTypeLabel')}</Label>
-                  <Select value={reminderType} onValueChange={setReminderType}>
-                    <SelectTrigger id="reminder-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ACTION_REQUIRED">{t('bulkOps.reminderTypeAction')}</SelectItem>
-                      <SelectItem value="DOCUMENT_MISSING">{t('bulkOps.reminderTypeDoc')}</SelectItem>
-                      <SelectItem value="VAT_DEADLINE">{t('bulkOps.reminderTypeVat')}</SelectItem>
-                      <SelectItem value="REVIEW_PENDING">{t('bulkOps.reminderTypeReview')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="reminder-title">{t('bulkOps.reminderTitleLabel')}</Label>
-                  <Input 
-                    id="reminder-title"
-                    value={reminderTitle}
-                    onChange={(e) => setReminderTitle(e.target.value)}
-                    placeholder={t('bulkOps.reminderTitlePlaceholder')}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="reminder-message">{t('bulkOps.reminderMessageLabel')}</Label>
-                  <Textarea 
-                    id="reminder-message"
-                    value={reminderMessage}
-                    onChange={(e) => setReminderMessage(e.target.value)}
-                    placeholder={t('bulkOps.reminderMessagePlaceholder')}
-                    rows={3}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Results */}
-            {bulkOperationResult && (
-              <div className="py-4">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    {bulkOperationResult.status === 'COMPLETED' && (
-                      <Badge className="bg-green-500">{t('bulkOps.statusCompleted')}</Badge>
-                    )}
-                    {bulkOperationResult.status === 'COMPLETED_WITH_ERRORS' && (
-                      <Badge className="bg-amber-500">{t('bulkOps.statusCompletedWithErrors')}</Badge>
-                    )}
-                    {bulkOperationResult.status === 'FAILED' && (
-                      <Badge variant="destructive">{t('bulkOps.statusFailed')}</Badge>
-                    )}
-                    <span className="text-sm text-muted-foreground">
-                      {bulkOperationResult.successful_clients}/{bulkOperationResult.total_clients} {t('accountant.successful')}
-                    </span>
-                  </div>
-                  {/* Idempotency key and timestamp */}
-                  <div className="text-xs text-muted-foreground">
-                    {bulkOperationResult.completed_at && (
-                      <span>{t('accountant.completed')}: {new Date(bulkOperationResult.completed_at).toLocaleTimeString('nl-NL')}</span>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="max-h-64 overflow-y-auto space-y-2">
-                  {bulkOperationResult.results.map((result) => (
-                    <div 
-                      key={result.client_id}
-                      className={`p-2 rounded text-sm ${
-                        result.status === 'SUCCESS' ? 'bg-green-500/10' :
-                        result.status === 'FAILED' ? 'bg-red-500/10' :
-                        'bg-gray-500/10'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{result.client_name}</span>
-                        <Badge variant={
-                          result.status === 'SUCCESS' ? 'outline' :
-                          result.status === 'FAILED' ? 'destructive' :
-                          'secondary'
-                        }>
-                          {result.status === 'SUCCESS' ? t('bulkOps.resultSuccess') :
-                           result.status === 'FAILED' ? t('bulkOps.resultFailed') :
-                           t('bulkOps.resultSkipped')}
-                        </Badge>
-                      </div>
-                      {result.error_message && (
-                        <p className="text-xs text-red-600 mt-1">{result.error_message}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Retry failed clients button */}
-                {bulkOperationResult.failed_clients > 0 && (
-                  <div className="mt-4 pt-4 border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        // Get failed client IDs and retry
-                        const failedIds = bulkOperationResult.results
-                          .filter(r => r.status === 'FAILED')
-                          .map(r => r.client_id)
-                        setSelectedClientIds(new Set(failedIds))
-                        setBulkOperationResult(null)
-                      }}
-                    >
-                      <ArrowsClockwise size={14} className="mr-2" />
-                      {t('bulkOps.retryFailed')} ({bulkOperationResult.failed_clients})
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <DialogFooter>
-              {!bulkOperationResult ? (
-                <>
-                  <Button variant="outline" onClick={() => setIsBulkModalOpen(false)}>
-                    {t('bulkOps.cancel')}
-                  </Button>
-                  <Button 
-                    onClick={executeBulkOperation}
-                    disabled={isBulkProcessing || (bulkOperationType === 'send_reminders' && (!reminderTitle || !reminderMessage))}
-                  >
-                    {isBulkProcessing ? (
-                      <>
-                        <ArrowsClockwise size={16} className="mr-2 animate-spin" />
-                        {t('bulkOps.processing')}
-                      </>
-                    ) : (
-                      <>
-                        <Lightning size={16} className="mr-2" />
-                        {t('bulkOps.execute')}
-                      </>
-                    )}
-                  </Button>
-                </>
-              ) : (
-                <Button onClick={() => setIsBulkModalOpen(false)}>
-                  {t('bulkOps.close')}
-                </Button>
-              )}
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* Bulk Operation Modal - New Component */}
+        <BulkOperationModal
+          isOpen={isBulkModalOpen}
+          onClose={closeBulkModal}
+          actionType={bulkOperationType}
+          selectedClients={selectedClients}
+          onOperationComplete={handleOperationComplete}
+          onRetryFailed={handleRetryFailed}
+        />
       </div>
     </div>
   )

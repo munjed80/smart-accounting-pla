@@ -77,6 +77,7 @@ import { nl as nlLocale } from 'date-fns/locale'
 import { ReviewQueue } from './ReviewQueue'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
+import { TodayCommandPanel } from './TodayCommandPanel'
 
 // KPI Card Component
 const KPICard = ({ 
@@ -257,6 +258,25 @@ export const AccountantHomePage = () => {
       }
     }
   }, [clients])
+
+  // Listen for tab changes from TodayCommandPanel
+  useEffect(() => {
+    const handleTabChange = (event: CustomEvent<{ tab: string | null }>) => {
+      if (event.detail.tab) {
+        setActiveTab(event.detail.tab)
+      }
+    }
+    
+    // Check sessionStorage for stored tab on mount
+    const storedTab = sessionStorage.getItem('accountantActiveTab')
+    if (storedTab) {
+      setActiveTab(storedTab)
+      sessionStorage.removeItem('accountantActiveTab')
+    }
+    
+    window.addEventListener('accountantTabChange', handleTabChange as EventListener)
+    return () => window.removeEventListener('accountantTabChange', handleTabChange as EventListener)
+  }, [])
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -457,6 +477,13 @@ export const AccountantHomePage = () => {
             {t('common.refresh')}
           </Button>
         </div>
+
+        {/* Accountant Command Layer - "Vandaag – Overzicht" */}
+        <TodayCommandPanel 
+          summary={summary} 
+          clients={clients} 
+          isLoading={isLoading} 
+        />
 
         {/* Error Alert */}
         {error && (

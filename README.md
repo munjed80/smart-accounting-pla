@@ -573,6 +573,83 @@ For security, admin users must be explicitly whitelisted to access admin endpoin
 ADMIN_WHITELIST=admin@example.com,superuser@company.com
 ```
 
+### Consent Workflow End-to-End Checklist
+
+Follow this checklist to test the complete consent workflow for accountant-client linking:
+
+**Prerequisites:**
+- Database running with migration `013_client_consent_workflow` applied
+- Backend server running
+- Frontend dev server running
+
+**Test Steps:**
+
+1. **Create ZZP User**
+   ```bash
+   curl -X POST "http://localhost:8000/api/v1/auth/register" \
+     -H "Content-Type: application/json" \
+     -d '{"email": "zzp-test@example.com", "password": "TestPass123!", "full_name": "Test ZZP Client", "role": "zzp"}'
+   ```
+   - [ ] User created successfully
+   - [ ] Complete onboarding to create an administration
+
+2. **Create Accountant User**
+   ```bash
+   curl -X POST "http://localhost:8000/api/v1/auth/register" \
+     -H "Content-Type: application/json" \
+     -d '{"email": "accountant-test@example.com", "password": "TestPass123!", "full_name": "Test Accountant", "role": "accountant"}'
+   ```
+   - [ ] User created successfully
+
+3. **Accountant: Invite ZZP Client**
+   - Login as accountant
+   - Navigate to `/accountant/clients`
+   - Click "Klant toevoegen" button
+   - Enter ZZP email: `zzp-test@example.com`
+   - Click "Uitnodigen"
+   - [ ] Toast shows "Uitnodiging verstuurd!"
+   - [ ] Client appears in "In afwachting" tab with PENDING status
+
+4. **ZZP: Approve Request**
+   - Logout accountant
+   - Login as ZZP user
+   - Navigate to `/dashboard/boekhouder`
+   - [ ] Pending request from accountant is visible
+   - Click "Goedkeuren"
+   - [ ] Toast shows success message
+   - [ ] Request disappears from list
+
+5. **Accountant: Access Approved Client**
+   - Logout ZZP
+   - Login as accountant
+   - Navigate to `/accountant/clients`
+   - [ ] Client now shows in "Actief" tab with ACTIVE status
+   - Click "Selecteren" on the client
+   - [ ] Client indicator in header updates
+   - [ ] Navigates to `/accountant/review-queue`
+
+6. **Accountant: Open Client Dossier**
+   - From clients page, click "Open dossier"
+   - [ ] Navigates to `/accountant/clients/{clientId}/issues`
+   - [ ] Page loads without "Not Found" error
+
+7. **Test Access Control**
+   - Create another ZZP user (not linked)
+   - As accountant, try to access their data
+   - [ ] Should receive 403 NOT_ASSIGNED error
+
+8. **Logout Test**
+   - Click logout button
+   - [ ] Successfully redirects to login page
+   - [ ] Active client selection is preserved in localStorage for next login
+
+**Expected Behavior:**
+- Accountant can only access ACTIVE client data
+- PENDING clients show "Wacht op goedkeuring" message
+- Client switcher in header shows active client name
+- ZZP can approve/reject accountant requests
+- All UI text is in Dutch
+
 ## Operations Guide
 
 ### Running Migrations

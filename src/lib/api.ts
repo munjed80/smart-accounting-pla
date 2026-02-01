@@ -1945,7 +1945,119 @@ export interface AccountantAssignmentsListResponse {
   total_count: number
 }
 
-// Accountant Client Assignment API
+// ============ Client Consent Workflow Types ============
+
+export interface InviteClientRequest {
+  email: string
+}
+
+export interface InviteClientResponse {
+  assignment_id: string
+  status: string  // PENDING or ACTIVE
+  client_name: string
+  client_email: string
+  message: string
+}
+
+export interface ClientLink {
+  assignment_id: string
+  client_user_id: string
+  client_email: string
+  client_name: string
+  administration_id: string
+  administration_name: string
+  status: 'PENDING' | 'ACTIVE' | 'REVOKED'
+  invited_by: 'ACCOUNTANT' | 'ADMIN'
+  assigned_at: string
+  approved_at: string | null
+  revoked_at: string | null
+  open_red_count: number
+  open_yellow_count: number
+}
+
+export interface ClientLinksResponse {
+  links: ClientLink[]
+  pending_count: number
+  active_count: number
+  total_count: number
+}
+
+export interface PendingLinkRequest {
+  assignment_id: string
+  accountant_id: string
+  accountant_email: string
+  accountant_name: string
+  administration_id: string
+  administration_name: string
+  invited_at: string
+}
+
+export interface ZZPLinksResponse {
+  pending_requests: PendingLinkRequest[]
+  total_count: number
+}
+
+export interface ApproveLinkResponse {
+  assignment_id: string
+  status: string  // ACTIVE
+  approved_at: string
+  message: string
+}
+
+export interface RejectLinkResponse {
+  assignment_id: string
+  status: string  // REVOKED
+  revoked_at: string
+  message: string
+}
+
+// Accountant Client Assignment API with Consent
+export const accountantApi = {
+  /**
+   * Invite a ZZP client by email (self-serve, creates PENDING assignment)
+   */
+  inviteClient: async (request: InviteClientRequest): Promise<InviteClientResponse> => {
+    const response = await api.post<InviteClientResponse>('/accountant/clients/invite', request)
+    return response.data
+  },
+
+  /**
+   * Get list of client links with consent status (PENDING + ACTIVE)
+   */
+  getClientLinks: async (): Promise<ClientLinksResponse> => {
+    const response = await api.get<ClientLinksResponse>('/accountant/clients/links')
+    return response.data
+  },
+}
+
+// ZZP Client Consent API
+export const zzpApi = {
+  /**
+   * Get list of pending accountant link requests for ZZP client
+   */
+  getPendingLinks: async (): Promise<ZZPLinksResponse> => {
+    const response = await api.get<ZZPLinksResponse>('/zzp/links')
+    return response.data
+  },
+
+  /**
+   * Approve an accountant link request
+   */
+  approveLink: async (assignmentId: string): Promise<ApproveLinkResponse> => {
+    const response = await api.post<ApproveLinkResponse>(`/zzp/links/${assignmentId}/approve`)
+    return response.data
+  },
+
+  /**
+   * Reject an accountant link request
+   */
+  rejectLink: async (assignmentId: string): Promise<RejectLinkResponse> => {
+    const response = await api.post<RejectLinkResponse>(`/zzp/links/${assignmentId}/reject`)
+    return response.data
+  },
+}
+
+// Accountant Client Assignment API (legacy endpoints)
 export const accountantClientApi = {
   /**
    * Get list of clients assigned to the current accountant

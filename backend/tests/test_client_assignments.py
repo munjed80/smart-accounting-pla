@@ -362,7 +362,7 @@ class TestRequireAssignedClientGuard:
     This guard ensures accountants can only access assigned clients.
     Tests verify:
     - Accountant can access assigned client (via AccountantClientAssignment)
-    - Accountant cannot access unassigned client (403 CLIENT_NOT_ASSIGNED)
+    - Accountant cannot access unassigned client (403 NOT_ASSIGNED)
     - ZZP users cannot access accountant routes (403 FORBIDDEN_ROLE)
     """
     
@@ -383,7 +383,7 @@ class TestRequireAssignedClientGuard:
         assert has_access == True
     
     def test_accountant_cannot_access_unassigned_client(self):
-        """Accountant should get CLIENT_NOT_ASSIGNED error for unassigned client."""
+        """Accountant should get NOT_ASSIGNED error for unassigned client."""
         accountant_id = str(uuid.uuid4())
         client_id = str(uuid.uuid4())
         unassigned_client_id = str(uuid.uuid4())
@@ -399,12 +399,12 @@ class TestRequireAssignedClientGuard:
         
         assert has_access == False
         
-        # Error code should be CLIENT_NOT_ASSIGNED
+        # Error code should be NOT_ASSIGNED
         expected_error = {
-            "code": "CLIENT_NOT_ASSIGNED",
+            "code": "NOT_ASSIGNED",
             "message": "Geen toegang tot deze klant."
         }
-        assert expected_error["code"] == "CLIENT_NOT_ASSIGNED"
+        assert expected_error["code"] == "NOT_ASSIGNED"
         assert "Geen toegang" in expected_error["message"]
     
     def test_zzp_user_forbidden_on_accountant_routes(self):
@@ -492,14 +492,14 @@ class TestRequireAssignedClientGuard:
 class TestDutchErrorMessages:
     """Tests for Dutch-friendly error messages."""
     
-    def test_client_not_assigned_error_is_dutch(self):
-        """CLIENT_NOT_ASSIGNED error should have Dutch message."""
+    def test_not_assigned_error_is_dutch(self):
+        """NOT_ASSIGNED error should have Dutch message."""
         error_detail = {
-            "code": "CLIENT_NOT_ASSIGNED",
+            "code": "NOT_ASSIGNED",
             "message": "Geen toegang tot deze klant."
         }
         
-        assert error_detail["code"] == "CLIENT_NOT_ASSIGNED"
+        assert error_detail["code"] == "NOT_ASSIGNED"
         assert error_detail["message"] == "Geen toegang tot deze klant."
         # Message is in Dutch
         assert "toegang" in error_detail["message"]

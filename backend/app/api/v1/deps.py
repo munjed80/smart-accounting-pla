@@ -35,7 +35,7 @@ async def require_assigned_client(
         
     Raises:
         HTTPException: 403 with FORBIDDEN_ROLE if user is not accountant/admin
-        HTTPException: 403 with CLIENT_NOT_ASSIGNED if user is not assigned to client
+        HTTPException: 403 with NOT_ASSIGNED if user is not assigned to client
     """
     # First verify role
     require_accountant(current_user)
@@ -65,7 +65,7 @@ async def require_assigned_client(
     if not administration:
         raise HTTPException(
             status_code=403,
-            detail={"code": "CLIENT_NOT_ASSIGNED", "message": "Geen toegang tot deze klant."}
+            detail={"code": "NOT_ASSIGNED", "message": "Geen toegang tot deze klant."}
         )
     
     return administration
@@ -144,53 +144,6 @@ def require_accountant(current_user: User) -> None:
             status_code=403,
             detail={"code": "FORBIDDEN_ROLE", "message": "This endpoint is only available for accountants"}
         )
-
-
-# =============================================================================
-# Accountant-only Guards
-# =============================================================================
-
-async def require_assigned_client(
-    client_id: UUID,
-    current_user: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> AccountantClientAssignment:
-    """
-    Guard: Requires accountant role AND active assignment to the given client.
-    
-    This guard:
-    1. First verifies the user has accountant role
-    2. Then checks that the accountant is actively assigned to the client
-    
-    Args:
-        client_id: The administration/client UUID to check access for
-        current_user: The authenticated user
-        db: Database session
-    
-    Returns:
-        The AccountantClientAssignment record if valid
-        
-    Raises:
-        HTTP 403: If user is not accountant or not assigned to client
-    """
-    # First, verify accountant role
-    require_accountant(current_user)
-    
-    # Then, check assignment in database
-    result = await db.execute(
-        select(AccountantClientAssignment)
-        .where(AccountantClientAssignment.accountant_id == current_user.id)
-        .where(AccountantClientAssignment.administration_id == client_id)
-    )
-    assignment = result.scalar_one_or_none()
-    
-    if assignment is None:
-        raise HTTPException(
-            status_code=403,
-            detail={"code": "NOT_ASSIGNED", "message": "You are not assigned to this client"}
-        )
-    
-    return assignment
 
 
 # =============================================================================

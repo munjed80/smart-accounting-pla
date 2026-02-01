@@ -42,10 +42,10 @@ import { ClientPeriodsTab } from '@/components/ClientPeriodsTab'
 import { ClientDecisionsTab } from '@/components/ClientDecisionsTab'
 
 /**
- * Check if an error is a CLIENT_NOT_ASSIGNED error (403).
+ * Check if an error is a NOT_ASSIGNED error (403).
  * Returns true if the user is not assigned to the requested client.
  */
-function isClientNotAssignedError(err: unknown): boolean {
+function isNotAssignedError(err: unknown): boolean {
   if (typeof err !== 'object' || err === null || !('response' in err)) {
     return false
   }
@@ -54,7 +54,7 @@ function isClientNotAssignedError(err: unknown): boolean {
     return false
   }
   const detail = response?.data?.detail
-  return typeof detail === 'object' && detail?.code === 'CLIENT_NOT_ASSIGNED'
+  return typeof detail === 'object' && detail?.code === 'NOT_ASSIGNED'
 }
 
 interface ClientDossierPageProps {
@@ -89,8 +89,8 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
         localStorage.setItem('selectedClientName', data.client_name)
       }
     } catch (err: unknown) {
-      // Check if it's a CLIENT_NOT_ASSIGNED error (403)
-      if (isClientNotAssignedError(err)) {
+      // Check if it's a NOT_ASSIGNED error (403)
+      if (isNotAssignedError(err)) {
         setIsAccessDenied(true)
         // Clear localStorage since user doesn't have access
         localStorage.removeItem('selectedClientId')

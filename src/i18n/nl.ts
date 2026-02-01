@@ -964,6 +964,8 @@ export const nl = {
     selectClientCta: "Selecteer een klant uit de lijst om het dossier te openen.",
     noClientSelected: "Geen klant geselecteerd",
     goToClients: "Ga naar Klanten",
+    activeClient: "Actieve klant",
+    todayCompleted: "Vandaag afgerond",
     tabs: {
       issues: "Problemen",
       periods: "Periodes",

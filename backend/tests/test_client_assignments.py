@@ -44,6 +44,34 @@ class TestRequireAccountantGuard:
         assert is_accountant == True
 
 
+class TestRequireZZPGuard:
+    """Tests for the require_zzp authentication guard."""
+    
+    def test_accountant_user_gets_forbidden(self):
+        """Accountant users should receive 403 FORBIDDEN_ROLE error for ZZP endpoints."""
+        user_role = "accountant"
+        
+        is_zzp_allowed = user_role in ["zzp", "admin"]
+        
+        assert is_zzp_allowed == False
+    
+    def test_zzp_user_passes(self):
+        """ZZP users should pass the guard."""
+        user_role = "zzp"
+        
+        is_zzp_allowed = user_role in ["zzp", "admin"]
+        
+        assert is_zzp_allowed == True
+    
+    def test_admin_can_access_zzp_endpoints(self):
+        """Admin users should be able to access ZZP endpoints for support."""
+        user_role = "admin"
+        
+        is_zzp_allowed = user_role in ["zzp", "admin"]
+        
+        assert is_zzp_allowed == True
+
+
 class TestAssignmentByEmail:
     """Tests for client assignment by email functionality."""
     

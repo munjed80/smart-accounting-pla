@@ -26,6 +26,20 @@ def require_accountant(current_user: User) -> None:
         )
 
 
+def require_zzp(current_user: User) -> None:
+    """
+    Reusable dependency to verify user has ZZP role.
+    
+    Raises HTTPException with 403 status and FORBIDDEN_ROLE code if user
+    is not a ZZP user. Note: Admins can still access if needed for support purposes.
+    """
+    if current_user.role not in ["zzp", "admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "FORBIDDEN_ROLE", "message": "This endpoint is only available for ZZP users"}
+        )
+
+
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     db: Annotated[AsyncSession, Depends(get_db)],

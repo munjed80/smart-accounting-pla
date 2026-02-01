@@ -121,6 +121,14 @@ api.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    
+    // Add selected client context header for accountant-mode API calls
+    // This allows the backend to know which client's data to retrieve
+    const selectedClientId = localStorage.getItem('selectedClientId')
+    if (selectedClientId && config.headers) {
+      config.headers['X-Selected-Client-Id'] = selectedClientId
+    }
+    
     return config
   },
   (error) => {

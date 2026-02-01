@@ -9,17 +9,20 @@ Security:
 - Admin users must be in ADMIN_WHITELIST to access these endpoints
 """
 import logging
-from typing import Annotated
+from typing import Annotated, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.config import settings
 from app.models.user import User
+from app.models.administration import Administration, AdministrationMember, MemberRole
+from app.models.accountant_dashboard import AccountantClientAssignment
 from app.api.v1.deps import CurrentUser
 
 
@@ -274,4 +277,278 @@ async def get_user(
         role=user.role,
         is_active=user.is_active,
         is_email_verified=user.is_email_verified,
+    )
+
+
+# ===========================================================================
+# DEV-ONLY ENDPOINTS: Accountant-Client Assignment Seeding
+# ===========================================================================
+# These endpoints are available to admin/accountant users for development
+# purposes to quickly set up accountant-client assignments.
+# ===========================================================================
+
+
+class DevAssignmentByEmailRequest(BaseModel):
+    """Request body for dev assignment by email."""
+    accountant_email: EmailStr = Field(..., description="Email of the accountant to assign clients to")
+    client_email: Optional[EmailStr] = Field(None, description="Email of specific ZZP client (or None for all)")
+
+
+class DevAssignmentResult(BaseModel):
+    """Result of a single assignment operation."""
+    client_email: str
+    administration_name: str
+    status: str  # "created", "exists", "skipped"
+    message: str
+
+
+class DevAssignmentResponse(BaseModel):
+    """Response from dev assignment endpoint."""
+    accountant_email: str
+    accountant_name: str
+    total_assigned: int
+    total_skipped: int
+    results: list[DevAssignmentResult]
+
+
+class DevAssignmentsListItem(BaseModel):
+    """Item in dev assignments list."""
+    id: UUID
+    accountant_email: str
+    accountant_name: str
+    administration_id: UUID
+    administration_name: str
+    client_user_email: Optional[str] = None
+    assigned_at: str
+
+
+class DevAssignmentsListResponse(BaseModel):
+    """Response for listing all assignments."""
+    assignments: list[DevAssignmentsListItem]
+    total: int
+
+
+@router.post("/dev/seed-assignments", response_model=DevAssignmentResponse)
+async def dev_seed_assignments(
+    request: DevAssignmentByEmailRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    DEV ENDPOINT: Create accountant-client assignments.
+    
+    This endpoint is for development purposes to quickly set up accountant-client
+    assignments. It:
+    1. Finds the accountant by email
+    2. Finds ZZP users (specific one or all) with administrations
+    3. Creates AccountantClientAssignment records
+    4. Is idempotent (skips existing assignments)
+    
+    Access: Requires accountant or admin role.
+    
+    Args:
+        accountant_email: Email of the accountant to assign clients to
+        client_email: Optional email of specific ZZP client (None = all ZZP users)
+    
+    Returns:
+        DevAssignmentResponse with list of results
+    """
+    # Verify caller is accountant or admin
+    if current_user.role not in ["accountant", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint requires accountant or admin role"
+        )
+    
+    # 1. Find the accountant
+    accountant_result = await db.execute(
+        select(User).where(User.email == request.accountant_email.lower().strip())
+    )
+    accountant = accountant_result.scalar_one_or_none()
+    
+    if not accountant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "ACCOUNTANT_NOT_FOUND", "message": f"Accountant not found: {request.accountant_email}"}
+        )
+    
+    if accountant.role not in ["accountant", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "NOT_ACCOUNTANT", "message": f"User {request.accountant_email} has role '{accountant.role}', not accountant"}
+        )
+    
+    # 2. Find ZZP users
+    if request.client_email:
+        zzp_query = select(User).where(
+            User.email == request.client_email.lower().strip(),
+            User.role == "zzp"
+        )
+    else:
+        zzp_query = select(User).where(User.role == "zzp")
+    
+    zzp_result = await db.execute(zzp_query)
+    zzp_users = zzp_result.scalars().all()
+    
+    if not zzp_users:
+        if request.client_email:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ZZP_NOT_FOUND", "message": f"No ZZP user found with email: {request.client_email}"}
+            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "NO_ZZP_USERS", "message": "No ZZP users found in database"}
+        )
+    
+    # 3. Process each ZZP user
+    results = []
+    total_assigned = 0
+    total_skipped = 0
+    
+    for zzp_user in zzp_users:
+        # Find administrations where this user is OWNER
+        admin_member_result = await db.execute(
+            select(AdministrationMember)
+            .options(selectinload(AdministrationMember.administration))
+            .where(AdministrationMember.user_id == zzp_user.id)
+            .where(AdministrationMember.role == MemberRole.OWNER)
+        )
+        admin_members = admin_member_result.scalars().all()
+        
+        if not admin_members:
+            results.append(DevAssignmentResult(
+                client_email=zzp_user.email,
+                administration_name="N/A",
+                status="skipped",
+                message="No administration found (user needs to complete onboarding)"
+            ))
+            total_skipped += 1
+            continue
+        
+        for member in admin_members:
+            administration = member.administration
+            if not administration:
+                continue
+            
+            # Check if assignment already exists
+            existing_result = await db.execute(
+                select(AccountantClientAssignment)
+                .where(AccountantClientAssignment.accountant_id == accountant.id)
+                .where(AccountantClientAssignment.administration_id == administration.id)
+            )
+            existing = existing_result.scalar_one_or_none()
+            
+            if existing:
+                results.append(DevAssignmentResult(
+                    client_email=zzp_user.email,
+                    administration_name=administration.name,
+                    status="exists",
+                    message="Assignment already exists"
+                ))
+                total_skipped += 1
+                continue
+            
+            # Create assignment
+            assignment = AccountantClientAssignment(
+                accountant_id=accountant.id,
+                administration_id=administration.id,
+                is_primary=True,
+                assigned_by_id=current_user.id,
+                notes=f"Created via dev/seed-assignments API for {zzp_user.email}",
+            )
+            db.add(assignment)
+            
+            results.append(DevAssignmentResult(
+                client_email=zzp_user.email,
+                administration_name=administration.name,
+                status="created",
+                message="Assignment created successfully"
+            ))
+            total_assigned += 1
+    
+    await db.commit()
+    
+    return DevAssignmentResponse(
+        accountant_email=accountant.email,
+        accountant_name=accountant.full_name,
+        total_assigned=total_assigned,
+        total_skipped=total_skipped,
+        results=results,
+    )
+
+
+@router.get("/dev/assignments", response_model=DevAssignmentsListResponse)
+async def dev_list_assignments(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    accountant_email: Optional[str] = None,
+):
+    """
+    DEV ENDPOINT: List all accountant-client assignments.
+    
+    Returns all assignments in the system for debugging/verification.
+    
+    Access: Requires accountant or admin role.
+    
+    Args:
+        accountant_email: Optional filter by accountant email
+    
+    Returns:
+        DevAssignmentsListResponse with list of all assignments
+    """
+    # Verify caller is accountant or admin
+    if current_user.role not in ["accountant", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint requires accountant or admin role"
+        )
+    
+    query = (
+        select(AccountantClientAssignment)
+        .options(
+            selectinload(AccountantClientAssignment.accountant),
+            selectinload(AccountantClientAssignment.administration),
+        )
+        .order_by(AccountantClientAssignment.assigned_at.desc())
+    )
+    
+    if accountant_email:
+        # Filter by accountant email via subquery
+        accountant_subquery = select(User.id).where(User.email == accountant_email.lower().strip())
+        query = query.where(AccountantClientAssignment.accountant_id.in_(accountant_subquery))
+    
+    result = await db.execute(query)
+    assignments = result.scalars().all()
+    
+    items = []
+    for assignment in assignments:
+        # Get client user email if possible
+        client_email = None
+        if assignment.administration:
+            # Find the owner of the administration
+            owner_result = await db.execute(
+                select(AdministrationMember)
+                .options(selectinload(AdministrationMember.user))
+                .where(AdministrationMember.administration_id == assignment.administration_id)
+                .where(AdministrationMember.role == MemberRole.OWNER)
+                .limit(1)
+            )
+            owner_member = owner_result.scalar_one_or_none()
+            if owner_member and owner_member.user:
+                client_email = owner_member.user.email
+        
+        items.append(DevAssignmentsListItem(
+            id=assignment.id,
+            accountant_email=assignment.accountant.email if assignment.accountant else "Unknown",
+            accountant_name=assignment.accountant.full_name if assignment.accountant else "Unknown",
+            administration_id=assignment.administration_id,
+            administration_name=assignment.administration.name if assignment.administration else "Unknown",
+            client_user_email=client_email,
+            assigned_at=assignment.assigned_at.isoformat() if assignment.assigned_at else "N/A",
+        ))
+    
+    return DevAssignmentsListResponse(
+        assignments=items,
+        total=len(items),
     )

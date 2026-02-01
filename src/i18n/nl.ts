@@ -362,6 +362,10 @@ export const nl = {
     deselectAll: "Deselecteer alles",
     resultsFound: "klant(en) gevonden",
     noResultsFound: "Geen klanten gevonden met deze filters",
+    allFilteredSelected: "Alle {count} gefilterde klanten geselecteerd",
+    clearSearch: "Zoekopdracht wissen",
+    adjustFilters: "Pas je filters of zoekopdracht aan.",
+    onPageSelected: "{count} klanten op deze pagina geselecteerd.",
   },
 
   // Priority Clients Panel

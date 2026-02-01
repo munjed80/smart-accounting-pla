@@ -763,7 +763,7 @@ export const AccountantHomePage = () => {
         {selectedCount > 0 && selectedCount === paginatedClients.length && !selectAllResultsMode && filteredClients.length > paginatedClients.length && (
           <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-4 flex items-center justify-between">
             <span className="text-sm">
-              {paginatedClients.length} {t('pagination.clients')} op deze pagina geselecteerd.
+              {t('filters.onPageSelected').replace('{count}', String(paginatedClients.length))}
             </span>
             <Button variant="link" size="sm" onClick={handleSelectAllResults}>
               {t('filters.selectAll')} {filteredClients.length} {t('filters.resultsFound')}
@@ -774,10 +774,10 @@ export const AccountantHomePage = () => {
         {selectAllResultsMode && (
           <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4 flex items-center justify-between">
             <span className="text-sm text-blue-700 dark:text-blue-300">
-              ✓ Alle {filteredClients.length} gefilterde klanten geselecteerd
+              ✓ {t('filters.allFilteredSelected').replace('{count}', String(filteredClients.length))}
             </span>
             <Button variant="link" size="sm" className="text-blue-600" onClick={handleClearSelection}>
-              Selectie wissen
+              {t('bulkOps.clearSelection')}
             </Button>
           </div>
         )}
@@ -1014,12 +1014,12 @@ export const AccountantHomePage = () => {
                 <Funnel size={48} className="mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium">{t('filters.noResultsFound')}</p>
                 <p className="text-sm mt-2 mb-4">
-                  Pas je filters of zoekopdracht aan.
+                  {t('filters.adjustFilters')}
                 </p>
                 <div className="flex gap-2 justify-center">
                   {searchText && (
                     <Button variant="outline" onClick={() => setSearchText('')}>
-                      Zoekopdracht wissen
+                      {t('filters.clearSearch')}
                     </Button>
                   )}
                   {activeFilter !== 'all' && (

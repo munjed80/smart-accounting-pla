@@ -235,6 +235,30 @@ export const TodayCommandPanel = ({ summary, clients, isLoading }: TodayCommandP
       })
     }
     
+    // 6. Inactive clients (30+ days) - lowest priority, only if space
+    if (allTasks.length < 5) {
+      const inactiveClients = clients.filter(c => {
+        if (!c.last_activity_at) return true // Never active = inactive
+        const lastActivity = new Date(c.last_activity_at)
+        const daysSince = (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24)
+        return daysSince >= 30
+      }).length
+      
+      if (inactiveClients > 0) {
+        allTasks.push({
+          id: 'inactive',
+          icon: Stack,
+          iconColor: 'yellow',
+          text: inactiveClients === 1
+            ? '1 klant inactief > 30 dagen'
+            : `${inactiveClients} klanten inactief > 30 dagen`,
+          priority: 'kan_wachten',
+          link: '/accountant?tab=stale',
+          count: inactiveClients,
+        })
+      }
+    }
+    
     // Return max 5 tasks, sorted by priority
     const priorityOrder: Record<Priority, number> = {
       nu_doen: 0,

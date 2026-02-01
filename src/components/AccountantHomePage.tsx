@@ -388,9 +388,10 @@ export const AccountantHomePage = () => {
     return sortOrder === 'asc' ? <CaretUp size={14} /> : <CaretDown size={14} />
   }
   
-  // Handle view review queue for a client
+  // Handle view review queue for a client - navigate to client dossier
   const handleViewReviewQueue = (client: ClientStatusCard) => {
-    setReviewQueueClient(client)
+    // Navigate to client dossier issues page
+    navigateTo(`/accountant/clients/${client.administration_id}/issues`)
   }
   
   // Close review queue and go back to client list

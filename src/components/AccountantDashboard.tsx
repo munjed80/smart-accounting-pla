@@ -364,6 +364,11 @@ export const AccountantDashboard = () => {
     }
   }
   
+  const handleOpenDossier = (clientId: string) => {
+    // Navigate to client dossier issues page
+    navigateTo(`/accountant/clients/${clientId}/issues`)
+  }
+  
   const handleRemoveClient = async (client: AccountantClientListItem) => {
     // Find the assignment by matching administration_id
     const assignment = assignments.find(
@@ -693,11 +698,11 @@ export const AccountantDashboard = () => {
                           <Button
                             variant="default"
                             size="sm"
-                            onClick={() => handleSelectClient(client)}
+                            onClick={() => client.administration_id && handleOpenDossier(client.administration_id)}
                             disabled={!client.administration_id}
                           >
-                            <Check size={14} className="mr-1" />
-                            {t('clientList.select')}
+                            <Eye size={14} className="mr-1" />
+                            {t('accountantDashboard.openDossier')}
                           </Button>
                           <Button
                             variant="outline"

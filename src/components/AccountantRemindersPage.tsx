@@ -62,6 +62,10 @@ import { nl as nlLocale } from 'date-fns/locale'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
 
+// Constants
+const ADMIN_ID_TRUNCATE_LENGTH = 8
+const MESSAGE_PREVIEW_LENGTH = 50
+
 // Period filter options
 type PeriodFilter = 'last7' | 'last30' | 'last90' | 'all'
 
@@ -311,7 +315,7 @@ export const AccountantRemindersPage = () => {
   // Get client name from administration_id
   const getClientName = (administrationId: string) => {
     const client = clients.find(c => c.administration_id === administrationId)
-    return client?.name || client?.administration_name || administrationId.substring(0, 8) + '...'
+    return client?.name || client?.administration_name || administrationId.substring(0, ADMIN_ID_TRUNCATE_LENGTH) + '...'
   }
 
   return (
@@ -463,7 +467,7 @@ export const AccountantRemindersPage = () => {
                               </span>
                             ) : (
                               <span className="text-xs text-muted-foreground truncate" title={reminder.message}>
-                                {reminder.message?.substring(0, 50)}...
+                                {reminder.message?.substring(0, MESSAGE_PREVIEW_LENGTH)}...
                               </span>
                             )}
                           </div>

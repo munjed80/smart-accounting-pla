@@ -82,6 +82,7 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
     if (clientId) {
       fetchOverview()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId])
 
   const handleBack = () => {

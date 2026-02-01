@@ -469,6 +469,7 @@ export const ClientIssuesTab = ({ clientId, onIssueResolved }: ClientIssuesTabPr
 
   useEffect(() => {
     fetchIssues()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId])
 
   // Group issues by severity

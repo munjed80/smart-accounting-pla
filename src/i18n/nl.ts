@@ -780,6 +780,13 @@ export const nl = {
     noDecisions: "Nog geen beslissingen",
     noDecisionsDescription: "Beslissingen over problemen worden hier weergegeven.",
     totalDecisions: "Totaal beslissingen",
+    tableHeaders: {
+      issue: "Probleem",
+      action: "Actie",
+      decision: "Beslissing",
+      status: "Status",
+    },
+    reverseWarning: "Het probleem zal worden heropend en je moet mogelijk een correctieboeking maken.",
     status: {
       approved: "Goedgekeurd",
       rejected: "Afgewezen",

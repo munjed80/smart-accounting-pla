@@ -363,10 +363,10 @@ export const ClientDecisionsTab = ({ clientId }: ClientDecisionsTabProps) => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Probleem</TableHead>
-                  <TableHead>Actie</TableHead>
-                  <TableHead>Beslissing</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{t('decisions.tableHeaders.issue')}</TableHead>
+                  <TableHead>{t('decisions.tableHeaders.action')}</TableHead>
+                  <TableHead>{t('decisions.tableHeaders.decision')}</TableHead>
+                  <TableHead>{t('decisions.tableHeaders.status')}</TableHead>
                   <TableHead>{t('decisions.decidedBy')}</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -415,7 +415,7 @@ export const ClientDecisionsTab = ({ clientId }: ClientDecisionsTabProps) => {
             <Alert className="bg-amber-500/10 border-amber-500/30">
               <Warning className="h-4 w-4 text-amber-500" />
               <AlertDescription className="text-sm">
-                Het probleem zal worden heropend en je moet mogelijk een correctieboeking maken.
+                {t('decisions.reverseWarning')}
               </AlertDescription>
             </Alert>
           </div>

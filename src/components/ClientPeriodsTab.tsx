@@ -196,7 +196,7 @@ const PeriodCard = ({
 
   const handleLock = async () => {
     if (!confirmIrreversible) {
-      setError('Bevestig dat je begrijpt dat dit onomkeerbaar is.')
+      setError(t('periods.actions.lock.confirmLabel'))
       return
     }
     
@@ -713,6 +713,7 @@ export const ClientPeriodsTab = ({ clientId }: ClientPeriodsTabProps) => {
 
   useEffect(() => {
     fetchPeriods()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId])
 
   if (error && periods.length === 0) {

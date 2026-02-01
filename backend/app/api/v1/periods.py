@@ -16,7 +16,6 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.models.administration import Administration, AdministrationMember, MemberRole
 from app.models.ledger import AccountingPeriod, PeriodStatus as ModelPeriodStatus
 from app.schemas.period import (
     PeriodResponse,
@@ -43,36 +42,9 @@ from app.services.period.control import (
     PeriodStateError,
     FinalizationPrerequisiteError,
 )
-from app.api.v1.deps import CurrentUser
+from app.api.v1.deps import CurrentUser, require_assigned_client
 
 router = APIRouter()
-
-
-async def verify_accountant_access(
-    client_id: UUID,
-    current_user: CurrentUser,
-    db: AsyncSession,
-) -> Administration:
-    """Verify user has accountant access to the client."""
-    if current_user.role not in ["accountant", "admin"]:
-        raise HTTPException(
-            status_code=403,
-            detail="This endpoint is only available for accountants"
-        )
-    
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(Administration.id == client_id)
-        .where(AdministrationMember.user_id == current_user.id)
-        .where(AdministrationMember.role.in_([MemberRole.OWNER, MemberRole.ADMIN, MemberRole.ACCOUNTANT]))
-    )
-    administration = result.scalar_one_or_none()
-    
-    if not administration:
-        raise HTTPException(status_code=404, detail="Client not found or access denied")
-    
-    return administration
 
 
 def convert_period_to_response(period: AccountingPeriod) -> PeriodResponse:
@@ -110,7 +82,7 @@ async def list_periods(
     
     Optionally filter by status (OPEN, REVIEW, FINALIZED, LOCKED).
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     service = PeriodControlService(db, client_id)
     
@@ -142,7 +114,7 @@ async def get_period(
     
     Returns the period and its validation status (RED/YELLOW issues).
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     service = PeriodControlService(db, client_id)
     
@@ -180,7 +152,7 @@ async def review_period(
     This triggers a full validation run and transitions the period from OPEN to REVIEW.
     The period will remain in REVIEW status until finalized or reopened.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     # Get request metadata for audit
     ip_address = request.client.host if request.client else None
@@ -239,7 +211,7 @@ async def finalize_period(
     
     **Warning:** This action cannot be undone. The period can only be locked further.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     # Get request metadata for audit
     ip_address = request.client.host if request.client else None
@@ -303,7 +275,7 @@ async def lock_period(
     
     **⚠️ WARNING: This action is IRREVERSIBLE. Use with extreme caution.**
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     if not body.confirm_irreversible:
         raise HTTPException(
@@ -358,7 +330,7 @@ async def get_period_snapshot(
     
     This is only available for FINALIZED or LOCKED periods.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     service = PeriodControlService(db, client_id)
     
@@ -427,7 +399,7 @@ async def get_period_audit_logs(
     
     Each log entry includes who performed the action, when, and any notes.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     service = PeriodControlService(db, client_id)
     

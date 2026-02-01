@@ -125,6 +125,7 @@ export const nl = {
     reviewQueue: "Te beoordelen",
     backToDashboard: "Terug naar Dashboard",
     backToWorkQueue: "Terug naar Werklijst",
+    backToClientList: "Terug naar klantenlijst",
     navigationMenu: "Navigatiemenu",
     navigateApp: "Navigeer door de applicatie",
   },
@@ -939,6 +940,9 @@ export const nl = {
     loadFailed: "Laden mislukt",
     tryAgain: "Probeer opnieuw",
     somethingWrong: "Er is iets misgegaan",
+    clientNotAssigned: "Geen toegang tot deze klant",
+    clientNotAssignedDescription: "Je bent niet toegewezen aan deze klant. Neem contact op met de beheerder of koppel de klant via je dashboard.",
+    backToClients: "Terug naar klanten",
   },
 };
 

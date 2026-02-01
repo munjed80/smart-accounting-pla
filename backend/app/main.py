@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.core.database import engine
-from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin
+from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +120,7 @@ api_v1_router.include_router(vat.router, prefix="/accountant", tags=["vat-btw-fi
 api_v1_router.include_router(review_queue.router, prefix="/accountant", tags=["document-review-queue"])
 api_v1_router.include_router(accountant_dashboard.router, prefix="/accountant", tags=["accountant-master-dashboard"])
 api_v1_router.include_router(work_queue.router, prefix="/accountant", tags=["work-queue-reminders-evidence"])
+api_v1_router.include_router(zzp.router, prefix="/zzp", tags=["zzp-client-consent"])
 api_v1_router.include_router(observability.router, prefix="/ops", tags=["observability"])
 api_v1_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 

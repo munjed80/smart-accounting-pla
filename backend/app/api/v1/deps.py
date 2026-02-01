@@ -24,11 +24,14 @@ async def require_assigned_client(
     db: AsyncSession,
 ) -> Administration:
     """
-    Verify user is an accountant AND is assigned to the client (server-enforced).
+    Verify user is an accountant AND is assigned to the client with ACTIVE status.
     
     Checks both:
     1. AdministrationMember table (direct membership)
-    2. AccountantClientAssignment table (assignment-based access)
+    2. AccountantClientAssignment table (assignment-based access with consent)
+    
+    For AccountantClientAssignment, only ACTIVE assignments grant access.
+    PENDING assignments (awaiting client approval) do NOT grant access.
     
     Returns:
         Administration: The administration if access is granted
@@ -36,6 +39,7 @@ async def require_assigned_client(
     Raises:
         HTTPException: 403 with FORBIDDEN_ROLE if user is not accountant/admin
         HTTPException: 403 with NOT_ASSIGNED if user is not assigned to client
+        HTTPException: 403 with PENDING_APPROVAL if assignment is pending client approval
     """
     # First verify role
     require_accountant(current_user)
@@ -53,20 +57,44 @@ async def require_assigned_client(
     if administration:
         return administration
     
-    # Check via AccountantClientAssignment (assignment-based access)
+    # Check via AccountantClientAssignment (assignment-based access with consent)
+    # Import AssignmentStatus here to avoid circular imports
+    from app.models.accountant_dashboard import AssignmentStatus
+    
     assignment_result = await db.execute(
-        select(Administration)
+        select(Administration, AccountantClientAssignment)
         .join(AccountantClientAssignment, AccountantClientAssignment.administration_id == Administration.id)
         .where(Administration.id == client_id)
         .where(AccountantClientAssignment.accountant_id == current_user.id)
     )
-    administration = assignment_result.scalar_one_or_none()
+    result_tuple = assignment_result.first()
     
-    if not administration:
+    if not result_tuple:
         raise HTTPException(
             status_code=403,
             detail={"code": "NOT_ASSIGNED", "message": "Geen toegang tot deze klant."}
         )
+    
+    administration, assignment = result_tuple
+    
+    # Check assignment status - only ACTIVE grants access
+    if assignment.status != AssignmentStatus.ACTIVE:
+        if assignment.status == AssignmentStatus.PENDING:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PENDING_APPROVAL",
+                    "message": "Toegang is in afwachting van goedkeuring door de klant."
+                }
+            )
+        else:  # REVOKED
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "ACCESS_REVOKED",
+                    "message": "Toegang is ingetrokken door de klant."
+                }
+            )
     
     return administration
 

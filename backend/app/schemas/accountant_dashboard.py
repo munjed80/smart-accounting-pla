@@ -296,3 +296,85 @@ class AccountantAssignmentsListResponse(BaseModel):
     """Response for listing assignments."""
     assignments: List[AccountantAssignmentResponse]
     total_count: int
+
+
+# ============ Client Consent Workflow Schemas ============
+
+class InviteClientRequest(BaseModel):
+    """Request to invite a client by email (accountant self-serve)."""
+    email: str = Field(..., description="Email of the ZZP client to invite")
+
+
+class InviteClientResponse(BaseModel):
+    """Response after inviting a client."""
+    assignment_id: UUID
+    status: str  # PENDING or ACTIVE
+    client_name: str
+    client_email: str
+    message: str
+
+
+class ClientLinkItem(BaseModel):
+    """
+    Client link item for accountant's client list.
+    
+    Represents a single accountant-client relationship with consent status.
+    """
+    assignment_id: UUID
+    client_user_id: UUID
+    client_email: str
+    client_name: str
+    administration_id: UUID
+    administration_name: str
+    status: str  # PENDING, ACTIVE, REVOKED
+    invited_by: str  # ACCOUNTANT, ADMIN
+    assigned_at: datetime
+    approved_at: Optional[datetime] = None
+    revoked_at: Optional[datetime] = None
+    open_red_count: int = 0
+    open_yellow_count: int = 0
+
+
+class AccountantClientLinksResponse(BaseModel):
+    """Response for listing accountant's client links with consent status."""
+    links: List[ClientLinkItem]
+    pending_count: int
+    active_count: int
+    total_count: int
+
+
+class PendingLinkRequest(BaseModel):
+    """
+    Pending link request for ZZP client approval.
+    
+    Shows accountant requesting access to the client's administration.
+    """
+    assignment_id: UUID
+    accountant_id: UUID
+    accountant_email: str
+    accountant_name: str
+    administration_id: UUID
+    administration_name: str
+    invited_at: datetime
+
+
+class ZZPLinksResponse(BaseModel):
+    """Response for ZZP client's pending link requests."""
+    pending_requests: List[PendingLinkRequest]
+    total_count: int
+
+
+class ApproveLinkResponse(BaseModel):
+    """Response after approving a link."""
+    assignment_id: UUID
+    status: str  # ACTIVE
+    approved_at: datetime
+    message: str
+
+
+class RejectLinkResponse(BaseModel):
+    """Response after rejecting a link."""
+    assignment_id: UUID
+    status: str  # REVOKED
+    revoked_at: datetime
+    message: str

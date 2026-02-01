@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from '@/lib/AuthContext'
+import { ActiveClientProvider } from '@/lib/ActiveClientContext'
 import { LoginPage } from '@/components/LoginPage'
 import { VerifyEmailPage } from '@/components/VerifyEmailPage'
 import { ForgotPasswordPage } from '@/components/ForgotPasswordPage'
@@ -425,7 +426,9 @@ const AppContent = () => {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <ActiveClientProvider>
+        <AppContent />
+      </ActiveClientProvider>
     </AuthProvider>
   )
 }

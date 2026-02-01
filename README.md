@@ -414,7 +414,7 @@ Follow this checklist to verify the accountant registration and login flow works
    - Go back to the login page
    - Enter your credentials
    - Click "Login"
-   - **Expected**: You should be redirected to `/accountant/review` (Work Queue)
+   - **Expected**: You should be redirected to `/accountant` (Work Queue)
 
 4. **Verify Role Badge**
    - Check the header badge shows "accountant" (not "ZZP")
@@ -429,6 +429,67 @@ Follow this checklist to verify the accountant registration and login flow works
    - Click the Logout button (header or sidebar)
    - You should be redirected to `/login`
    - localStorage should be cleared (no access_token)
+
+### End-to-End Accountant Workflow Checklist
+
+Follow this checklist to test the complete accountant workflow:
+
+1. **Create ZZP User**
+   ```bash
+   # Register via API or UI
+   curl -X POST "http://localhost:8000/api/v1/auth/register" \
+     -H "Content-Type: application/json" \
+     -d '{"email": "zzp@example.com", "password": "TestPass123!", "full_name": "Test ZZP", "role": "zzp"}'
+   ```
+
+2. **Create Accountant User**
+   ```bash
+   curl -X POST "http://localhost:8000/api/v1/auth/register" \
+     -H "Content-Type: application/json" \
+     -d '{"email": "accountant@example.com", "password": "TestPass123!", "full_name": "Test Accountant", "role": "accountant"}'
+   ```
+
+3. **Verify Emails** (if email verification is enabled)
+   - Check both email inboxes for verification links
+
+4. **ZZP: Complete Onboarding**
+   - Login as ZZP user
+   - Complete the onboarding wizard to create an administration
+
+5. **Assign ZZP to Accountant** (for testing)
+   ```bash
+   # Login as accountant first, then use the assignment endpoint
+   curl -X POST "http://localhost:8000/api/v1/accountant/assignments/by-email" \
+     -H "Authorization: Bearer ACCOUNTANT_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"client_email": "zzp@example.com"}'
+   ```
+   
+   Or use the admin dev endpoint:
+   ```bash
+   curl -X POST "http://localhost:8000/api/v1/admin/dev/seed-assignments" \
+     -H "Authorization: Bearer ACCOUNTANT_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"accountant_email": "accountant@example.com", "client_email": "zzp@example.com"}'
+   ```
+
+6. **Accountant: View Clients**
+   - Login as accountant
+   - Navigate to `/accountant/clients`
+   - Should see the assigned ZZP client in the list
+
+7. **Accountant: Open Client Dossier**
+   - Click "Open Dossier" on a client
+   - Should navigate to `/accountant/clients/{clientId}/issues`
+   - Page should load without "Not Found" error
+
+8. **Accountant: Review Queue**
+   - Navigate to `/accountant/review-queue`
+   - Should load the review queue (even if empty)
+
+9. **Logout**
+   - Click logout button
+   - Should redirect to login page
 
 ### Troubleshooting Role Issues
 

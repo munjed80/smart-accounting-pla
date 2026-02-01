@@ -265,7 +265,7 @@ export const AccountantHomePage = () => {
       setError(null)
       
       // Fetch summary
-      const summaryRes = await api.get<DashboardSummary>('/api/v1/accountant/dashboard/summary')
+      const summaryRes = await api.get<DashboardSummary>('/accountant/dashboard/summary')
       setSummary(summaryRes.data)
       
       // Determine filters based on active tab
@@ -276,7 +276,7 @@ export const AccountantHomePage = () => {
       else if (activeTab === 'stale') filters = ['stale_30d']
       
       // Fetch clients
-      const clientsRes = await api.get<ClientsListResponse>('/api/v1/accountant/dashboard/clients', {
+      const clientsRes = await api.get<ClientsListResponse>('/accountant/dashboard/clients', {
         params: {
           sort: sortBy,
           order: sortOrder,
@@ -338,20 +338,20 @@ export const AccountantHomePage = () => {
       
       switch (bulkOperationType) {
         case 'recalculate':
-          endpoint = '/api/v1/accountant/bulk/recalculate'
+          endpoint = '/accountant/bulk/recalculate'
           payload.force = true
           break
         case 'ack_yellow':
-          endpoint = '/api/v1/accountant/bulk/ack-yellow'
+          endpoint = '/accountant/bulk/ack-yellow'
           break
         case 'send_reminders':
-          endpoint = '/api/v1/accountant/bulk/send-reminders'
+          endpoint = '/accountant/bulk/send-reminders'
           payload.reminder_type = reminderType
           payload.title = reminderTitle
           payload.message = reminderMessage
           break
         case 'generate_vat':
-          endpoint = '/api/v1/accountant/bulk/generate-vat-draft'
+          endpoint = '/accountant/bulk/generate-vat-draft'
           const now = new Date()
           payload.period_year = now.getFullYear()
           payload.period_quarter = Math.ceil((now.getMonth() + 1) / 3)

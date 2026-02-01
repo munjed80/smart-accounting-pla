@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.security import oauth2_scheme, decode_token
+from app.core.roles import UserRole
 from app.models.user import User
 from app.models.administration import Administration, AdministrationMember, MemberRole
 from app.models.accountant_dashboard import AccountantClientAssignment
@@ -121,7 +122,7 @@ def require_zzp(current_user: User) -> None:
     Raises:
         HTTP 403: If user role is not 'zzp'
     """
-    if current_user.role != "zzp":
+    if current_user.role != UserRole.ZZP.value:
         raise HTTPException(
             status_code=403,
             detail={"code": "FORBIDDEN_ROLE", "message": "This endpoint is only available for ZZP users"}
@@ -135,7 +136,7 @@ def require_accountant(current_user: User) -> None:
     Raises:
         HTTP 403: If user role is not 'accountant'
     """
-    if current_user.role != "accountant":
+    if current_user.role != UserRole.ACCOUNTANT.value:
         raise HTTPException(
             status_code=403,
             detail={"code": "FORBIDDEN_ROLE", "message": "This endpoint is only available for accountants"}

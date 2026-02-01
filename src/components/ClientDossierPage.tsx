@@ -31,6 +31,7 @@ import {
   ClipboardText,
   CalendarBlank,
   ListChecks,
+  LockSimple,
 } from '@phosphor-icons/react'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
@@ -50,6 +51,7 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
   const [overview, setOverview] = useState<LedgerClientOverview | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isAccessDenied, setIsAccessDenied] = useState(false)
   const [activeTab, setActiveTab] = useState<string>(initialTab)
 
   // Store selected client in localStorage
@@ -63,13 +65,26 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
     try {
       setIsLoading(true)
       setError(null)
+      setIsAccessDenied(false)
       const data = await ledgerApi.getClientOverview(clientId)
       setOverview(data)
       // Store client name
       if (data.client_name) {
         localStorage.setItem('selectedClientName', data.client_name)
       }
-    } catch (err) {
+    } catch (err: unknown) {
+      // Check if it's a CLIENT_NOT_ASSIGNED error (403)
+      if (typeof err === 'object' && err !== null && 'response' in err) {
+        const response = (err as { response?: { status?: number; data?: { detail?: { code?: string } | string } } }).response
+        const detail = response?.data?.detail
+        if (response?.status === 403 && typeof detail === 'object' && detail?.code === 'CLIENT_NOT_ASSIGNED') {
+          setIsAccessDenied(true)
+          // Clear localStorage since user doesn't have access
+          localStorage.removeItem('selectedClientId')
+          localStorage.removeItem('selectedClientName')
+          return
+        }
+      }
       const message = getErrorMessage(err)
       setError(message)
       console.error('Failed to fetch client overview:', err)
@@ -112,6 +127,29 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
     )
   }
 
+  // Access denied - CLIENT_NOT_ASSIGNED error
+  if (isAccessDenied) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background p-8">
+        <div className="max-w-4xl mx-auto">
+          <Alert className="bg-amber-500/10 border-amber-500/40">
+            <LockSimple className="h-5 w-5 text-amber-600" />
+            <AlertTitle className="text-amber-700 dark:text-amber-400">{t('errors.clientNotAssigned')}</AlertTitle>
+            <AlertDescription className="mt-2">
+              <p className="text-muted-foreground mb-4">
+                {t('errors.clientNotAssignedDescription')}
+              </p>
+              <Button onClick={handleBack} variant="outline">
+                <ArrowLeft size={16} className="mr-2" />
+                {t('errors.backToClients')}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    )
+  }
+
   // No client selected
   if (!clientId) {
     return (
@@ -140,7 +178,7 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
         <div className="max-w-4xl mx-auto">
           <Button variant="ghost" size="sm" onClick={handleBack} className="mb-4">
             <ArrowLeft size={18} className="mr-2" />
-            {t('sidebar.backToClientList') || t('accountant.backToClientList')}
+            {t('sidebar.backToClientList')}
           </Button>
           <Alert className="bg-destructive/10 border-destructive/40">
             <WarningCircle className="h-5 w-5 text-destructive" />

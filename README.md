@@ -665,3 +665,101 @@ Ensure this directory:
 - Is writable by the backend process
 - Has sufficient disk space
 - Is backed up regularly for compliance
+
+---
+
+## Bulk Operations - Manual Test Checklist (Mobile)
+
+This checklist is for testing the accountant bulk operations feature on mobile devices (iPhone Safari).
+
+### Pre-requisites
+- [ ] Logged in as accountant role
+- [ ] At least 2-3 test clients assigned
+- [ ] Backend API is running and accessible
+
+### Selection Model Tests
+- [ ] **Multi-select from table**: Tap checkboxes to select multiple clients
+- [ ] **Select all visible**: Tap "Selecteer alles (zichtbaar)" button
+- [ ] **Clear selection**: Tap "Selectie wissen" button
+- [ ] **Selection persists**: Refresh page, verify selection is maintained (localStorage)
+- [ ] **Selection count**: Verify "Geselecteerd: X klanten" shows correct count
+
+### BulkActionBar Tests (Mobile Responsive)
+- [ ] **Bar visibility**: Bar appears when at least 1 client selected
+- [ ] **Bar hidden**: Bar disappears when selection is cleared
+- [ ] **Buttons wrap**: On narrow screens, action buttons wrap to multiple lines
+- [ ] **Large selection warning**: Select >50 clients, verify warning message appears
+
+### Bulk Operation Modal Tests
+- [ ] **Open modal**: Tap any bulk action button (e.g., "Herberekenen")
+- [ ] **Selection summary**: Modal shows first 5 client names + "+N meer" if more
+- [ ] **Dutch text**: All modal text is in Dutch
+- [ ] **Cancel button**: Tap "Annuleren" closes modal without action
+- [ ] **Scroll on mobile**: Modal content is scrollable on small screens
+
+### Reminder-specific Tests
+- [ ] **Reminder type dropdown**: Can select type (Actie vereist, Document ontbreekt, etc.)
+- [ ] **Default message**: Title and message have Dutch defaults
+- [ ] **Deadline checkbox**: Toggle "Deadline toevoegen" shows date picker
+- [ ] **Validation**: Execute button disabled if title/message empty
+
+### VAT Draft-specific Tests
+- [ ] **Year selector**: Can select year from dropdown
+- [ ] **Quarter selector**: Can select Q1-Q4 from dropdown
+- [ ] **Default period**: Current quarter is pre-selected
+
+### Execution & Results Tests
+- [ ] **Progress indicator**: Spinner shows "Bezig met uitvoeren…" during execution
+- [ ] **Success display**: Shows Gelukt / Mislukt / Overgeslagen counts
+- [ ] **Expandable details**: Can expand to see per-client results
+- [ ] **Error messages**: Failed clients show error reason
+- [ ] **Retry button**: "Opnieuw proberen (alleen mislukt)" button works
+
+### Action Log Tests
+- [ ] **Navigate to Actions page**: Tap "Acties" in sidebar
+- [ ] **List displays**: Shows list of recent bulk operations
+- [ ] **Expand details**: Can expand each entry to see client results
+- [ ] **Status badges**: Shows correct status (Succesvol/Gedeeltelijk/Mislukt)
+- [ ] **Recent actions on dashboard**: RecentActionsPanel shows last 3 actions
+
+### Error Handling Tests
+- [ ] **401 Unauthorized**: Token expired triggers logout and redirect to login
+- [ ] **403 Forbidden**: Shows appropriate error message
+- [ ] **Network error**: Shows error alert, allows retry
+- [ ] **Rate limit**: Shows "Let op: Grote bewerkingen kunnen enkele minuten duren."
+
+### Cross-browser Tests
+- [ ] **iPhone Safari**: All features work correctly
+- [ ] **Android Chrome**: All features work correctly
+- [ ] **Desktop Chrome**: All features work correctly
+
+### Bulk API Payload Shape
+
+```json
+// POST /accountant/bulk/recalculate
+{
+  "client_ids": ["uuid-1", "uuid-2"],
+  "force": true
+}
+
+// POST /accountant/bulk/ack-yellow
+{
+  "client_ids": ["uuid-1", "uuid-2"]
+}
+
+// POST /accountant/bulk/generate-vat-draft
+{
+  "client_ids": ["uuid-1", "uuid-2"],
+  "period_year": 2026,
+  "period_quarter": 1
+}
+
+// POST /accountant/bulk/send-reminders
+{
+  "client_ids": ["uuid-1", "uuid-2"],
+  "reminder_type": "ACTION_REQUIRED",
+  "title": "Herinnering van uw boekhouder",
+  "message": "Beste klant, graag uw aandacht...",
+  "due_date": "2026-02-15"
+}
+```

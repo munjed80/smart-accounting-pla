@@ -1834,6 +1834,18 @@ export interface BulkLockPeriodRequest {
   idempotency_key?: string
 }
 
+// ============ Accountant Bulk API Endpoints ============
+// Single source of truth for all bulk endpoint paths
+export const ACCOUNTANT_BULK_ENDPOINTS = {
+  recalculate: '/accountant/bulk/recalculate',
+  ackYellow: '/accountant/bulk/ack-yellow',
+  generateVatDraft: '/accountant/bulk/generate-vat-draft',
+  sendReminders: '/accountant/bulk/send-reminders',
+  lockPeriod: '/accountant/bulk/lock-period',
+  operations: '/accountant/bulk/operations',
+  operationById: (id: string) => `/accountant/bulk/operations/${id}`,
+} as const
+
 // Accountant Master Dashboard API
 export const accountantMasterDashboardApi = {
   getSummary: async (): Promise<DashboardSummary> => {
@@ -1855,32 +1867,32 @@ export const accountantMasterDashboardApi = {
   },
 
   bulkRecalculate: async (request: BulkRecalculateRequest): Promise<BulkOperationResponse> => {
-    const response = await api.post<BulkOperationResponse>('/accountant/bulk/recalculate', request)
+    const response = await api.post<BulkOperationResponse>(ACCOUNTANT_BULK_ENDPOINTS.recalculate, request)
     return response.data
   },
 
   bulkAckYellow: async (request: BulkAckYellowRequest): Promise<BulkOperationResponse> => {
-    const response = await api.post<BulkOperationResponse>('/accountant/bulk/ack-yellow', request)
+    const response = await api.post<BulkOperationResponse>(ACCOUNTANT_BULK_ENDPOINTS.ackYellow, request)
     return response.data
   },
 
   bulkGenerateVatDraft: async (request: BulkGenerateVatDraftRequest): Promise<BulkOperationResponse> => {
-    const response = await api.post<BulkOperationResponse>('/accountant/bulk/generate-vat-draft', request)
+    const response = await api.post<BulkOperationResponse>(ACCOUNTANT_BULK_ENDPOINTS.generateVatDraft, request)
     return response.data
   },
 
   bulkSendReminders: async (request: BulkSendRemindersRequest): Promise<BulkOperationResponse> => {
-    const response = await api.post<BulkOperationResponse>('/accountant/bulk/send-reminders', request)
+    const response = await api.post<BulkOperationResponse>(ACCOUNTANT_BULK_ENDPOINTS.sendReminders, request)
     return response.data
   },
 
   bulkLockPeriod: async (request: BulkLockPeriodRequest): Promise<BulkOperationResponse> => {
-    const response = await api.post<BulkOperationResponse>('/accountant/bulk/lock-period', request)
+    const response = await api.post<BulkOperationResponse>(ACCOUNTANT_BULK_ENDPOINTS.lockPeriod, request)
     return response.data
   },
 
   getBulkOperation: async (operationId: string): Promise<BulkOperationResponse> => {
-    const response = await api.get<BulkOperationResponse>(`/accountant/bulk/operations/${operationId}`)
+    const response = await api.get<BulkOperationResponse>(ACCOUNTANT_BULK_ENDPOINTS.operationById(operationId))
     return response.data
   },
 
@@ -1888,7 +1900,7 @@ export const accountantMasterDashboardApi = {
     const params: Record<string, unknown> = {}
     if (limit) params.limit = limit
     if (operationType) params.operation_type = operationType
-    const response = await api.get<{ operations: BulkOperationResponse[], total_count: number }>('/accountant/bulk/operations', { params })
+    const response = await api.get<{ operations: BulkOperationResponse[], total_count: number }>(ACCOUNTANT_BULK_ENDPOINTS.operations, { params })
     return response.data
   },
 }

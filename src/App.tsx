@@ -13,6 +13,8 @@ import { AccountantHomePage } from '@/components/AccountantHomePage'
 import { AccountantReviewQueuePage } from '@/components/AccountantReviewQueuePage'
 import { AccountantRemindersPage } from '@/components/AccountantRemindersPage'
 import { AccountantActionsPage } from '@/components/AccountantActionsPage'
+import { AccountantClientsPage } from '@/components/AccountantClientsPage'
+import { ZZPAccountantLinksPage } from '@/components/ZZPAccountantLinksPage'
 import { ClientDossierPage } from '@/components/ClientDossierPage'
 import { IntelligentUploadPortal } from '@/components/IntelligentUploadPortal'
 import { SmartTransactionList } from '@/components/SmartTransactionList'
@@ -120,6 +122,9 @@ const pathToTab = (path: string, isAccountant: boolean): string => {
       return 'settings'
     case '/support':
       return 'support'
+    case '/dashboard/boekhouder':
+    case '/zzp/boekhouder':
+      return 'boekhouder'
     case '/':
     default:
       // Default based on role
@@ -150,6 +155,8 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
       return '/settings'
     case 'support':
       return '/support'
+    case 'boekhouder':
+      return '/dashboard/boekhouder'
     default:
       return isAccountant ? '/accountant' : '/dashboard'
   }
@@ -158,7 +165,7 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
 const AppContent = () => {
   const { user, isAuthenticated, isLoading } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'transactions' | 'upload' | 'settings' | 'support'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
   // Onboarding state - tracks if user needs onboarding (no administrations for ZZP, no clients for accountants)
@@ -391,13 +398,17 @@ const AppContent = () => {
         // Redirect ZZP users to dashboard if they try to access accountant-only pages
         return isAccountant ? <AccountantHomePage /> : <SmartDashboard />
       case 'clients':
-        return isAccountant ? <AccountantDashboard /> : <SmartDashboard />
+        // Use the new AccountantClientsPage for accountants (consent workflow)
+        return isAccountant ? <AccountantClientsPage /> : <SmartDashboard />
       case 'reviewqueue':
         return isAccountant ? <AccountantReviewQueuePage /> : <SmartDashboard />
       case 'reminders':
         return isAccountant ? <AccountantRemindersPage /> : <SmartDashboard />
       case 'acties':
         return isAccountant ? <AccountantActionsPage /> : <SmartDashboard />
+      case 'boekhouder':
+        // ZZP-only page for managing accountant links
+        return !isAccountant ? <ZZPAccountantLinksPage /> : <SmartDashboard />
       case 'dashboard':
         return <SmartDashboard />
       case 'transactions':

@@ -6,6 +6,7 @@
  * - Tabs: Rode issues, Te beoordelen, BTW binnenkort, Achterstand documenten
  * - EmptyState when no client selected
  * - Uses existing AccountantWorkQueue and ReviewQueue components
+ * - Handles PENDING_APPROVAL and ACCESS_REVOKED errors from backend
  */
 
 import { useState, useEffect } from 'react'
@@ -16,7 +17,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { EmptyState } from '@/components/EmptyState'
 import { ReviewQueue } from '@/components/ReviewQueue'
+import { ClientAccessError, parseClientAccessError } from '@/components/ClientAccessError'
 import { useAuth } from '@/lib/AuthContext'
+import { useActiveClient } from '@/lib/ActiveClientContext'
 import { accountantClientApi, AccountantClientListItem, getErrorMessage } from '@/lib/api'
 import { 
   WarningCircle,
@@ -32,49 +35,48 @@ import { t } from '@/i18n'
 
 export const AccountantReviewQueuePage = () => {
   const { user } = useAuth()
+  const { activeClient, hasActiveClients, hasPendingClients } = useActiveClient()
   
-  // Selected client state (from localStorage)
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
-  const [selectedClientName, setSelectedClientName] = useState<string | null>(null)
+  // Client details state
   const [selectedClient, setSelectedClient] = useState<AccountantClientListItem | null>(null)
   
   // Active tab
   const [activeTab, setActiveTab] = useState<'red' | 'review' | 'vat' | 'backlog'>('review')
   
-  // Loading state
+  // Loading and error state
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [clientAccessError, setClientAccessError] = useState<'pending_approval' | 'access_revoked' | 'not_assigned' | 'no_client' | null>(null)
   
-  // Load selected client from localStorage
+  // Fetch client details when activeClient changes
   useEffect(() => {
-    const storedId = localStorage.getItem('selectedClientId')
-    const storedName = localStorage.getItem('selectedClientName')
-    setSelectedClientId(storedId)
-    setSelectedClientName(storedName)
-    
-    // If we have a stored ID, try to fetch client details
-    if (storedId) {
-      fetchClientDetails(storedId)
+    if (activeClient) {
+      fetchClientDetails(activeClient.administrationId)
     } else {
+      setSelectedClient(null)
       setIsLoading(false)
     }
-  }, [])
+  }, [activeClient])
   
   const fetchClientDetails = async (clientId: string) => {
     setIsLoading(true)
+    setError(null)
+    setClientAccessError(null)
+    
     try {
       const response = await accountantClientApi.listClients()
       const client = response.clients.find(c => c.administration_id === clientId)
       if (client) {
         setSelectedClient(client)
-        // Update stored name if we have a better one
-        if (client.name && client.name !== selectedClientName) {
-          localStorage.setItem('selectedClientName', client.name)
-          setSelectedClientName(client.name)
-        }
       }
     } catch (err) {
-      setError(getErrorMessage(err))
+      // Check for client access errors (PENDING_APPROVAL, ACCESS_REVOKED)
+      const accessError = parseClientAccessError(err)
+      if (accessError && accessError !== 'no_client') {
+        setClientAccessError(accessError)
+      } else {
+        setError(getErrorMessage(err))
+      }
     } finally {
       setIsLoading(false)
     }
@@ -101,8 +103,19 @@ export const AccountantReviewQueuePage = () => {
     )
   }
   
+  // Show client access error if there's one
+  if (clientAccessError) {
+    return (
+      <ClientAccessError 
+        type={clientAccessError} 
+        clientName={activeClient?.name}
+        onGoToClients={handleGoToClients}
+      />
+    )
+  }
+  
   // Show empty state if no client selected
-  if (!isLoading && !selectedClientId) {
+  if (!isLoading && !activeClient) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -112,17 +125,25 @@ export const AccountantReviewQueuePage = () => {
             </h1>
           </div>
           
-          <EmptyState
-            title={t('clientSwitcher.noClientSelected')}
-            description={t('reviewQueue.selectClientCta')}
-            icon={<UsersThree size={64} weight="duotone" className="text-muted-foreground" />}
-            actionLabel={t('clientSwitcher.goToClients')}
-            onAction={handleGoToClients}
-            tips={[
-              t('emptyStates.clientsAssignedByAdmin'),
-              t('emptyStates.onceAssigned'),
-            ]}
-          />
+          {/* Show different message based on whether user has active clients or only pending */}
+          {hasPendingClients && !hasActiveClients ? (
+            <ClientAccessError 
+              type="pending_approval"
+              onGoToClients={handleGoToClients}
+            />
+          ) : (
+            <EmptyState
+              title={t('clientSwitcher.noClientSelected')}
+              description={t('reviewQueue.selectClientCta')}
+              icon={<UsersThree size={64} weight="duotone" className="text-muted-foreground" />}
+              actionLabel={t('clientSwitcher.goToClients')}
+              onAction={handleGoToClients}
+              tips={[
+                t('emptyStates.clientsAssignedByAdmin'),
+                t('emptyStates.onceAssigned'),
+              ]}
+            />
+          )}
         </div>
       </div>
     )
@@ -137,9 +158,9 @@ export const AccountantReviewQueuePage = () => {
             <h1 className="text-3xl font-bold text-foreground mb-1">
               {t('sidebar.reviewQueue')}
             </h1>
-            {selectedClientName && (
+            {activeClient && (
               <p className="text-muted-foreground">
-                {t('clientSwitcher.activeClient')}: <span className="font-semibold">{selectedClientName}</span>
+                {t('clientSwitcher.activeClient')}: <span className="font-semibold">{activeClient.name || activeClient.email}</span>
               </p>
             )}
           </div>
@@ -255,12 +276,12 @@ export const AccountantReviewQueuePage = () => {
                 <ArrowsClockwise size={32} className="mx-auto mb-4 animate-spin text-primary" />
                 <p className="text-muted-foreground">{t('common.loading')}</p>
               </div>
-            ) : selectedClientId ? (
+            ) : activeClient ? (
               <>
                 {activeTab === 'review' && (
                   <ReviewQueue
-                    clientId={selectedClientId}
-                    clientName={selectedClientName || 'Klant'}
+                    clientId={activeClient.administrationId}
+                    clientName={activeClient.name || activeClient.email}
                   />
                 )}
                 {activeTab === 'red' && (

@@ -9,7 +9,7 @@ Security:
 - Admin users must be in ADMIN_WHITELIST to access these endpoints
 """
 import logging
-from typing import Annotated, Optional
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -291,7 +291,7 @@ async def get_user(
 class DevAssignmentByEmailRequest(BaseModel):
     """Request body for dev assignment by email."""
     accountant_email: EmailStr = Field(..., description="Email of the accountant to assign clients to")
-    client_email: Optional[EmailStr] = Field(None, description="Email of specific ZZP client (or None for all)")
+    client_email: EmailStr | None = Field(None, description="Email of specific ZZP client (or None for all)")
 
 
 class DevAssignmentResult(BaseModel):
@@ -318,7 +318,7 @@ class DevAssignmentsListItem(BaseModel):
     accountant_name: str
     administration_id: UUID
     administration_name: str
-    client_user_email: Optional[str] = None
+    client_user_email: str | None = None
     assigned_at: str
 
 
@@ -482,7 +482,7 @@ async def dev_seed_assignments(
 async def dev_list_assignments(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    accountant_email: Optional[str] = None,
+    accountant_email: str | None = None,
 ):
     """
     DEV ENDPOINT: List all accountant-client assignments.

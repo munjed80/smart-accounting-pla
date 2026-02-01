@@ -10,40 +10,24 @@ from app.core.database import get_db
 from app.core.security import oauth2_scheme, decode_token
 from app.models.user import User
 from app.models.administration import Administration, AdministrationMember, MemberRole
+from app.models.accountant_dashboard import AccountantClientAssignment
 
 
-def require_accountant(current_user: User) -> None:
-    """
-    Reusable dependency to verify user has accountant or admin role.
-    
-    Raises HTTPException with 403 status and FORBIDDEN_ROLE code if user
-    is not an accountant or admin.
-    """
-    if current_user.role not in ["accountant", "admin"]:
-        raise HTTPException(
-            status_code=403,
-            detail={"code": "FORBIDDEN_ROLE", "message": "This endpoint is only available for accountants"}
-        )
-
-
-def require_zzp(current_user: User) -> None:
-    """
-    Reusable dependency to verify user has ZZP role.
-    
-    Raises HTTPException with 403 status and FORBIDDEN_ROLE code if user
-    is not a ZZP user. Note: Admins can still access if needed for support purposes.
-    """
-    if current_user.role not in ["zzp", "admin"]:
-        raise HTTPException(
-            status_code=403,
-            detail={"code": "FORBIDDEN_ROLE", "message": "This endpoint is only available for ZZP users"}
-        )
-
+# =============================================================================
+# Authentication: Get current user from token
+# =============================================================================
 
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
+    """
+    Extract and validate the current user from the JWT token.
+    
+    Raises:
+        HTTP 401: If token is invalid or user not found
+        HTTP 400: If user is inactive
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -73,13 +57,113 @@ async def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+# =============================================================================
+# Common Role Guards
+# =============================================================================
+
+def require_zzp(current_user: User) -> None:
+    """
+    Guard: Allows ONLY users with role = ZZP.
+    
+    Raises:
+        HTTP 403: If user role is not 'zzp'
+    """
+    if current_user.role != "zzp":
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "FORBIDDEN_ROLE", "message": "This endpoint is only available for ZZP users"}
+        )
+
+
+def require_accountant(current_user: User) -> None:
+    """
+    Guard: Allows ONLY users with role = ACCOUNTANT.
+    
+    Raises:
+        HTTP 403: If user role is not 'accountant'
+    """
+    if current_user.role != "accountant":
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "FORBIDDEN_ROLE", "message": "This endpoint is only available for accountants"}
+        )
+
+
+# =============================================================================
+# Accountant-only Guards
+# =============================================================================
+
+async def require_assigned_client(
+    client_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> AccountantClientAssignment:
+    """
+    Guard: Requires accountant role AND active assignment to the given client.
+    
+    This guard:
+    1. First verifies the user has accountant role
+    2. Then checks that the accountant is actively assigned to the client
+    
+    Args:
+        client_id: The administration/client UUID to check access for
+        current_user: The authenticated user
+        db: Database session
+    
+    Returns:
+        The AccountantClientAssignment record if valid
+        
+    Raises:
+        HTTP 403: If user is not accountant or not assigned to client
+    """
+    # First, verify accountant role
+    require_accountant(current_user)
+    
+    # Then, check assignment in database
+    result = await db.execute(
+        select(AccountantClientAssignment)
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+        .where(AccountantClientAssignment.administration_id == client_id)
+    )
+    assignment = result.scalar_one_or_none()
+    
+    if assignment is None:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "NOT_ASSIGNED", "message": "You are not assigned to this client"}
+        )
+    
+    return assignment
+
+
+# =============================================================================
+# Administration Access (for ZZP users accessing their own administration)
+# =============================================================================
+
 async def get_admin_with_access(
     admin_id: UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    required_roles: list[MemberRole] = None,
+    required_roles: list[MemberRole] | None = None,
 ) -> Administration:
-    """Get administration and verify user has access with required role"""
+    """
+    Get administration and verify user has access with required role.
+    
+    Used primarily for ZZP users accessing their own administrations.
+    
+    Args:
+        admin_id: The administration UUID
+        current_user: The authenticated user
+        db: Database session
+        required_roles: Optional list of required member roles
+        
+    Returns:
+        The Administration if user has access
+        
+    Raises:
+        HTTP 404: If administration not found
+        HTTP 403: If user is not a member or lacks required role
+    """
     result = await db.execute(
         select(Administration)
         .options(selectinload(Administration.members))

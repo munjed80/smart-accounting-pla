@@ -23,7 +23,8 @@ class TestRequireAccountantGuard:
         """ZZP users should receive 403 FORBIDDEN_ROLE error."""
         user_role = "zzp"
         
-        is_accountant = user_role in ["accountant", "admin"]
+        # require_accountant now only allows "accountant" role
+        is_accountant = user_role == "accountant"
         
         assert is_accountant == False
     
@@ -31,17 +32,18 @@ class TestRequireAccountantGuard:
         """Accountant users should pass the guard."""
         user_role = "accountant"
         
-        is_accountant = user_role in ["accountant", "admin"]
+        is_accountant = user_role == "accountant"
         
         assert is_accountant == True
     
-    def test_admin_user_passes(self):
-        """Admin users should pass the guard."""
+    def test_admin_user_gets_forbidden(self):
+        """Admin users should NOT pass the accountant guard (strict role check)."""
         user_role = "admin"
         
-        is_accountant = user_role in ["accountant", "admin"]
+        # require_accountant is strict: only "accountant" role allowed
+        is_accountant = user_role == "accountant"
         
-        assert is_accountant == True
+        assert is_accountant == False
 
 
 class TestRequireZZPGuard:
@@ -51,7 +53,8 @@ class TestRequireZZPGuard:
         """Accountant users should receive 403 FORBIDDEN_ROLE error for ZZP endpoints."""
         user_role = "accountant"
         
-        is_zzp_allowed = user_role in ["zzp", "admin"]
+        # require_zzp now only allows "zzp" role
+        is_zzp_allowed = user_role == "zzp"
         
         assert is_zzp_allowed == False
     
@@ -59,17 +62,18 @@ class TestRequireZZPGuard:
         """ZZP users should pass the guard."""
         user_role = "zzp"
         
-        is_zzp_allowed = user_role in ["zzp", "admin"]
+        is_zzp_allowed = user_role == "zzp"
         
         assert is_zzp_allowed == True
     
-    def test_admin_can_access_zzp_endpoints(self):
-        """Admin users should be able to access ZZP endpoints for support."""
+    def test_admin_user_gets_forbidden(self):
+        """Admin users should NOT pass the ZZP guard (strict role check)."""
         user_role = "admin"
         
-        is_zzp_allowed = user_role in ["zzp", "admin"]
+        # require_zzp is strict: only "zzp" role allowed
+        is_zzp_allowed = user_role == "zzp"
         
-        assert is_zzp_allowed == True
+        assert is_zzp_allowed == False
 
 
 class TestAssignmentByEmail:

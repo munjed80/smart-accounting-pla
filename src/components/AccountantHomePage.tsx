@@ -73,8 +73,10 @@ import {
   Eye,
 } from '@phosphor-icons/react'
 import { format, formatDistanceToNow } from 'date-fns'
+import { nl as nlLocale } from 'date-fns/locale'
 import { ReviewQueue } from './ReviewQueue'
 import { navigateTo } from '@/lib/navigation'
+import { t } from '@/i18n'
 
 // KPI Card Component
 const KPICard = ({ 
@@ -157,16 +159,16 @@ const ClientRow = ({
       <TableCell>
         {client.red_issue_count > 0 && (
           <Badge variant="destructive" className="mr-1">
-            {client.red_issue_count} RED
+            {client.red_issue_count} {t('accountant.red')}
           </Badge>
         )}
         {client.yellow_issue_count > 0 && (
           <Badge variant="outline" className="bg-amber-500/20 text-amber-700">
-            {client.yellow_issue_count} YELLOW
+            {client.yellow_issue_count} {t('accountant.yellow')}
           </Badge>
         )}
         {client.red_issue_count === 0 && client.yellow_issue_count === 0 && (
-          <span className="text-green-600">✓ OK</span>
+          <span className="text-green-600">✓ {t('accountant.green')}</span>
         )}
       </TableCell>
       <TableCell>
@@ -190,10 +192,10 @@ const ClientRow = ({
       <TableCell>
         {client.last_activity_at ? (
           <span className="text-sm">
-            {formatDistanceToNow(new Date(client.last_activity_at), { addSuffix: true })}
+            {formatDistanceToNow(new Date(client.last_activity_at), { addSuffix: true, locale: nlLocale })}
           </span>
         ) : (
-          <span className="text-muted-foreground">Never</span>
+          <span className="text-muted-foreground">{t('accountant.never')}</span>
         )}
       </TableCell>
       <TableCell>
@@ -203,7 +205,7 @@ const ClientRow = ({
           onClick={() => onViewReviewQueue(client)}
         >
           <Eye size={16} className="mr-1" />
-          Review
+          {t('accountantDashboard.openDossier')}
         </Button>
       </TableCell>
     </TableRow>
@@ -403,9 +405,9 @@ export const AccountantHomePage = () => {
         <div className="max-w-7xl mx-auto">
           <Alert className="bg-amber-500/10 border-amber-500/40">
             <Warning className="h-5 w-5 text-amber-600" />
-            <AlertTitle>Access Restricted</AlertTitle>
+            <AlertTitle>{t('accountantDashboard.accessRestricted')}</AlertTitle>
             <AlertDescription>
-              This page is only available for accountants managing ZZP clients.
+              {t('accountantDashboard.accessRestrictedDesc')}
             </AlertDescription>
           </Alert>
         </div>
@@ -422,7 +424,7 @@ export const AccountantHomePage = () => {
           <div className="mb-4">
             <Button variant="ghost" onClick={handleCloseReviewQueue}>
               <CaretLeft size={18} className="mr-2" />
-              Back to Client List
+              {t('accountantDashboard.backToClients')}
             </Button>
           </div>
           
@@ -443,15 +445,15 @@ export const AccountantHomePage = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-1">
-              Daily Work Queue
+              {t('accountantDashboard.dailyWorkQueue')}
             </h1>
             <p className="text-muted-foreground">
-              {summary?.total_clients || 0} clients assigned
+              {summary?.total_clients || 0} {t('accountant.clientsAssigned')}
             </p>
           </div>
           <Button onClick={fetchData} variant="outline" size="sm" disabled={isLoading}>
             <ArrowsClockwise size={18} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
+            {t('common.refresh')}
           </Button>
         </div>
 
@@ -467,41 +469,41 @@ export const AccountantHomePage = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
           <KPICard 
             icon={Users} 
-            label="Total Clients" 
+            label={t('accountantDashboard.kpiTotalClients')} 
             value={summary?.total_clients || 0}
             isLoading={isLoading}
           />
           <KPICard 
             icon={WarningCircle} 
-            label="RED Issues" 
+            label={t('accountantDashboard.kpiRedIssues')} 
             value={summary?.clients_with_red_issues || 0}
             color="red"
             isLoading={isLoading}
           />
           <KPICard 
             icon={MagnifyingGlass} 
-            label="In Review" 
+            label={t('accountantDashboard.kpiToReview')} 
             value={summary?.clients_in_review || 0}
             color="yellow"
             isLoading={isLoading}
           />
           <KPICard 
             icon={Calendar} 
-            label="VAT Due 7d" 
+            label={t('accountantDashboard.kpiVatDue')} 
             value={summary?.upcoming_vat_deadlines_7d || 0}
             color={summary?.upcoming_vat_deadlines_7d ? 'red' : 'green'}
             isLoading={isLoading}
           />
           <KPICard 
             icon={Stack} 
-            label="Doc Backlog" 
+            label={t('accountantDashboard.kpiDocBacklog')} 
             value={summary?.document_backlog_total || 0}
             color={summary?.document_backlog_total ? 'yellow' : 'green'}
             isLoading={isLoading}
           />
           <KPICard 
             icon={Bell} 
-            label="Alerts" 
+            label={t('accountantDashboard.kpiAlerts')} 
             value={(summary?.alerts_by_severity.critical || 0) + (summary?.alerts_by_severity.warning || 0)}
             color={summary?.alerts_by_severity.critical ? 'red' : 'yellow'}
             isLoading={isLoading}
@@ -511,18 +513,18 @@ export const AccountantHomePage = () => {
         {/* Bulk Actions Bar */}
         {selectedClientIds.size > 0 && (
           <Card className="mb-4 bg-primary/5 border-primary/20">
-            <CardContent className="p-3 flex items-center gap-4">
+            <CardContent className="p-3 flex flex-wrap items-center gap-4">
               <span className="font-medium">
-                {selectedClientIds.size} client{selectedClientIds.size > 1 ? 's' : ''} selected
+                {selectedClientIds.size} {t('bulkOps.selected')}
               </span>
-              <div className="flex gap-2 ml-auto">
+              <div className="flex flex-wrap gap-2 ml-auto">
                 <Button 
                   size="sm" 
                   variant="outline"
                   onClick={() => openBulkModal('recalculate')}
                 >
                   <ArrowsClockwise size={16} className="mr-1" />
-                  Recalculate
+                  {t('bulkOps.recalculate')}
                 </Button>
                 <Button 
                   size="sm" 
@@ -530,7 +532,7 @@ export const AccountantHomePage = () => {
                   onClick={() => openBulkModal('ack_yellow')}
                 >
                   <CheckCircle size={16} className="mr-1" />
-                  Ack YELLOW
+                  {t('bulkOps.ackYellow')}
                 </Button>
                 <Button 
                   size="sm" 
@@ -538,7 +540,7 @@ export const AccountantHomePage = () => {
                   onClick={() => openBulkModal('generate_vat')}
                 >
                   <Gauge size={16} className="mr-1" />
-                  VAT Draft
+                  {t('bulkOps.vatDraft')}
                 </Button>
                 <Button 
                   size="sm" 
@@ -546,14 +548,14 @@ export const AccountantHomePage = () => {
                   onClick={() => openBulkModal('send_reminders')}
                 >
                   <PaperPlaneTilt size={16} className="mr-1" />
-                  Send Reminder
+                  {t('bulkOps.sendReminder')}
                 </Button>
                 <Button 
                   size="sm" 
                   variant="ghost"
                   onClick={() => setSelectedClientIds(new Set())}
                 >
-                  Clear
+                  {t('common.clear')}
                 </Button>
               </div>
             </CardContent>
@@ -566,23 +568,23 @@ export const AccountantHomePage = () => {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="all">
-                  All Clients
+                  {t('accountantDashboard.tabAllClients')}
                 </TabsTrigger>
                 <TabsTrigger value="red_issues" className="text-red-600">
                   <WarningCircle size={16} className="mr-1" />
-                  Red Issues
+                  {t('accountantDashboard.tabRedIssues')}
                 </TabsTrigger>
                 <TabsTrigger value="needs_review">
                   <MagnifyingGlass size={16} className="mr-1" />
-                  Needs Review
+                  {t('accountantDashboard.tabToReview')}
                 </TabsTrigger>
                 <TabsTrigger value="vat_due">
                   <Calendar size={16} className="mr-1" />
-                  VAT Due
+                  {t('accountantDashboard.tabVatSoon')}
                 </TabsTrigger>
                 <TabsTrigger value="stale">
                   <Warning size={16} className="mr-1" />
-                  Stale 30d
+                  {t('accountantDashboard.tabInactive')}
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -608,40 +610,40 @@ export const AccountantHomePage = () => {
                       className="cursor-pointer"
                       onClick={() => toggleSort('name')}
                     >
-                      Client <SortIcon field="name" />
+                      {t('accountantDashboard.tableClient')} <SortIcon field="name" />
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer"
                       onClick={() => toggleSort('readiness_score')}
                     >
-                      Score <SortIcon field="readiness_score" />
+                      {t('accountantDashboard.tableScore')} <SortIcon field="readiness_score" />
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer"
                       onClick={() => toggleSort('red_issues')}
                     >
-                      Issues <SortIcon field="red_issues" />
+                      {t('accountantDashboard.tableIssues')} <SortIcon field="red_issues" />
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer"
                       onClick={() => toggleSort('backlog')}
                     >
-                      Backlog <SortIcon field="backlog" />
+                      {t('accountantDashboard.tableBacklog')} <SortIcon field="backlog" />
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer"
                       onClick={() => toggleSort('deadline')}
                     >
-                      VAT <SortIcon field="deadline" />
+                      {t('accountantDashboard.tableVat')} <SortIcon field="deadline" />
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer"
                       onClick={() => toggleSort('last_activity')}
                     >
-                      Activity <SortIcon field="last_activity" />
+                      {t('accountantDashboard.tableActivity')} <SortIcon field="last_activity" />
                     </TableHead>
                     <TableHead>
-                      Actions
+                      {t('accountantDashboard.tableActions')}
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -660,10 +662,16 @@ export const AccountantHomePage = () => {
             ) : (
               <div className="text-center py-12 text-muted-foreground">
                 <Users size={48} className="mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium">No clients yet</p>
-                <p className="text-sm mt-2">
-                  Clients will appear here once they're assigned to you.
+                <p className="text-lg font-medium">{t('accountantDashboard.noClientsTitle')}</p>
+                <p className="text-sm mt-2 mb-4">
+                  {t('accountantDashboard.noClientsDesc')}
                 </p>
+                <Button 
+                  variant="outline"
+                  onClick={() => navigateTo('/accountant/onboarding')}
+                >
+                  {t('accountantDashboard.goToOnboarding')}
+                </Button>
               </div>
             )}
           </CardContent>
@@ -674,13 +682,13 @@ export const AccountantHomePage = () => {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>
-                {bulkOperationType === 'recalculate' && 'Bulk Recalculate Validation'}
-                {bulkOperationType === 'ack_yellow' && 'Bulk Acknowledge YELLOW Issues'}
-                {bulkOperationType === 'generate_vat' && 'Bulk Generate VAT Draft'}
-                {bulkOperationType === 'send_reminders' && 'Bulk Send Reminders'}
+                {bulkOperationType === 'recalculate' && t('accountant.bulkRecalculate')}
+                {bulkOperationType === 'ack_yellow' && t('accountant.bulkAckYellow')}
+                {bulkOperationType === 'generate_vat' && t('accountant.bulkGenerateVat')}
+                {bulkOperationType === 'send_reminders' && t('accountant.bulkSendReminders')}
               </DialogTitle>
               <DialogDescription>
-                This action will be applied to {selectedClientIds.size} selected client{selectedClientIds.size > 1 ? 's' : ''}.
+                {t('bulkOps.confirmDesc').replace('{count}', String(selectedClientIds.size))}
               </DialogDescription>
             </DialogHeader>
 
@@ -688,35 +696,35 @@ export const AccountantHomePage = () => {
             {bulkOperationType === 'send_reminders' && !bulkOperationResult && (
               <div className="space-y-4 py-4">
                 <div>
-                  <Label htmlFor="reminder-type">Reminder Type</Label>
+                  <Label htmlFor="reminder-type">{t('bulkOps.reminderTypeLabel')}</Label>
                   <Select value={reminderType} onValueChange={setReminderType}>
                     <SelectTrigger id="reminder-type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ACTION_REQUIRED">Action Required</SelectItem>
-                      <SelectItem value="DOCUMENT_MISSING">Document Missing</SelectItem>
-                      <SelectItem value="VAT_DEADLINE">VAT Deadline</SelectItem>
-                      <SelectItem value="REVIEW_PENDING">Review Pending</SelectItem>
+                      <SelectItem value="ACTION_REQUIRED">{t('bulkOps.reminderTypeAction')}</SelectItem>
+                      <SelectItem value="DOCUMENT_MISSING">{t('bulkOps.reminderTypeDoc')}</SelectItem>
+                      <SelectItem value="VAT_DEADLINE">{t('bulkOps.reminderTypeVat')}</SelectItem>
+                      <SelectItem value="REVIEW_PENDING">{t('bulkOps.reminderTypeReview')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="reminder-title">Title</Label>
+                  <Label htmlFor="reminder-title">{t('bulkOps.reminderTitleLabel')}</Label>
                   <Input 
                     id="reminder-title"
                     value={reminderTitle}
                     onChange={(e) => setReminderTitle(e.target.value)}
-                    placeholder="Reminder title..."
+                    placeholder={t('bulkOps.reminderTitlePlaceholder')}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="reminder-message">Message</Label>
+                  <Label htmlFor="reminder-message">{t('bulkOps.reminderMessageLabel')}</Label>
                   <Textarea 
                     id="reminder-message"
                     value={reminderMessage}
                     onChange={(e) => setReminderMessage(e.target.value)}
-                    placeholder="Reminder message..."
+                    placeholder={t('bulkOps.reminderMessagePlaceholder')}
                     rows={3}
                   />
                 </div>
@@ -729,22 +737,22 @@ export const AccountantHomePage = () => {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     {bulkOperationResult.status === 'COMPLETED' && (
-                      <Badge className="bg-green-500">COMPLETED</Badge>
+                      <Badge className="bg-green-500">{t('bulkOps.statusCompleted')}</Badge>
                     )}
                     {bulkOperationResult.status === 'COMPLETED_WITH_ERRORS' && (
-                      <Badge className="bg-amber-500">COMPLETED WITH ERRORS</Badge>
+                      <Badge className="bg-amber-500">{t('bulkOps.statusCompletedWithErrors')}</Badge>
                     )}
                     {bulkOperationResult.status === 'FAILED' && (
-                      <Badge variant="destructive">FAILED</Badge>
+                      <Badge variant="destructive">{t('bulkOps.statusFailed')}</Badge>
                     )}
                     <span className="text-sm text-muted-foreground">
-                      {bulkOperationResult.successful_clients}/{bulkOperationResult.total_clients} successful
+                      {bulkOperationResult.successful_clients}/{bulkOperationResult.total_clients} {t('accountant.successful')}
                     </span>
                   </div>
                   {/* Idempotency key and timestamp */}
                   <div className="text-xs text-muted-foreground">
                     {bulkOperationResult.completed_at && (
-                      <span>Completed: {new Date(bulkOperationResult.completed_at).toLocaleTimeString()}</span>
+                      <span>{t('accountant.completed')}: {new Date(bulkOperationResult.completed_at).toLocaleTimeString('nl-NL')}</span>
                     )}
                   </div>
                 </div>
@@ -766,7 +774,9 @@ export const AccountantHomePage = () => {
                           result.status === 'FAILED' ? 'destructive' :
                           'secondary'
                         }>
-                          {result.status}
+                          {result.status === 'SUCCESS' ? t('bulkOps.resultSuccess') :
+                           result.status === 'FAILED' ? t('bulkOps.resultFailed') :
+                           t('bulkOps.resultSkipped')}
                         </Badge>
                       </div>
                       {result.error_message && (
@@ -792,7 +802,7 @@ export const AccountantHomePage = () => {
                       }}
                     >
                       <ArrowsClockwise size={14} className="mr-2" />
-                      Retry {bulkOperationResult.failed_clients} Failed Client{bulkOperationResult.failed_clients > 1 ? 's' : ''}
+                      {t('bulkOps.retryFailed')} ({bulkOperationResult.failed_clients})
                     </Button>
                   </div>
                 )}
@@ -803,7 +813,7 @@ export const AccountantHomePage = () => {
               {!bulkOperationResult ? (
                 <>
                   <Button variant="outline" onClick={() => setIsBulkModalOpen(false)}>
-                    Cancel
+                    {t('bulkOps.cancel')}
                   </Button>
                   <Button 
                     onClick={executeBulkOperation}
@@ -812,19 +822,19 @@ export const AccountantHomePage = () => {
                     {isBulkProcessing ? (
                       <>
                         <ArrowsClockwise size={16} className="mr-2 animate-spin" />
-                        Processing...
+                        {t('bulkOps.processing')}
                       </>
                     ) : (
                       <>
                         <Lightning size={16} className="mr-2" />
-                        Execute
+                        {t('bulkOps.execute')}
                       </>
                     )}
                   </Button>
                 </>
               ) : (
                 <Button onClick={() => setIsBulkModalOpen(false)}>
-                  Close
+                  {t('bulkOps.close')}
                 </Button>
               )}
             </DialogFooter>

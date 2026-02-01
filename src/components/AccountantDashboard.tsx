@@ -63,8 +63,11 @@ import {
   UserPlus,
   Trash,
   Check,
+  MagnifyingGlass,
+  Funnel,
 } from '@phosphor-icons/react'
 import { format, formatDistanceToNow } from 'date-fns'
+import { nl as nlLocale } from 'date-fns/locale'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
 
@@ -211,6 +214,10 @@ export const AccountantDashboard = () => {
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'red' | 'yellow' | 'ok'>('all')
+  
   // Issue dialog state
   const [selectedClient, setSelectedClient] = useState<ClientOverview | null>(null)
   const [clientIssues, setClientIssues] = useState<ClientIssuesResponse | null>(null)
@@ -223,6 +230,26 @@ export const AccountantDashboard = () => {
   const [isAddingClient, setIsAddingClient] = useState(false)
   const [addClientError, setAddClientError] = useState<string | null>(null)
   const [addClientSuccess, setAddClientSuccess] = useState<string | null>(null)
+  
+  // Filter clients based on search query and status filter
+  const filteredClients = assignedClients.filter(client => {
+    // Search filter
+    const matchesSearch = searchQuery === '' || 
+      (client.name && client.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (client.email && client.email.toLowerCase().includes(searchQuery.toLowerCase()))
+    
+    // Status filter
+    let matchesStatus = true
+    if (statusFilter === 'red') {
+      matchesStatus = client.open_red_count > 0
+    } else if (statusFilter === 'yellow') {
+      matchesStatus = client.open_yellow_count > 0 && client.open_red_count === 0
+    } else if (statusFilter === 'ok') {
+      matchesStatus = client.open_red_count === 0 && client.open_yellow_count === 0
+    }
+    
+    return matchesSearch && matchesStatus
+  })
 
   const fetchDashboard = async () => {
     try {
@@ -557,13 +584,64 @@ export const AccountantDashboard = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <UsersThree size={24} />
-                {t('clientList.addClientForm')}
+                {t('accountant.allClients')}
               </CardTitle>
               <CardDescription>
                 {t('accountant.selectClient')}
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Search and Filter Bar */}
+              <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                <div className="relative flex-1">
+                  <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder={t('filters.searchPlaceholder')}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={statusFilter === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setStatusFilter('all')}
+                  >
+                    {t('filters.all')}
+                  </Button>
+                  <Button
+                    variant={statusFilter === 'red' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setStatusFilter('red')}
+                    className={statusFilter === 'red' ? '' : 'text-red-600 hover:text-red-600'}
+                  >
+                    {t('filters.red')}
+                  </Button>
+                  <Button
+                    variant={statusFilter === 'yellow' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setStatusFilter('yellow')}
+                    className={statusFilter === 'yellow' ? '' : 'text-amber-600 hover:text-amber-600'}
+                  >
+                    {t('filters.yellow')}
+                  </Button>
+                  <Button
+                    variant={statusFilter === 'ok' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setStatusFilter('ok')}
+                    className={statusFilter === 'ok' ? '' : 'text-green-600 hover:text-green-600'}
+                  >
+                    {t('filters.ok')}
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Results count */}
+              <p className="text-sm text-muted-foreground mb-3">
+                {filteredClients.length} {t('filters.resultsFound')}
+              </p>
+              
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -574,7 +652,7 @@ export const AccountantDashboard = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {assignedClients.map((client) => (
+                  {filteredClients.map((client) => (
                     <TableRow key={client.id}>
                       <TableCell className="font-medium">
                         <div>
@@ -634,6 +712,14 @@ export const AccountantDashboard = () => {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {filteredClients.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                        <MagnifyingGlass size={32} className="mx-auto mb-2 opacity-50" />
+                        <p>{t('filters.noResultsFound')}</p>
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

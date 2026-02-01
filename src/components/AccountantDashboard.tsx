@@ -624,7 +624,7 @@ export const AccountantDashboard = () => {
                     onClick={() => setStatusFilter('yellow')}
                     className={statusFilter === 'yellow' ? '' : 'text-amber-600 hover:text-amber-600'}
                   >
-                    GEEL
+                    {t('filters.yellow')}
                   </Button>
                   <Button
                     variant={statusFilter === 'ok' ? 'default' : 'outline'}
@@ -632,14 +632,14 @@ export const AccountantDashboard = () => {
                     onClick={() => setStatusFilter('ok')}
                     className={statusFilter === 'ok' ? '' : 'text-green-600 hover:text-green-600'}
                   >
-                    OK
+                    {t('filters.ok')}
                   </Button>
                 </div>
               </div>
               
               {/* Results count */}
               <p className="text-sm text-muted-foreground mb-3">
-                {filteredClients.length} {filteredClients.length === 1 ? 'klant' : 'klanten'} gevonden
+                {filteredClients.length} {t('filters.resultsFound')}
               </p>
               
               <Table>
@@ -716,7 +716,7 @@ export const AccountantDashboard = () => {
                     <TableRow>
                       <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                         <MagnifyingGlass size={32} className="mx-auto mb-2 opacity-50" />
-                        <p>Geen klanten gevonden met deze filters</p>
+                        <p>{t('filters.noResultsFound')}</p>
                       </TableCell>
                     </TableRow>
                   )}

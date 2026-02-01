@@ -236,37 +236,10 @@ export const nl = {
     failed: "Mislukt",
     successful: "succesvol",
     retryFailed: "Mislukte klanten opnieuw proberen",
-    // KPI labels
-    totaalKlanten: "Totaal klanten",
-    rodeIssues: "Rode issues",
-    teBeoordelen: "Te beoordelen",
-    btwDeadlines: "BTW deadlines",
-    achterstandDocumenten: "Achterstand documenten",
-    waarschuwingen: "Waarschuwingen",
-    openDossier: "Open dossier",
-    // Filters and sorting
-    zoekNaamEmail: "Zoek op naam/e-mail...",
-    alleStatussen: "Alle",
-    roodFilter: "Rood",
-    btwBinnenkort: "BTW binnenkort",
-    achterstandFilter: "Achterstand",
-    sorteerOp: "Sorteer op",
-    prioriteit: "Prioriteit",
-    deadline: "Deadline",
-    selecteerAlles: "Selecteer alles",
-    deselecteerAlles: "Deselecteer alles",
-    // Bulk confirmation
-    bevestigActie: "Bevestig actie",
-    bevestigOmTeGaan: "Druk op 'Uitvoeren' om door te gaan.",
-    letOpRateLimit: "Let op: Grote bewerkingen kunnen even duren.",
-    // Results
-    gelukt: "Gelukt",
-    mislukt: "Mislukt",
-    overgeslagen: "Overgeslagen",
-    // Misc
-    uitvoeren: "Uitvoeren",
-    sluiten: "Sluiten",
-    wissen: "Wissen",
+    // Issue labels
+    red: "ROOD",
+    yellow: "GEEL",
+    green: "OK",
   },
 
   // Accountant Dashboard (Master dashboard specific)
@@ -337,6 +310,8 @@ export const nl = {
   filters: {
     all: "Alle",
     red: "Rood",
+    yellow: "Geel",
+    ok: "OK",
     vatSoon: "BTW binnenkort",
     backlog: "Achterstand",
     inactive: "Inactief",
@@ -350,6 +325,8 @@ export const nl = {
     sortActivity: "Activiteit",
     selectAll: "Selecteer alles",
     deselectAll: "Deselecteer alles",
+    resultsFound: "klant(en) gevonden",
+    noResultsFound: "Geen klanten gevonden met deze filters",
   },
 
   // Confirmation dialogs

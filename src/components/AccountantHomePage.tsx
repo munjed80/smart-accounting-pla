@@ -159,16 +159,16 @@ const ClientRow = ({
       <TableCell>
         {client.red_issue_count > 0 && (
           <Badge variant="destructive" className="mr-1">
-            {client.red_issue_count} ROOD
+            {client.red_issue_count} {t('accountant.red')}
           </Badge>
         )}
         {client.yellow_issue_count > 0 && (
           <Badge variant="outline" className="bg-amber-500/20 text-amber-700">
-            {client.yellow_issue_count} GEEL
+            {client.yellow_issue_count} {t('accountant.yellow')}
           </Badge>
         )}
         {client.red_issue_count === 0 && client.yellow_issue_count === 0 && (
-          <span className="text-green-600">✓ OK</span>
+          <span className="text-green-600">✓ {t('accountant.green')}</span>
         )}
       </TableCell>
       <TableCell>

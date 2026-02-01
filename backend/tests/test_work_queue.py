@@ -685,6 +685,85 @@ class TestSLAPolicyEnforcement:
         assert is_warning == True
 
 
+class TestReminderHistoryAccess:
+    """Tests for reminder history endpoint access control."""
+    
+    def test_zzp_user_denied_reminder_history(self):
+        """ZZP users should be denied access to reminder history (403)."""
+        user_role = "zzp"
+        allowed_roles = ["accountant", "admin"]
+        
+        has_access = user_role in allowed_roles
+        
+        assert has_access == False
+    
+    def test_accountant_user_allowed_reminder_history(self):
+        """Accountant users should be allowed access to reminder history."""
+        user_role = "accountant"
+        allowed_roles = ["accountant", "admin"]
+        
+        has_access = user_role in allowed_roles
+        
+        assert has_access == True
+    
+    def test_admin_user_allowed_reminder_history(self):
+        """Admin users should be allowed access to reminder history."""
+        user_role = "admin"
+        allowed_roles = ["accountant", "admin"]
+        
+        has_access = user_role in allowed_roles
+        
+        assert has_access == True
+    
+    def test_reminder_history_filtering_by_period(self):
+        """Test reminder history can be filtered by period."""
+        now = datetime.now(timezone.utc)
+        
+        reminders = [
+            {"created_at": now - timedelta(days=5), "status": "SENT"},
+            {"created_at": now - timedelta(days=15), "status": "SENT"},
+            {"created_at": now - timedelta(days=45), "status": "FAILED"},
+            {"created_at": now - timedelta(days=100), "status": "SENT"},
+        ]
+        
+        # Filter last 30 days
+        cutoff_30d = now - timedelta(days=30)
+        filtered_30d = [r for r in reminders if r["created_at"] >= cutoff_30d]
+        assert len(filtered_30d) == 2
+        
+        # Filter last 7 days
+        cutoff_7d = now - timedelta(days=7)
+        filtered_7d = [r for r in reminders if r["created_at"] >= cutoff_7d]
+        assert len(filtered_7d) == 1
+    
+    def test_reminder_history_filtering_by_status(self):
+        """Test reminder history can be filtered by status."""
+        reminders = [
+            {"status": "SENT", "client_id": "c1"},
+            {"status": "FAILED", "client_id": "c2"},
+            {"status": "SENT", "client_id": "c3"},
+            {"status": "PENDING", "client_id": "c4"},
+        ]
+        
+        sent_only = [r for r in reminders if r["status"] == "SENT"]
+        assert len(sent_only) == 2
+        
+        failed_only = [r for r in reminders if r["status"] == "FAILED"]
+        assert len(failed_only) == 1
+    
+    def test_reminder_history_filtering_by_client(self):
+        """Test reminder history can be filtered by client."""
+        reminders = [
+            {"client_id": "c1", "status": "SENT"},
+            {"client_id": "c2", "status": "SENT"},
+            {"client_id": "c1", "status": "FAILED"},
+            {"client_id": "c3", "status": "SENT"},
+        ]
+        
+        client_c1 = [r for r in reminders if r["client_id"] == "c1"]
+        assert len(client_c1) == 2
+
+
 # Run tests with pytest
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -130,42 +130,47 @@ export const ActiveClientProvider = ({ children }: ActiveClientProviderProps) =>
       const response = await accountantApi.getClientLinks()
       setAllLinks(response.links)
 
-      // Auto-select first ACTIVE client if none selected
-      if (!activeClient && response.links.length > 0) {
-        const firstActive = response.links.find(link => link.status === 'ACTIVE')
-        if (firstActive) {
-          const autoSelected: ActiveClient = {
-            id: firstActive.client_user_id,
-            name: firstActive.client_name,
-            email: firstActive.client_email,
-            administrationId: firstActive.administration_id,
-            administrationName: firstActive.administration_name,
+      // Use latest state for validation
+      setActiveClientState(prevClient => {
+        // Auto-select first ACTIVE client if none selected
+        if (!prevClient && response.links.length > 0) {
+          const firstActive = response.links.find(link => link.status === 'ACTIVE')
+          if (firstActive) {
+            const autoSelected: ActiveClient = {
+              id: firstActive.client_user_id,
+              name: firstActive.client_name,
+              email: firstActive.client_email,
+              administrationId: firstActive.administration_id,
+              administrationName: firstActive.administration_name,
+            }
+            saveActiveClient(autoSelected)
+            toast.success(`Actieve klant: ${autoSelected.name}`)
+            return autoSelected
           }
-          setActiveClientState(autoSelected)
-          saveActiveClient(autoSelected)
-          toast.success(`Actieve klant: ${autoSelected.name}`)
         }
-      }
 
-      // Validate current activeClient is still ACTIVE
-      if (activeClient) {
-        const currentLink = response.links.find(
-          link => link.client_user_id === activeClient.id
-        )
-        if (!currentLink || currentLink.status !== 'ACTIVE') {
-          // Current client is no longer active, clear selection
-          setActiveClientState(null)
-          saveActiveClient(null)
-          toast.warning('Actieve klant is niet meer beschikbaar.')
+        // Validate current activeClient is still ACTIVE
+        if (prevClient) {
+          const currentLink = response.links.find(
+            link => link.client_user_id === prevClient.id
+          )
+          if (!currentLink || currentLink.status !== 'ACTIVE') {
+            // Current client is no longer active, clear selection
+            saveActiveClient(null)
+            toast.warning('Actieve klant is niet meer beschikbaar.')
+            return null
+          }
         }
-      }
+
+        return prevClient
+      })
     } catch (error) {
       console.error('Failed to fetch client links:', error)
       toast.error('Kon klantenlijst niet laden.')
     } finally {
       setIsLoading(false)
     }
-  }, [isAuthenticated, isAccountant, activeClient])
+  }, [isAuthenticated, isAccountant])  // activeClient not in dependencies - using state updater
 
   /**
    * Set active client with localStorage persistence

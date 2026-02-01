@@ -251,7 +251,7 @@ class TestAccessControlWithConsentStatus:
         # Check access
         has_access = (assignment["status"] == "ACTIVE")
         
-        assert has_access == True
+        assert has_access
     
     def test_pending_assignment_denies_access(self):
         """PENDING assignment should NOT grant access (awaiting approval)."""

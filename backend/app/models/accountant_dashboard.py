@@ -53,12 +53,15 @@ class AccountantClientAssignment(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    # References the accountant User (role=accountant or admin)
     accountant_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    # References the ZZP client User (role=zzp) who owns the administration
     client_user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    # References the Administration (business entity) being managed
     administration_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("administrations.id", ondelete="CASCADE"), nullable=False
     )

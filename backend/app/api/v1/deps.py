@@ -131,12 +131,15 @@ def require_zzp(current_user: User) -> None:
 
 def require_accountant(current_user: User) -> None:
     """
-    Guard: Allows ONLY users with role = ACCOUNTANT.
+    Guard: Allows users with role = ACCOUNTANT or ADMIN.
+    
+    Admin users are considered accountants for permission purposes,
+    matching the frontend behavior (isAccountantRole).
     
     Raises:
-        HTTP 403: If user role is not 'accountant'
+        HTTP 403: If user role is not 'accountant' or 'admin'
     """
-    if current_user.role != UserRole.ACCOUNTANT.value:
+    if current_user.role not in (UserRole.ACCOUNTANT.value, UserRole.ADMIN.value):
         raise HTTPException(
             status_code=403,
             detail={"code": "FORBIDDEN_ROLE", "message": "This endpoint is only available for accountants"}

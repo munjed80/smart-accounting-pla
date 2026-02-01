@@ -331,6 +331,25 @@ export const nl = {
     noResultsFound: "Geen klanten gevonden met deze filters",
   },
 
+  // Priority Clients Panel
+  priorityClients: {
+    title: "Top prioriteit klanten",
+    toReview: "Te beoordelen",
+    vatDays: "BTW",
+    days: "dagen",
+    openDossier: "Open dossier",
+    select: "Selecteer",
+    riskRed: "Rood",
+    riskYellow: "Geel",
+    riskOk: "OK",
+    noClients: "Geen klanten toegewezen",
+    noClientsDesc: "Voeg klanten toe via onboarding om te beginnen.",
+    goToOnboarding: "Ga naar onboarding",
+    noResults: "Geen klanten gevonden met deze filters",
+    clearFilter: "Filter wissen",
+    searchPlaceholder: "Zoek op naam...",
+  },
+
   // Confirmation dialogs
   confirmations: {
     bulkRecalculate: "Validatie herberekenen voor {count} klant(en)?",

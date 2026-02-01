@@ -78,6 +78,7 @@ import { ReviewQueue } from './ReviewQueue'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
 import { TodayCommandPanel } from './TodayCommandPanel'
+import { PriorityClientsPanel } from './PriorityClientsPanel'
 
 // KPI Card Component
 const KPICard = ({ 
@@ -481,6 +482,12 @@ export const AccountantHomePage = () => {
         {/* Accountant Command Layer - "Vandaag – Overzicht" */}
         <TodayCommandPanel 
           summary={summary} 
+          clients={clients} 
+          isLoading={isLoading} 
+        />
+
+        {/* Priority Clients Panel - "Top prioriteit klanten" */}
+        <PriorityClientsPanel 
           clients={clients} 
           isLoading={isLoading} 
         />

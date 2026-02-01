@@ -99,6 +99,9 @@ const saveActionLog = (entries: ActionLogEntry[]) => {
   }
 }
 
+// Max client results to store per entry (to limit localStorage usage)
+const MAX_CLIENT_RESULTS_PER_ENTRY = 50
+
 /**
  * Convert BulkOperationResponse to ActionLogEntry
  */
@@ -111,13 +114,31 @@ export const createActionLogEntry = (
     reminderInfo?: { type: string; title: string }
   }
 ): ActionLogEntry => {
-  // Map results to minimal summary
-  const clientResults: ClientResultSummary[] = response.results.map((r: BulkOperationResultItem) => ({
-    client_id: r.client_id,
-    client_name: r.client_name,
-    status: r.status,
-    error_message: r.error_message,
-  }))
+  // Map results to minimal summary, limiting to MAX_CLIENT_RESULTS_PER_ENTRY
+  // Prioritize failed results first (they contain error messages we need to show)
+  const failedResults = response.results
+    .filter((r: BulkOperationResultItem) => r.status === 'FAILED')
+    .map((r: BulkOperationResultItem) => ({
+      client_id: r.client_id,
+      client_name: r.client_name,
+      status: r.status,
+      error_message: r.error_message,
+    }))
+  
+  const otherResults = response.results
+    .filter((r: BulkOperationResultItem) => r.status !== 'FAILED')
+    .map((r: BulkOperationResultItem) => ({
+      client_id: r.client_id,
+      client_name: r.client_name,
+      status: r.status,
+      error_message: null, // Omit error messages for successful/skipped to save space
+    }))
+  
+  // Combine: all failed results + remaining capacity for others
+  const clientResults: ClientResultSummary[] = [
+    ...failedResults,
+    ...otherResults.slice(0, MAX_CLIENT_RESULTS_PER_ENTRY - failedResults.length),
+  ].slice(0, MAX_CLIENT_RESULTS_PER_ENTRY)
 
   return {
     id: response.id || `local-${Date.now()}`,

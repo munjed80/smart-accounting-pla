@@ -18,6 +18,9 @@ const SELECTION_KEY = 'accountant_selected_client_ids'
 // Custom event name for cross-component sync
 const SELECTION_CHANGED_EVENT = 'clientSelectionChanged'
 
+// Stale selection age: 24 hours in milliseconds
+const STALE_SELECTION_AGE_MS = 24 * 60 * 60 * 1000
+
 interface SelectionData {
   ids: string[]
   updatedAt: number
@@ -32,7 +35,7 @@ const loadSelection = (): Set<string> => {
     if (stored) {
       const data: SelectionData = JSON.parse(stored)
       // Check if data is stale (> 24 hours) and clear if so
-      if (Date.now() - data.updatedAt > 24 * 60 * 60 * 1000) {
+      if (Date.now() - data.updatedAt > STALE_SELECTION_AGE_MS) {
         localStorage.removeItem(SELECTION_KEY)
         return new Set()
       }

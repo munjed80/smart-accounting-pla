@@ -23,6 +23,7 @@ import {
 } from '@phosphor-icons/react'
 import { DashboardSummary, ClientStatusCard } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
+import { t } from '@/i18n'
 
 // Business logic thresholds for task prioritization
 // VAT deadlines within this many days are considered urgent ("Nu doen")
@@ -250,8 +251,8 @@ export const TodayCommandPanel = ({ summary, clients, isLoading }: TodayCommandP
           icon: Stack,
           iconColor: 'yellow',
           text: inactiveClients === 1
-            ? '1 klant inactief > 30 dagen'
-            : `${inactiveClients} klanten inactief > 30 dagen`,
+            ? t('todayPanel.inactiveClient')
+            : t('todayPanel.inactiveClients').replace('{count}', String(inactiveClients)),
           priority: 'kan_wachten',
           link: '/accountant?tab=stale',
           count: inactiveClients,

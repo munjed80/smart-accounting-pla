@@ -358,6 +358,8 @@ export const nl = {
     sortBacklog: "Achterstand",
     sortName: "Naam",
     sortActivity: "Activiteit",
+    sortAscending: "Oplopend",
+    sortDescending: "Aflopend",
     selectAll: "Selecteer alles",
     deselectAll: "Deselecteer alles",
     resultsFound: "klant(en) gevonden",

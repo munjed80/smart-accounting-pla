@@ -833,7 +833,7 @@ export const AccountantHomePage = () => {
                     size="icon"
                     className="h-10 w-10"
                     onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                    title={sortOrder === 'asc' ? 'Oplopend' : 'Aflopend'}
+                    title={sortOrder === 'asc' ? t('filters.sortAscending') : t('filters.sortDescending')}
                   >
                     {sortOrder === 'asc' ? <CaretUp size={16} /> : <CaretDown size={16} />}
                   </Button>

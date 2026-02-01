@@ -17,12 +17,36 @@ import enum
 from app.core.database import Base
 
 
+class AssignmentStatus(str, enum.Enum):
+    """Status of an accountant-client assignment."""
+    PENDING = "PENDING"  # Invited but not yet approved by client
+    ACTIVE = "ACTIVE"    # Approved and active
+    REVOKED = "REVOKED"  # Revoked by client or accountant
+
+
+class InvitedBy(str, enum.Enum):
+    """Who initiated the assignment."""
+    ACCOUNTANT = "ACCOUNTANT"  # Self-serve invitation by accountant
+    ADMIN = "ADMIN"            # Admin-created assignment
+
+
 class AccountantClientAssignment(Base):
     """
-    Tracks which accountants are assigned to which clients.
+    Tracks which accountants are assigned to which clients with consent workflow.
     
-    This enables the multi-client dashboard and bulk operations
-    to scope data to only assigned clients.
+    Consent Workflow:
+    1. Accountant invites ZZP client by email -> status=PENDING
+    2. ZZP client approves -> status=ACTIVE
+    3. Either party can revoke -> status=REVOKED
+    
+    Key Identifiers (to avoid confusion):
+    - accountant_id: UUID of the accountant User (role=accountant)
+    - client_user_id: UUID of the ZZP User (role=zzp) who owns the administration
+    - administration_id: UUID of the Administration (business entity) being managed
+    
+    Access Control:
+    - Only ACTIVE assignments grant accountant access to client data
+    - Used in require_assigned_client() guard for authorization
     """
     __tablename__ = "accountant_client_assignments"
 
@@ -32,8 +56,17 @@ class AccountantClientAssignment(Base):
     accountant_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    client_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
     administration_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("administrations.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[AssignmentStatus] = mapped_column(
+        SQLEnum(AssignmentStatus), default=AssignmentStatus.ACTIVE, nullable=False
+    )
+    invited_by: Mapped[InvitedBy] = mapped_column(
+        SQLEnum(InvitedBy), default=InvitedBy.ADMIN, nullable=False
     )
     is_primary: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     assigned_at: Mapped[datetime] = mapped_column(
@@ -42,10 +75,13 @@ class AccountantClientAssignment(Base):
     assigned_by_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
 
     # Relationships
     accountant = relationship("User", foreign_keys=[accountant_id])
+    client_user = relationship("User", foreign_keys=[client_user_id])
     administration = relationship("Administration")
     assigned_by = relationship("User", foreign_keys=[assigned_by_id])
 

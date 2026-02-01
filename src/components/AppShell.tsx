@@ -1,5 +1,6 @@
 import { ReactNode, useState, useEffect } from 'react'
 import { useAuth } from '@/lib/AuthContext'
+import { useActiveClient } from '@/lib/ActiveClientContext'
 import { navigateTo } from '@/lib/navigation'
 import { getApiBaseUrl } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -31,6 +32,7 @@ import {
   MagnifyingGlass,
   Bell,
   ClipboardText,
+  Handshake,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 
@@ -103,6 +105,13 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
+  {
+    label: t('sidebarExtra.accountantLinks'),
+    tabValue: 'boekhouder',
+    icon: <Handshake size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
   // Secondary items (Settings & Support for all roles)
   {
     label: t('sidebar.settings'),
@@ -128,37 +137,11 @@ interface AppShellProps {
 
 export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) => {
   const { user, logout } = useAuth()
+  const { activeClient, pendingCount } = useActiveClient()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isDev = import.meta.env.DEV
 
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
-  
-  // Selected client state (for accountants) - stored in localStorage
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
-  const [selectedClientName, setSelectedClientName] = useState<string | null>(null)
-  
-  // Sync selected client from localStorage
-  useEffect(() => {
-    if (isAccountant) {
-      const storedId = localStorage.getItem('selectedClientId')
-      const storedName = localStorage.getItem('selectedClientName')
-      setSelectedClientId(storedId)
-      setSelectedClientName(storedName)
-      
-      // Listen for storage changes (when another tab updates it)
-      const handleStorageChange = (e: StorageEvent) => {
-        if (e.key === 'selectedClientId') {
-          setSelectedClientId(e.newValue)
-        }
-        if (e.key === 'selectedClientName') {
-          setSelectedClientName(e.newValue)
-        }
-      }
-      
-      window.addEventListener('storage', handleStorageChange)
-      return () => window.removeEventListener('storage', handleStorageChange)
-    }
-  }, [isAccountant])
   
   // Determine the home tab based on user role
   const homeTab = isAccountant ? 'workqueue' : 'dashboard'
@@ -362,10 +345,15 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
                 <User size={16} className="text-muted-foreground" />
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">{t('clientSwitcher.activeClient')}:</span>
-                  {selectedClientName ? (
-                    <span className="text-sm font-medium">{selectedClientName}</span>
+                  {activeClient ? (
+                    <span className="text-sm font-medium">{activeClient.name || activeClient.email}</span>
                   ) : (
                     <span className="text-sm text-amber-600">{t('clientSwitcher.noClientSelected')}</span>
+                  )}
+                  {pendingCount > 0 && (
+                    <Badge variant="secondary" className="ml-1 bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
+                      {pendingCount}
+                    </Badge>
                   )}
                 </div>
                 <Button 
@@ -413,10 +401,15 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
               <div className="flex items-center gap-2">
                 <User size={14} className="text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">{t('clientSwitcher.activeClient')}:</span>
-                {selectedClientName ? (
-                  <span className="text-xs font-medium">{selectedClientName}</span>
+                {activeClient ? (
+                  <span className="text-xs font-medium">{activeClient.name || activeClient.email}</span>
                 ) : (
                   <span className="text-xs text-amber-600">{t('clientSwitcher.noClientSelected')}</span>
+                )}
+                {pendingCount > 0 && (
+                  <Badge variant="secondary" className="bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
+                    {pendingCount}
+                  </Badge>
                 )}
               </div>
               <Button 

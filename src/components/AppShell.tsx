@@ -33,6 +33,7 @@ import {
   Bell,
   ClipboardText,
   Handshake,
+  Bank,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 
@@ -66,6 +67,13 @@ const menuItems: MenuItem[] = [
     label: t('sidebar.reviewQueue'),
     tabValue: 'reviewqueue',
     icon: <MagnifyingGlass size={20} weight="duotone" />,
+    rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
+  },
+  {
+    label: t('bank.menuItem'),
+    tabValue: 'bank',
+    icon: <Bank size={20} weight="duotone" />,
     rolesAllowed: ['accountant', 'admin'],
     section: 'main',
   },

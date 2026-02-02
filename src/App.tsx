@@ -17,6 +17,7 @@ import { AccountantClientsPage } from '@/components/AccountantClientsPage'
 import { ZZPAccountantLinksPage } from '@/components/ZZPAccountantLinksPage'
 import { ClientDossierPage } from '@/components/ClientDossierPage'
 import { BulkOperationsHistoryPage } from '@/components/BulkOperationsHistoryPage'
+import { BankReconciliationPage } from '@/components/BankReconciliationPage'
 import { IntelligentUploadPortal } from '@/components/IntelligentUploadPortal'
 import { SmartTransactionList } from '@/components/SmartTransactionList'
 import { SettingsPage } from '@/components/SettingsPage'
@@ -37,6 +38,7 @@ type Route =
   | { type: 'app'; path: string }
   | { type: 'client-dossier'; clientId: string; tab: 'issues' | 'periods' | 'decisions' }
   | { type: 'bulk-operations-history' }
+  | { type: 'bank-reconciliation' }
 
 // Parse client dossier route
 const parseClientDossierRoute = (path: string): { clientId: string; tab: 'issues' | 'periods' | 'decisions' } | null => {
@@ -87,6 +89,11 @@ const getRouteFromURL = (): Route => {
     return { type: 'bulk-operations-history' }
   }
   
+  // Check for bank reconciliation route
+  if (path === '/accountant/bank') {
+    return { type: 'bank-reconciliation' }
+  }
+  
   // Check for client dossier routes: /accountant/clients/:clientId[/:tab]
   const clientDossierRoute = parseClientDossierRoute(path)
   if (clientDossierRoute) {
@@ -122,6 +129,8 @@ const pathToTab = (path: string, isAccountant: boolean): string => {
     case '/accountant/acties':
     case '/accountant/activity':
       return 'acties'
+    case '/accountant/bank':
+      return 'bank'
     case '/ai-upload':
     case '/upload':
       return 'upload'
@@ -154,6 +163,8 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
       return '/accountant/reminders'
     case 'acties':
       return '/accountant/acties'
+    case 'bank':
+      return '/accountant/bank'
     case 'clients':
       return isAccountant ? '/accountant/clients' : '/clients'
     case 'upload':
@@ -172,7 +183,7 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
 const AppContent = () => {
   const { user, isAuthenticated, isLoading } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
   // Onboarding state - tracks if user needs onboarding (no administrations for ZZP, no clients for accountants)
@@ -410,6 +421,18 @@ const AppContent = () => {
     )
   }
 
+  // Show bank reconciliation page for accountants
+  if (route.type === 'bank-reconciliation' && isAccountant) {
+    return (
+      <AppShell 
+        activeTab="bank" 
+        onTabChange={handleTabChange}
+      >
+        <BankReconciliationPage />
+      </AppShell>
+    )
+  }
+
   // Render the content based on active tab
   const renderTabContent = () => {
     switch (activeTab) {
@@ -425,6 +448,8 @@ const AppContent = () => {
         return isAccountant ? <AccountantRemindersPage /> : <SmartDashboard />
       case 'acties':
         return isAccountant ? <AccountantActionsPage /> : <SmartDashboard />
+      case 'bank':
+        return isAccountant ? <BankReconciliationPage /> : <SmartDashboard />
       case 'boekhouder':
         // ZZP-only page for managing accountant links
         return !isAccountant ? <ZZPAccountantLinksPage /> : <SmartDashboard />

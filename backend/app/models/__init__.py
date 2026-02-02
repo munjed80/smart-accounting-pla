@@ -19,6 +19,14 @@ from app.models.accountant_dashboard import (
     ClientReminder,
 )
 from app.models.auth_token import AuthToken, TokenType
+from app.models.bank import (
+    BankAccount,
+    BankTransaction,
+    BankTransactionStatus,
+    MatchedType,
+    ReconciliationAction,
+    ReconciliationActionType,
+)
 
 __all__ = [
     "User",
@@ -57,4 +65,10 @@ __all__ = [
     "ClientReminder",
     "AuthToken",
     "TokenType",
+    "BankAccount",
+    "BankTransaction",
+    "BankTransactionStatus",
+    "MatchedType",
+    "ReconciliationAction",
+    "ReconciliationActionType",
 ]

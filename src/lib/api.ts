@@ -2309,3 +2309,161 @@ export const evidencePackApi = {
     return response.data
   },
 }
+
+// ============ Bank Reconciliation Types ============
+
+export type BankTransactionStatus = 'NEW' | 'MATCHED' | 'IGNORED' | 'NEEDS_REVIEW'
+export type MatchedType = 'INVOICE' | 'EXPENSE' | 'TRANSFER' | 'MANUAL'
+export type ReconciliationAction = 'ACCEPT_MATCH' | 'IGNORE' | 'CREATE_EXPENSE' | 'LINK_INVOICE' | 'UNMATCH'
+
+export interface ColumnMapping {
+  date_column?: string
+  amount_column?: string
+  description_column?: string
+  name_column?: string
+  iban_column?: string
+  reference_column?: string
+}
+
+export interface BankImportRequest {
+  administration_id: string
+  format: string
+  file_base64: string
+  mapping?: ColumnMapping
+  date_format?: string
+}
+
+export interface BankImportResponse {
+  imported_count: number
+  skipped_duplicates: number
+  total_in_file: number
+  errors: string[]
+  message: string
+}
+
+export interface BankTransaction {
+  id: string
+  administration_id: string
+  bank_account_id: string | null
+  booking_date: string
+  amount: string | number
+  counterparty_name: string | null
+  counterparty_iban: string | null
+  description: string
+  reference: string | null
+  status: BankTransactionStatus
+  matched_type: MatchedType | null
+  matched_entity_id: string | null
+  created_at: string
+}
+
+export interface BankTransactionListResponse {
+  transactions: BankTransaction[]
+  total_count: number
+  limit: number
+  offset: number
+}
+
+export interface MatchSuggestion {
+  entity_type: MatchedType
+  entity_id: string
+  entity_reference: string
+  confidence_score: number
+  amount: string | number
+  date: string
+  explanation: string
+}
+
+export interface SuggestMatchResponse {
+  transaction_id: string
+  suggestions: MatchSuggestion[]
+  message: string
+}
+
+export interface ApplyActionRequest {
+  action: ReconciliationAction
+  entity_id?: string
+  vat_code?: string
+  ledger_code?: string
+  notes?: string
+}
+
+export interface ApplyActionResponse {
+  transaction_id: string
+  new_status: BankTransactionStatus
+  action_applied: ReconciliationAction
+  journal_entry_id: string | null
+  message: string
+}
+
+export interface ReconciliationActionRecord {
+  id: string
+  bank_transaction_id: string
+  user_id: string
+  user_name: string | null
+  action: ReconciliationAction
+  payload: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface ReconciliationActionsListResponse {
+  actions: ReconciliationActionRecord[]
+  total_count: number
+}
+
+// ============ Bank Reconciliation API ============
+
+export const bankReconciliationApi = {
+  importFile: async (request: BankImportRequest): Promise<BankImportResponse> => {
+    const response = await api.post<BankImportResponse>('/accountant/bank/import', request)
+    return response.data
+  },
+
+  listTransactions: async (
+    administrationId: string,
+    options?: {
+      status?: BankTransactionStatus
+      q?: string
+      dateFrom?: string
+      dateTo?: string
+      limit?: number
+      offset?: number
+    }
+  ): Promise<BankTransactionListResponse> => {
+    const params: Record<string, unknown> = { administration_id: administrationId }
+    if (options?.status) params.status = options.status
+    if (options?.q) params.q = options.q
+    if (options?.dateFrom) params.date_from = options.dateFrom
+    if (options?.dateTo) params.date_to = options.dateTo
+    if (options?.limit) params.limit = options.limit
+    if (options?.offset !== undefined) params.offset = options.offset
+    const response = await api.get<BankTransactionListResponse>('/accountant/bank/transactions', { params })
+    return response.data
+  },
+
+  suggestMatches: async (transactionId: string): Promise<SuggestMatchResponse> => {
+    const response = await api.post<SuggestMatchResponse>(
+      `/accountant/bank/transactions/${transactionId}/suggest`
+    )
+    return response.data
+  },
+
+  applyAction: async (transactionId: string, request: ApplyActionRequest): Promise<ApplyActionResponse> => {
+    const response = await api.post<ApplyActionResponse>(
+      `/accountant/bank/transactions/${transactionId}/apply`,
+      request
+    )
+    return response.data
+  },
+
+  listActions: async (
+    administrationId: string,
+    options?: { limit?: number; offset?: number }
+  ): Promise<ReconciliationActionsListResponse> => {
+    const params: Record<string, unknown> = { administration_id: administrationId }
+    if (options?.limit) params.limit = options.limit
+    if (options?.offset !== undefined) params.offset = options.offset
+    const response = await api.get<ReconciliationActionsListResponse>('/accountant/bank/actions', { params })
+    return response.data
+  },
+}

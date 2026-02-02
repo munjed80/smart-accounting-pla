@@ -50,6 +50,9 @@ class Administration(Base):
     decision_patterns = relationship("DecisionPattern", back_populates="administration", cascade="all, delete-orphan")
     # Alerts relationship
     alerts = relationship("Alert", back_populates="administration", cascade="all, delete-orphan")
+    # Bank reconciliation relationships
+    bank_accounts = relationship("BankAccount", back_populates="administration", cascade="all, delete-orphan")
+    bank_transactions = relationship("BankTransaction", back_populates="administration", cascade="all, delete-orphan")
 
 
 class AdministrationMember(Base):

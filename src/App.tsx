@@ -183,6 +183,7 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
 const AppContent = () => {
   const { user, isAuthenticated, isLoading } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
+  const isAccountantOnly = user?.role === 'accountant'
   const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
@@ -422,7 +423,7 @@ const AppContent = () => {
   }
 
   // Show bank reconciliation page for accountants
-  if (route.type === 'bank-reconciliation' && isAccountant) {
+  if (route.type === 'bank-reconciliation' && isAccountantOnly) {
     return (
       <AppShell 
         activeTab="bank" 
@@ -449,7 +450,7 @@ const AppContent = () => {
       case 'acties':
         return isAccountant ? <AccountantActionsPage /> : <SmartDashboard />
       case 'bank':
-        return isAccountant ? <BankReconciliationPage /> : <SmartDashboard />
+        return isAccountantOnly ? <BankReconciliationPage /> : <SmartDashboard />
       case 'boekhouder':
         // ZZP-only page for managing accountant links
         return !isAccountant ? <ZZPAccountantLinksPage /> : <SmartDashboard />

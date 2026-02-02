@@ -34,7 +34,7 @@ class User(Base):
 
     # Relationships
     memberships = relationship("AdministrationMember", back_populates="user", cascade="all, delete-orphan")
-    reconciliation_actions = relationship("ReconciliationAction", back_populates="user", cascade="all, delete-orphan")
+    reconciliation_actions = relationship("ReconciliationAction", back_populates="accountant", cascade="all, delete-orphan")
     
     @property
     def is_email_verified(self) -> bool:

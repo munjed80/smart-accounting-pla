@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -32,6 +32,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { EmptyState } from '@/components/EmptyState'
 import { useActiveClient } from '@/lib/ActiveClientContext'
 import { 
   bankReconciliationApi, 
@@ -41,6 +42,7 @@ import {
   ApplyActionRequest,
   getErrorMessage 
 } from '@/lib/api'
+import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -53,17 +55,13 @@ import {
   XCircle,
   Clock,
   Warning,
-  ArrowRight,
   Lightning,
   Link,
   Receipt,
   X,
   CaretDown,
   Bank,
-  ArrowUp,
-  ArrowDown,
   Info,
-  Trash,
 } from '@phosphor-icons/react'
 
 // Status badge colors
@@ -162,7 +160,7 @@ const TransactionRow = ({
           </p>
           {transaction.reference && (
             <p className="text-xs text-muted-foreground mt-1">
-              Ref: {transaction.reference}
+              {t('bank.referenceShort')}: {transaction.reference}
             </p>
           )}
         </div>
@@ -188,7 +186,8 @@ const UploadDialog = ({
   onImportSuccess: () => void
 }) => {
   const [file, setFile] = useState<File | null>(null)
-  const [dateFormat, setDateFormat] = useState('%d-%m-%Y')
+  const [bankAccountIban, setBankAccountIban] = useState('')
+  const [bankName, setBankName] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -204,52 +203,32 @@ const UploadDialog = ({
 
     setIsUploading(true)
     try {
-      // Read file and convert to base64
-      const reader = new FileReader()
-      reader.onload = async (e) => {
-        const content = e.target?.result as string
-        // Remove data URL prefix if present, otherwise encode
-        let base64Content: string
-        if (content.includes('base64,')) {
-          base64Content = content.split('base64,')[1]
-        } else {
-          base64Content = btoa(content)
-        }
+      const result = await bankReconciliationApi.importFile({
+        administration_id: administrationId,
+        file,
+        bank_account_iban: bankAccountIban || undefined,
+        bank_name: bankName || undefined,
+      })
 
-        try {
-          const result = await bankReconciliationApi.importFile({
-            administration_id: administrationId,
-            format: 'csv',
-            file_base64: base64Content,
-            date_format: dateFormat,
-          })
-
-          if (result.imported_count > 0) {
-            toast.success(t('bank.importSuccess'), {
-              description: `${result.imported_count} ${t('bank.imported')}${result.skipped_duplicates > 0 ? `, ${result.skipped_duplicates} ${t('bank.skipped')}` : ''}`
-            })
-            onImportSuccess()
-            onClose()
-          } else if (result.skipped_duplicates > 0) {
-            toast.info(result.message)
-          } else {
-            toast.error(t('bank.importFailed'), {
-              description: result.errors.length > 0 ? result.errors[0] : result.message
-            })
-          }
-        } catch (error) {
-          toast.error(t('bank.importFailed'), {
-            description: getErrorMessage(error)
-          })
-        } finally {
-          setIsUploading(false)
-        }
+      if (result.imported_count > 0) {
+        toast.success(t('bank.importSuccess'), {
+          description: `${result.imported_count} ${t('bank.imported')}${result.skipped_duplicates_count > 0 ? `, ${result.skipped_duplicates_count} ${t('bank.skipped')}` : ''}`
+        })
+        onImportSuccess()
+        onClose()
+      } else if (result.skipped_duplicates_count > 0) {
+        toast.info(result.message)
+      } else {
+        toast.error(t('bank.importFailed'), {
+          description: result.errors.length > 0 ? result.errors[0] : result.message
+        })
       }
-      reader.readAsDataURL(file)
     } catch (error) {
       toast.error(t('bank.importFailed'), {
         description: getErrorMessage(error)
       })
+      setIsUploading(false)
+    } finally {
       setIsUploading(false)
     }
   }
@@ -299,15 +278,23 @@ const UploadDialog = ({
             </Button>
           </div>
 
-          {/* Date format */}
           <div className="space-y-2">
-            <Label>{t('bank.dateFormat')}</Label>
+            <Label>{t('bank.ibanLabel')}</Label>
             <Input
-              value={dateFormat}
-              onChange={(e) => setDateFormat(e.target.value)}
-              placeholder="%d-%m-%Y"
+              value={bankAccountIban}
+              onChange={(e) => setBankAccountIban(e.target.value)}
+              placeholder={t('bank.ibanPlaceholder')}
             />
-            <p className="text-xs text-muted-foreground">{t('bank.dateFormatHint')}</p>
+            <p className="text-xs text-muted-foreground">{t('bank.ibanHint')}</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t('bank.bankNameLabel')}</Label>
+            <Input
+              value={bankName}
+              onChange={(e) => setBankName(e.target.value)}
+              placeholder={t('bank.bankNamePlaceholder')}
+            />
           </div>
         </div>
 
@@ -389,11 +376,13 @@ const TransactionDrawer = ({
   transaction, 
   isOpen, 
   onClose,
+  administrationId,
   onActionApplied,
 }: { 
   transaction: BankTransaction | null
   isOpen: boolean
   onClose: () => void
+  administrationId: string
   onActionApplied: () => void
 }) => {
   const [suggestions, setSuggestions] = useState<MatchSuggestion[]>([])
@@ -401,8 +390,8 @@ const TransactionDrawer = ({
   const [isApplying, setIsApplying] = useState(false)
   const [showCreateExpense, setShowCreateExpense] = useState(false)
   const [expenseForm, setExpenseForm] = useState({
-    vatCode: '',
-    ledgerCode: '',
+    vatRate: '',
+    expenseCategory: '',
     notes: '',
   })
 
@@ -411,7 +400,7 @@ const TransactionDrawer = ({
     
     setIsLoadingSuggestions(true)
     try {
-      const response = await bankReconciliationApi.suggestMatches(transaction.id)
+      const response = await bankReconciliationApi.suggestMatches(transaction.id, administrationId)
       setSuggestions(response.suggestions)
     } catch (error) {
       console.error('Failed to load suggestions:', error)
@@ -431,7 +420,7 @@ const TransactionDrawer = ({
     
     setIsApplying(true)
     try {
-      const response = await bankReconciliationApi.applyAction(transaction.id, request)
+      const response = await bankReconciliationApi.applyAction(transaction.id, administrationId, request)
       toast.success(t('reconciliation.applySuccess'), {
         description: response.message
       })
@@ -448,24 +437,25 @@ const TransactionDrawer = ({
 
   const handleAcceptMatch = (suggestion: MatchSuggestion) => {
     applyAction({
-      action: 'ACCEPT_MATCH',
-      entity_id: suggestion.entity_id,
+      action_type: 'APPLY_MATCH',
+      match_entity_type: suggestion.entity_type,
+      match_entity_id: suggestion.entity_id,
     })
   }
 
   const handleIgnore = () => {
-    applyAction({ action: 'IGNORE' })
+    applyAction({ action_type: 'IGNORE' })
   }
 
   const handleUnmatch = () => {
-    applyAction({ action: 'UNMATCH' })
+    applyAction({ action_type: 'UNMATCH' })
   }
 
   const handleCreateExpense = () => {
     applyAction({
-      action: 'CREATE_EXPENSE',
-      vat_code: expenseForm.vatCode || undefined,
-      ledger_code: expenseForm.ledgerCode || undefined,
+      action_type: 'CREATE_EXPENSE',
+      expense_category: expenseForm.expenseCategory || undefined,
+      vat_rate: expenseForm.vatRate ? Number(expenseForm.vatRate) : undefined,
       notes: expenseForm.notes || undefined,
     })
   }
@@ -564,19 +554,19 @@ const TransactionDrawer = ({
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>{t('reconciliation.ledgerCode')}</Label>
+                  <Label>{t('reconciliation.expenseCategory')}</Label>
                   <Input
-                    value={expenseForm.ledgerCode}
-                    onChange={(e) => setExpenseForm(prev => ({ ...prev, ledgerCode: e.target.value }))}
-                    placeholder={t('reconciliation.ledgerCodePlaceholder')}
+                    value={expenseForm.expenseCategory}
+                    onChange={(e) => setExpenseForm(prev => ({ ...prev, expenseCategory: e.target.value }))}
+                    placeholder={t('reconciliation.expenseCategoryPlaceholder')}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t('reconciliation.vatCode')}</Label>
+                  <Label>{t('reconciliation.vatRate')}</Label>
                   <Input
-                    value={expenseForm.vatCode}
-                    onChange={(e) => setExpenseForm(prev => ({ ...prev, vatCode: e.target.value }))}
-                    placeholder={t('reconciliation.vatCodePlaceholder')}
+                    value={expenseForm.vatRate}
+                    onChange={(e) => setExpenseForm(prev => ({ ...prev, vatRate: e.target.value }))}
+                    placeholder={t('reconciliation.vatRatePlaceholder')}
                   />
                 </div>
                 <div className="space-y-2">
@@ -659,10 +649,10 @@ export const BankReconciliationPage = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<BankTransaction | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
-  const [currentOffset, setCurrentOffset] = useState(0)
-  const limit = 50
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 50
 
-  const loadTransactions = useCallback(async (reset: boolean = true, existingOffset?: number) => {
+  const loadTransactions = useCallback(async (reset: boolean = true, pageOverride?: number) => {
     if (!activeClientId) return
 
     if (reset) {
@@ -672,14 +662,14 @@ export const BankReconciliationPage = () => {
     }
 
     try {
-      const newOffset = reset ? 0 : (existingOffset ?? 0)
+      const nextPage = reset ? 1 : (pageOverride ?? 1)
       const response = await bankReconciliationApi.listTransactions(
         activeClientId,
         {
           status: statusFilter !== 'ALL' ? statusFilter : undefined,
           q: searchQuery || undefined,
-          limit,
-          offset: newOffset,
+          page: nextPage,
+          pageSize,
         }
       )
 
@@ -689,7 +679,7 @@ export const BankReconciliationPage = () => {
         setTransactions(prev => [...prev, ...response.transactions])
       }
       setTotalCount(response.total_count)
-      setCurrentOffset(newOffset + response.transactions.length)
+      setCurrentPage(nextPage)
     } catch (error) {
       console.error('Failed to load transactions:', error)
       toast.error(t('errors.loadFailed'), {
@@ -731,15 +721,13 @@ export const BankReconciliationPage = () => {
   if (!activeClientId) {
     return (
       <div className="p-6">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <Bank size={48} className="mx-auto mb-4 text-muted-foreground" />
-            <h2 className="text-lg font-semibold mb-2">{t('bank.title')}</h2>
-            <p className="text-muted-foreground">
-              Selecteer eerst een klant om banktransacties te beheren.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          title={t('bank.noActiveClientTitle')}
+          description={t('bank.noActiveClientDescription')}
+          icon={<Bank size={64} className="text-muted-foreground" weight="duotone" />}
+          actionLabel={t('bank.selectClient')}
+          onAction={() => navigateTo('/accountant/clients')}
+        />
       </div>
     )
   }
@@ -807,7 +795,9 @@ export const BankReconciliationPage = () => {
             <CardTitle>{t('bank.transactions')}</CardTitle>
             {totalCount > 0 && (
               <p className="text-sm text-muted-foreground">
-                {transactions.length} van {totalCount} transacties
+                {t('bank.showingCount')
+                  .replace('{count}', String(transactions.length))
+                  .replace('{total}', String(totalCount))}
               </p>
             )}
           </div>
@@ -835,7 +825,7 @@ export const BankReconciliationPage = () => {
                 <div className="p-4 text-center">
                   <Button 
                     variant="outline" 
-                    onClick={() => loadTransactions(false, currentOffset)}
+                    onClick={() => loadTransactions(false, currentPage + 1)}
                     disabled={isLoadingMore}
                   >
                     {isLoadingMore ? t('common.loading') : t('bank.loadMore')}
@@ -871,6 +861,7 @@ export const BankReconciliationPage = () => {
       <TransactionDrawer
         transaction={selectedTransaction}
         isOpen={isDrawerOpen}
+        administrationId={activeClientId}
         onClose={() => {
           setIsDrawerOpen(false)
           setSelectedTransaction(null)

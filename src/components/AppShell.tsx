@@ -74,7 +74,7 @@ const menuItems: MenuItem[] = [
     label: t('bank.menuItem'),
     tabValue: 'bank',
     icon: <Bank size={20} weight="duotone" />,
-    rolesAllowed: ['accountant', 'admin'],
+    rolesAllowed: ['accountant'],
     section: 'main',
   },
   {

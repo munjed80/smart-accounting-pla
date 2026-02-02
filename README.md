@@ -190,8 +190,39 @@ VITE_API_URL=https://api.zzpershub.nl
 - `PUT /api/v1/transactions/{id}` - Update draft transaction
 - `POST /api/v1/transactions/{id}/post` - Post transaction (validates debit=credit)
 
+### Bank (Accountant)
+- `POST /api/v1/accountant/bank/import` - Import bank statement CSV
+- `GET /api/v1/accountant/bank/transactions` - List bank transactions
+- `POST /api/v1/accountant/bank/transactions/{id}/suggest` - Get match suggestions
+- `POST /api/v1/accountant/bank/transactions/{id}/apply` - Apply reconciliation action
+- `GET /api/v1/accountant/bank/actions` - Audit trail of reconciliation actions
+
 ### Health
 - `GET /health` - Health check (DB + Redis)
+
+## Bank Statement Import (Accountant)
+
+### Coolify Manual E2E (Accountant)
+1. Log in as an **accountant** in production.
+2. Open **Bank** in the sidebar.
+3. Select an **actieve klant** in the clients list if none is active.
+4. Upload a **CSV bankafschrift** in the import dialog.
+5. Open a transaction → apply a suggestion or book as expense.
+
+### Security Notes
+- Bank reconciliation is **accountant-only** and always scoped to the **active client**.
+- Every reconciliation action is stored in an **audit trail** (reconciliation_actions).
+
+### CSV Formats (Supported)
+Required columns (case-insensitive):
+- `date` or `booking_date`
+- `amount`
+- `description`
+
+Optional columns:
+- `iban` or `counterparty_iban`
+- `counterparty_name`
+- `reference`
 
 ## Project Structure
 
@@ -1096,4 +1127,3 @@ Accountants can import bank statements (CSV) and reconcile transactions with inv
 | CREATE_EXPENSE | Uitgave geboekt | Create expense journal entry |
 | IGNORE | Transactie genegeerd | Ignore this transaction |
 | UNMATCH | Match ongedaan gemaakt | Undo previous match |
-

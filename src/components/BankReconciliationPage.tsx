@@ -406,13 +406,7 @@ const TransactionDrawer = ({
     notes: '',
   })
 
-  useEffect(() => {
-    if (transaction && isOpen) {
-      loadSuggestions()
-    }
-  }, [transaction, isOpen])
-
-  const loadSuggestions = async () => {
+  const loadSuggestions = useCallback(async () => {
     if (!transaction) return
     
     setIsLoadingSuggestions(true)
@@ -424,7 +418,13 @@ const TransactionDrawer = ({
     } finally {
       setIsLoadingSuggestions(false)
     }
-  }
+  }, [transaction])
+
+  useEffect(() => {
+    if (transaction && isOpen) {
+      loadSuggestions()
+    }
+  }, [transaction, isOpen, loadSuggestions])
 
   const applyAction = async (request: ApplyActionRequest) => {
     if (!transaction) return
@@ -659,21 +659,20 @@ export const BankReconciliationPage = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<BankTransaction | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
-  const [offset, setOffset] = useState(0)
+  const [currentOffset, setCurrentOffset] = useState(0)
   const limit = 50
 
-  const loadTransactions = useCallback(async (reset: boolean = true) => {
+  const loadTransactions = useCallback(async (reset: boolean = true, existingOffset?: number) => {
     if (!activeClientId) return
 
     if (reset) {
       setIsLoading(true)
-      setOffset(0)
     } else {
       setIsLoadingMore(true)
     }
 
     try {
-      const newOffset = reset ? 0 : offset
+      const newOffset = reset ? 0 : (existingOffset ?? 0)
       const response = await bankReconciliationApi.listTransactions(
         activeClientId,
         {
@@ -690,7 +689,7 @@ export const BankReconciliationPage = () => {
         setTransactions(prev => [...prev, ...response.transactions])
       }
       setTotalCount(response.total_count)
-      setOffset(newOffset + response.transactions.length)
+      setCurrentOffset(newOffset + response.transactions.length)
     } catch (error) {
       console.error('Failed to load transactions:', error)
       toast.error(t('errors.loadFailed'), {
@@ -700,11 +699,11 @@ export const BankReconciliationPage = () => {
       setIsLoading(false)
       setIsLoadingMore(false)
     }
-  }, [activeClientId, statusFilter, searchQuery, offset])
+  }, [activeClientId, statusFilter, searchQuery])
 
   useEffect(() => {
     loadTransactions(true)
-  }, [activeClientId, statusFilter])
+  }, [activeClientId, statusFilter, loadTransactions])
 
   // Debounced search
   useEffect(() => {
@@ -714,7 +713,7 @@ export const BankReconciliationPage = () => {
       }
     }, 300)
     return () => clearTimeout(timer)
-  }, [searchQuery])
+  }, [searchQuery, activeClientId, loadTransactions])
 
   const handleTransactionClick = (transaction: BankTransaction) => {
     setSelectedTransaction(transaction)
@@ -836,7 +835,7 @@ export const BankReconciliationPage = () => {
                 <div className="p-4 text-center">
                   <Button 
                     variant="outline" 
-                    onClick={() => loadTransactions(false)}
+                    onClick={() => loadTransactions(false, currentOffset)}
                     disabled={isLoadingMore}
                   >
                     {isLoadingMore ? t('common.loading') : t('bank.loadMore')}

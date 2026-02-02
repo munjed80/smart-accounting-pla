@@ -7,7 +7,6 @@ Handles:
 - Match suggestion generation
 - Reconciliation action execution
 """
-import base64
 import csv
 import hashlib
 import io
@@ -15,34 +14,29 @@ import re
 import uuid
 from datetime import datetime, date, timezone
 from decimal import Decimal, InvalidOperation
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple
 
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.models.bank import (
     BankAccount,
     BankTransaction,
     BankTransactionStatus,
-    MatchedType,
     ReconciliationAction,
     ReconciliationActionType,
 )
-from app.models.subledger import OpenItem, OpenItemStatus
+from app.models.subledger import OpenItem, OpenItemStatus, OpenItemAllocation
 from app.models.ledger import JournalEntry, JournalLine, JournalEntryStatus, AccountingPeriod
 from app.models.accounting import ChartOfAccount, VatCode
 from app.models.subledger import Party
 from app.schemas.bank import (
-    BankImportRequest,
     BankImportResponse,
-    ColumnMapping,
     MatchSuggestion,
-    MatchedTypeEnum,
     ApplyActionRequest,
     ReconciliationActionEnum,
-    BankTransactionStatusEnum,
 )
+from app.services.vat.posting import VatPostingService
 
 
 class BankReconciliationService:
@@ -58,7 +52,8 @@ class BankReconciliationService:
         booking_date: date,
         amount: Decimal,
         description: str,
-        reference: Optional[str] = None
+        reference: Optional[str] = None,
+        counterparty_iban: Optional[str] = None,
     ) -> str:
         """
         Compute SHA256 hash for idempotent import.
@@ -69,6 +64,7 @@ class BankReconciliationService:
         - amount (normalized to 2 decimal places)
         - description (stripped)
         - reference (optional, stripped)
+        - counterparty_iban (optional, stripped)
         """
         parts = [
             str(self.administration_id),
@@ -76,9 +72,10 @@ class BankReconciliationService:
             f"{amount:.2f}",
             description.strip(),
             (reference or "").strip(),
+            (counterparty_iban or "").strip(),
         ]
         hash_input = "|".join(parts)
-        return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
+        return hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
 
     def _parse_amount(self, value: str) -> Optional[Decimal]:
         """Parse amount from various formats."""
@@ -141,102 +138,204 @@ class BankReconciliationService:
         
         return None
 
-    async def import_csv(self, request: BankImportRequest) -> BankImportResponse:
+    def _normalize_header(self, header: str) -> str:
+        normalized = header.strip().lower().replace(" ", "_").replace("-", "_")
+        return normalized
+
+    def _resolve_columns(self, headers: List[str]) -> Optional[dict]:
+        normalized = {self._normalize_header(h): h for h in headers if h}
+        aliases = {
+            "booking_date": {"date", "booking_date"},
+            "amount": {"amount"},
+            "description": {"description"},
+            "counterparty_iban": {"iban", "counterparty_iban"},
+            "counterparty_name": {"counterparty_name"},
+            "reference": {"reference"},
+            "account_iban": {"account_iban", "rekening", "rekeningnummer"},
+        }
+
+        resolved: dict = {}
+        for key, options in aliases.items():
+            for option in options:
+                if option in normalized:
+                    resolved[key] = normalized[option]
+                    break
+
+        required = all(resolved.get(k) for k in ("booking_date", "amount", "description"))
+        return resolved if required else None
+
+    def _build_reader(self, decoded: str) -> csv.DictReader:
+        sample = decoded[:2048]
+        try:
+            dialect = csv.Sniffer().sniff(sample, delimiters=";,")
+        except csv.Error:
+            dialect = csv.get_dialect("excel")
+        return csv.DictReader(io.StringIO(decoded), dialect=dialect)
+
+    def _get_row_value(self, row: dict, key: Optional[str]) -> Optional[str]:
+        if not key:
+            return None
+        value = row.get(key)
+        if value is None:
+            return None
+        value = str(value).strip()
+        return value or None
+
+    def _infer_bank_account_iban(self, rows: List[dict], account_iban_column: Optional[str]) -> Optional[str]:
+        if not account_iban_column:
+            return None
+        candidates: set[str] = set()
+        for row in rows:
+            value = self._get_row_value(row, account_iban_column)
+            if value:
+                candidates.add(value.replace(" ", "").upper())
+            if len(candidates) > 1:
+                break
+        return candidates.pop() if len(candidates) == 1 else None
+
+    async def _get_or_create_bank_account(
+        self,
+        iban: str,
+        bank_name: Optional[str],
+    ) -> BankAccount:
+        normalized_iban = iban.replace(" ", "").upper()
+        result = await self.db.execute(
+            select(BankAccount)
+            .where(BankAccount.administration_id == self.administration_id)
+            .where(BankAccount.iban == normalized_iban)
+        )
+        bank_account = result.scalar_one_or_none()
+        if bank_account:
+            return bank_account
+
+        bank_account = BankAccount(
+            administration_id=self.administration_id,
+            iban=normalized_iban,
+            bank_name=bank_name,
+            currency="EUR",
+        )
+        self.db.add(bank_account)
+        await self.db.flush()
+        return bank_account
+
+    async def import_csv(
+        self,
+        file_bytes: bytes,
+        bank_account_iban: Optional[str],
+        bank_name: Optional[str],
+    ) -> BankImportResponse:
         """
         Import bank transactions from a CSV file.
         
         Returns counts of imported, skipped (duplicate), and failed rows.
         """
-        # Decode base64 file content
         try:
-            file_content = base64.b64decode(request.file_base64).decode('utf-8')
-        except Exception as e:
+            decoded = file_bytes.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            decoded = file_bytes.decode("latin-1")
+
+        reader = self._build_reader(decoded)
+        if not reader.fieldnames:
             return BankImportResponse(
                 imported_count=0,
-                skipped_duplicates=0,
+                skipped_duplicates_count=0,
                 total_in_file=0,
-                errors=[f"Bestand kon niet worden gedecodeerd: {str(e)}"],
-                message="Import mislukt: ongeldig bestandsformaat"
+                errors=["CSV-bestand bevat geen kolommen."],
+                message="Import mislukt: ontbrekende kolommen.",
+                bank_account_id=None,
             )
-        
-        # Parse CSV
-        mapping = request.mapping or ColumnMapping()
-        date_format = request.date_format or "%Y-%m-%d"
-        
-        reader = csv.DictReader(io.StringIO(file_content))
-        
+
+        column_map = self._resolve_columns(reader.fieldnames)
+        if not column_map:
+            return BankImportResponse(
+                imported_count=0,
+                skipped_duplicates_count=0,
+                total_in_file=0,
+                errors=["CSV-bestand mist verplichte kolommen: datum, bedrag, omschrijving."],
+                message="Import mislukt: ongeldige kolommen.",
+                bank_account_id=None,
+            )
+
+        rows = list(reader)
+        iban_from_file = self._infer_bank_account_iban(rows, column_map.get("account_iban"))
+        effective_iban = bank_account_iban or iban_from_file
+        if not effective_iban:
+            return BankImportResponse(
+                imported_count=0,
+                skipped_duplicates_count=0,
+                total_in_file=0,
+                errors=["Geen IBAN opgegeven en niet kunnen afleiden uit het bestand."],
+                message="Import mislukt: IBAN ontbreekt.",
+                bank_account_id=None,
+            )
+
+        bank_account = await self._get_or_create_bank_account(effective_iban, bank_name)
+
         imported_count = 0
         skipped_duplicates = 0
         total_in_file = 0
         errors: List[str] = []
-        
-        # Get existing hashes for this administration
+
         existing_hashes_result = await self.db.execute(
-            select(BankTransaction.raw_hash)
+            select(BankTransaction.import_hash)
             .where(BankTransaction.administration_id == self.administration_id)
         )
         existing_hashes = set(row[0] for row in existing_hashes_result.fetchall())
-        
-        for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is row 1)
+
+        for row_num, row in enumerate(rows, start=2):
             total_in_file += 1
-            
-            # Extract fields with mapping
-            try:
-                date_str = row.get(mapping.date_column, "")
-                amount_str = row.get(mapping.amount_column, "")
-                description = row.get(mapping.description_column, "")
-                counterparty_name = row.get(mapping.name_column, "") if mapping.name_column else None
-                counterparty_iban = row.get(mapping.iban_column, "") if mapping.iban_column else None
-                reference = row.get(mapping.reference_column, "") if mapping.reference_column else None
-            except KeyError as e:
-                errors.append(f"Rij {row_num}: Kolom niet gevonden: {e}")
-                continue
-            
-            # Parse date
-            booking_date = self._parse_date(date_str, date_format)
+
+            date_str = self._get_row_value(row, column_map.get("booking_date"))
+            amount_str = self._get_row_value(row, column_map.get("amount"))
+            description = self._get_row_value(row, column_map.get("description"))
+            counterparty_iban = self._get_row_value(row, column_map.get("counterparty_iban"))
+            counterparty_name = self._get_row_value(row, column_map.get("counterparty_name"))
+            reference = self._get_row_value(row, column_map.get("reference"))
+
+            booking_date = self._parse_date(date_str)
             if not booking_date:
                 errors.append(f"Rij {row_num}: Ongeldige datum: {date_str}")
                 continue
-            
-            # Parse amount
+
             amount = self._parse_amount(amount_str)
             if amount is None:
                 errors.append(f"Rij {row_num}: Ongeldig bedrag: {amount_str}")
                 continue
-            
-            # Validate description
-            if not description or not description.strip():
+
+            if not description:
                 errors.append(f"Rij {row_num}: Omschrijving is verplicht")
                 continue
-            
-            # Compute hash
-            raw_hash = self._compute_hash(booking_date, amount, description, reference)
-            
-            # Check for duplicate
+
+            raw_hash = self._compute_hash(
+                booking_date,
+                amount,
+                description,
+                reference=reference,
+                counterparty_iban=counterparty_iban,
+            )
             if raw_hash in existing_hashes:
                 skipped_duplicates += 1
                 continue
-            
-            # Create transaction
+
             transaction = BankTransaction(
                 administration_id=self.administration_id,
+                bank_account_id=bank_account.id,
                 booking_date=booking_date,
                 amount=amount,
-                counterparty_name=counterparty_name.strip() if counterparty_name else None,
-                counterparty_iban=counterparty_iban.strip().upper() if counterparty_iban else None,
-                description=description.strip(),
-                reference=reference.strip() if reference else None,
-                raw_hash=raw_hash,
+                currency="EUR",
+                counterparty_name=counterparty_name,
+                counterparty_iban=counterparty_iban,
+                description=description,
+                reference=reference,
+                import_hash=raw_hash,
                 status=BankTransactionStatus.NEW,
             )
-            
             self.db.add(transaction)
-            existing_hashes.add(raw_hash)  # Prevent duplicates within same file
+            existing_hashes.add(raw_hash)
             imported_count += 1
-        
+
         await self.db.commit()
-        
-        # Create message
+
         if imported_count > 0 and len(errors) == 0:
             message = f"{imported_count} transacties geïmporteerd."
         elif imported_count > 0:
@@ -245,13 +344,14 @@ class BankReconciliationService:
             message = f"Geen nieuwe transacties. {skipped_duplicates} duplicaten overgeslagen."
         else:
             message = "Import mislukt: geen geldige transacties gevonden."
-        
+
         return BankImportResponse(
             imported_count=imported_count,
-            skipped_duplicates=skipped_duplicates,
+            skipped_duplicates_count=skipped_duplicates,
             total_in_file=total_in_file,
-            errors=errors[:10],  # Limit errors to first 10
+            errors=errors[:10],
             message=message,
+            bank_account_id=bank_account.id,
         )
 
     async def get_match_suggestions(self, transaction_id: uuid.UUID) -> Tuple[BankTransaction, List[MatchSuggestion]]:
@@ -259,9 +359,9 @@ class BankReconciliationService:
         Generate match suggestions for a bank transaction.
         
         Matching rules:
-        1. Invoice number in description → suggest invoice
+        1. Invoice number in description/reference → suggest invoice
         2. Amount matches open invoice (±1%) → suggest invoice
-        3. Counterparty IBAN matches known vendor → suggest expense
+        3. Counterparty IBAN matches known party (if available) → suggest expense
         """
         # Get transaction
         result = await self.db.execute(
@@ -276,20 +376,22 @@ class BankReconciliationService:
         
         suggestions: List[MatchSuggestion] = []
         
-        # Rule 1: Invoice number in description
-        invoice_numbers = self._extract_invoice_numbers(transaction.description)
+        # Rule 1: Invoice number in description/reference
+        search_text = " ".join(filter(None, [transaction.description, transaction.reference]))
+        invoice_numbers = self._extract_invoice_numbers(search_text)
         if invoice_numbers:
             for invoice_num in invoice_numbers:
                 matched_items = await self._find_open_items_by_reference(invoice_num)
                 for item in matched_items:
                     suggestions.append(MatchSuggestion(
-                        entity_type=MatchedTypeEnum.INVOICE,
+                        entity_type="INVOICE",
                         entity_id=item.id,
                         entity_reference=item.document_number or invoice_num,
                         confidence_score=90,
                         amount=item.open_amount,
                         date=item.document_date,
-                        explanation=f"Factuurnummer '{invoice_num}' gevonden in omschrijving",
+                        explanation=f"Factuurnummer '{invoice_num}' gevonden in omschrijving of referentie",
+                        proposed_action="APPLY_MATCH",
                     ))
         
         # Rule 2: Amount match for open items
@@ -302,7 +404,7 @@ class BankReconciliationService:
             if not any(s.entity_id == item.id for s in suggestions):
                 score = 80 if item.open_amount == abs(transaction.amount) else 60
                 suggestions.append(MatchSuggestion(
-                    entity_type=MatchedTypeEnum.INVOICE if item.item_type == "RECEIVABLE" else MatchedTypeEnum.EXPENSE,
+                    entity_type="INVOICE" if item.item_type == "RECEIVABLE" else "EXPENSE",
                     entity_id=item.id,
                     entity_reference=item.document_number or str(item.id)[:8],
                     confidence_score=score,
@@ -310,6 +412,7 @@ class BankReconciliationService:
                     date=item.document_date,
                     explanation=f"Bedrag €{item.open_amount:.2f} komt overeen" + 
                                (" (exact)" if item.open_amount == abs(transaction.amount) else " (binnen 1%)"),
+                    proposed_action="APPLY_MATCH",
                 ))
         
         # Rule 3: Counterparty IBAN match
@@ -321,13 +424,14 @@ class BankReconciliationService:
                 for item in party_items[:3]:  # Limit to 3 suggestions per party
                     if not any(s.entity_id == item.id for s in suggestions):
                         suggestions.append(MatchSuggestion(
-                            entity_type=MatchedTypeEnum.EXPENSE if item.item_type == "PAYABLE" else MatchedTypeEnum.INVOICE,
+                            entity_type="EXPENSE" if item.item_type == "PAYABLE" else "INVOICE",
                             entity_id=item.id,
                             entity_reference=item.document_number or party.name,
                             confidence_score=70,
                             amount=item.open_amount,
                             date=item.document_date,
                             explanation=f"IBAN {transaction.counterparty_iban[:8]}... behoort tot {party.name}",
+                            proposed_action="APPLY_MATCH",
                         ))
         
         # Sort by confidence score descending
@@ -337,19 +441,10 @@ class BankReconciliationService:
 
     def _extract_invoice_numbers(self, description: str) -> List[str]:
         """Extract potential invoice numbers from transaction description."""
-        patterns = [
-            r'(?:factuur|invoice|inv|fac)[.\s:#-]*(\d+)',
-            r'(?:F|INV)[-]?(\d{4,})',
-            r'\b(\d{4}-\d{4})\b',  # Format like 2024-0001
-            r'\b(\d{6,})\b',  # Long numbers that could be invoice numbers
-        ]
-        
-        numbers = []
-        for pattern in patterns:
-            matches = re.findall(pattern, description, re.IGNORECASE)
-            numbers.extend(matches)
-        
-        return list(set(numbers))
+        pattern = r"(factuur|invoice|inv)\s*[:#-]?\s*([A-Za-z0-9-]+)"
+        matches = re.findall(pattern, description, re.IGNORECASE)
+        numbers = [match[1] for match in matches if isinstance(match, tuple) and len(match) > 1]
+        return list({n for n in numbers if n})
 
     async def _find_open_items_by_reference(self, reference: str) -> List[OpenItem]:
         """Find open items by document number/reference."""
@@ -360,7 +455,6 @@ class BankReconciliationService:
             .where(
                 or_(
                     OpenItem.document_number.ilike(f"%{reference}%"),
-                    OpenItem.reference.ilike(f"%{reference}%"),
                 )
             )
             .limit(5)
@@ -392,13 +486,20 @@ class BankReconciliationService:
 
     async def _find_parties_by_iban(self, iban: str) -> List[Party]:
         """Find parties by bank account IBAN."""
-        # Normalize IBAN for comparison
         normalized_iban = iban.strip().upper().replace(" ", "")
-        
+        iban_column = None
+        for candidate in ("bank_account", "iban", "bank_account_iban"):
+            if hasattr(Party, candidate):
+                iban_column = getattr(Party, candidate)
+                break
+
+        if iban_column is None:
+            return []
+
         result = await self.db.execute(
             select(Party)
             .where(Party.administration_id == self.administration_id)
-            .where(Party.bank_account.ilike(f"%{normalized_iban}%"))
+            .where(iban_column.ilike(f"%{normalized_iban}%"))
             .limit(3)
         )
         return list(result.scalars().all())
@@ -439,52 +540,49 @@ class BankReconciliationService:
         journal_entry_id = None
         
         # Process action
-        if request.action == ReconciliationActionEnum.IGNORE:
+        if request.action_type == ReconciliationActionEnum.IGNORE:
             transaction.status = BankTransactionStatus.IGNORED
-            transaction.matched_type = None
+            transaction.matched_entity_type = None
             transaction.matched_entity_id = None
-        
-        elif request.action == ReconciliationActionEnum.ACCEPT_MATCH:
-            if not request.entity_id:
-                raise ValueError("entity_id is verplicht voor ACCEPT_MATCH")
+
+        elif request.action_type == ReconciliationActionEnum.APPLY_MATCH:
+            if not request.match_entity_id or not request.match_entity_type:
+                raise ValueError("match_entity_id en match_entity_type zijn verplicht voor APPLY_MATCH")
+
+            open_item = await self._get_open_item(request.match_entity_id)
+            if not open_item:
+                raise ValueError("Gekoppelde open post niet gevonden")
+
+            payment_entry_id = await self._create_payment_entry(transaction, open_item)
+            await self._allocate_open_item(open_item, payment_entry_id, abs(transaction.amount))
+
             transaction.status = BankTransactionStatus.MATCHED
-            # Determine matched type from the entity
-            open_item = await self._get_open_item(request.entity_id)
-            if open_item:
-                transaction.matched_type = (
-                    MatchedType.INVOICE if open_item.item_type == "RECEIVABLE"
-                    else MatchedType.EXPENSE
-                )
-                transaction.matched_entity_id = request.entity_id
+            transaction.matched_entity_type = request.match_entity_type
+            transaction.matched_entity_id = request.match_entity_id
         
-        elif request.action == ReconciliationActionEnum.LINK_INVOICE:
-            if not request.entity_id:
-                raise ValueError("entity_id is verplicht voor LINK_INVOICE")
-            transaction.status = BankTransactionStatus.MATCHED
-            transaction.matched_type = MatchedType.INVOICE
-            transaction.matched_entity_id = request.entity_id
-        
-        elif request.action == ReconciliationActionEnum.CREATE_EXPENSE:
+        elif request.action_type == ReconciliationActionEnum.CREATE_EXPENSE:
             # Create journal entry for the expense
             journal_entry_id = await self._create_expense_entry(transaction, request)
             transaction.status = BankTransactionStatus.MATCHED
-            transaction.matched_type = MatchedType.MANUAL
+            transaction.matched_entity_type = "JOURNAL_ENTRY"
             transaction.matched_entity_id = journal_entry_id
         
-        elif request.action == ReconciliationActionEnum.UNMATCH:
+        elif request.action_type == ReconciliationActionEnum.UNMATCH:
             transaction.status = BankTransactionStatus.NEW
-            transaction.matched_type = None
+            transaction.matched_entity_type = None
             transaction.matched_entity_id = None
         
         # Record action for audit trail
         action = ReconciliationAction(
+            administration_id=self.administration_id,
+            accountant_user_id=self.user_id,
             bank_transaction_id=transaction_id,
-            user_id=self.user_id,
-            action=ReconciliationActionType(request.action.value),
+            action_type=ReconciliationActionType(request.action_type.value),
             payload={
-                "entity_id": str(request.entity_id) if request.entity_id else None,
-                "vat_code": request.vat_code,
-                "ledger_code": request.ledger_code,
+                "match_entity_type": request.match_entity_type,
+                "match_entity_id": str(request.match_entity_id) if request.match_entity_id else None,
+                "expense_category": request.expense_category,
+                "vat_rate": str(request.vat_rate) if request.vat_rate is not None else None,
                 "notes": request.notes,
                 "journal_entry_id": str(journal_entry_id) if journal_entry_id else None,
             }
@@ -505,6 +603,88 @@ class BankReconciliationService:
         )
         return result.scalar_one_or_none()
 
+    async def _allocate_open_item(
+        self,
+        open_item: OpenItem,
+        journal_entry_id: uuid.UUID,
+        amount: Decimal,
+    ) -> None:
+        allocation_amount = min(amount, open_item.open_amount)
+        allocation = OpenItemAllocation(
+            open_item_id=open_item.id,
+            payment_journal_entry_id=journal_entry_id,
+            allocated_amount=allocation_amount,
+            allocation_date=datetime.now(timezone.utc).date(),
+        )
+        self.db.add(allocation)
+
+        open_item.paid_amount += allocation_amount
+        open_item.update_status()
+
+    async def _create_payment_entry(
+        self,
+        transaction: BankTransaction,
+        open_item: OpenItem,
+    ) -> uuid.UUID:
+        period = await self._get_or_create_period(transaction.booking_date)
+        bank_account = await self._get_bank_control_account()
+        if not bank_account:
+            raise ValueError("Bank grootboekrekening niet gevonden")
+
+        control_type = "AR" if open_item.item_type == "RECEIVABLE" else "AP"
+        counterparty_account = await self._get_control_account(control_type)
+        if not counterparty_account:
+            raise ValueError("Debiteuren/crediteuren rekening niet gevonden")
+
+        entry_number = await self._generate_entry_number(transaction.booking_date)
+        amount = abs(transaction.amount)
+
+        entry = JournalEntry(
+            administration_id=self.administration_id,
+            period_id=period.id if period else None,
+            entry_number=entry_number,
+            entry_date=transaction.booking_date,
+            description=f"Bankbetaling: {transaction.description[:200]}",
+            reference=transaction.reference,
+            status=JournalEntryStatus.POSTED,
+            total_debit=amount,
+            total_credit=amount,
+            is_balanced=True,
+            source_type="BANK_RECONCILIATION",
+            source_id=transaction.id,
+            posted_at=datetime.now(timezone.utc),
+            posted_by_id=self.user_id,
+        )
+        self.db.add(entry)
+        await self.db.flush()
+
+        if open_item.item_type == "RECEIVABLE":
+            debit_account = bank_account
+            credit_account = counterparty_account
+        else:
+            debit_account = counterparty_account
+            credit_account = bank_account
+
+        line1 = JournalLine(
+            journal_entry_id=entry.id,
+            account_id=debit_account.id,
+            line_number=1,
+            description=transaction.description[:200],
+            debit_amount=amount,
+            credit_amount=Decimal("0.00"),
+        )
+        line2 = JournalLine(
+            journal_entry_id=entry.id,
+            account_id=credit_account.id,
+            line_number=2,
+            description=transaction.description[:200],
+            debit_amount=Decimal("0.00"),
+            credit_amount=amount,
+        )
+        self.db.add_all([line1, line2])
+
+        return entry.id
+
     async def _create_expense_entry(
         self,
         transaction: BankTransaction,
@@ -520,9 +700,9 @@ class BankReconciliationService:
         period = await self._get_or_create_period(transaction.booking_date)
         
         # Get expense account
-        expense_account = await self._get_account_by_code(request.ledger_code or "4000")
+        expense_account = await self._get_account_by_code(request.expense_category or "4000")
         if not expense_account:
-            raise ValueError(f"Grootboekrekening {request.ledger_code or '4000'} niet gevonden")
+            raise ValueError(f"Grootboekrekening {request.expense_category or '4000'} niet gevonden")
         
         # Get bank account (control account)
         bank_account = await self._get_bank_control_account()
@@ -532,20 +712,19 @@ class BankReconciliationService:
         # Get VAT code if provided
         vat_code = None
         vat_amount = Decimal("0.00")
-        if request.vat_code:
-            vat_code = await self._get_vat_code(request.vat_code)
-            if vat_code:
-                # Calculate VAT (reverse calculation from gross amount)
-                # Note: Assumes bank transaction amount is gross (VAT-inclusive)
-                vat_rate = vat_code.rate / Decimal("100")
-                vat_amount = abs(transaction.amount) * vat_rate / (1 + vat_rate)
+        vat_base = abs(transaction.amount)
+        if request.vat_rate is not None:
+            vat_service = VatPostingService(self.db, self.administration_id)
+            vat_rate = Decimal(str(request.vat_rate))
+            vat_base, vat_amount = vat_service.extract_base_from_gross(abs(transaction.amount), vat_rate)
+            vat_code = await self._get_vat_code_by_rate(vat_rate)
         
         # Generate entry number
         entry_number = await self._generate_entry_number(transaction.booking_date)
         
         # Create journal entry
         amount = abs(transaction.amount)
-        net_amount = amount - vat_amount
+        net_amount = vat_base
         
         entry = JournalEntry(
             administration_id=self.administration_id,
@@ -576,13 +755,13 @@ class BankReconciliationService:
             debit_amount=net_amount if vat_code else amount,
             credit_amount=Decimal("0.00"),
             vat_code_id=vat_code.id if vat_code else None,
-            vat_amount=vat_amount if vat_code else None,
-            taxable_amount=net_amount if vat_code else None,
+            vat_amount=vat_amount if vat_amount > 0 else None,
+            taxable_amount=net_amount if vat_amount > 0 else None,
         )
         self.db.add(expense_line)
         
         # Line 2: Debit VAT recoverable (if applicable)
-        if vat_code and vat_amount > 0:
+        if vat_amount > 0:
             vat_account = await self._get_vat_recoverable_account()
             if vat_account:
                 vat_line = JournalLine(
@@ -607,6 +786,16 @@ class BankReconciliationService:
         self.db.add(bank_line)
         
         return entry.id
+
+    async def _get_control_account(self, control_type: str) -> Optional[ChartOfAccount]:
+        result = await self.db.execute(
+            select(ChartOfAccount)
+            .where(ChartOfAccount.administration_id == self.administration_id)
+            .where(ChartOfAccount.control_type == control_type)
+            .where(ChartOfAccount.is_active)
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
 
     async def _get_or_create_period(self, entry_date: date) -> Optional[AccountingPeriod]:
         """Get accounting period for a date."""
@@ -654,12 +843,12 @@ class BankReconciliationService:
         
         return account
 
-    async def _get_vat_code(self, code: str) -> Optional[VatCode]:
-        """Get VAT code by code."""
+    async def _get_vat_code_by_rate(self, rate: Decimal) -> Optional[VatCode]:
         result = await self.db.execute(
             select(VatCode)
-            .where(VatCode.code == code)
+            .where(VatCode.administration_id == self.administration_id)
             .where(VatCode.is_active)
+            .where(VatCode.rate == rate)
             .limit(1)
         )
         return result.scalar_one_or_none()

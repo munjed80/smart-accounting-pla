@@ -23,7 +23,6 @@ from app.models.bank import (
     BankAccount,
     BankTransaction,
     BankTransactionStatus,
-    MatchedType,
     ReconciliationAction,
     ReconciliationActionType,
 )
@@ -68,7 +67,6 @@ __all__ = [
     "BankAccount",
     "BankTransaction",
     "BankTransactionStatus",
-    "MatchedType",
     "ReconciliationAction",
     "ReconciliationActionType",
 ]

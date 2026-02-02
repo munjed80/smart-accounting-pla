@@ -174,6 +174,32 @@ def require_accountant(current_user: User) -> None:
         )
 
 
+def require_accountant_only(current_user: User) -> None:
+    """
+    Guard: Allows ONLY users with role = ACCOUNTANT.
+    
+    Raises:
+        HTTP 403: If user role is not 'accountant'
+    """
+    if current_user.role != UserRole.ACCOUNTANT.value:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "FORBIDDEN_ROLE", "message": "Deze endpoint is alleen beschikbaar voor accountants"}
+        )
+
+
+async def require_assigned_accountant_client(
+    client_id: UUID,
+    current_user: User,
+    db: AsyncSession,
+) -> Administration:
+    """
+    Verify user is an accountant (not admin) AND assigned to the client.
+    """
+    require_accountant_only(current_user)
+    return await require_assigned_client(client_id, current_user, db)
+
+
 # =============================================================================
 # Administration Access (for ZZP users accessing their own administration)
 # =============================================================================

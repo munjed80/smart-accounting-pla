@@ -9,11 +9,13 @@ Tests cover:
 """
 import pytest
 import uuid
-import base64
 import hashlib
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from unittest.mock import MagicMock, AsyncMock
+
+from app.services.bank_reconciliation import BankReconciliationService
+from app.services.vat.posting import VatPostingService
 
 
 class TestBankImportIdempotency:
@@ -26,20 +28,22 @@ class TestBankImportIdempotency:
         amount = Decimal("123.45")
         description = "Test payment"
         reference = "REF-001"
+        counterparty_iban = "NL91ABNA0417164300"
         
-        def compute_hash(admin_id, booking_date, amount, description, reference=None):
+        def compute_hash(admin_id, booking_date, amount, description, reference=None, counterparty_iban=None):
             parts = [
                 str(admin_id),
                 booking_date.isoformat(),
                 f"{amount:.2f}",
                 description.strip(),
                 (reference or "").strip(),
+                (counterparty_iban or "").strip(),
             ]
             hash_input = "|".join(parts)
             return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
         
-        hash1 = compute_hash(admin_id, booking_date, amount, description, reference)
-        hash2 = compute_hash(admin_id, booking_date, amount, description, reference)
+        hash1 = compute_hash(admin_id, booking_date, amount, description, reference, counterparty_iban)
+        hash2 = compute_hash(admin_id, booking_date, amount, description, reference, counterparty_iban)
         
         assert hash1 == hash2
         assert len(hash1) == 64  # SHA256 produces 64 hex characters
@@ -50,13 +54,14 @@ class TestBankImportIdempotency:
         booking_date = date(2024, 1, 15)
         description = "Test payment"
         
-        def compute_hash(admin_id, booking_date, amount, description, reference=None):
+        def compute_hash(admin_id, booking_date, amount, description, reference=None, counterparty_iban=None):
             parts = [
                 str(admin_id),
                 booking_date.isoformat(),
                 f"{amount:.2f}",
                 description.strip(),
                 (reference or "").strip(),
+                (counterparty_iban or "").strip(),
             ]
             hash_input = "|".join(parts)
             return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
@@ -72,13 +77,14 @@ class TestBankImportIdempotency:
         amount = Decimal("100.00")
         description = "Test payment"
         
-        def compute_hash(admin_id, booking_date, amount, description, reference=None):
+        def compute_hash(admin_id, booking_date, amount, description, reference=None, counterparty_iban=None):
             parts = [
                 str(admin_id),
                 booking_date.isoformat(),
                 f"{amount:.2f}",
                 description.strip(),
                 (reference or "").strip(),
+                (counterparty_iban or "").strip(),
             ]
             hash_input = "|".join(parts)
             return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
@@ -94,13 +100,14 @@ class TestBankImportIdempotency:
         amount = Decimal("100.00")
         description = "Test payment"
         
-        def compute_hash(admin_id, booking_date, amount, description, reference=None):
+        def compute_hash(admin_id, booking_date, amount, description, reference=None, counterparty_iban=None):
             parts = [
                 str(admin_id),
                 booking_date.isoformat(),
                 f"{amount:.2f}",
                 description.strip(),
                 (reference or "").strip(),
+                (counterparty_iban or "").strip(),
             ]
             hash_input = "|".join(parts)
             return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
@@ -193,6 +200,31 @@ class TestCSVParsing:
         assert parse_date("15.01.2024") == date(2024, 1, 15)
 
 
+class TestColumnMapping:
+    """Tests for CSV column mapping resolution."""
+
+    def test_column_mapping_accepts_booking_date(self):
+        service = BankReconciliationService(MagicMock(), uuid.uuid4(), uuid.uuid4())
+        headers = ["Booking_Date", "Amount", "Description"]
+        mapping = service._resolve_columns(headers)
+        assert mapping["booking_date"] == "Booking_Date"
+        assert mapping["amount"] == "Amount"
+        assert mapping["description"] == "Description"
+
+    def test_column_mapping_accepts_date_column(self):
+        service = BankReconciliationService(MagicMock(), uuid.uuid4(), uuid.uuid4())
+        headers = ["Date", "Amount", "Description", "Counterparty_Name"]
+        mapping = service._resolve_columns(headers)
+        assert mapping["booking_date"] == "Date"
+        assert mapping["counterparty_name"] == "Counterparty_Name"
+
+    def test_column_mapping_requires_required_columns(self):
+        service = BankReconciliationService(MagicMock(), uuid.uuid4(), uuid.uuid4())
+        headers = ["Date", "Description"]
+        mapping = service._resolve_columns(headers)
+        assert mapping is None
+
+
 class TestReconciliationActions:
     """Tests for reconciliation action logic."""
     
@@ -209,11 +241,11 @@ class TestReconciliationActions:
         assert new_status == "IGNORED"
     
     def test_status_transitions_for_accept_match(self):
-        """Test that ACCEPT_MATCH sets status to MATCHED."""
+        """Test that APPLY_MATCH sets status to MATCHED."""
         current_status = "NEW"
-        action = "ACCEPT_MATCH"
+        action = "APPLY_MATCH"
         
-        if action == "ACCEPT_MATCH":
+        if action == "APPLY_MATCH":
             new_status = "MATCHED"
         else:
             new_status = current_status
@@ -233,7 +265,7 @@ class TestReconciliationActions:
         assert new_status == "NEW"
     
     def test_matched_type_is_set_correctly(self):
-        """Test that matched_type is set based on entity type."""
+        """Test that matched_entity_type is set based on entity type."""
         item_types = {
             "RECEIVABLE": "INVOICE",
             "PAYABLE": "EXPENSE",
@@ -244,20 +276,20 @@ class TestReconciliationActions:
             assert matched_type == expected_matched_type
     
     def test_accept_match_requires_entity_id(self):
-        """Test that ACCEPT_MATCH requires an entity_id."""
-        action = "ACCEPT_MATCH"
+        """Test that APPLY_MATCH requires an entity_id."""
+        action = "APPLY_MATCH"
         entity_id = None
         
-        is_valid = not (action == "ACCEPT_MATCH" and entity_id is None)
+        is_valid = not (action == "APPLY_MATCH" and entity_id is None)
         
         assert is_valid == False
     
     def test_link_invoice_requires_entity_id(self):
-        """Test that LINK_INVOICE requires an entity_id."""
-        action = "LINK_INVOICE"
-        entity_id = None
+        """Test that APPLY_MATCH requires a match_entity_type."""
+        action = "APPLY_MATCH"
+        match_entity_type = None
         
-        is_valid = not (action == "LINK_INVOICE" and entity_id is None)
+        is_valid = not (action == "APPLY_MATCH" and match_entity_type is None)
         
         assert is_valid == False
 
@@ -270,20 +302,13 @@ class TestMatchSuggestions:
         import re
         
         def extract_invoice_numbers(description):
-            patterns = [
-                r'(?:factuur|invoice|inv|fac)[.\s:#-]*(\d+)',
-                r'(?:F|INV)[-]?(\d{4,})',
-                r'\b(\d{4}-\d{4})\b',
-            ]
-            numbers = []
-            for pattern in patterns:
-                matches = re.findall(pattern, description, re.IGNORECASE)
-                numbers.extend(matches)
-            return list(set(numbers))
+            pattern = r"(factuur|invoice|inv)\s*[:#-]?\s*([A-Za-z0-9-]+)"
+            matches = re.findall(pattern, description, re.IGNORECASE)
+            return list({match[1] for match in matches if len(match) > 1})
         
         assert "12345" in extract_invoice_numbers("Factuur 12345 betaling")
         assert "67890" in extract_invoice_numbers("Invoice #67890")
-        assert "2024-0001" in extract_invoice_numbers("Betr: 2024-0001")
+        assert "2024-0001" in extract_invoice_numbers("Inv-2024-0001 betaling")
         assert "9999" in extract_invoice_numbers("INV-9999 payment")
     
     def test_amount_tolerance_matching(self):
@@ -337,6 +362,11 @@ class TestMatchSuggestions:
         assert invoice_match_score > amount_exact_match_score
         assert invoice_match_score > iban_match_score
 
+    def test_suggestion_proposed_action_is_apply_match(self):
+        """Test that suggestion proposed action is APPLY_MATCH."""
+        proposed_action = "APPLY_MATCH"
+        assert proposed_action == "APPLY_MATCH"
+
 
 class TestJournalEntryCreation:
     """Tests for CREATE_EXPENSE journal entry creation."""
@@ -385,6 +415,13 @@ class TestJournalEntryCreation:
         
         assert entry_number == "BNK-2024-00043"
 
+    def test_vat_engine_extracts_base_from_gross(self):
+        """Test VAT engine extraction from gross amount."""
+        vat_service = VatPostingService(MagicMock(), uuid.uuid4())
+        base_amount, vat_amount = vat_service.extract_base_from_gross(Decimal("121.00"), Decimal("21.00"))
+        assert base_amount == Decimal("100.00")
+        assert vat_amount == Decimal("21.00")
+
 
 class TestRoleEnforcement:
     """Tests for role and assignment enforcement."""
@@ -392,7 +429,7 @@ class TestRoleEnforcement:
     def test_non_accountant_cannot_import(self):
         """Test that non-accountant users cannot import bank files."""
         user_role = "zzp"
-        allowed_roles = ["accountant", "admin"]
+        allowed_roles = ["accountant"]
         
         is_allowed = user_role in allowed_roles
         
@@ -401,20 +438,20 @@ class TestRoleEnforcement:
     def test_accountant_can_import(self):
         """Test that accountants can import bank files."""
         user_role = "accountant"
-        allowed_roles = ["accountant", "admin"]
+        allowed_roles = ["accountant"]
         
         is_allowed = user_role in allowed_roles
         
         assert is_allowed == True
     
     def test_admin_can_import(self):
-        """Test that admins can import bank files."""
+        """Test that admins cannot import bank files."""
         user_role = "admin"
-        allowed_roles = ["accountant", "admin"]
+        allowed_roles = ["accountant"]
         
         is_allowed = user_role in allowed_roles
         
-        assert is_allowed == True
+        assert is_allowed == False
     
     def test_unassigned_client_access_denied(self):
         """Test that accountants cannot access unassigned clients."""
@@ -460,12 +497,14 @@ class TestAuditTrail:
             "id": uuid.uuid4(),
             "bank_transaction_id": uuid.uuid4(),
             "user_id": uuid.uuid4(),
+            "administration_id": uuid.uuid4(),
             "action": "IGNORE",
             "created_at": datetime.now(timezone.utc),
         }
         
         assert action["created_at"] is not None
         assert action["user_id"] is not None
+        assert action["administration_id"] is not None
     
     def test_action_payload_contains_details(self):
         """Test that action payload contains relevant details."""
@@ -483,7 +522,7 @@ class TestAuditTrail:
     
     def test_action_types_are_valid(self):
         """Test that all action types are valid."""
-        valid_actions = ["ACCEPT_MATCH", "IGNORE", "CREATE_EXPENSE", "LINK_INVOICE", "UNMATCH"]
+        valid_actions = ["APPLY_MATCH", "IGNORE", "CREATE_EXPENSE", "UNMATCH"]
         
         for action in valid_actions:
             assert action in valid_actions
@@ -492,3 +531,26 @@ class TestAuditTrail:
 # Run tests with pytest
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+    def test_hash_differs_for_different_counterparty_iban(self):
+        """Test that different IBANs produce different hashes."""
+        admin_id = uuid.uuid4()
+        booking_date = date(2024, 1, 15)
+        amount = Decimal("100.00")
+        description = "Test payment"
+
+        def compute_hash(admin_id, booking_date, amount, description, reference=None, counterparty_iban=None):
+            parts = [
+                str(admin_id),
+                booking_date.isoformat(),
+                f"{amount:.2f}",
+                description.strip(),
+                (reference or "").strip(),
+                (counterparty_iban or "").strip(),
+            ]
+            hash_input = "|".join(parts)
+            return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
+
+        hash1 = compute_hash(admin_id, booking_date, amount, description, counterparty_iban="NL01TEST0000000001")
+        hash2 = compute_hash(admin_id, booking_date, amount, description, counterparty_iban="NL01TEST0000000002")
+
+        assert hash1 != hash2

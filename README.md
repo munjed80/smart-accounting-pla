@@ -929,3 +929,120 @@ This checklist verifies the accountant master dashboard features for managing 20
 - [ ] Verify clients are still selected (checkmarks shown)
 - [ ] Execute a bulk action
 - [ ] Verify action applies to ALL clients, not just page 1
+
+## Closed-Loop Workflow Verification
+
+This checklist verifies the end-to-end accountant closed-loop workflow that makes this platform beat SnelStart.
+
+### Prerequisites
+- [ ] PostgreSQL database running and migrated
+- [ ] Backend running (FastAPI)
+- [ ] Frontend running (Vite)
+- [ ] Test accountant user created (role=accountant)
+- [ ] Test ZZP user created (role=zzp) with administration
+
+### E2E Test: Complete Workflow
+
+#### 1. Create Accountant + ZZP Users
+```bash
+# Via seed.py or registration
+python backend/seed.py
+# Or register via UI at /register
+```
+- [ ] Accountant user can login at `/login`
+- [ ] ZZP user can login at `/login`
+
+#### 2. Consent Approval Flow
+- [ ] Accountant navigates to `/accountant/clients`
+- [ ] Clicks "Klant uitnodigen" and enters ZZP email
+- [ ] ZZP user sees pending invite at `/dashboard/boekhouder`
+- [ ] ZZP user approves → status becomes ACTIVE
+- [ ] Accountant sees client in dashboard
+
+#### 3. Bulk Action → Operation ID → History
+- [ ] Select 1+ clients in accountant dashboard
+- [ ] Click "Herberekenen" bulk action
+- [ ] Modal shows "Bezig…" with polling status
+- [ ] Operation completes, shows results
+- [ ] Navigate to `/accountant/bulk-operations`
+- [ ] Operation appears in history table
+- [ ] Status badge shows Dutch label (Voltooid/Mislukt)
+
+#### 4. Details Show Per-Client Results
+- [ ] Click "Details bekijken" on operation row
+- [ ] Drawer shows operation summary
+- [ ] Counts display: Gelukt / Mislukt / Overgeslagen
+- [ ] Per-client list shows with status badges
+- [ ] Status filter dropdown works
+- [ ] Can close drawer
+
+#### 5. Open Dossier → Execute Suggestion → Audit
+- [ ] Open client dossier (`/accountant/clients/:id/issues`)
+- [ ] "Actieve klant" badge visible in header
+- [ ] Issues grouped by Rood/Geel
+- [ ] Click "Acties bekijken" on an issue
+- [ ] Suggestion cards load
+- [ ] Click "Goedkeuren" on a suggestion
+- [ ] Success toast shows
+- [ ] "Vandaag afgerond" counter increments
+
+#### 6. Today Panel Links Apply Filters
+- [ ] Dashboard shows "Vandaag – Overzicht" panel
+- [ ] Click on a task (e.g., "X klanten met rode issues")
+- [ ] Dashboard applies appropriate filter (e.g., "Rood")
+- [ ] Click on "BTW deadline" task
+- [ ] Dashboard applies deadline_7d filter + sorts by deadline
+
+#### 7. Logout Works Everywhere
+- [ ] From accountant dashboard: click logout → redirects to `/login`
+- [ ] From ZZP dashboard: click logout → redirects to `/login`
+- [ ] Session cleared (localStorage removed)
+
+### How to Test Locally
+
+```bash
+# Terminal 1: Start backend
+cd backend
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+
+# Terminal 2: Start frontend
+npm install
+npm run dev
+
+# Terminal 3: (Optional) Start worker for OCR
+cd worker
+python worker.py
+```
+
+### How to Test on Coolify/Production
+
+1. **Deploy via Coolify**: Push to main branch triggers deploy
+2. **Environment variables**: Ensure `DATABASE_URL`, `SECRET_KEY`, `VITE_API_URL` are set
+3. **Run migrations**: `alembic upgrade head` in backend container
+4. **Verify health**: Check `/api/v1/health` returns OK
+5. **Test login**: Verify auth flow works with production CORS
+6. **Test bulk ops**: Select clients, execute, verify history updates
+
+### New Endpoints (Phase 1-4)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/accountant/bulk/operations` | GET | List bulk operations history |
+| `/api/v1/accountant/bulk/operations/{id}` | GET | Get operation details + per-client results |
+| `/api/v1/accountant/bulk/recalculate` | POST | Trigger validation, returns operation_id |
+| `/api/v1/accountant/bulk/ack-yellow` | POST | Acknowledge yellow issues |
+| `/api/v1/accountant/bulk/generate-vat-draft` | POST | Generate VAT drafts |
+| `/api/v1/accountant/bulk/send-reminders` | POST | Send client reminders |
+
+### Status Model
+
+| Status | Dutch Label | Description |
+|--------|-------------|-------------|
+| PENDING | Wachtend | Operation created, not started |
+| IN_PROGRESS | Bezig | Operation running |
+| COMPLETED | Voltooid | All clients processed successfully |
+| COMPLETED_WITH_ERRORS | Voltooid met fouten | Some clients failed |
+| FAILED | Mislukt | All clients failed |
+

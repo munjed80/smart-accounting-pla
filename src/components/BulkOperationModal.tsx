@@ -268,6 +268,12 @@ export const BulkOperationModal = ({
 
   // Start polling for an operation
   const startPolling = useCallback((operationId: string) => {
+    // Clear any existing interval before starting a new one
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+      pollingIntervalRef.current = null
+    }
+    
     setPollingOperationId(operationId)
     
     // Poll every 2 seconds

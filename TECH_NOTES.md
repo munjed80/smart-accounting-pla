@@ -92,25 +92,27 @@
 
 ---
 
-## What Needs Enhancement (Minimal Changes)
+## Enhancements Implemented (Phases 1-4)
 
-### Phase 1: Polish Bulk Operation Flow
-1. **Add polling support in BulkOperationModal** - Currently fire-and-forget for long operations
-2. **Add status filter to history page** - Frontend filter dropdown
-3. **Improve empty states** - Add retry buttons and clearer messages
+### Phase 1: Bulk Operation Flow ✅ COMPLETE
+1. **Polling support in BulkOperationModal** - ✅ Polls operation status every 2s until terminal state
+2. **Status filter on history page** - ✅ Dropdown filter by COMPLETED/FAILED/IN_PROGRESS/PENDING
+3. **Improved empty states** - ✅ Clear messages with action buttons
 
-### Phase 2: Client Dossier Enhancements
-1. **Active client indicator** - Visual badge in dossier header
-2. **"Vandaag afgerond" counter** - Track actions completed today
-3. **Recommended next tab** - Navigate after issue resolution
+### Phase 2: Client Dossier Enhancements ✅ COMPLETE
+1. **"Actieve klant" indicator** - ✅ Visual badge in dossier header
+2. **"Vandaag afgerond" counter** - ✅ Session-based counter increments on issue resolution
+3. **Issue resolution callback** - ✅ Refreshes overview after action completion
 
-### Phase 3: Differentiators
-1. **Risk score panel** - Top 10 by readiness_score (data exists, just needs panel)
-2. **Vandaag panel links** - Connect to dashboard filters
+### Phase 3: Differentiators ✅ COMPLETE
+1. **Risk score panel** - ✅ PriorityClientsPanel shows top 10 by computed risk score
+2. **Vandaag panel links** - ✅ Links apply dashboard filters (deadline_7d, has_red, etc.)
+3. **BTW binnenkort filter** - ✅ New filter chip shows clients with VAT deadline ≤7 days
 
-### Phase 4: Documentation
-1. **README E2E checklist** - Document verification steps
-2. **Local testing instructions** - Docker compose setup
+### Phase 4: Documentation ✅ COMPLETE
+1. **README E2E checklist** - ✅ Added "Closed-Loop Workflow Verification" section
+2. **Local testing instructions** - ✅ Docker compose and manual setup documented
+3. **Endpoint reference** - ✅ Table of new endpoints with descriptions
 
 ---
 

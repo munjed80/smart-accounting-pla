@@ -1360,7 +1360,7 @@ export const nl = {
     notesPlaceholder: "Optionele notitie...",
   },
 
-  suggestions: {
+  bankSuggestions: {
     invoiceMatch: "Factuurnummer gevonden",
     amountMatch: "Bedrag komt overeen",
     amountMatchExact: "Bedrag komt exact overeen",

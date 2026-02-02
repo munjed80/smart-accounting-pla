@@ -335,10 +335,10 @@ const SuggestionCard = ({
   isApplying: boolean
 }) => {
   const typeLabels = {
-    INVOICE: t('suggestions.matchTypes.INVOICE'),
-    EXPENSE: t('suggestions.matchTypes.EXPENSE'),
-    TRANSFER: t('suggestions.matchTypes.TRANSFER'),
-    MANUAL: t('suggestions.matchTypes.MANUAL'),
+    INVOICE: t('bankSuggestions.matchTypes.INVOICE'),
+    EXPENSE: t('bankSuggestions.matchTypes.EXPENSE'),
+    TRANSFER: t('bankSuggestions.matchTypes.TRANSFER'),
+    MANUAL: t('bankSuggestions.matchTypes.MANUAL'),
   }
 
   return (

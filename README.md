@@ -1046,3 +1046,54 @@ python worker.py
 | COMPLETED_WITH_ERRORS | Voltooid met fouten | Some clients failed |
 | FAILED | Mislukt | All clients failed |
 
+---
+
+## Bank Import & Reconciliation (MVP)
+
+### Overview
+Accountants can import bank statements (CSV) and reconcile transactions with invoices, expenses, and transfers. Dutch-first UI with rules-based matching suggestions.
+
+### E2E Verification Checklist
+
+1. **Login as accountant** - Verify login works and role-appropriate menu is shown
+2. **Select client** - Use client switcher to select a client administration
+3. **Navigate to Bank** - Click "Bank" in sidebar menu → `/accountant/bank`
+4. **Import CSV** - Click "Importeren", upload a CSV file with transactions
+5. **Verify import** - Check toast shows imported count, transactions appear in list
+6. **Test idempotency** - Import same file again, verify duplicates are skipped
+7. **View NEW transactions** - Use filter tabs to show only "Nieuw" transactions
+8. **Get suggestions** - Click a transaction, click "Suggesties" to load matches
+9. **Apply match** - Accept a suggested match or create an expense
+10. **Verify status** - Check transaction status changes to "Gematcht"
+11. **Verify journal entry** - For CREATE_EXPENSE, journal entry is created
+12. **Audit trail** - Reconciliation action is recorded with user/timestamp
+
+### Bank Reconciliation Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/accountant/bank/import` | POST | Import CSV bank statement |
+| `/api/v1/accountant/bank/transactions` | GET | List bank transactions with filters |
+| `/api/v1/accountant/bank/transactions/{id}/suggest` | POST | Get match suggestions |
+| `/api/v1/accountant/bank/transactions/{id}/apply` | POST | Apply reconciliation action |
+| `/api/v1/accountant/bank/actions` | GET | List reconciliation actions for audit |
+
+### Bank Transaction Status
+
+| Status | Dutch Label | Description |
+|--------|-------------|-------------|
+| NEW | Nieuw | Just imported, awaiting reconciliation |
+| MATCHED | Gematcht | Successfully matched to invoice/expense |
+| IGNORED | Genegeerd | Manually ignored (e.g., internal transfers) |
+| NEEDS_REVIEW | Te beoordelen | Flagged for accountant review |
+
+### Reconciliation Actions
+
+| Action | Dutch Label | Description |
+|--------|-------------|-------------|
+| ACCEPT_MATCH | Match geaccepteerd | Accept a suggested match |
+| LINK_INVOICE | Gekoppeld aan factuur | Link to existing invoice |
+| CREATE_EXPENSE | Uitgave geboekt | Create expense journal entry |
+| IGNORE | Transactie genegeerd | Ignore this transaction |
+| UNMATCH | Match ongedaan gemaakt | Undo previous match |
+

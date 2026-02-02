@@ -32,6 +32,8 @@ import {
   CalendarBlank,
   ListChecks,
   LockSimple,
+  User,
+  Sparkle,
 } from '@phosphor-icons/react'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
@@ -62,6 +64,39 @@ interface ClientDossierPageProps {
   initialTab?: 'issues' | 'periods' | 'decisions'
 }
 
+// Session storage key for today's completed actions
+const TODAY_COMPLETED_KEY = 'dossier_today_completed'
+
+// Get today's date string for session tracking
+const getTodayDateKey = () => new Date().toISOString().split('T')[0]
+
+// Get today's completed count from session storage
+const getTodayCompleted = (): number => {
+  try {
+    const stored = sessionStorage.getItem(TODAY_COMPLETED_KEY)
+    if (!stored) return 0
+    const data = JSON.parse(stored)
+    // Only return count if it's from today
+    if (data.date === getTodayDateKey()) {
+      return data.count || 0
+    }
+    return 0
+  } catch {
+    return 0
+  }
+}
+
+// Increment today's completed count
+const incrementTodayCompleted = (): number => {
+  const current = getTodayCompleted()
+  const newCount = current + 1
+  sessionStorage.setItem(TODAY_COMPLETED_KEY, JSON.stringify({
+    date: getTodayDateKey(),
+    count: newCount
+  }))
+  return newCount
+}
+
 export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDossierPageProps) => {
   const { user } = useAuth()
   const [overview, setOverview] = useState<LedgerClientOverview | null>(null)
@@ -69,6 +104,7 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
   const [error, setError] = useState<string | null>(null)
   const [isAccessDenied, setIsAccessDenied] = useState(false)
   const [activeTab, setActiveTab] = useState<string>(initialTab)
+  const [todayCompleted, setTodayCompleted] = useState(getTodayCompleted())
 
   // Store selected client in localStorage
   useEffect(() => {
@@ -120,6 +156,16 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
     setActiveTab(tab)
     // Update URL to reflect current tab
     navigateTo(`/accountant/clients/${clientId}/${tab}`)
+  }
+
+  // Handle issue resolved - increment counter and check for next recommended action
+  const handleIssueResolved = () => {
+    // Increment today's completed counter
+    const newCount = incrementTodayCompleted()
+    setTodayCompleted(newCount)
+    
+    // Refresh overview to get updated counts
+    fetchOverview()
   }
 
   // Check if user is accountant
@@ -214,10 +260,20 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-6">
-          <Button variant="ghost" size="sm" onClick={handleBack} className="mb-4">
-            <ArrowLeft size={18} className="mr-2" />
-            {t('accountant.backToClientList')}
-          </Button>
+          <div className="flex items-center justify-between mb-4">
+            <Button variant="ghost" size="sm" onClick={handleBack}>
+              <ArrowLeft size={18} className="mr-2" />
+              {t('accountant.backToClientList')}
+            </Button>
+            
+            {/* Today's completed counter */}
+            {todayCompleted > 0 && (
+              <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30 px-3 py-1">
+                <Sparkle size={14} weight="fill" className="mr-1" />
+                {t('dossier.todayCompleted')}: {todayCompleted}
+              </Badge>
+            )}
+          </div>
           
           <div className="flex items-center justify-between">
             <div>
@@ -226,9 +282,16 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
                 {isLoading ? (
                   <Skeleton className="h-9 w-48" />
                 ) : (
-                  <h1 className="text-2xl font-bold text-foreground">
-                    {overview?.client_name || t('dossier.title')}
-                  </h1>
+                  <>
+                    <h1 className="text-2xl font-bold text-foreground">
+                      {overview?.client_name || t('dossier.title')}
+                    </h1>
+                    {/* Active client indicator */}
+                    <Badge variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30">
+                      <User size={12} className="mr-1" />
+                      {t('dossier.activeClient')}
+                    </Badge>
+                  </>
                 )}
               </div>
               <p className="text-muted-foreground mt-1">
@@ -289,7 +352,7 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
           <TabsContent value="issues">
             <ClientIssuesTab 
               clientId={clientId} 
-              onIssueResolved={fetchOverview}
+              onIssueResolved={handleIssueResolved}
             />
           </TabsContent>
 

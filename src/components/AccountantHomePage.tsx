@@ -85,7 +85,7 @@ const PREF_SORT_ORDER = 'accountant_sort_order'
 const PREF_PAGE_SIZE = 'accountant_page_size'
 
 // Filter options
-type FilterType = 'all' | 'has_red' | 'has_yellow' | 'ok' | 'stale_30d'
+type FilterType = 'all' | 'has_red' | 'has_yellow' | 'ok' | 'stale_30d' | 'deadline_7d'
 
 // Sort options  
 type SortField = 'readiness_score' | 'deadline' | 'backlog' | 'last_activity' | 'red_issues' | 'name'
@@ -356,6 +356,11 @@ export const AccountantHomePage = () => {
           return daysSince >= 30
         })
         break
+      case 'deadline_7d':
+        result = result.filter(c => 
+          c.days_to_vat_deadline !== null && c.days_to_vat_deadline <= 7
+        )
+        break
       // 'all' shows everything
     }
     
@@ -444,14 +449,16 @@ export const AccountantHomePage = () => {
             setActiveFilter('has_red')
             break
           case 'needs_review':
-            // needs_review doesn't map directly, use 'all'
+            // Filter by clients that have docs needing review
+            setSortBy('backlog')
+            setSortOrder('desc')
             setActiveFilter('all')
             break
           case 'vat_due':
-            // Sort by deadline instead of filter
+            // Filter to clients with deadline in 7 days and sort by deadline
+            setActiveFilter('deadline_7d')
             setSortBy('deadline')
             setSortOrder('asc')
-            setActiveFilter('all')
             break
           case 'stale':
             setActiveFilter('stale_30d')
@@ -474,6 +481,15 @@ export const AccountantHomePage = () => {
           break
         case 'stale':
           setActiveFilter('stale_30d')
+          break
+        case 'vat_due':
+          setActiveFilter('deadline_7d')
+          setSortBy('deadline')
+          setSortOrder('asc')
+          break
+        case 'needs_review':
+          setSortBy('backlog')
+          setSortOrder('desc')
           break
       }
     }
@@ -613,6 +629,7 @@ export const AccountantHomePage = () => {
     { value: 'has_red', label: t('filters.red'), color: 'text-red-600' },
     { value: 'has_yellow', label: t('filters.yellow'), color: 'text-amber-600' },
     { value: 'ok', label: t('filters.ok'), color: 'text-green-600' },
+    { value: 'deadline_7d', label: t('filters.vatSoon'), color: 'text-purple-600' },
     { value: 'stale_30d', label: t('filters.inactive') },
   ]
   

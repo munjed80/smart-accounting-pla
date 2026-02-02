@@ -13,7 +13,7 @@
  *   - "Opnieuw proberen (alleen mislukt)" button
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -210,6 +210,8 @@ export const BulkOperationModal = ({
   const [result, setResult] = useState<BulkOperationResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set())
+  const [pollingOperationId, setPollingOperationId] = useState<string | null>(null)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
   // Reminder form state
   const [reminderType, setReminderType] = useState('ACTION_REQUIRED')
@@ -225,6 +227,61 @@ export const BulkOperationModal = ({
   // Action log
   const { logBulkOperation } = useActionLog()
 
+  // Clear polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+      }
+    }
+  }, [])
+
+  // Poll for operation status
+  const pollOperationStatus = useCallback(async (operationId: string) => {
+    try {
+      const updatedOp = await accountantMasterDashboardApi.getBulkOperation(operationId)
+      
+      // Check if operation is complete
+      if (updatedOp.status === 'COMPLETED' || 
+          updatedOp.status === 'COMPLETED_WITH_ERRORS' || 
+          updatedOp.status === 'FAILED') {
+        // Stop polling
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current)
+          pollingIntervalRef.current = null
+        }
+        setPollingOperationId(null)
+        setResult(updatedOp)
+        setIsProcessing(false)
+        
+        // Notify parent that operation is complete
+        onOperationComplete?.()
+      } else {
+        // Update result with latest status
+        setResult(updatedOp)
+      }
+    } catch (err) {
+      console.error('Polling error:', err)
+      // Don't stop polling on transient errors
+    }
+  }, [onOperationComplete])
+
+  // Start polling for an operation
+  const startPolling = useCallback((operationId: string) => {
+    // Clear any existing interval before starting a new one
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+      pollingIntervalRef.current = null
+    }
+    
+    setPollingOperationId(operationId)
+    
+    // Poll every 2 seconds
+    pollingIntervalRef.current = setInterval(() => {
+      pollOperationStatus(operationId)
+    }, 2000)
+  }, [pollOperationStatus])
+
   // Reset state when modal opens with new action type
   useEffect(() => {
     if (isOpen && actionType) {
@@ -232,6 +289,11 @@ export const BulkOperationModal = ({
       setError(null)
       setExpandedClients(new Set())
       setIsProcessing(false)
+      setPollingOperationId(null)
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
       
       // Set defaults for reminder
       if (actionType === 'send_reminders') {
@@ -308,24 +370,32 @@ export const BulkOperationModal = ({
       
       setResult(response)
       
-      // Log the operation
-      logBulkOperation(
-        response,
-        mapToActionType(actionType),
-        selectedClients.length,
-        {
-          vatPeriod: actionType === 'generate_vat' ? { year: vatYear, quarter: vatQuarter } : undefined,
-          reminderInfo: actionType === 'send_reminders' ? { type: reminderType, title: reminderTitle } : undefined,
-        }
-      )
-      
-      // Notify parent that operation is complete
-      onOperationComplete?.()
+      // Check if operation is still in progress (PENDING or IN_PROGRESS)
+      if (response.status === 'PENDING' || response.status === 'IN_PROGRESS') {
+        // Start polling for status updates
+        startPolling(response.id)
+      } else {
+        // Operation completed immediately
+        setIsProcessing(false)
+        
+        // Log the operation
+        logBulkOperation(
+          response,
+          mapToActionType(actionType),
+          selectedClients.length,
+          {
+            vatPeriod: actionType === 'generate_vat' ? { year: vatYear, quarter: vatQuarter } : undefined,
+            reminderInfo: actionType === 'send_reminders' ? { type: reminderType, title: reminderTitle } : undefined,
+          }
+        )
+        
+        // Notify parent that operation is complete
+        onOperationComplete?.()
+      }
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Er is een fout opgetreden'
       setError(errorMessage)
-    } finally {
       setIsProcessing(false)
     }
   }
@@ -592,7 +662,14 @@ export const BulkOperationModal = ({
           {isProcessing && (
             <div className="flex flex-col items-center justify-center py-8">
               <Spinner size={32} className="animate-spin text-primary mb-4" />
-              <p className="text-sm text-muted-foreground">{t('bulkOps.processing')}</p>
+              <p className="text-sm text-muted-foreground">
+                {pollingOperationId ? t('bulkOps.processingPolling') : t('bulkOps.processing')}
+              </p>
+              {pollingOperationId && result && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {t('bulkOps.processedSoFar')}: {result.processed_clients || 0} / {result.total_clients}
+                </p>
+              )}
             </div>
           )}
           

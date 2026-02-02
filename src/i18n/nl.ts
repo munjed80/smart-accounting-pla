@@ -292,6 +292,8 @@ export const nl = {
     confirmDesc: "Deze actie wordt toegepast op {count} geselecteerde klant(en).",
     warningRateLimit: "Let op: Grote bewerkingen kunnen enkele minuten duren.",
     processing: "Bezig met uitvoeren…",
+    processingPolling: "Bewerking wordt uitgevoerd…",
+    processedSoFar: "Verwerkt",
     execute: "Uitvoeren",
     cancel: "Annuleren",
     close: "Sluiten",
@@ -572,6 +574,11 @@ export const nl = {
     resultStatus: "Status",
     errorMessage: "Foutmelding",
     processedAt: "Verwerkt op",
+    // Filter results
+    resultsShowing: "resultaten",
+    noFilterResults: "Geen bewerkingen gevonden",
+    tryDifferentFilter: "Probeer een andere filterinstelling.",
+    showAll: "Toon alles",
   },
 
   // Today Command Panel
@@ -957,6 +964,8 @@ export const nl = {
     selectClientCta: "Selecteer een klant uit de lijst om het dossier te openen.",
     noClientSelected: "Geen klant geselecteerd",
     goToClients: "Ga naar Klanten",
+    activeClient: "Actieve klant",
+    todayCompleted: "Vandaag afgerond",
     tabs: {
       issues: "Problemen",
       periods: "Periodes",

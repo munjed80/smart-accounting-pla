@@ -322,6 +322,7 @@ export const BulkOperationsHistoryPage = () => {
   const [operations, setOperations] = useState<BulkOperationResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   
   // Details drawer state
   const [selectedOperation, setSelectedOperation] = useState<BulkOperationResponse | null>(null)
@@ -347,6 +348,11 @@ export const BulkOperationsHistoryPage = () => {
   useEffect(() => {
     fetchOperations()
   }, [fetchOperations])
+
+  // Filter operations by status
+  const filteredOperations = statusFilter === 'all' 
+    ? operations 
+    : operations.filter(op => op.status === statusFilter)
 
   // View operation details
   const handleViewDetails = async (operationId: string) => {
@@ -421,6 +427,29 @@ export const BulkOperationsHistoryPage = () => {
           </Alert>
         )}
 
+        {/* Status Filter */}
+        <div className="flex items-center gap-3 mb-6">
+          <Funnel size={18} className="text-muted-foreground" />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder={t('bulkHistory.filterByStatus')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('bulkHistory.allResults')}</SelectItem>
+              <SelectItem value="COMPLETED">{t('bulkHistory.statusCompleted')}</SelectItem>
+              <SelectItem value="COMPLETED_WITH_ERRORS">{t('bulkHistory.statusCompletedWithErrors')}</SelectItem>
+              <SelectItem value="FAILED">{t('bulkHistory.statusFailed')}</SelectItem>
+              <SelectItem value="IN_PROGRESS">{t('bulkHistory.statusInProgress')}</SelectItem>
+              <SelectItem value="PENDING">{t('bulkHistory.statusPending')}</SelectItem>
+            </SelectContent>
+          </Select>
+          {statusFilter !== 'all' && (
+            <Badge variant="secondary" className="text-xs">
+              {filteredOperations.length} {t('bulkHistory.resultsShowing')}
+            </Badge>
+          )}
+        </div>
+
         {/* Main content */}
         <Card className="bg-card/80 backdrop-blur-sm">
           <CardContent className="pt-6">
@@ -430,7 +459,7 @@ export const BulkOperationsHistoryPage = () => {
                   <Skeleton key={i} className="h-16 w-full" />
                 ))}
               </div>
-            ) : operations.length > 0 ? (
+            ) : filteredOperations.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -442,7 +471,7 @@ export const BulkOperationsHistoryPage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {operations.map((op) => (
+                  {filteredOperations.map((op) => (
                     <OperationRow
                       key={op.id}
                       operation={op}
@@ -451,6 +480,21 @@ export const BulkOperationsHistoryPage = () => {
                   ))}
                 </TableBody>
               </Table>
+            ) : operations.length > 0 ? (
+              // Filtered empty state
+              <div className="text-center py-16 text-muted-foreground">
+                <Funnel size={48} className="mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">{t('bulkHistory.noFilterResults')}</p>
+                <p className="text-sm mt-2 mb-4">
+                  {t('bulkHistory.tryDifferentFilter')}
+                </p>
+                <Button 
+                  variant="outline"
+                  onClick={() => setStatusFilter('all')}
+                >
+                  {t('bulkHistory.showAll')}
+                </Button>
+              </div>
             ) : (
               // Empty state
               <div className="text-center py-16 text-muted-foreground">

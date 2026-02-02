@@ -121,3 +121,72 @@
 - History endpoint already exists ✅
 - Per-client results already stored ✅
 - Multi-tenant isolation already working ✅
+
+---
+
+## Bank Import + Reconciliation (MVP)
+
+### Overview
+Feature to import bank statements (CSV) and reconcile transactions with invoices, expenses, and transfers.
+Dutch-first UI. Accountant-only access with client assignment enforcement.
+
+### Database Schema
+
+**bank_accounts:**
+- id (UUID PK)
+- administration_id (UUID FK → administrations)
+- iban (varchar)
+- bank_name (varchar nullable)
+- currency (varchar default 'EUR')
+- created_at
+
+**bank_transactions:**
+- id (UUID PK)
+- administration_id (UUID FK → administrations)
+- bank_account_id (UUID FK nullable → bank_accounts)
+- booking_date (date)
+- amount (numeric 14,2 - positive = inbound, negative = outbound)
+- counterparty_name (varchar nullable)
+- counterparty_iban (varchar nullable)
+- description (text)
+- reference (varchar nullable)
+- raw_hash (varchar unique - SHA256 for idempotency)
+- status (enum: NEW, MATCHED, IGNORED, NEEDS_REVIEW)
+- matched_type (enum nullable: INVOICE, EXPENSE, TRANSFER, MANUAL)
+- matched_entity_id (UUID nullable)
+- created_at
+
+**reconciliation_actions:**
+- id (UUID PK)
+- bank_transaction_id (UUID FK → bank_transactions)
+- user_id (UUID FK → users)
+- action (enum: ACCEPT_MATCH, IGNORE, CREATE_EXPENSE, LINK_INVOICE, UNMATCH)
+- payload (JSONB nullable)
+- created_at
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /api/v1/accountant/bank/import | Import CSV bank file |
+| GET | /api/v1/accountant/bank/transactions | List bank transactions |
+| POST | /api/v1/accountant/bank/transactions/{id}/suggest | Get match suggestions |
+| POST | /api/v1/accountant/bank/transactions/{id}/apply | Apply reconciliation action |
+
+### Matching Rules
+
+1. **Invoice number in description** → Suggest matching invoice
+2. **Amount matches open invoice (±1%)** → Suggest invoice match
+3. **Counterparty IBAN matches known vendor** → Suggest expense category
+
+### Frontend Routes
+
+- `/accountant/bank` - Bank & Afletteren page
+- Upload CSV, view transactions, apply matches
+
+### Translation Namespaces
+
+- bank.* - Bank-related labels
+- reconciliation.* - Reconciliation actions
+- import.* - Import flow
+- suggestions.* - Match suggestion explanations

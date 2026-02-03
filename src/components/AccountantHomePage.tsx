@@ -70,7 +70,7 @@ import { nl as nlLocale } from 'date-fns/locale'
 import { ReviewQueue } from './ReviewQueue'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
-import { TodayCommandPanel } from './TodayCommandPanel'
+import { DagstartPanel } from './DagstartPanel'
 import { PriorityClientsPanel } from './PriorityClientsPanel'
 import { BulkActionBar, BulkActionType } from './BulkActionBar'
 import { BulkOperationModal } from './BulkOperationModal'
@@ -701,11 +701,12 @@ export const AccountantHomePage = () => {
           </Button>
         </div>
 
-        {/* Accountant Command Layer - "Vandaag – Overzicht" */}
-        <TodayCommandPanel 
+        {/* Dagstart Panel - "Dagstart" Daily workflow panel */}
+        <DagstartPanel 
           summary={summary} 
           clients={allClients} 
-          isLoading={isLoading} 
+          isLoading={isLoading}
+          onFilterChange={setActiveFilter as (filter: string) => void}
         />
 
         {/* Priority Clients Panel - "Top prioriteit klanten" */}
@@ -803,7 +804,7 @@ export const AccountantHomePage = () => {
         <RecentActionsPanel />
 
         {/* Main Content Card with Search, Filters, Sorting, and Pagination */}
-        <Card className="bg-card/80 backdrop-blur-sm">
+        <Card id="client-list-section" className="bg-card/80 backdrop-blur-sm">
           <CardHeader className="pb-4">
             <div className="flex flex-col gap-4">
               {/* Search and Sort Row */}

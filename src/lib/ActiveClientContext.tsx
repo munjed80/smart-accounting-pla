@@ -30,6 +30,10 @@ export interface ActiveClient {
 interface ActiveClientContextType {
   /** Currently selected active client */
   activeClient: ActiveClient | null
+  /** Convenience: Active client's administration ID (for API calls) */
+  activeClientId: string | null
+  /** Convenience: Active client's display name */
+  activeClientName: string | null
   /** All available ACTIVE client links */
   activeClients: ClientLink[]
   /** All client links (PENDING + ACTIVE) */
@@ -199,6 +203,8 @@ export const ActiveClientProvider = ({ children }: ActiveClientProviderProps) =>
   const value = useMemo<ActiveClientContextType>(
     () => ({
       activeClient,
+      activeClientId: activeClient?.administrationId ?? null,
+      activeClientName: activeClient?.name ?? null,
       activeClients,
       allLinks,
       pendingCount,

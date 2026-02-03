@@ -21,8 +21,10 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import { EmptyState } from '@/components/EmptyState'
+import { RequireActiveClient } from '@/components/RequireActiveClient'
+import { ApiErrorState, parseApiError, ApiErrorType } from '@/components/ApiErrorState'
 import { useActiveClient } from '@/lib/ActiveClientContext'
-import { ledgerApi, ProfitAndLossResponse, getErrorMessage } from '@/lib/api'
+import { ledgerApi, ProfitAndLossResponse } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
 import {
@@ -32,7 +34,6 @@ import {
   TrendUp,
   TrendDown,
   Info,
-  User,
   Warning,
   Calendar,
   Coins,
@@ -50,7 +51,7 @@ export const ProfitLossPage = ({ onNavigate }: ProfitLossPageProps) => {
   const { activeClientId, activeClientName } = useActiveClient()
   const [pnlData, setPnlData] = useState<ProfitAndLossResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [apiError, setApiError] = useState<{ type: ApiErrorType; message: string } | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodOption>('thisQuarter')
 
   // Calculate period dates based on selection
@@ -88,15 +89,15 @@ export const ProfitLossPage = ({ onNavigate }: ProfitLossPageProps) => {
       }
 
       setIsLoading(true)
-      setError(null)
+      setApiError(null)
 
       try {
         const { startDate, endDate } = getPeriodDates(selectedPeriod)
         const response = await ledgerApi.getProfitAndLoss(activeClientId, startDate, endDate)
         setPnlData(response)
       } catch (err) {
-        console.error('Failed to load P&L data:', err)
-        setError(getErrorMessage(err))
+        const parsedError = parseApiError(err)
+        setApiError(parsedError)
       } finally {
         setIsLoading(false)
       }
@@ -155,8 +156,20 @@ export const ProfitLossPage = ({ onNavigate }: ProfitLossPageProps) => {
     }
   }
 
-  // No active client selected
+  // No active client selected - use RequireActiveClient component
   if (!activeClientId) {
+    return (
+      <RequireActiveClient
+        headerIcon={<ChartLineUp size={24} weight="duotone" className="text-primary" />}
+        headerTitle={t('profitLoss.title')}
+        headerSubtitle={t('profitLoss.subtitle')}
+        onNavigate={onNavigate}
+      />
+    )
+  }
+
+  // API error occurred - use ApiErrorState component
+  if (apiError && !isLoading) {
     return (
       <div className="container mx-auto py-6 px-4 sm:px-6 max-w-5xl">
         <Card className="bg-card/80 backdrop-blur-sm mb-6">
@@ -173,12 +186,11 @@ export const ProfitLossPage = ({ onNavigate }: ProfitLossPageProps) => {
           </CardHeader>
         </Card>
 
-        <EmptyState
-          title="Geen klant geselecteerd"
-          description="Selecteer eerst een klant om de winst- en verliesrekening te bekijken."
-          icon={<User size={64} weight="duotone" className="text-muted-foreground" />}
-          actionLabel="Klant selecteren"
-          onAction={handleGoToClients}
+        <ApiErrorState
+          type={apiError.type}
+          message={apiError.message}
+          onRetry={() => window.location.reload()}
+          onNavigate={onNavigate}
         />
       </div>
     )
@@ -256,22 +268,8 @@ export const ProfitLossPage = ({ onNavigate }: ProfitLossPageProps) => {
         </div>
       )}
 
-      {/* Error state */}
-      {error && !isLoading && (
-        <Card className="bg-destructive/10 border-destructive/30">
-          <CardContent className="py-6 text-center">
-            <Warning size={48} className="mx-auto mb-4 text-destructive" />
-            <p className="text-destructive font-medium mb-2">Laden mislukt</p>
-            <p className="text-sm text-muted-foreground mb-4">{error}</p>
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              Opnieuw proberen
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Empty state */}
-      {!isLoading && !error && !hasData && (
+      {!isLoading && !apiError && !hasData && (
         <>
           <EmptyState
             title={t('profitLoss.noDataYet')}
@@ -302,7 +300,7 @@ export const ProfitLossPage = ({ onNavigate }: ProfitLossPageProps) => {
       )}
 
       {/* P&L Data */}
-      {!isLoading && !error && hasData && pnlData && (
+      {!isLoading && !apiError && hasData && pnlData && (
         <>
           {/* Period indicator */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">

@@ -109,9 +109,7 @@
 - Documents API auto-selects first administration if none specified
 - Transaction stats API auto-filters to user's administrations
 
-**Enhancement Needed:**
-- Create `ActiveAdministrationContext` similar to `ActiveClientContext`
-- Add guard component `RequireActiveAdministration`
+**Status:** ✅ Working - ZZP users are automatically redirected to onboarding if no administrations exist, and the first administration is auto-selected for API calls.
 
 ---
 
@@ -128,22 +126,32 @@
 
 ---
 
-## Dutch Translation Keys Needed
+## Dutch Translation Keys
 
-The following new translation keys should be added to `nl.ts`:
+**Status:** ✅ Implemented - All Dutch translation keys have been added to `nl.ts`:
 - `sidebar.overzicht` - "Overzicht"
 - `sidebar.documenten` - "Documenten"  
 - `sidebar.boekingen` - "Boekingen"
-- `sidebar.boekhouderLinks` - "Boekhouder"
+- `sidebar.boekhouder` - "Boekhouder"
+- `sidebar.backToOverzicht` - "Terug naar Overzicht"
+- Plus comprehensive onboarding and dashboard translations
+
+---
+
+## Implementation Status
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| ZZP MVP Navigation | ✅ Done | Dutch labels, minimal menu items |
+| Dutch Onboarding | ✅ Done | Full Dutch onboarding flow |
+| SmartDashboard | ✅ Done | Dutch labels, locale formatting |
+| Documenten page | ✅ Done | Dutch title, locale formatting |
+| Boekingen page | ✅ Done | Dutch title, locale formatting |
+| Boekhouder page | ✅ Done | Already had Dutch text |
+| Verification checklist | ✅ Done | Added to README.md |
 
 ---
 
 ## Verification Checklist
 
-- [ ] Register/login as ZZP user
-- [ ] Onboarding creates/selects administratie
-- [ ] Documenten page shows upload + list
-- [ ] Boekingen shows stats/list
-- [ ] Boekhouder-koppelingen page works
-- [ ] Logout works
-- [ ] Accountant flow unaffected
+See README.md for the full ZZP MVP Verification Checklist with detailed testing steps.

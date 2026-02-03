@@ -621,6 +621,33 @@ export const nl = {
     inactiveClient: "1 klant inactief > 30 dagen",
   },
 
+  // Dagstart Panel (Daily Start)
+  dagstart: {
+    title: "Dagstart",
+    // Priority labels
+    urgent: "Nu doen",
+    today: "Vandaag",
+    soon: "Binnenkort",
+    // Action labels (imperative verbs)
+    toReview: "Beoordeel documenten",
+    toReviewWhy: "Documenten wachten op goedkeuring",
+    redIssues: "Los rode issues op",
+    redIssuesWhy: "Klanten met kritieke problemen",
+    vatDue: "Controleer BTW-deadlines",
+    vatDueWhy: "BTW-aangiftes binnen 7 dagen",
+    docBacklog: "Verwerk achterstand",
+    docBacklogWhy: "Documenten wachten te lang",
+    inactiveClients: "Controleer inactieve klanten",
+    inactiveClientsWhy: "Klanten zonder activiteit > 30 dagen",
+    // Empty state
+    allDone: "Alles afgerond!",
+    allDoneDesc: "Geen urgente taken vandaag. Goed bezig!",
+    // Footer
+    actionSingular: "actie",
+    actionPlural: "acties",
+    tip: "Klik op een actie om direct aan de slag te gaan",
+  },
+
   // Empty states
   emptyStates: {
     noData: "Nog geen gegevens beschikbaar",
@@ -961,6 +988,25 @@ export const nl = {
     invalidEmail: "Ongeldig e-mailadres",
     passwordTooShort: "Wachtwoord moet minimaal 8 tekens bevatten",
     passwordsDoNotMatch: "Wachtwoorden komen niet overeen",
+  },
+
+  // Review Queue Actions (toasts)
+  reviewQueueActions: {
+    posted: "Document geboekt",
+    rejected: "Document afgewezen",
+    reprocessing: "Document wordt opnieuw verwerkt",
+  },
+
+  // Review Queue Table
+  reviewQueueTable: {
+    document: "Document",
+    status: "Status",
+    supplier: "Leverancier",
+    amount: "Bedrag",
+    confidence: "Zekerheid",
+    actions: "Acties",
+    documents: "Documenten",
+    documentsCount: "{count} document(en)",
   },
 
   // Date/time

@@ -7,6 +7,8 @@
  * - See suggested actions from the matching engine
  * - Approve and post in one flow
  * - Reject with reason
+ * 
+ * Shows Dutch toast notifications for success/failure.
  */
 
 import { useEffect, useState } from 'react'
@@ -60,6 +62,8 @@ import {
   XCircle
 } from '@phosphor-icons/react'
 import { format, formatDistanceToNow } from 'date-fns'
+import { toast } from 'sonner'
+import { t } from '@/i18n'
 
 // Status colors and labels
 const statusConfig: Record<DocumentReviewStatus, { bg: string; text: string; label: string }> = {
@@ -129,9 +133,10 @@ interface ReviewQueueProps {
   clientId: string
   clientName: string
   onClose?: () => void
+  onActionComplete?: () => void // Called after an action to invalidate cache
 }
 
-export const ReviewQueue = ({ clientId, clientName, onClose }: ReviewQueueProps) => {
+export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }: ReviewQueueProps) => {
   const [documents, setDocuments] = useState<DocumentReviewItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -171,11 +176,17 @@ export const ReviewQueue = ({ clientId, clientName, onClose }: ReviewQueueProps)
     try {
       setIsProcessing(true)
       await documentReviewApi.postDocument(clientId, doc.id, {})
-      setActionMessage({ type: 'success', text: 'Document posted successfully' })
+      toast.success(t('common.success'), {
+        description: t('reviewQueueActions.posted'),
+      })
       setIsDetailOpen(false)
       fetchDocuments()
+      // Invalidate cache in parent
+      onActionComplete?.()
     } catch (err) {
-      setActionMessage({ type: 'error', text: getErrorMessage(err) })
+      toast.error(t('common.error'), {
+        description: getErrorMessage(err),
+      })
     } finally {
       setIsProcessing(false)
     }
@@ -187,13 +198,19 @@ export const ReviewQueue = ({ clientId, clientName, onClose }: ReviewQueueProps)
     try {
       setIsProcessing(true)
       await documentReviewApi.rejectDocument(clientId, selectedDoc.id, { reason: rejectReason })
-      setActionMessage({ type: 'success', text: 'Document rejected' })
+      toast.success(t('common.success'), {
+        description: t('reviewQueueActions.rejected'),
+      })
       setIsRejectOpen(false)
       setIsDetailOpen(false)
       setRejectReason('')
       fetchDocuments()
+      // Invalidate cache in parent
+      onActionComplete?.()
     } catch (err) {
-      setActionMessage({ type: 'error', text: getErrorMessage(err) })
+      toast.error(t('common.error'), {
+        description: getErrorMessage(err),
+      })
     } finally {
       setIsProcessing(false)
     }
@@ -203,10 +220,16 @@ export const ReviewQueue = ({ clientId, clientName, onClose }: ReviewQueueProps)
     try {
       setIsProcessing(true)
       await documentReviewApi.reprocessDocument(clientId, doc.id)
-      setActionMessage({ type: 'success', text: 'Document queued for reprocessing' })
+      toast.success(t('common.success'), {
+        description: t('reviewQueueActions.reprocessing'),
+      })
       fetchDocuments()
+      // Invalidate cache in parent
+      onActionComplete?.()
     } catch (err) {
-      setActionMessage({ type: 'error', text: getErrorMessage(err) })
+      toast.error(t('common.error'), {
+        description: getErrorMessage(err),
+      })
     } finally {
       setIsProcessing(false)
     }
@@ -280,10 +303,10 @@ export const ReviewQueue = ({ clientId, clientName, onClose }: ReviewQueueProps)
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText size={24} />
-            Documents
+            {t('reviewQueueTable.documents')}
           </CardTitle>
           <CardDescription>
-            {documents.length} document(s) {filter ? `with status "${statusConfig[filter].label}"` : 'total'}
+            {t('reviewQueueTable.documentsCount').replace('{count}', String(documents.length))}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -296,18 +319,19 @@ export const ReviewQueue = ({ clientId, clientName, onClose }: ReviewQueueProps)
           ) : documents.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <FileText size={48} className="mx-auto mb-4 opacity-50" />
-              <p>No documents found</p>
+              <p className="text-lg font-medium mb-2">{t('emptyStates.noReviewItems')}</p>
+              <p className="text-sm mb-4">{t('emptyStates.noReviewItemsDescription')}</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Document</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Confidence</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>{t('reviewQueueTable.document')}</TableHead>
+                  <TableHead>{t('reviewQueueTable.status')}</TableHead>
+                  <TableHead>{t('reviewQueueTable.supplier')}</TableHead>
+                  <TableHead>{t('reviewQueueTable.amount')}</TableHead>
+                  <TableHead>{t('reviewQueueTable.confidence')}</TableHead>
+                  <TableHead>{t('reviewQueueTable.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

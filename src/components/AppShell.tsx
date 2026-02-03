@@ -44,52 +44,72 @@ interface MenuItem {
   icon: ReactNode
   rolesAllowed: Array<'zzp' | 'accountant' | 'admin'>
   section?: 'main' | 'secondary'
+  // Accounting concept grouping for accountants (5 core concepts)
+  accountingSection?: 'activa' | 'debiteuren' | 'crediteuren' | 'grootboek' | 'winstverlies'
+  // Hidden from menu but code remains
+  hidden?: boolean
 }
 
 // Define menu items for both roles
 const menuItems: MenuItem[] = [
-  // Accountant-only main items (shown at top for accountants)
+  // === ACTIVA (Assets) ===
   {
-    label: t('sidebar.accountantOverview'),
-    tabValue: 'workqueue',
-    icon: <Stack size={20} weight="duotone" />,
-    rolesAllowed: ['accountant', 'admin'],
-    section: 'main',
-  },
-  {
-    label: t('sidebar.accountantClients'),
-    tabValue: 'clients',
-    icon: <UsersThree size={20} weight="duotone" />,
-    rolesAllowed: ['accountant', 'admin'],
-    section: 'main',
-  },
-  {
-    label: t('sidebar.reviewQueue'),
-    tabValue: 'reviewqueue',
-    icon: <MagnifyingGlass size={20} weight="duotone" />,
-    rolesAllowed: ['accountant', 'admin'],
-    section: 'main',
-  },
-  {
-    label: t('bank.menuItem'),
+    label: t('sidebar.bankActiva'),
     tabValue: 'bank',
     icon: <Bank size={20} weight="duotone" />,
     rolesAllowed: ['accountant'],
     section: 'main',
+    accountingSection: 'activa',
   },
+  
+  // === DEBITEUREN (Receivables/Customers) ===
+  {
+    label: t('sidebar.klantenDebiteuren'),
+    tabValue: 'clients',
+    icon: <UsersThree size={20} weight="duotone" />,
+    rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
+    accountingSection: 'debiteuren',
+  },
+  
+  // === CREDITEUREN (Payables/Suppliers) - Currently no dedicated page, hidden ===
+  // Placeholder for future crediteuren functionality
+  
+  // === GROOTBOEK (General Ledger) ===
+  {
+    label: t('sidebar.werklijstGrootboek'),
+    tabValue: 'workqueue',
+    icon: <Stack size={20} weight="duotone" />,
+    rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
+    accountingSection: 'grootboek',
+  },
+  {
+    label: t('sidebar.beoordelenGrootboek'),
+    tabValue: 'reviewqueue',
+    icon: <MagnifyingGlass size={20} weight="duotone" />,
+    rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
+    accountingSection: 'grootboek',
+  },
+  
+  // === WINST & VERLIES (P&L) - Currently no dedicated page, hidden ===
+  // Placeholder for future P&L reporting functionality
+  
+  // === Secondary items (not part of 5 concepts) ===
   {
     label: t('sidebar.reminders'),
     tabValue: 'reminders',
     icon: <Bell size={20} weight="duotone" />,
     rolesAllowed: ['accountant', 'admin'],
-    section: 'main',
+    section: 'secondary',
   },
   {
     label: t('sidebar.actionLog'),
     tabValue: 'acties',
     icon: <ClipboardText size={20} weight="duotone" />,
     rolesAllowed: ['accountant', 'admin'],
-    section: 'main',
+    section: 'secondary',
   },
   // ZZP main items (Dashboard first for ZZP users)
   {
@@ -155,10 +175,41 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   const homeTab = isAccountant ? 'workqueue' : 'dashboard'
   const homeLabel = isAccountant ? t('sidebar.backToWorkQueue') : t('sidebar.backToDashboard')
 
-  // Filter menu items based on user role
+  // Filter menu items based on user role and hidden flag
   const visibleMenuItems = menuItems.filter(item => 
-    user?.role && item.rolesAllowed.includes(user.role as 'zzp' | 'accountant' | 'admin')
+    user?.role && 
+    item.rolesAllowed.includes(user.role as 'zzp' | 'accountant' | 'admin') &&
+    !item.hidden
   )
+  
+  // Group items by accounting section for accountants
+  const accountingSections: Array<{ key: string; label: string; items: MenuItem[] }> = isAccountant ? [
+    { 
+      key: 'activa', 
+      label: t('sidebar.sectionActiva'), 
+      items: visibleMenuItems.filter(i => i.accountingSection === 'activa' && i.section !== 'secondary') 
+    },
+    { 
+      key: 'debiteuren', 
+      label: t('sidebar.sectionDebiteuren'), 
+      items: visibleMenuItems.filter(i => i.accountingSection === 'debiteuren' && i.section !== 'secondary') 
+    },
+    { 
+      key: 'crediteuren', 
+      label: t('sidebar.sectionCrediteuren'), 
+      items: visibleMenuItems.filter(i => i.accountingSection === 'crediteuren' && i.section !== 'secondary') 
+    },
+    { 
+      key: 'grootboek', 
+      label: t('sidebar.sectionGrootboek'), 
+      items: visibleMenuItems.filter(i => i.accountingSection === 'grootboek' && i.section !== 'secondary') 
+    },
+    { 
+      key: 'winstverlies', 
+      label: t('sidebar.sectionWinstVerlies'), 
+      items: visibleMenuItems.filter(i => i.accountingSection === 'winstverlies' && i.section !== 'secondary') 
+    },
+  ].filter(section => section.items.length > 0) : []
 
   // Handle logout: use centralized logout from AuthContext and redirect
   const handleLogout = () => {
@@ -220,32 +271,73 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
 
       {/* Navigation Menu - Main Items */}
       <nav className="flex-1 overflow-y-auto p-2" aria-label="Main navigation">
-        <ul className="space-y-1" role="menu">
-          {visibleMenuItems.filter(item => item.section !== 'secondary').map((item) => {
-            const isActive = item.tabValue && activeTab === item.tabValue
-            return (
-              <li key={item.label} role="none">
-                <button
-                  role="menuitem"
-                  onClick={() => handleMenuClick(item)}
-                  aria-current={isActive ? 'page' : undefined}
-                  className={`
-                    w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm
-                    transition-colors duration-150
-                    ${isActive 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'hover:bg-secondary text-foreground'
-                    }
-                  `}
-                  style={{ minHeight: '44px' }} // iOS tap target minimum
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+        {/* Accountant: Show grouped sections by accounting concept */}
+        {isAccountant && accountingSections.length > 0 ? (
+          <div className="space-y-4">
+            {accountingSections.map((section) => (
+              <div key={section.key}>
+                {/* Section Header */}
+                <h3 className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  {section.label}
+                </h3>
+                <ul className="space-y-1" role="menu">
+                  {section.items.map((item) => {
+                    const isActive = item.tabValue && activeTab === item.tabValue
+                    return (
+                      <li key={item.label} role="none">
+                        <button
+                          role="menuitem"
+                          onClick={() => handleMenuClick(item)}
+                          aria-current={isActive ? 'page' : undefined}
+                          className={`
+                            w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm
+                            transition-colors duration-150
+                            ${isActive 
+                              ? 'bg-primary text-primary-foreground' 
+                              : 'hover:bg-secondary text-foreground'
+                            }
+                          `}
+                          style={{ minHeight: '44px' }}
+                        >
+                          {item.icon}
+                          <span>{item.label}</span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* ZZP users: Show flat list without sections */
+          <ul className="space-y-1" role="menu">
+            {visibleMenuItems.filter(item => item.section !== 'secondary').map((item) => {
+              const isActive = item.tabValue && activeTab === item.tabValue
+              return (
+                <li key={item.label} role="none">
+                  <button
+                    role="menuitem"
+                    onClick={() => handleMenuClick(item)}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`
+                      w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm
+                      transition-colors duration-150
+                      ${isActive 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'hover:bg-secondary text-foreground'
+                      }
+                    `}
+                    style={{ minHeight: '44px' }} // iOS tap target minimum
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
         
         {/* Secondary Navigation - Settings & Support */}
         <Separator className="my-3" />

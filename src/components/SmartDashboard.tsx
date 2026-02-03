@@ -3,8 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/lib/AuthContext'
-import { transactionApi, TransactionStats, administrationApi, Administration } from '@/lib/api'
+import { transactionApi, TransactionStats, administrationApi, Administration, getErrorMessage } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { NoAdministrationsEmptyState } from '@/components/EmptyState'
 import { 
@@ -15,19 +16,23 @@ import {
   Brain,
   Sparkle,
   CheckCircle,
-  ArrowsClockwise
+  ArrowsClockwise,
+  WarningCircle
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
+import { t } from '@/i18n'
 
 export const SmartDashboard = () => {
   const { user } = useAuth()
   const [stats, setStats] = useState<TransactionStats | null>(null)
   const [administrations, setAdministrations] = useState<Administration[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
 
   const fetchData = async () => {
     setIsLoading(true)
+    setFetchError(null)
     try {
       // First fetch administrations
       const admins = await administrationApi.list()
@@ -48,7 +53,7 @@ export const SmartDashboard = () => {
       setLastRefresh(new Date())
     } catch (error) {
       console.error('Failed to fetch administrations:', error)
-      // Empty administrations array will trigger the empty state
+      setFetchError(getErrorMessage(error))
       setAdministrations([])
       setStats(null)
     } finally {
@@ -122,6 +127,39 @@ export const SmartDashboard = () => {
               </Card>
             ))}
           </div>
+        </div>
+      </div>
+    )
+  }
+  
+  // Show error state if fetching administrations failed
+  if (fetchError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
+                <Brain size={40} weight="duotone" className="text-primary" />
+                Smart Dashboard
+              </h1>
+              <p className="text-muted-foreground">
+                Welcome, <span className="font-semibold">{user?.full_name}</span>
+              </p>
+            </div>
+          </div>
+          
+          <Alert variant="destructive">
+            <WarningCircle size={18} />
+            <AlertDescription className="ml-2 flex items-center justify-between">
+              <span>{fetchError}</span>
+              <Button variant="outline" size="sm" onClick={handleRefresh} className="ml-4">
+                <ArrowsClockwise size={16} className="mr-2" />
+                {t('common.retry')}
+              </Button>
+            </AlertDescription>
+          </Alert>
         </div>
       </div>
     )

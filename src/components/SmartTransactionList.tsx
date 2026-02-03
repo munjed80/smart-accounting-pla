@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { transactionApi, TransactionListItem } from '@/lib/api'
 import { 
@@ -11,15 +12,16 @@ import {
   Sparkle,
   TrendDown,
   Brain,
-  ArrowsClockwise
+  ArrowsClockwise,
+  WarningCircle
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
-import { toast } from 'sonner'
 import { t } from '@/i18n'
 
 export const SmartTransactionList = () => {
   const [transactions, setTransactions] = useState<TransactionListItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const fetchIdRef = useRef(0) // Prevent race conditions from multiple fetches
@@ -27,6 +29,7 @@ export const SmartTransactionList = () => {
   const fetchTransactions = async () => {
     const fetchId = ++fetchIdRef.current
     setIsLoading(true)
+    setFetchError(null)
     try {
       const statusParam = statusFilter !== 'all' ? statusFilter as 'DRAFT' | 'POSTED' : undefined
       const data = await transactionApi.getAll(statusParam)
@@ -37,7 +40,7 @@ export const SmartTransactionList = () => {
     } catch (error) {
       if (fetchId === fetchIdRef.current) {
         console.error('Failed to fetch transactions:', error)
-        toast.error(t('smartTransactions.failedToLoad'))
+        setFetchError(t('smartTransactions.failedToLoad'))
         setTransactions([])
       }
     } finally {
@@ -198,6 +201,17 @@ export const SmartTransactionList = () => {
               <ArrowsClockwise size={48} className="mx-auto mb-4 text-primary animate-spin" />
               <p className="text-muted-foreground">{t('smartTransactions.loadingTransactions')}</p>
             </div>
+          ) : fetchError ? (
+            <Alert variant="destructive">
+              <WarningCircle size={18} />
+              <AlertDescription className="ml-2 flex items-center justify-between">
+                <span>{fetchError}</span>
+                <Button variant="outline" size="sm" onClick={fetchTransactions} className="ml-4">
+                  <ArrowsClockwise size={16} className="mr-2" />
+                  {t('common.retry')}
+                </Button>
+              </AlertDescription>
+            </Alert>
           ) : filteredTransactions.length === 0 ? (
             <div className="text-center py-12">
               <Receipt size={64} className="mx-auto mb-4 text-muted-foreground" weight="duotone" />

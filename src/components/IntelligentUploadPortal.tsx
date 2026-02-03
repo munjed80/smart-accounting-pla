@@ -63,7 +63,7 @@ export const IntelligentUploadPortal = () => {
     try {
       await documentApi.reprocess(docId)
       toast.success(t('upload.queuedForReprocessing'))
-      // Update local state instead of refetching entire list (reduces API calls)
+      // Update local state after successful API call (reduces API calls vs refetching)
       setDocuments(prev => 
         prev.map(d => d.id === docId ? { ...d, status: 'PROCESSING' as const } : d)
       )

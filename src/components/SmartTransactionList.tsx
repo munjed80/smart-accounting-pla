@@ -37,7 +37,6 @@ export const SmartTransactionList = () => {
     } catch (error) {
       if (fetchId === fetchIdRef.current) {
         console.error('Failed to fetch transactions:', error)
-        // Only show toast for errors that aren't expected (like no transactions)
         toast.error(t('smartTransactions.failedToLoad'))
         setTransactions([])
       }

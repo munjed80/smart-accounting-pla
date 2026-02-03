@@ -52,7 +52,9 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
     
     # CORS
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+    # Include production frontend URLs by default for ZZPersHub
+    # These can be overridden via CORS_ORIGINS env var
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173,https://zzpershub.nl,https://www.zzpershub.nl"
     
     @property
     def cors_origins_list(self) -> list[str]:

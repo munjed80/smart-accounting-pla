@@ -130,6 +130,17 @@ export const nl = {
     backToClientList: "Terug naar klantenlijst",
     navigationMenu: "Navigatiemenu",
     navigateApp: "Navigeer door de applicatie",
+    // Accounting concept sections
+    sectionActiva: "Activa",
+    sectionDebiteuren: "Debiteuren",
+    sectionCrediteuren: "Crediteuren",
+    sectionGrootboek: "Grootboek",
+    sectionWinstVerlies: "Winst & Verlies",
+    // Renamed items for clarity
+    bankActiva: "Bank & Kas",
+    klantenDebiteuren: "Klanten",
+    werklijstGrootboek: "Werklijst",
+    beoordelenGrootboek: "Beoordelen",
   },
 
   // Dashboard

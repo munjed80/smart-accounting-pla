@@ -34,6 +34,8 @@ import {
   ClipboardText,
   Handshake,
   Bank,
+  Storefront,
+  ChartLineUp,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 
@@ -72,8 +74,15 @@ const menuItems: MenuItem[] = [
     accountingSection: 'debiteuren',
   },
   
-  // === CREDITEUREN (Payables/Suppliers) - Currently no dedicated page, hidden ===
-  // Placeholder for future crediteuren functionality
+  // === CREDITEUREN (Payables/Suppliers) ===
+  {
+    label: t('sidebar.leveranciersCrediteuren'),
+    tabValue: 'crediteuren',
+    icon: <Storefront size={20} weight="duotone" />,
+    rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
+    accountingSection: 'crediteuren',
+  },
   
   // === GROOTBOEK (General Ledger) ===
   {
@@ -93,8 +102,15 @@ const menuItems: MenuItem[] = [
     accountingSection: 'grootboek',
   },
   
-  // === WINST & VERLIES (P&L) - Currently no dedicated page, hidden ===
-  // Placeholder for future P&L reporting functionality
+  // === WINST & VERLIES (Profit & Loss) ===
+  {
+    label: t('sidebar.overzichtWinstVerlies'),
+    tabValue: 'profitloss',
+    icon: <ChartLineUp size={20} weight="duotone" />,
+    rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
+    accountingSection: 'winstverlies',
+  },
   
   // === Secondary items (not part of 5 concepts) ===
   {

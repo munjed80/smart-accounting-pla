@@ -141,6 +141,9 @@ export const nl = {
     klantenDebiteuren: "Klanten",
     werklijstGrootboek: "Werklijst",
     beoordelenGrootboek: "Beoordelen",
+    // New navigation items for Crediteuren and Winst & Verlies
+    leveranciersCrediteuren: "Leveranciers",
+    overzichtWinstVerlies: "Overzicht",
   },
 
   // Dashboard
@@ -1389,6 +1392,45 @@ export const nl = {
       TRANSFER: "Overboeking",
       MANUAL: "Handmatig",
     },
+  },
+
+  // Crediteuren (Suppliers) Page
+  crediteuren: {
+    title: "Leveranciers (Crediteuren)",
+    subtitle: "Beheer je leveranciers en openstaande facturen",
+    noSuppliersYet: "Nog geen leveranciers",
+    noSuppliersDescription: "Leveranciers worden automatisch aangemaakt wanneer je inkoopfacturen verwerkt via het uploadsysteem.",
+    tips: {
+      uploadInvoices: "Upload inkoopfacturen via de AI Upload om leveranciers toe te voegen",
+      autoExtract: "AI extraheert automatisch leveranciersgegevens uit facturen",
+      trackPayables: "Houd openstaande crediteuren bij per leverancier",
+    },
+    goToUpload: "Naar AI Upload",
+    goToBank: "Naar Bank & Kas",
+  },
+
+  // Winst & Verlies (Profit & Loss) Page
+  profitLoss: {
+    title: "Winst- en verliesrekening",
+    subtitle: "Inzicht in je inkomsten en uitgaven",
+    noDataYet: "Nog geen gegevens",
+    noDataDescription: "De winst- en verliesrekening wordt samengesteld uit je geboekte transacties. Begin met het verwerken van facturen en bonnen.",
+    tips: {
+      fromTransactions: "Dit overzicht wordt automatisch opgebouwd uit je transacties",
+      categorizedExpenses: "Kosten worden gecategoriseerd per grootboekrekening",
+      periodSelection: "Bekijk resultaten per kwartaal of boekjaar",
+    },
+    comingSoon: "Binnenkort beschikbaar",
+    comingSoonDescription: "Geavanceerde rapportage en analyse worden binnenkort toegevoegd.",
+    goToWorkqueue: "Naar Werklijst",
+    goToReview: "Naar Beoordelen",
+  },
+
+  // Accountant Not Found Page
+  accountantNotFound: {
+    title: "Pagina niet gevonden",
+    description: "De pagina die je zoekt bestaat niet of is verplaatst.",
+    backToWorkqueue: "Terug naar Werklijst",
   },
 };
 

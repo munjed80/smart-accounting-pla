@@ -725,10 +725,7 @@ export const BankReconciliationPage = () => {
         headerIcon={<Bank size={24} weight="duotone" className="text-primary" />}
         headerTitle={t('bank.title')}
         headerSubtitle={t('bank.noActiveClientDescription')}
-      >
-        {/* Never reached, but required for TypeScript */}
-        <div />
-      </RequireActiveClient>
+      />
     )
   }
 

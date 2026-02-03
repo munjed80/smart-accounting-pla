@@ -242,10 +242,7 @@ export const GrootboekPage = ({ onNavigate }: GrootboekPageProps) => {
         headerTitle="Grootboek"
         headerSubtitle="Rekeningschema en balans overzicht"
         onNavigate={onNavigate}
-      >
-        {/* Never reached, but required for TypeScript */}
-        <div />
-      </RequireActiveClient>
+      />
     )
   }
 

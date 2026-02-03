@@ -3,6 +3,10 @@
  * 
  * For accountant screens that require a selected client to display data.
  * Shows a consistent Dutch empty state with CTA to go to clients page.
+ * 
+ * Usage:
+ * - As a wrapper: <RequireActiveClient>{children}</RequireActiveClient>
+ * - As a guard (no children): <RequireActiveClient headerTitle="Page" />
  */
 
 import { ReactNode } from 'react'
@@ -18,8 +22,8 @@ import {
 } from '@phosphor-icons/react'
 
 interface RequireActiveClientProps {
-  /** Content to render when an active client is selected */
-  children: ReactNode
+  /** Content to render when an active client is selected (optional for guard-only usage) */
+  children?: ReactNode
   /** Optional icon to show in the empty state header */
   headerIcon?: ReactNode
   /** Optional title for the header card */
@@ -33,6 +37,10 @@ interface RequireActiveClientProps {
 /**
  * Wraps content that requires an active client selection.
  * Shows a friendly Dutch empty state when no client is selected.
+ * 
+ * Can be used in two modes:
+ * 1. Wrapper mode: Pass children, renders them when client is active
+ * 2. Guard mode: No children, just returns the empty state (use in early-return pattern)
  */
 export const RequireActiveClient = ({
   children,
@@ -41,7 +49,7 @@ export const RequireActiveClient = ({
   headerSubtitle,
   onNavigate,
 }: RequireActiveClientProps) => {
-  const { activeClientId, activeClientName } = useActiveClient()
+  const { activeClientId } = useActiveClient()
 
   const handleGoToClients = () => {
     if (onNavigate) {
@@ -51,9 +59,15 @@ export const RequireActiveClient = ({
     }
   }
 
-  // If active client is selected, render children
-  if (activeClientId) {
+  // If active client is selected and children provided, render children
+  if (activeClientId && children) {
     return <>{children}</>
+  }
+  
+  // If active client is selected but no children (guard mode), return null
+  // This allows the parent component to handle rendering
+  if (activeClientId) {
+    return null
   }
 
   // No active client - show empty state

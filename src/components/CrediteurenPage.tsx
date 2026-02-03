@@ -220,10 +220,7 @@ export const CrediteurenPage = ({ onNavigate }: CrediteurenPageProps) => {
         headerTitle={t('crediteuren.title')}
         headerSubtitle={t('crediteuren.subtitle')}
         onNavigate={onNavigate}
-      >
-        {/* Never reached, but required for TypeScript */}
-        <div />
-      </RequireActiveClient>
+      />
     )
   }
 

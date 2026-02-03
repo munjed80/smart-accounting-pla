@@ -164,10 +164,7 @@ export const ProfitLossPage = ({ onNavigate }: ProfitLossPageProps) => {
         headerTitle={t('profitLoss.title')}
         headerSubtitle={t('profitLoss.subtitle')}
         onNavigate={onNavigate}
-      >
-        {/* Never reached, but required for TypeScript */}
-        <div />
-      </RequireActiveClient>
+      />
     )
   }
 

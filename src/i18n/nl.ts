@@ -174,7 +174,6 @@ export const nl = {
     totalCredit: "Totaal credit",
     sumOfDebits: "Som van alle debetbedragen",
     sumOfCredits: "Som van alle creditbedragen",
-    draftsAndPosted: "concepten, {posted} geboekt",
     draftsPending: "Concept wachtend",
     awaitingReview: "Wacht op beoordeling",
     processingStatus: "Verwerkingsstatus",

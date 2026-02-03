@@ -180,7 +180,7 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'secondary',
   },
-  // Hidden: Support (removed from sidebar for cleaner UX, accessible via Settings)
+  // Hidden: Support (removed from ZZP sidebar for cleaner MVP UX - route still accessible via direct URL /support)
   {
     label: t('sidebar.support'),
     tabValue: 'support',

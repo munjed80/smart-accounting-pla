@@ -173,6 +173,10 @@ export const SettingsPage = () => {
                     <Skeleton className="h-10 w-full" />
                     <Skeleton className="h-10 w-full" />
                   </div>
+                ) : loadError ? (
+                  <Alert variant="destructive">
+                    <AlertDescription>{loadError}</AlertDescription>
+                  </Alert>
                 ) : primaryAdmin ? (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

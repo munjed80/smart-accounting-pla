@@ -34,17 +34,21 @@ interface UploadedFile {
 export const IntelligentUploadPortal = () => {
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [documents, setDocuments] = useState<DocumentResponse[]>([])
-  const [isLoadingDocs, setIsLoadingDocs] = useState(false)
+  const [isLoadingDocs, setIsLoadingDocs] = useState(true)
+  const [docFetchError, setDocFetchError] = useState<string | null>(null)
   const [reprocessingIds, setReprocessingIds] = useState<Set<string>>(new Set())
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchDocuments = async () => {
     setIsLoadingDocs(true)
+    setDocFetchError(null)
     try {
       const docs = await documentApi.list()
       setDocuments(docs)
     } catch (error) {
       console.error('Failed to fetch documents:', error)
+      setDocFetchError(getErrorMessage(error))
+      setDocuments([])
     } finally {
       setIsLoadingDocs(false)
     }
@@ -59,8 +63,10 @@ export const IntelligentUploadPortal = () => {
     try {
       await documentApi.reprocess(docId)
       toast.success(t('upload.queuedForReprocessing'))
-      // Refresh the document list
-      await fetchDocuments()
+      // Update local state after successful API call (reduces API calls vs refetching)
+      setDocuments(prev => 
+        prev.map(d => d.id === docId ? { ...d, status: 'PROCESSING' as const } : d)
+      )
     } catch (error) {
       toast.error(t('upload.uploadFailed') + ': ' + getErrorMessage(error))
     } finally {
@@ -461,6 +467,13 @@ export const IntelligentUploadPortal = () => {
               <ArrowsClockwise size={32} className="mx-auto mb-4 text-primary animate-spin" />
               <p className="text-muted-foreground">{t('upload.loadingDocuments')}</p>
             </div>
+          ) : docFetchError ? (
+            <Alert variant="destructive">
+              <WarningCircle size={16} />
+              <AlertDescription className="ml-2">
+                {docFetchError}
+              </AlertDescription>
+            </Alert>
           ) : documents.length === 0 ? (
             <div className="text-center py-8">
               <FileImage size={48} className="mx-auto mb-4 text-muted-foreground opacity-50" weight="duotone" />

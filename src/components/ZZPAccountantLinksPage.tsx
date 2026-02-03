@@ -194,13 +194,15 @@ export const ZZPAccountantLinksPage = () => {
 
   // Load pending requests
   const loadRequests = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
     try {
-      setError(null)
       const response = await zzpApi.getPendingLinks()
       setPendingRequests(response.pending_requests)
     } catch (err) {
       console.error('Failed to load pending requests:', err)
       setError(getErrorMessage(err))
+      setPendingRequests([])
     } finally {
       setIsLoading(false)
     }

@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/lib/AuthContext'
-import { transactionApi, TransactionStats, TransactionListItem, administrationApi, Administration } from '@/lib/api'
+import { transactionApi, TransactionStats, administrationApi, Administration } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
-import { NoAdministrationsEmptyState, NoTransactionsEmptyState } from '@/components/EmptyState'
+import { NoAdministrationsEmptyState } from '@/components/EmptyState'
 import { 
   Receipt, 
   TrendUp, 
@@ -17,7 +18,6 @@ import {
   ArrowsClockwise
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
-import { toast } from 'sonner'
 
 export const SmartDashboard = () => {
   const { user } = useAuth()
@@ -29,17 +29,28 @@ export const SmartDashboard = () => {
   const fetchData = async () => {
     setIsLoading(true)
     try {
-      // Fetch both administrations and stats in parallel
-      const [admins, statsData] = await Promise.all([
-        administrationApi.list(),
-        transactionApi.getStats().catch(() => null),  // Stats might fail if no admins
-      ])
+      // First fetch administrations
+      const admins = await administrationApi.list()
       setAdministrations(admins)
-      setStats(statsData)
+      
+      // Only fetch stats if administrations exist (avoids premature API errors)
+      if (admins.length > 0) {
+        try {
+          const statsData = await transactionApi.getStats()
+          setStats(statsData)
+        } catch {
+          // Stats may be unavailable if no transactions - this is expected for fresh accounts
+          setStats(null)
+        }
+      } else {
+        setStats(null)
+      }
       setLastRefresh(new Date())
     } catch (error) {
-      console.error('Failed to fetch data:', error)
-      // Don't show error toast for initial load - backend might not be ready
+      console.error('Failed to fetch administrations:', error)
+      // Empty administrations array will trigger the empty state
+      setAdministrations([])
+      setStats(null)
     } finally {
       setIsLoading(false)
     }
@@ -60,8 +71,64 @@ export const SmartDashboard = () => {
     }).format(amount)
   }
   
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
+                <Brain size={40} weight="duotone" className="text-primary" />
+                Smart Dashboard
+              </h1>
+              <p className="text-muted-foreground">
+                Welcome, <span className="font-semibold">{user?.full_name}</span>
+              </p>
+            </div>
+          </div>
+          
+          {/* Loading skeleton for stats cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="bg-card/80 backdrop-blur-sm border-2 border-primary/20">
+                <CardHeader className="pb-3">
+                  <Skeleton className="h-4 w-24" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-16 mb-2" />
+                  <Skeleton className="h-3 w-32" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          
+          {/* Loading skeleton for content cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {[1, 2].map((i) => (
+              <Card key={i} className="bg-card/80 backdrop-blur-sm">
+                <CardHeader>
+                  <Skeleton className="h-6 w-40 mb-2" />
+                  <Skeleton className="h-4 w-56" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+  
   // Show empty state if user has no administrations
-  if (!isLoading && administrations.length === 0) {
+  if (administrations.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />

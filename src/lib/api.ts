@@ -80,7 +80,7 @@ const normalizeBaseUrl = (url: string | undefined): string => {
 
 /**
  * Normalize API origin: extracts only the origin (scheme + host + port) from a URL,
- * stripping any trailing paths like /api/v1 or /api.
+ * stripping any trailing paths like /api/v1, /api/v2, /api, etc.
  * 
  * This makes the API URL resilient to misconfigured Coolify env vars where
  * someone accidentally includes the path suffix.
@@ -90,15 +90,18 @@ const normalizeBaseUrl = (url: string | undefined): string => {
  *   https://api.zzpershub.nl/          -> https://api.zzpershub.nl
  *   https://api.zzpershub.nl/api/v1    -> https://api.zzpershub.nl
  *   https://api.zzpershub.nl/api/v1/   -> https://api.zzpershub.nl
+ *   https://api.zzpershub.nl/api/v2    -> https://api.zzpershub.nl
  *   https://api.zzpershub.nl/api       -> https://api.zzpershub.nl
  *   https://api.zzpershub.nl/api/      -> https://api.zzpershub.nl
+ * 
+ * @returns Object with `origin` (cleaned URL) and `hadApiPath` (true if /api path was stripped)
  */
-export const normalizeApiOrigin = (url: string | undefined): { origin: string; hadPath: boolean } => {
-  if (!url) return { origin: '', hadPath: false }
+export const normalizeApiOrigin = (url: string | undefined): { origin: string; hadApiPath: boolean } => {
+  if (!url) return { origin: '', hadApiPath: false }
   
   // First apply base normalization (trim, add scheme)
   const baseNormalized = normalizeBaseUrl(url)
-  if (!baseNormalized) return { origin: '', hadPath: false }
+  if (!baseNormalized) return { origin: '', hadApiPath: false }
   
   try {
     const parsed = new URL(baseNormalized)
@@ -107,12 +110,11 @@ export const normalizeApiOrigin = (url: string | undefined): { origin: string; h
     // Check if the URL had a path that we're stripping
     // Strip trailing slashes from pathname for comparison
     const pathname = parsed.pathname.replace(/\/+$/, '')
-    const hadPath = pathname !== '' && pathname !== '/'
     
-    // Specifically check for /api or /api/v1 paths which are common mistakes
+    // Specifically check for /api or /api/v{N} paths which are common mistakes
     const hadApiPath = /^\/api(\/v\d+)?$/.test(pathname)
     
-    // If there was a path (especially /api or /api/v1), warn about it
+    // If there was an API path, warn about it (production only)
     if (hadApiPath && !isDev) {
       console.warn(
         `[API Config] ⚠️ VITE_API_URL bevat een pad (${pathname}). ` +
@@ -120,17 +122,17 @@ export const normalizeApiOrigin = (url: string | undefined): { origin: string; h
       )
     }
     
-    return { origin, hadPath }
+    return { origin, hadApiPath }
   } catch {
     // If URL parsing fails, fall back to regex-based stripping
-    // Remove trailing /api/v1, /api/v1/, /api, /api/ and any trailing slashes
+    // Remove trailing /api/v{N}, /api/v{N}/, /api, /api/ and any trailing slashes
     const stripped = baseNormalized
       .replace(/\/api\/v\d+\/?$/, '')
       .replace(/\/api\/?$/, '')
       .replace(/\/+$/, '')
     
-    const hadPath = stripped !== baseNormalized
-    return { origin: stripped, hadPath }
+    const hadApiPath = stripped !== baseNormalized
+    return { origin: stripped, hadApiPath }
   }
 }
 
@@ -150,16 +152,16 @@ const isLocalhostUrl = (url: string | undefined): boolean => {
 // Normalize the env URL using the new origin-stripping function
 // This handles cases where VITE_API_URL is set to https://api.zzpershub.nl/api/v1 (incorrect)
 // and normalizes it to https://api.zzpershub.nl (correct origin only)
-const normalizedEnvApiResult = envApiUrl ? normalizeApiOrigin(envApiUrl) : { origin: '', hadPath: false }
+const normalizedEnvApiResult = envApiUrl ? normalizeApiOrigin(envApiUrl) : { origin: '', hadApiPath: false }
 const normalizedEnvApiUrl = normalizedEnvApiResult.origin || undefined
-const envApiUrlHadPath = normalizedEnvApiResult.hadPath
+const envApiUrlHadApiPath = normalizedEnvApiResult.hadApiPath
 
 // Determine if API is misconfigured (production with localhost or missing URL)
 // Uses normalized URL to ensure consistent validation
 const checkMisconfiguration = (): { isMisconfigured: boolean; reason: string; warning?: string } => {
-  // Check if env URL had a path (like /api/v1) that we stripped - this is a warning, not an error
-  const warning = envApiUrlHadPath && !isDev
-    ? `VITE_API_URL bevat een pad dat automatisch is verwijderd. Stel VITE_API_URL in als alleen: ${normalizedEnvApiUrl} (zonder /api/v1).`
+  // Check if env URL had an API path (like /api/v1) that we stripped - this is a warning, not an error
+  const warning = envApiUrlHadApiPath && !isDev
+    ? `VITE_API_URL bevat een pad dat automatisch is verwijderd. Stel VITE_API_URL in als alleen: ${normalizedEnvApiUrl} (zonder /api paden).`
     : undefined
   
   if (isDev) {
@@ -206,10 +208,10 @@ const misconfigurationCheck = checkMisconfiguration()
 if (isDev) {
   console.log('[API Config] VITE_API_URL:', rawViteApiUrl)
   console.log('[API Config] Normalized Origin:', normalizedEnvApiUrl ?? '(not set)')
-  console.log('[API Config] Had Path Stripped:', envApiUrlHadPath)
+  console.log('[API Config] Had API Path Stripped:', envApiUrlHadApiPath)
   console.log('[API Config] Final Base URL:', API_BASE_URL)
   console.log('[API Config] Register endpoint:', `${API_BASE_URL}/auth/register`)
-} else if (envApiUrlHadPath) {
+} else if (envApiUrlHadApiPath) {
   // In production, warn if we had to strip a path
   console.warn('[API Config] ⚠️ VITE_API_URL pad automatisch verwijderd. Configureer als:', normalizedEnvApiUrl)
 }
@@ -532,7 +534,7 @@ export const checkApiHealth = async (): Promise<HealthCheckResult> => {
           success: false,
           status: 'unreachable',
           message: 'Kan API-server niet bereiken',
-          details: `Kan geen verbinding maken met ${API_BASE_URL}. Mogelijke oorzaken: CORS-beleid blokkeert het verzoek, ongeldig/verlopen TLS-certificaat, DNS-resolutiefout, of de server is offline. Controleer Coolify build env: VITE_API_URL moet alleen het domein zijn (zonder /api/v1).`,
+          details: `Kan geen verbinding maken met ${API_BASE_URL}. Mogelijke oorzaken: CORS, TLS-certificaat, DNS, of server offline.`,
           responseTime,
         }
       }
@@ -1398,9 +1400,12 @@ export const getErrorMessage = (error: unknown): string => {
     // Network error - could be CORS, TLS, or connectivity issue
     // Dutch message with helpful troubleshooting hint
     if (error.message === 'Network Error') {
+      const baseHint = normalizedEnvApiUrl 
+        ? `VITE_API_URL moet alleen ${normalizedEnvApiUrl} zijn (zonder /api paden).`
+        : 'VITE_API_URL moet alleen het domein bevatten (zonder /api paden).'
       return `Kan geen verbinding maken met de server op ${API_BASE_URL}. ` +
         `Mogelijke oorzaken: netwerkproblemen, CORS-fout, of ongeldig TLS-certificaat. ` +
-        `Controleer Coolify build env: VITE_API_URL moet alleen ${normalizedEnvApiUrl || 'https://api.zzpershub.nl'} zijn (zonder /api/v1).`
+        `Controleer Coolify build env: ${baseHint}`
     }
     
     // Timeout - Dutch message

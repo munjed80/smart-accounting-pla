@@ -85,16 +85,22 @@ VITE_API_URL=http://localhost:8000
 # ✅ Correct: Domain only, no path
 VITE_API_URL=https://api.zzpershub.nl
 
-# ❌ Incorrect: Don't include /api/v1 path
+# ❌ Incorrect: Don't include API paths
 VITE_API_URL=https://api.zzpershub.nl/api/v1
+VITE_API_URL=https://api.zzpershub.nl/api
 ```
 
-The API client automatically appends `/api/v1` to the base URL. If your `VITE_API_URL` accidentally includes `/api/v1`, it will be automatically stripped to prevent double-path issues like `/api/v1/api/v1`.
+The API client automatically appends `/api/v1` to the base URL. If your `VITE_API_URL` accidentally includes an API path like `/api`, `/api/v1`, `/api/v2`, etc., it will be automatically stripped to prevent double-path issues like `/api/v1/api/v1`.
+
+**Patterns that are automatically stripped:**
+- `/api/v1`, `/api/v1/`
+- `/api/v2`, `/api/v2/` (or any version number)
+- `/api`, `/api/`
 
 **Diagnostics:** Visit the Settings page to see the effective API configuration including:
-- `API Base`: The final URL used for API calls
-- `VITE_API_URL`: The raw build-time value
-- `Origin`: The current browser origin
+- `API Basis`: The final URL used for API calls
+- `Build VITE_API_URL`: The raw build-time value
+- `Browser Oorsprong`: The current browser origin
 
 ## API Client Architecture
 

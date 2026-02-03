@@ -363,17 +363,17 @@ export const SettingsPage = () => {
                 <div className="space-y-1 font-mono text-xs">
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
                     <span>
-                      <strong>API Base:</strong>{' '}
+                      <strong>{t('settings.apiBase')}:</strong>{' '}
                       <code className="bg-secondary px-1 rounded">{getApiBaseUrl()}</code>
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground/70">
                     <span>
-                      <strong>VITE_API_URL:</strong>{' '}
+                      <strong>{t('settings.viteApiUrl')}:</strong>{' '}
                       <code className="bg-secondary/50 px-1 rounded">{getRawViteApiUrl()}</code>
                     </span>
                     <span>
-                      <strong>Origin:</strong>{' '}
+                      <strong>{t('settings.browserOrigin')}:</strong>{' '}
                       <code className="bg-secondary/50 px-1 rounded">{getWindowOrigin()}</code>
                     </span>
                   </div>

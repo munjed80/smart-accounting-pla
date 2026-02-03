@@ -730,6 +730,7 @@ export const nl = {
     development: "Ontwikkeling",
     production: "Productie",
     preferencesSaved: "Meldingsvoorkeuren opgeslagen",
+    apiDiagnosticsHint: "VITE_API_URL is een build-time variabele. Wijzigingen vereisen een nieuwe build in Coolify.",
   },
 
   // Support page

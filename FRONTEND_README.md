@@ -73,6 +73,29 @@ Create a `.env` file in the root:
 VITE_API_URL=http://localhost:8000
 ```
 
+**⚠️ Important: Build-Time Configuration**
+
+`VITE_API_URL` is a **build-time** environment variable. This means:
+- The value is embedded into the JavaScript bundle during `npm run build`
+- Changing the `.env` file requires a **full rebuild** for changes to take effect
+- In Coolify/Docker deployments, update the build environment variable and trigger a redeploy
+
+**Correct configuration:**
+```env
+# ✅ Correct: Domain only, no path
+VITE_API_URL=https://api.zzpershub.nl
+
+# ❌ Incorrect: Don't include /api/v1 path
+VITE_API_URL=https://api.zzpershub.nl/api/v1
+```
+
+The API client automatically appends `/api/v1` to the base URL. If your `VITE_API_URL` accidentally includes `/api/v1`, it will be automatically stripped to prevent double-path issues like `/api/v1/api/v1`.
+
+**Diagnostics:** Visit the Settings page to see the effective API configuration including:
+- `API Base`: The final URL used for API calls
+- `VITE_API_URL`: The raw build-time value
+- `Origin`: The current browser origin
+
 ## API Client Architecture
 
 ### File: `src/lib/api.ts`

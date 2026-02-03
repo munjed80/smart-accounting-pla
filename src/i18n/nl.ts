@@ -795,10 +795,10 @@ export const nl = {
     emailClientFallback: "Als je e-mailclient niet opent, mail ons direct op",
   },
 
-  // Smart Transactions page
+  // Smart Transactions page (renamed to Boekingen for ZZP MVP)
   smartTransactions: {
-    title: "Slimme transacties",
-    subtitle: "AI-verwerkte en automatisch gecategoriseerde transacties",
+    title: "Boekingen",
+    subtitle: "Overzicht van al je transacties en boekingen",
     totalTransactions: "Totaal transacties",
     totalAmount: "Totaalbedrag",
     avgAiConfidence: "Gem. AI-betrouwbaarheid",
@@ -817,14 +817,14 @@ export const nl = {
 
   // AI Upload / Document Upload
   upload: {
-    title: "Document Upload Portaal",
-    subtitle: "Upload facturen en bonnen naar de backend voor AI-verwerking",
+    title: "Documenten",
+    subtitle: "Upload en beheer je facturen en bonnen",
     pending: "Wachtend",
     uploading: "Uploaden",
     uploaded: "Geüpload",
     errors: "Fouten",
     uploadDocuments: "Documenten uploaden",
-    uploadDescription: "Sleep factuur- of bonafbeeldingen hierheen. Bestanden worden geüpload naar de backend.",
+    uploadDescription: "Sleep factuur- of bonafbeeldingen hierheen voor automatische verwerking.",
     dropHere: "Sleep documenten hier",
     orClickToBrowse: "of klik om te bladeren (PNG, JPG, PDF)",
     uploadedFiles: "Geüploade bestanden",

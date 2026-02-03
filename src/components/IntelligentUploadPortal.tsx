@@ -15,10 +15,12 @@ import {
   Sparkle,
   CloudArrowUp,
   ArrowsClockwise,
-  WarningCircle
+  WarningCircle,
+  FileText
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
+import { nl as nlLocale } from 'date-fns/locale'
 import { t } from '@/i18n'
 
 interface UploadedFile {
@@ -289,7 +291,8 @@ export const IntelligentUploadPortal = () => {
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-3">
+            <FileText size={32} weight="duotone" className="text-primary" />
             {t('upload.title')}
           </h2>
           <p className="text-muted-foreground mt-1">
@@ -492,7 +495,7 @@ export const IntelligentUploadPortal = () => {
                           {getDocStatusBadge(doc.status)}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
-                          {format(new Date(doc.created_at), 'dd MMM yyyy HH:mm')}
+                          {format(new Date(doc.created_at), 'dd MMM yyyy HH:mm', { locale: nlLocale })}
                           {doc.transaction_id && (
                             <span className="ml-2">• {t('upload.transactionLinked')}</span>
                           )}

@@ -16,6 +16,7 @@ import {
   WarningCircle
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
+import { nl as nlLocale } from 'date-fns/locale'
 import { t } from '@/i18n'
 
 export const SmartTransactionList = () => {
@@ -111,8 +112,8 @@ export const SmartTransactionList = () => {
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-2">
-            <Brain size={32} weight="duotone" className="text-primary" />
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-3">
+            <Receipt size={32} weight="duotone" className="text-primary" />
             {t('smartTransactions.title')}
           </h2>
           <p className="text-muted-foreground mt-1">
@@ -248,7 +249,7 @@ export const SmartTransactionList = () => {
                       <div className="text-sm mt-3">
                         <span className="text-muted-foreground">{t('smartTransactions.date')}:</span>
                         <span className="ml-2 font-medium">
-                          {format(new Date(transaction.transaction_date), 'dd-MM-yyyy')}
+                          {format(new Date(transaction.transaction_date), 'dd-MM-yyyy', { locale: nlLocale })}
                         </span>
                       </div>
                     </div>

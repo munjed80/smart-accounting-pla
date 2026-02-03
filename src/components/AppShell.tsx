@@ -96,14 +96,13 @@ const menuItems: MenuItem[] = [
   // === WINST & VERLIES (P&L) - Currently no dedicated page, hidden ===
   // Placeholder for future P&L reporting functionality
   
-  // === Secondary items (not part of 5 concepts - hidden from main menu) ===
+  // === Secondary items (not part of 5 concepts) ===
   {
     label: t('sidebar.reminders'),
     tabValue: 'reminders',
     icon: <Bell size={20} weight="duotone" />,
     rolesAllowed: ['accountant', 'admin'],
     section: 'secondary',
-    hidden: false, // Keep visible in secondary section
   },
   {
     label: t('sidebar.actionLog'),
@@ -111,7 +110,6 @@ const menuItems: MenuItem[] = [
     icon: <ClipboardText size={20} weight="duotone" />,
     rolesAllowed: ['accountant', 'admin'],
     section: 'secondary',
-    hidden: false, // Keep visible in secondary section
   },
   // ZZP main items (Dashboard first for ZZP users)
   {

@@ -87,6 +87,37 @@ const StatusBadge = ({ status }: { status: string }) => {
   )
 }
 
+// Helper function for risk level styling
+const getRiskStyle = (link: ClientLink): { 
+  bgClass: string
+  textClass: string 
+  borderClass: string
+  label: string 
+} => {
+  if (link.open_red_count > 0) {
+    return {
+      bgClass: 'bg-red-500/20',
+      textClass: 'text-red-600',
+      borderClass: 'border-red-500/40',
+      label: 'Rood',
+    }
+  }
+  if (link.open_yellow_count > 0) {
+    return {
+      bgClass: 'bg-amber-500/20',
+      textClass: 'text-amber-700 dark:text-amber-400',
+      borderClass: 'border-amber-500/40',
+      label: 'Geel',
+    }
+  }
+  return {
+    bgClass: 'bg-green-500/20',
+    textClass: 'text-green-700 dark:text-green-400',
+    borderClass: 'border-green-500/40',
+    label: 'OK',
+  }
+}
+
 // Client card component
 const ClientCard = ({ 
   link, 
@@ -102,6 +133,7 @@ const ClientCard = ({
   const isActive = link.status === 'ACTIVE'
   const isPending = link.status === 'PENDING'
   const isRevoked = link.status === 'REVOKED'
+  const riskStyle = getRiskStyle(link)
   
   return (
     <Card className={`${isSelected ? 'ring-2 ring-primary' : ''} ${isRevoked ? 'opacity-60' : ''}`}>
@@ -109,8 +141,9 @@ const ClientCard = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           {/* Client info */}
           <div className="flex items-start gap-3 flex-1 min-w-0">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <User size={20} className="text-primary" weight="duotone" />
+            {/* Risk indicator circle */}
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${riskStyle.bgClass}`}>
+              <User size={20} className={riskStyle.textClass.split(' ')[0]} weight="duotone" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
@@ -118,6 +151,15 @@ const ClientCard = ({
                   {link.client_name || link.client_email}
                 </h3>
                 <StatusBadge status={link.status} />
+                {/* Risk badge */}
+                {isActive && (
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs ${riskStyle.bgClass} ${riskStyle.textClass} ${riskStyle.borderClass}`}
+                  >
+                    {riskStyle.label}
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-muted-foreground truncate">
                 {link.client_email}

@@ -116,7 +116,7 @@ const mapAccountToCategory = (account: AccountBalance): CategoryKey[] => {
     categories.push('crediteuren')
   }
   
-  return categories.length > 0 ? categories : ['activa'] // Default to activa
+  return categories.length > 0 ? categories : [] // Return empty array - account will still show in 'all' view
 }
 
 export const GrootboekPage = ({ onNavigate }: GrootboekPageProps) => {

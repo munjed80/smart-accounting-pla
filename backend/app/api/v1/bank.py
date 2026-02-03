@@ -38,11 +38,11 @@ router = APIRouter()
 @router.post("/bank/import", response_model=BankImportResponse)
 async def import_bank_file(
     file: Annotated[UploadFile, File(..., description="CSV-bestand")],
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
     administration_id: UUID = Query(..., description="Administration ID"),
     bank_account_iban: Optional[str] = Form(None),
     bank_name: Optional[str] = Form(None),
-    current_user: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
     Import a bank statement CSV file.
@@ -153,9 +153,9 @@ async def list_bank_transactions(
 @router.post("/bank/transactions/{transaction_id}/suggest", response_model=SuggestMatchResponse)
 async def suggest_matches(
     transaction_id: UUID,
-    administration_id: UUID = Query(..., description="Administration ID"),
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    administration_id: UUID = Query(..., description="Administration ID"),
 ):
     """
     Get match suggestions for a bank transaction.
@@ -201,9 +201,9 @@ async def suggest_matches(
 async def apply_action(
     transaction_id: UUID,
     request: ApplyActionRequest,
-    administration_id: UUID = Query(..., description="Administration ID"),
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    administration_id: UUID = Query(..., description="Administration ID"),
 ):
     """
     Apply a reconciliation action to a bank transaction.

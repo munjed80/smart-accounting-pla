@@ -20,6 +20,7 @@ import {
   WarningCircle
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
+import { t } from '@/i18n'
 
 export const SmartDashboard = () => {
   const { user } = useAuth()
@@ -155,7 +156,7 @@ export const SmartDashboard = () => {
               <span>{fetchError}</span>
               <Button variant="outline" size="sm" onClick={handleRefresh} className="ml-4">
                 <ArrowsClockwise size={16} className="mr-2" />
-                Retry
+                {t('common.retry')}
               </Button>
             </AlertDescription>
           </Alert>

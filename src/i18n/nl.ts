@@ -1432,6 +1432,28 @@ export const nl = {
     description: "De pagina die je zoekt bestaat niet of is verplaatst.",
     backToWorkqueue: "Terug naar Werklijst",
   },
+
+  // RequireActiveClient component
+  requireClient: {
+    title: "Geen klant geselecteerd",
+    description: "Selecteer eerst een klant om deze gegevens te bekijken.",
+    goToClients: "Ga naar Klanten",
+  },
+
+  // ApiErrorState component - consistent error UX
+  apiError: {
+    unauthorized: "Niet ingelogd",
+    unauthorizedDescription: "Je sessie is verlopen of ongeldig. Log opnieuw in om door te gaan.",
+    forbidden: "Geen toegang",
+    forbiddenDescription: "Je hebt geen toegang tot deze gegevens. Controleer of je de juiste klant hebt geselecteerd.",
+    notFound: "Niet beschikbaar",
+    notFoundDescription: "Deze gegevens zijn niet beschikbaar of bestaan niet (meer).",
+    serverError: "Tijdelijke storing",
+    serverErrorDescription: "Er is een tijdelijk probleem met de server. Probeer het over enkele minuten opnieuw.",
+    unknown: "Er ging iets mis",
+    unknownDescription: "Er is een onverwachte fout opgetreden. Probeer het opnieuw.",
+    retry: "Opnieuw proberen",
+  },
 };
 
 /**

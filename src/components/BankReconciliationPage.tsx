@@ -33,6 +33,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/EmptyState'
+import { RequireActiveClient } from '@/components/RequireActiveClient'
 import { useActiveClient } from '@/lib/ActiveClientContext'
 import { 
   bankReconciliationApi, 
@@ -720,15 +721,14 @@ export const BankReconciliationPage = () => {
 
   if (!activeClientId) {
     return (
-      <div className="p-6">
-        <EmptyState
-          title={t('bank.noActiveClientTitle')}
-          description={t('bank.noActiveClientDescription')}
-          icon={<Bank size={64} className="text-muted-foreground" weight="duotone" />}
-          actionLabel={t('bank.selectClient')}
-          onAction={() => navigateTo('/accountant/clients')}
-        />
-      </div>
+      <RequireActiveClient
+        headerIcon={<Bank size={24} weight="duotone" className="text-primary" />}
+        headerTitle={t('bank.title')}
+        headerSubtitle={t('bank.noActiveClientDescription')}
+      >
+        {/* Never reached, but required for TypeScript */}
+        <div />
+      </RequireActiveClient>
     )
   }
 

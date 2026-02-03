@@ -23,8 +23,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { EmptyState } from '@/components/EmptyState'
+import { RequireActiveClient } from '@/components/RequireActiveClient'
+import { ApiErrorState, parseApiError, ApiErrorType } from '@/components/ApiErrorState'
 import { useActiveClient } from '@/lib/ActiveClientContext'
-import { ledgerApi, BalanceSheetResponse, AccountBalance, getErrorMessage } from '@/lib/api'
+import { ledgerApi, BalanceSheetResponse, AccountBalance } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
 import {
@@ -38,7 +40,6 @@ import {
   TrendDown,
   Warning,
   MagnifyingGlass,
-  User,
   CaretRight,
   Scales,
 } from '@phosphor-icons/react'
@@ -123,7 +124,7 @@ export const GrootboekPage = ({ onNavigate }: GrootboekPageProps) => {
   const { activeClientId, activeClientName } = useActiveClient()
   const [balanceSheet, setBalanceSheet] = useState<BalanceSheetResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [apiError, setApiError] = useState<{ type: ApiErrorType; message: string } | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -136,14 +137,14 @@ export const GrootboekPage = ({ onNavigate }: GrootboekPageProps) => {
       }
 
       setIsLoading(true)
-      setError(null)
+      setApiError(null)
 
       try {
         const response = await ledgerApi.getBalanceSheet(activeClientId)
         setBalanceSheet(response)
       } catch (err) {
-        console.error('Failed to load balance sheet:', err)
-        setError(getErrorMessage(err))
+        const parsedError = parseApiError(err)
+        setApiError(parsedError)
       } finally {
         setIsLoading(false)
       }
@@ -233,8 +234,23 @@ export const GrootboekPage = ({ onNavigate }: GrootboekPageProps) => {
     }).format(amount)
   }
 
-  // No active client selected
+  // No active client selected - use RequireActiveClient component
   if (!activeClientId) {
+    return (
+      <RequireActiveClient
+        headerIcon={<Books size={24} weight="duotone" className="text-primary" />}
+        headerTitle="Grootboek"
+        headerSubtitle="Rekeningschema en balans overzicht"
+        onNavigate={onNavigate}
+      >
+        {/* Never reached, but required for TypeScript */}
+        <div />
+      </RequireActiveClient>
+    )
+  }
+
+  // API error occurred - use ApiErrorState component
+  if (apiError && !isLoading) {
     return (
       <div className="container mx-auto py-6 px-4 sm:px-6 max-w-6xl">
         <Card className="bg-card/80 backdrop-blur-sm mb-6">
@@ -251,12 +267,11 @@ export const GrootboekPage = ({ onNavigate }: GrootboekPageProps) => {
           </CardHeader>
         </Card>
 
-        <EmptyState
-          title="Geen klant geselecteerd"
-          description="Selecteer eerst een klant om het grootboek te bekijken."
-          icon={<User size={64} weight="duotone" className="text-muted-foreground" />}
-          actionLabel="Klant selecteren"
-          onAction={handleGoToClients}
+        <ApiErrorState
+          type={apiError.type}
+          message={apiError.message}
+          onRetry={() => window.location.reload()}
+          onNavigate={onNavigate}
         />
       </div>
     )
@@ -319,22 +334,8 @@ export const GrootboekPage = ({ onNavigate }: GrootboekPageProps) => {
         </div>
       )}
 
-      {/* Error state */}
-      {error && !isLoading && (
-        <Card className="bg-destructive/10 border-destructive/30">
-          <CardContent className="py-6 text-center">
-            <Warning size={48} className="mx-auto mb-4 text-destructive" />
-            <p className="text-destructive font-medium mb-2">Laden mislukt</p>
-            <p className="text-sm text-muted-foreground mb-4">{error}</p>
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              Opnieuw proberen
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Main content */}
-      {!isLoading && !error && balanceSheet && (
+      {!isLoading && !apiError && balanceSheet && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left sidebar - Categories */}
           <div className="lg:col-span-1">
@@ -484,7 +485,7 @@ export const GrootboekPage = ({ onNavigate }: GrootboekPageProps) => {
       )}
 
       {/* Empty state - no accounts at all */}
-      {!isLoading && !error && allAccounts.length === 0 && (
+      {!isLoading && !apiError && allAccounts.length === 0 && (
         <EmptyState
           title="Geen grootboekrekeningen"
           description="Er zijn nog geen grootboekrekeningen aangemaakt voor deze klant. Rekeningen worden automatisch aangemaakt bij het verwerken van transacties."

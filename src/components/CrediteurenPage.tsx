@@ -21,8 +21,10 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/EmptyState'
+import { RequireActiveClient } from '@/components/RequireActiveClient'
+import { ApiErrorState, parseApiError, ApiErrorType } from '@/components/ApiErrorState'
 import { useActiveClient } from '@/lib/ActiveClientContext'
-import { ledgerApi, OpenItemReport, getErrorMessage } from '@/lib/api'
+import { ledgerApi, OpenItemReport } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
 import {
@@ -36,7 +38,6 @@ import {
   Warning,
   CurrencyEur,
   Invoice,
-  User,
   CaretRight,
 } from '@phosphor-icons/react'
 
@@ -63,7 +64,7 @@ export const CrediteurenPage = ({ onNavigate }: CrediteurenPageProps) => {
   const { activeClientId, activeClientName } = useActiveClient()
   const [apItems, setApItems] = useState<OpenItemReport[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [apiError, setApiError] = useState<{ type: ApiErrorType; message: string } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [sortField, setSortField] = useState<SortField>('amount')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
@@ -78,7 +79,7 @@ export const CrediteurenPage = ({ onNavigate }: CrediteurenPageProps) => {
       }
 
       setIsLoading(true)
-      setError(null)
+      setApiError(null)
 
       try {
         const response = await ledgerApi.getAccountsPayable(activeClientId)
@@ -89,8 +90,8 @@ export const CrediteurenPage = ({ onNavigate }: CrediteurenPageProps) => {
           overdueAmount: response.overdue_amount,
         })
       } catch (err) {
-        console.error('Failed to load AP data:', err)
-        setError(getErrorMessage(err))
+        const parsedError = parseApiError(err)
+        setApiError(parsedError)
       } finally {
         setIsLoading(false)
       }
@@ -211,8 +212,23 @@ export const CrediteurenPage = ({ onNavigate }: CrediteurenPageProps) => {
     }).format(amount)
   }
 
-  // No active client selected
+  // No active client selected - use RequireActiveClient component
   if (!activeClientId) {
+    return (
+      <RequireActiveClient
+        headerIcon={<Storefront size={24} weight="duotone" className="text-primary" />}
+        headerTitle={t('crediteuren.title')}
+        headerSubtitle={t('crediteuren.subtitle')}
+        onNavigate={onNavigate}
+      >
+        {/* Never reached, but required for TypeScript */}
+        <div />
+      </RequireActiveClient>
+    )
+  }
+
+  // API error occurred - use ApiErrorState component
+  if (apiError && !isLoading) {
     return (
       <div className="container mx-auto py-6 px-4 sm:px-6 max-w-5xl">
         <Card className="bg-card/80 backdrop-blur-sm mb-6">
@@ -229,12 +245,11 @@ export const CrediteurenPage = ({ onNavigate }: CrediteurenPageProps) => {
           </CardHeader>
         </Card>
 
-        <EmptyState
-          title="Geen klant geselecteerd"
-          description="Selecteer eerst een klant om de leveranciers te bekijken."
-          icon={<User size={64} weight="duotone" className="text-muted-foreground" />}
-          actionLabel="Klant selecteren"
-          onAction={handleGoToClients}
+        <ApiErrorState
+          type={apiError.type}
+          message={apiError.message}
+          onRetry={() => window.location.reload()}
+          onNavigate={onNavigate}
         />
       </div>
     )
@@ -290,22 +305,8 @@ export const CrediteurenPage = ({ onNavigate }: CrediteurenPageProps) => {
         </div>
       )}
 
-      {/* Error state */}
-      {error && !isLoading && (
-        <Card className="bg-destructive/10 border-destructive/30">
-          <CardContent className="py-6 text-center">
-            <Warning size={48} className="mx-auto mb-4 text-destructive" />
-            <p className="text-destructive font-medium mb-2">Laden mislukt</p>
-            <p className="text-sm text-muted-foreground mb-4">{error}</p>
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              Opnieuw proberen
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Empty state */}
-      {!isLoading && !error && suppliers.length === 0 && (
+      {!isLoading && !apiError && suppliers.length === 0 && (
         <>
           <EmptyState
             title={t('crediteuren.noSuppliersYet')}
@@ -331,7 +332,7 @@ export const CrediteurenPage = ({ onNavigate }: CrediteurenPageProps) => {
       )}
 
       {/* Suppliers list */}
-      {!isLoading && !error && suppliers.length > 0 && (
+      {!isLoading && !apiError && suppliers.length > 0 && (
         <>
           {/* Search and filters */}
           <Card className="mb-4">

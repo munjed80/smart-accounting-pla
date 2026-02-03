@@ -144,6 +144,12 @@ export const nl = {
     // New navigation items for Crediteuren and Winst & Verlies
     leveranciersCrediteuren: "Leveranciers",
     overzichtWinstVerlies: "Overzicht",
+    // ZZP MVP navigation (Dutch-first)
+    overzicht: "Overzicht",
+    documenten: "Documenten",
+    boekingen: "Boekingen",
+    boekhouder: "Boekhouder",
+    backToOverzicht: "Terug naar Overzicht",
   },
 
   // Dashboard

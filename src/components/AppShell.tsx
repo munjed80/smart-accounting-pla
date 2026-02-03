@@ -37,6 +37,8 @@ import {
   Storefront,
   ChartLineUp,
   Books,
+  FileText,
+  Receipt,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 
@@ -136,48 +138,70 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['accountant', 'admin'],
     section: 'secondary',
   },
-  // ZZP main items (Dashboard first for ZZP users)
+  // === ZZP MVP Navigation (Dutch-first, minimal) ===
+  // 1. Overzicht (Dashboard)
   {
-    label: t('sidebar.dashboard'),
+    label: t('sidebar.overzicht'),
     tabValue: 'dashboard',
     icon: <House size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',
   },
+  // 2. Documenten (AI Upload + document status list)
   {
-    label: t('sidebar.smartTransactions'),
-    tabValue: 'transactions',
-    icon: <Brain size={20} weight="duotone" />,
-    rolesAllowed: ['zzp'],
-    section: 'main',
-  },
-  {
-    label: t('sidebar.aiUpload'),
+    label: t('sidebar.documenten'),
     tabValue: 'upload',
-    icon: <Sparkle size={20} weight="duotone" />,
+    icon: <FileText size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',
   },
+  // 3. Boekingen (Transactions list + stats)
   {
-    label: t('sidebarExtra.accountantLinks'),
+    label: t('sidebar.boekingen'),
+    tabValue: 'transactions',
+    icon: <Receipt size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  // 4. Boekhouder (Links/consent page)
+  {
+    label: t('sidebar.boekhouder'),
     tabValue: 'boekhouder',
     icon: <Handshake size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // Secondary items (Settings & Support for all roles)
+  // === ZZP Secondary items ===
+  // Settings
   {
     label: t('sidebar.settings'),
     tabValue: 'settings',
     icon: <Gear size={20} weight="duotone" />,
-    rolesAllowed: ['zzp', 'accountant', 'admin'],
+    rolesAllowed: ['zzp'],
+    section: 'secondary',
+  },
+  // Hidden: Support (removed from ZZP sidebar for cleaner MVP UX - route still accessible via direct URL /support)
+  {
+    label: t('sidebar.support'),
+    tabValue: 'support',
+    icon: <Headset size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'secondary',
+    hidden: true,
+  },
+  // === Accountant Secondary items ===
+  {
+    label: t('sidebar.settings'),
+    tabValue: 'settings',
+    icon: <Gear size={20} weight="duotone" />,
+    rolesAllowed: ['accountant', 'admin'],
     section: 'secondary',
   },
   {
     label: t('sidebar.support'),
     tabValue: 'support',
     icon: <Headset size={20} weight="duotone" />,
-    rolesAllowed: ['zzp', 'accountant', 'admin'],
+    rolesAllowed: ['accountant', 'admin'],
     section: 'secondary',
   },
 ]
@@ -198,7 +222,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   
   // Determine the home tab based on user role
   const homeTab = isAccountant ? 'workqueue' : 'dashboard'
-  const homeLabel = isAccountant ? t('sidebar.backToWorkQueue') : t('sidebar.backToDashboard')
+  const homeLabel = isAccountant ? t('sidebar.backToWorkQueue') : t('sidebar.backToOverzicht')
 
   // Filter menu items based on user role and hidden flag
   const visibleMenuItems = menuItems.filter(item => 

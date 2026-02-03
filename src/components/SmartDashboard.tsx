@@ -13,13 +13,14 @@ import {
   TrendUp, 
   TrendDown,
   FileText, 
-  Brain,
+  House,
   Sparkle,
   CheckCircle,
   ArrowsClockwise,
   WarningCircle
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
+import { nl as nlLocale } from 'date-fns/locale'
 import { t } from '@/i18n'
 
 export const SmartDashboard = () => {
@@ -85,11 +86,11 @@ export const SmartDashboard = () => {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
-                <Brain size={40} weight="duotone" className="text-primary" />
-                Smart Dashboard
+                <House size={40} weight="duotone" className="text-primary" />
+                {t('dashboard.overzichtTitle')}
               </h1>
               <p className="text-muted-foreground">
-                Welcome, <span className="font-semibold">{user?.full_name}</span>
+                {t('dashboard.welcomeBack')}, <span className="font-semibold">{user?.full_name}</span>
               </p>
             </div>
           </div>
@@ -141,11 +142,11 @@ export const SmartDashboard = () => {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
-                <Brain size={40} weight="duotone" className="text-primary" />
-                Smart Dashboard
+                <House size={40} weight="duotone" className="text-primary" />
+                {t('dashboard.overzichtTitle')}
               </h1>
               <p className="text-muted-foreground">
-                Welcome, <span className="font-semibold">{user?.full_name}</span>
+                {t('dashboard.welcomeBack')}, <span className="font-semibold">{user?.full_name}</span>
               </p>
             </div>
           </div>
@@ -174,11 +175,11 @@ export const SmartDashboard = () => {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
-                <Brain size={40} weight="duotone" className="text-primary" />
-                Smart Dashboard
+                <House size={40} weight="duotone" className="text-primary" />
+                {t('dashboard.overzichtTitle')}
               </h1>
               <p className="text-muted-foreground">
-                Welcome, <span className="font-semibold">{user?.full_name}</span>
+                {t('dashboard.welcomeBack')}, <span className="font-semibold">{user?.full_name}</span>
               </p>
             </div>
           </div>
@@ -202,20 +203,20 @@ export const SmartDashboard = () => {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
-              <Brain size={40} weight="duotone" className="text-primary" />
-              Smart Dashboard
+              <House size={40} weight="duotone" className="text-primary" />
+              {t('dashboard.overzichtTitle')}
             </h1>
             <p className="text-muted-foreground">
-              Welcome back, <span className="font-semibold">{user?.full_name}</span>
+              {t('dashboard.welcomeBack')}, <span className="font-semibold">{user?.full_name}</span>
             </p>
           </div>
           <div className="text-right">
             <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isLoading}>
               <ArrowsClockwise size={18} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
+              {t('common.refresh')}
             </Button>
             <p className="text-xs text-muted-foreground mt-2">
-              Last updated: {format(lastRefresh, 'HH:mm:ss')}
+              {t('dashboard.lastUpdated')}: {format(lastRefresh, 'HH:mm:ss', { locale: nlLocale })}
             </p>
           </div>
         </div>
@@ -225,7 +226,7 @@ export const SmartDashboard = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <FileText size={18} weight="duotone" />
-                Total Transactions
+                {t('dashboard.totalTransactions')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -233,7 +234,7 @@ export const SmartDashboard = () => {
                 {stats?.total_transactions || 0}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {stats?.draft_count || 0} drafts, {stats?.posted_count || 0} posted
+                {stats?.draft_count || 0} {t('transactionStatus.draft').toLowerCase()}, {stats?.posted_count || 0} {t('transactionStatus.posted').toLowerCase()}
               </p>
             </CardContent>
           </Card>
@@ -242,7 +243,7 @@ export const SmartDashboard = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <TrendDown size={18} weight="duotone" />
-                Total Debit
+                {t('dashboard.totalDebit')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -250,7 +251,7 @@ export const SmartDashboard = () => {
                 {formatCurrency(Number(stats?.total_debit || 0))}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Sum of all debits
+                {t('dashboard.sumOfDebits')}
               </p>
             </CardContent>
           </Card>
@@ -259,7 +260,7 @@ export const SmartDashboard = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <TrendUp size={18} weight="duotone" />
-                Total Credit
+                {t('dashboard.totalCredit')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -267,7 +268,7 @@ export const SmartDashboard = () => {
                 {formatCurrency(Number(stats?.total_credit || 0))}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Sum of all credits
+                {t('dashboard.sumOfCredits')}
               </p>
             </CardContent>
           </Card>
@@ -276,7 +277,7 @@ export const SmartDashboard = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Sparkle size={18} weight="duotone" />
-                Draft Pending
+                {t('dashboard.draftsPending')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -284,7 +285,7 @@ export const SmartDashboard = () => {
                 {stats?.draft_count || 0}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Awaiting review
+                {t('dashboard.awaitingReview')}
               </p>
             </CardContent>
           </Card>
@@ -295,30 +296,30 @@ export const SmartDashboard = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CheckCircle size={24} weight="duotone" className="text-accent" />
-                Processing Status
+                {t('dashboard.processingStatus')}
               </CardTitle>
-              <CardDescription>Transaction approval workflow</CardDescription>
+              <CardDescription>{t('dashboard.transactionApprovalWorkflow')}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 rounded-full bg-accent" />
-                    <span className="font-medium">Posted</span>
+                    <span className="font-medium">{t('dashboard.posted')}</span>
                   </div>
                   <span className="text-2xl font-bold">{stats?.posted_count || 0}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 rounded-full bg-amber-500" />
-                    <span className="font-medium">Draft / Pending Review</span>
+                    <span className="font-medium">{t('dashboard.draftPendingReview')}</span>
                   </div>
                   <span className="text-2xl font-bold">{stats?.draft_count || 0}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 rounded-full bg-primary" />
-                    <span className="font-medium">Total</span>
+                    <span className="font-medium">{t('dashboard.total')}</span>
                   </div>
                   <span className="text-2xl font-bold">{stats?.total_transactions || 0}</span>
                 </div>
@@ -330,9 +331,9 @@ export const SmartDashboard = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Receipt size={24} weight="duotone" />
-                Recent Transactions
+                {t('dashboard.recentTransactions')}
               </CardTitle>
-              <CardDescription>Latest AI-processed invoices</CardDescription>
+              <CardDescription>{t('dashboard.latestAiProcessed')}</CardDescription>
             </CardHeader>
             <CardContent>
               {stats?.recent_transactions && stats.recent_transactions.length > 0 ? (
@@ -347,7 +348,7 @@ export const SmartDashboard = () => {
                         <div>
                           <p className="font-medium text-sm">{transaction.description}</p>
                           <p className="text-xs text-muted-foreground">
-                            {format(new Date(transaction.transaction_date), 'dd MMM yyyy')}
+                            {format(new Date(transaction.transaction_date), 'dd MMM yyyy', { locale: nlLocale })}
                           </p>
                         </div>
                       </div>
@@ -361,7 +362,7 @@ export const SmartDashboard = () => {
                               : 'bg-amber-500/20 text-amber-700'
                           }
                         >
-                          {transaction.status}
+                          {transaction.status === 'POSTED' ? t('transactionStatus.posted') : t('transactionStatus.draft')}
                         </Badge>
                       </div>
                     </div>
@@ -370,9 +371,9 @@ export const SmartDashboard = () => {
               ) : (
                 <div className="text-center py-8">
                   <Receipt size={48} className="mx-auto mb-4 text-muted-foreground opacity-50" weight="duotone" />
-                  <p className="text-muted-foreground">No transactions yet</p>
+                  <p className="text-muted-foreground">{t('dashboard.noTransactions')}</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Upload invoices to get started
+                    {t('dashboard.uploadToStart')}
                   </p>
                 </div>
               )}

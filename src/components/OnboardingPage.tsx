@@ -16,6 +16,7 @@ import {
 } from '@phosphor-icons/react'
 import { administrationApi, AdministrationCreateRequest } from '@/lib/api'
 import { toast } from 'sonner'
+import { t } from '@/i18n'
 
 interface OnboardingPageProps {
   userRole: 'zzp' | 'accountant' | 'admin'
@@ -51,11 +52,11 @@ export const OnboardingPage = ({ userRole, userName, onComplete }: OnboardingPag
     
     try {
       await administrationApi.create(administrationForm)
-      toast.success('Administration created successfully!')
+      toast.success(t('onboarding.adminCreatedSuccess'))
       setCurrentStep('confirmation')
     } catch (error) {
       console.error('Failed to create administration:', error)
-      toast.error('Failed to create administration. Please try again.')
+      toast.error(t('onboarding.adminCreatedError'))
     } finally {
       setIsLoading(false)
     }
@@ -74,9 +75,9 @@ export const OnboardingPage = ({ userRole, userName, onComplete }: OnboardingPag
         <div className="flex justify-center mb-4">
           <User size={48} weight="duotone" className="text-primary" />
         </div>
-        <CardTitle className="text-2xl">Welcome, {userName}!</CardTitle>
+        <CardTitle className="text-2xl">{t('onboarding.welcomeZzp')}, {userName}!</CardTitle>
         <CardDescription className="text-base">
-          Let's set up your account. First, tell us how you'll be using Smart Accounting.
+          {t('onboarding.zzpDescription')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -91,12 +92,12 @@ export const OnboardingPage = ({ userRole, userName, onComplete }: OnboardingPag
             <div className="flex items-center gap-3 mb-3">
               <Briefcase size={32} weight="duotone" className="text-primary" />
               <div>
-                <h3 className="font-semibold text-lg">ZZP / Freelancer</h3>
-                <Badge variant="outline" className="text-xs">Self-Employed</Badge>
+                <h3 className="font-semibold text-lg">{t('onboarding.accountTypeZzp')}</h3>
+                <Badge variant="outline" className="text-xs">{t('onboarding.accountTypeZzpBadge')}</Badge>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              I'm self-employed and want to manage my own bookkeeping and VAT returns.
+              {t('onboarding.accountTypeZzpDescription')}
             </p>
           </button>
           
@@ -110,19 +111,19 @@ export const OnboardingPage = ({ userRole, userName, onComplete }: OnboardingPag
             <div className="flex items-center gap-3 mb-3">
               <Buildings size={32} weight="duotone" className="text-accent" />
               <div>
-                <h3 className="font-semibold text-lg">Accountant</h3>
-                <Badge variant="outline" className="text-xs">Multi-client</Badge>
+                <h3 className="font-semibold text-lg">{t('onboarding.accountTypeAccountant')}</h3>
+                <Badge variant="outline" className="text-xs">{t('onboarding.accountTypeAccountantBadge')}</Badge>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              I'm an accountant managing bookkeeping for multiple clients (ZZP or businesses).
+              {t('onboarding.accountTypeAccountantDescription')}
             </p>
           </button>
         </div>
         
         <p className="text-center text-xs text-muted-foreground mt-6">
           <Sparkle size={14} className="inline mr-1" />
-          You can change this later in your settings
+          {t('onboarding.canChangeLater')}
         </p>
       </CardContent>
     </Card>
@@ -140,30 +141,30 @@ export const OnboardingPage = ({ userRole, userName, onComplete }: OnboardingPag
             className="text-muted-foreground"
           >
             <ArrowLeft size={16} className="mr-1" />
-            Back
+            {t('common.back')}
           </Button>
         </div>
         <div className="flex justify-center mb-4">
           <Buildings size={48} weight="duotone" className="text-primary" />
         </div>
         <CardTitle className="text-2xl text-center">
-          {accountType === 'zzp' ? 'Create Your Administration' : 'Create Your First Client'}
+          {accountType === 'zzp' ? t('onboarding.createAdministration') : t('onboarding.createClientAdmin')}
         </CardTitle>
         <CardDescription className="text-base text-center">
           {accountType === 'zzp'
-            ? 'Set up your business administration to start tracking invoices and expenses.'
-            : 'Add your first client administration. You can add more clients later.'}
+            ? t('onboarding.adminSetupZzp')
+            : t('onboarding.adminSetupAccountant')}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleCreateAdministration} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="admin-name">
-              {accountType === 'zzp' ? 'Business Name' : 'Client Name'} *
+              {accountType === 'zzp' ? t('onboarding.businessName') : t('onboarding.clientName')} *
             </Label>
             <Input
               id="admin-name"
-              placeholder={accountType === 'zzp' ? 'e.g., John Doe Consulting' : 'e.g., Client Company B.V.'}
+              placeholder={accountType === 'zzp' ? t('onboarding.businessNamePlaceholder') : t('onboarding.clientNamePlaceholder')}
               value={administrationForm.name}
               onChange={(e) => setAdministrationForm({ ...administrationForm, name: e.target.value })}
               required
@@ -173,34 +174,34 @@ export const OnboardingPage = ({ userRole, userName, onComplete }: OnboardingPag
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="admin-kvk">KVK Number (optional)</Label>
+            <Label htmlFor="admin-kvk">{t('onboarding.kvkNumberLabel')}</Label>
             <Input
               id="admin-kvk"
-              placeholder="e.g., 12345678"
+              placeholder={t('onboarding.kvkNumberPlaceholder')}
               value={administrationForm.kvk_number}
               onChange={(e) => setAdministrationForm({ ...administrationForm, kvk_number: e.target.value })}
               maxLength={50}
             />
-            <p className="text-xs text-muted-foreground">Dutch Chamber of Commerce registration number</p>
+            <p className="text-xs text-muted-foreground">{t('onboarding.kvkNumberHelp')}</p>
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="admin-btw">BTW Number (optional)</Label>
+            <Label htmlFor="admin-btw">{t('onboarding.btwNumberLabel')}</Label>
             <Input
               id="admin-btw"
-              placeholder="e.g., NL123456789B01"
+              placeholder={t('onboarding.btwNumberPlaceholder')}
               value={administrationForm.btw_number}
               onChange={(e) => setAdministrationForm({ ...administrationForm, btw_number: e.target.value })}
               maxLength={50}
             />
-            <p className="text-xs text-muted-foreground">VAT identification number</p>
+            <p className="text-xs text-muted-foreground">{t('onboarding.btwNumberHelp')}</p>
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="admin-description">Description (optional)</Label>
+            <Label htmlFor="admin-description">{t('onboarding.descriptionLabel')}</Label>
             <Input
               id="admin-description"
-              placeholder="Brief description of the business"
+              placeholder={t('onboarding.descriptionPlaceholder')}
               value={administrationForm.description}
               onChange={(e) => setAdministrationForm({ ...administrationForm, description: e.target.value })}
               maxLength={1000}
@@ -212,7 +213,7 @@ export const OnboardingPage = ({ userRole, userName, onComplete }: OnboardingPag
             className="w-full mt-6" 
             disabled={isLoading || !administrationForm.name.trim()}
           >
-            {isLoading ? 'Creating...' : 'Create Administration'}
+            {isLoading ? t('onboarding.creatingAdmin') : t('onboarding.createAdminButton')}
             <ArrowRight size={18} className="ml-2" />
           </Button>
         </form>
@@ -227,42 +228,40 @@ export const OnboardingPage = ({ userRole, userName, onComplete }: OnboardingPag
         <div className="flex justify-center mb-4">
           <CheckCircle size={64} weight="fill" className="text-green-500" />
         </div>
-        <CardTitle className="text-2xl text-green-600">You're All Set!</CardTitle>
+        <CardTitle className="text-2xl text-green-600">{t('onboarding.allSetTitle')}</CardTitle>
         <CardDescription className="text-base">
-          Your account is ready. You can now start using Smart Accounting.
+          {t('onboarding.allSetDescription')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="bg-secondary/50 rounded-lg p-4 space-y-3">
-          <h4 className="font-medium">What you can do now:</h4>
+          <h4 className="font-medium">{t('onboarding.whatYouCanDo')}</h4>
           <ul className="text-sm text-muted-foreground space-y-2">
             <li className="flex items-center gap-2">
               <Sparkle size={16} className="text-primary" />
-              Upload invoices and receipts for automatic processing
+              {t('onboarding.uploadInvoicesReceipts')}
             </li>
             <li className="flex items-center gap-2">
               <Sparkle size={16} className="text-primary" />
-              Review and approve AI-generated transactions
+              {t('onboarding.reviewAiTransactions')}
             </li>
             <li className="flex items-center gap-2">
               <Sparkle size={16} className="text-primary" />
-              Track your VAT obligations and deadlines
+              {t('onboarding.trackVatObligations')}
             </li>
             {accountType === 'accountant' && (
               <li className="flex items-center gap-2">
                 <Sparkle size={16} className="text-primary" />
-                Add more client administrations from the dashboard
+                {t('onboarding.addMoreClientsAccountant')}
               </li>
             )}
           </ul>
         </div>
         
         <Button onClick={onComplete} className="w-full" size="lg">
-          Go to Dashboard
+          {t('onboarding.goToDashboard')}
           <ArrowRight size={18} className="ml-2" />
         </Button>
-        
-        {/* TODO: Future expansion - Add links to help docs, video tutorials, etc. */}
       </CardContent>
     </Card>
   )
@@ -295,7 +294,7 @@ export const OnboardingPage = ({ userRole, userName, onComplete }: OnboardingPag
             }`} />
           </div>
           <p className="text-sm text-muted-foreground mt-2">
-            Step {currentStep === 'account-type' ? '1' : currentStep === 'create-administration' ? '2' : '3'} of 3
+            {t('onboarding.step')} {currentStep === 'account-type' ? '1' : currentStep === 'create-administration' ? '2' : '3'} {t('onboarding.of')} 3
           </p>
         </div>
         

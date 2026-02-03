@@ -1127,3 +1127,93 @@ Accountants can import bank statements (CSV) and reconcile transactions with inv
 | CREATE_EXPENSE | Uitgave geboekt | Create expense journal entry |
 | IGNORE | Transactie genegeerd | Ignore this transaction |
 | UNMATCH | Match ongedaan gemaakt | Undo previous match |
+
+---
+
+## ZZP MVP Verification Checklist
+
+### Overview
+The ZZP MVP provides a streamlined Dutch-first experience for ZZP (freelance) users to manage their bookkeeping. The navigation is simplified with 5 main menu items: Overzicht, Documenten, Boekingen, Boekhouder, and Instellingen.
+
+### E2E Verification Steps
+
+1. **Register/Login as ZZP**
+   - [ ] Register a new account with role "ZZP"
+   - [ ] Verify email
+   - [ ] Login successfully
+   - [ ] Sidebar shows Dutch labels: Overzicht, Documenten, Boekingen, Boekhouder, Instellingen
+
+2. **Onboarding creates/selects administratie**
+   - [ ] On first login, onboarding flow appears
+   - [ ] Dutch labels shown throughout onboarding
+   - [ ] Create administration with minimal required fields (name only)
+   - [ ] Confirmation step shows success message in Dutch
+   - [ ] Dashboard loads after onboarding completion
+
+3. **Documenten page shows upload + list**
+   - [ ] Navigate to Documenten via sidebar
+   - [ ] Page title shows "Documenten"
+   - [ ] Drag-and-drop upload zone visible
+   - [ ] Stats cards show upload counts
+   - [ ] Document list displays with Dutch status labels
+   - [ ] Reprocess button available for FAILED documents
+   - [ ] Dates formatted in Dutch locale
+
+4. **Boekingen shows stats/list**
+   - [ ] Navigate to Boekingen via sidebar
+   - [ ] Page title shows "Boekingen"
+   - [ ] Stats cards show transaction totals
+   - [ ] Transaction list with search/filter
+   - [ ] Dutch status labels (Concept, Geboekt)
+   - [ ] AI confidence badges visible
+   - [ ] Dates formatted in Dutch locale
+
+5. **Boekhouder-koppelingen page works**
+   - [ ] Navigate to Boekhouder via sidebar
+   - [ ] Page title shows "Boekhouder-koppelingen"
+   - [ ] Pending requests section visible
+   - [ ] Empty state shows Dutch message if no requests
+   - [ ] Approve/Reject buttons functional (if requests exist)
+
+6. **Instellingen page works**
+   - [ ] Navigate to Instellingen via sidebar
+   - [ ] Profile information displayed
+   - [ ] Company/Administration info shown (for ZZP users)
+   - [ ] Notification preferences available
+   - [ ] Dutch labels throughout
+
+7. **Logout works**
+   - [ ] Click Uitloggen button in header
+   - [ ] User is redirected to login page
+   - [ ] Session cleared properly
+
+8. **Accountant flow unaffected**
+   - [ ] Login as accountant user
+   - [ ] Sidebar shows accountant-specific menu (Bank & Kas, Klanten, etc.)
+   - [ ] Client switcher visible in header
+   - [ ] All accountant features working as before
+
+### ZZP Navigation Menu
+
+| Menu Item | Route | Component | Description |
+|-----------|-------|-----------|-------------|
+| Overzicht | `/dashboard` | SmartDashboard | Dashboard with stats and recent transactions |
+| Documenten | `/ai-upload` | IntelligentUploadPortal | Upload documents + view list |
+| Boekingen | `/transactions` | SmartTransactionList | Transaction list with filtering |
+| Boekhouder | `/dashboard/boekhouder` | ZZPAccountantLinksPage | Manage accountant access |
+| Instellingen | `/settings` | SettingsPage | Profile and notification settings |
+
+### API Endpoints Used
+
+| Feature | Endpoint | Method |
+|---------|----------|--------|
+| List administrations | `/api/v1/administrations` | GET |
+| Create administration | `/api/v1/administrations` | POST |
+| Upload document | `/api/v1/documents/upload` | POST |
+| List documents | `/api/v1/documents` | GET |
+| Reprocess document | `/api/v1/documents/{id}/reprocess` | POST |
+| Transaction stats | `/api/v1/transactions/stats` | GET |
+| List transactions | `/api/v1/transactions` | GET |
+| Pending accountant links | `/api/v1/zzp/links` | GET |
+| Approve link | `/api/v1/zzp/links/{id}/approve` | POST |
+| Reject link | `/api/v1/zzp/links/{id}/reject` | POST |

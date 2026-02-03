@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -22,18 +22,29 @@ export const SmartTransactionList = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const fetchIdRef = useRef(0) // Prevent race conditions from multiple fetches
 
   const fetchTransactions = async () => {
+    const fetchId = ++fetchIdRef.current
     setIsLoading(true)
     try {
       const statusParam = statusFilter !== 'all' ? statusFilter as 'DRAFT' | 'POSTED' : undefined
       const data = await transactionApi.getAll(statusParam)
-      setTransactions(data)
+      // Only update if this is the latest fetch (prevents race conditions)
+      if (fetchId === fetchIdRef.current) {
+        setTransactions(data)
+      }
     } catch (error) {
-      console.error('Failed to fetch transactions:', error)
-      toast.error(t('smartTransactions.failedToLoad'))
+      if (fetchId === fetchIdRef.current) {
+        console.error('Failed to fetch transactions:', error)
+        // Only show toast for errors that aren't expected (like no transactions)
+        toast.error(t('smartTransactions.failedToLoad'))
+        setTransactions([])
+      }
     } finally {
-      setIsLoading(false)
+      if (fetchId === fetchIdRef.current) {
+        setIsLoading(false)
+      }
     }
   }
 

@@ -260,6 +260,11 @@ api.interceptors.request.use(
       config.headers['X-Selected-Client-Id'] = selectedClientId
     }
     
+    // DEBUG: Log outgoing request URL (only in DEV mode to avoid exposing info in production)
+    if (isDev) {
+      console.log('[API Request]', config.method?.toUpperCase(), config.baseURL + (config.url || ''))
+    }
+    
     return config
   },
   (error) => {
@@ -268,8 +273,22 @@ api.interceptors.request.use(
 )
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // DEBUG: Log successful response (only in DEV mode to avoid exposing info in production)
+    if (isDev) {
+      console.log('[API Response]', response.status, response.config.url)
+    }
+    return response
+  },
   async (error: AxiosError) => {
+    // DEBUG: Log error response with details (only in DEV mode to avoid exposing info in production)
+    if (isDev) {
+      const url = error.config?.url || 'unknown'
+      const status = error.response?.status || 'network error'
+      const message = error.message || 'unknown error'
+      console.error('[API Error]', status, url, message)
+    }
+    
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
     if (error.response?.status === 401 && !originalRequest._retry) {

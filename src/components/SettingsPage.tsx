@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/lib/AuthContext'
-import { administrationApi, Administration, getApiBaseUrl } from '@/lib/api'
+import { administrationApi, Administration, getApiBaseUrl, getRawViteApiUrl, getWindowOrigin } from '@/lib/api'
 import { 
   User,
   Buildings,
@@ -339,26 +339,48 @@ export const SettingsPage = () => {
             </CardContent>
           </Card>
 
-          {/* Version Footer */}
+          {/* Version Footer with Diagnostics */}
           <Card className="bg-secondary/30 border-dashed">
             <CardContent className="py-4">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-muted-foreground">
-                <div className="flex items-center gap-4">
-                  <span>
-                    <strong>{t('settings.version')}:</strong> {BUILD_VERSION}
-                  </span>
-                  <span>
-                    <strong>{t('settings.build')}:</strong> {BUILD_TIMESTAMP === 'development' ? t('settings.development') : new Date(BUILD_TIMESTAMP).toLocaleString('nl-NL')}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span>
-                    <strong>{t('settings.api')}:</strong> {getApiBaseUrl().replace('/api/v1', '')}
-                  </span>
+              <div className="flex flex-col gap-3 text-sm text-muted-foreground">
+                {/* Version and build info */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-4">
+                    <span>
+                      <strong>{t('settings.version')}:</strong> {BUILD_VERSION}
+                    </span>
+                    <span>
+                      <strong>{t('settings.build')}:</strong> {BUILD_TIMESTAMP === 'development' ? t('settings.development') : new Date(BUILD_TIMESTAMP).toLocaleString('nl-NL')}
+                    </span>
+                  </div>
                   <Badge variant="outline" className="text-xs">
                     {import.meta.env.DEV ? t('settings.development') : t('settings.production')}
                   </Badge>
                 </div>
+                
+                {/* API Diagnostics - non-intrusive but visible for debugging */}
+                <Separator className="my-1" />
+                <div className="space-y-1 font-mono text-xs">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    <span>
+                      <strong>{t('settings.apiBase')}:</strong>{' '}
+                      <code className="bg-secondary px-1 rounded">{getApiBaseUrl()}</code>
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground/70">
+                    <span>
+                      <strong>{t('settings.viteApiUrl')}:</strong>{' '}
+                      <code className="bg-secondary/50 px-1 rounded">{getRawViteApiUrl()}</code>
+                    </span>
+                    <span>
+                      <strong>{t('settings.browserOrigin')}:</strong>{' '}
+                      <code className="bg-secondary/50 px-1 rounded">{getWindowOrigin()}</code>
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground/60 italic">
+                  {t('settings.apiDiagnosticsHint')}
+                </p>
               </div>
             </CardContent>
           </Card>

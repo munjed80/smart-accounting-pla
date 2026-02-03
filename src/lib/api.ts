@@ -52,6 +52,9 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 const isDev = import.meta.env.DEV
 const envApiUrl = import.meta.env.VITE_API_URL as string | undefined
 
+// Store raw VITE_API_URL for diagnostics (before any normalization)
+const rawViteApiUrl = envApiUrl ?? '(not set)'
+
 /**
  * Normalize URL: trim whitespace, ensure scheme is present, and remove trailing slash.
  * In production, URLs without a scheme are prefixed with "https://".
@@ -75,6 +78,64 @@ const normalizeBaseUrl = (url: string | undefined): string => {
   return result.replace(/\/+$/, '')
 }
 
+/**
+ * Normalize API origin: extracts only the origin (scheme + host + port) from a URL,
+ * stripping any trailing paths like /api/v1, /api/v2, /api, etc.
+ * 
+ * This makes the API URL resilient to misconfigured Coolify env vars where
+ * someone accidentally includes the path suffix.
+ * 
+ * Examples:
+ *   https://api.zzpershub.nl           -> https://api.zzpershub.nl
+ *   https://api.zzpershub.nl/          -> https://api.zzpershub.nl
+ *   https://api.zzpershub.nl/api/v1    -> https://api.zzpershub.nl
+ *   https://api.zzpershub.nl/api/v1/   -> https://api.zzpershub.nl
+ *   https://api.zzpershub.nl/api/v2    -> https://api.zzpershub.nl
+ *   https://api.zzpershub.nl/api       -> https://api.zzpershub.nl
+ *   https://api.zzpershub.nl/api/      -> https://api.zzpershub.nl
+ * 
+ * @returns Object with `origin` (cleaned URL) and `hadApiPath` (true if /api path was stripped)
+ */
+export const normalizeApiOrigin = (url: string | undefined): { origin: string; hadApiPath: boolean } => {
+  if (!url) return { origin: '', hadApiPath: false }
+  
+  // First apply base normalization (trim, add scheme)
+  const baseNormalized = normalizeBaseUrl(url)
+  if (!baseNormalized) return { origin: '', hadApiPath: false }
+  
+  try {
+    const parsed = new URL(baseNormalized)
+    const origin = parsed.origin
+    
+    // Check if the URL had a path that we're stripping
+    // Strip trailing slashes from pathname for comparison
+    const pathname = parsed.pathname.replace(/\/+$/, '')
+    
+    // Specifically check for /api or /api/v{N} paths which are common mistakes
+    const hadApiPath = /^\/api(\/v\d+)?$/.test(pathname)
+    
+    // If there was an API path, warn about it (production only)
+    if (hadApiPath && !isDev) {
+      console.warn(
+        `[API Config] ⚠️ VITE_API_URL bevat een pad (${pathname}). ` +
+        `Dit wordt automatisch verwijderd. Stel VITE_API_URL in als alleen het domein: ${origin}`
+      )
+    }
+    
+    return { origin, hadApiPath }
+  } catch {
+    // If URL parsing fails, fall back to regex-based stripping
+    // Remove trailing /api/v{N}, /api/v{N}/, /api, /api/ and any trailing slashes
+    const stripped = baseNormalized
+      .replace(/\/api\/v\d+\/?$/, '')
+      .replace(/\/api\/?$/, '')
+      .replace(/\/+$/, '')
+    
+    const hadApiPath = stripped !== baseNormalized
+    return { origin: stripped, hadApiPath }
+  }
+}
+
 // Check if the URL points to localhost by parsing the hostname
 const isLocalhostUrl = (url: string | undefined): boolean => {
   if (!url) return false
@@ -88,33 +149,44 @@ const isLocalhostUrl = (url: string | undefined): boolean => {
   }
 }
 
-// Normalize the env URL first (handles whitespace)
-const normalizedEnvApiUrl = envApiUrl ? normalizeBaseUrl(envApiUrl) : undefined
+// Normalize the env URL using the new origin-stripping function
+// This handles cases where VITE_API_URL is set to https://api.zzpershub.nl/api/v1 (incorrect)
+// and normalizes it to https://api.zzpershub.nl (correct origin only)
+const normalizedEnvApiResult = envApiUrl ? normalizeApiOrigin(envApiUrl) : { origin: '', hadApiPath: false }
+const normalizedEnvApiUrl = normalizedEnvApiResult.origin || undefined
+const envApiUrlHadApiPath = normalizedEnvApiResult.hadApiPath
 
 // Determine if API is misconfigured (production with localhost or missing URL)
 // Uses normalized URL to ensure consistent validation
-const checkMisconfiguration = (): { isMisconfigured: boolean; reason: string } => {
+const checkMisconfiguration = (): { isMisconfigured: boolean; reason: string; warning?: string } => {
+  // Check if env URL had an API path (like /api/v1) that we stripped - this is a warning, not an error
+  const warning = envApiUrlHadApiPath && !isDev
+    ? `VITE_API_URL bevat een pad dat automatisch is verwijderd. Stel VITE_API_URL in als alleen: ${normalizedEnvApiUrl} (zonder /api paden).`
+    : undefined
+  
   if (isDev) {
     // In DEV mode, anything goes (including localhost)
-    return { isMisconfigured: false, reason: '' }
+    return { isMisconfigured: false, reason: '', warning }
   }
   
   // In PROD mode, VITE_API_URL must be set and must NOT point to localhost
   if (!normalizedEnvApiUrl || normalizedEnvApiUrl === '') {
     return { 
       isMisconfigured: true, 
-      reason: 'VITE_API_URL environment variable is not set. The frontend cannot call the API.' 
+      reason: 'VITE_API_URL environment variable is not set. The frontend cannot call the API.',
+      warning 
     }
   }
   
   if (isLocalhostUrl(normalizedEnvApiUrl)) {
     return { 
       isMisconfigured: true, 
-      reason: `VITE_API_URL is set to "${normalizedEnvApiUrl}" which points to localhost. In production, this must be the actual API URL (e.g., https://api.zzpershub.nl).` 
+      reason: `VITE_API_URL is set to "${normalizedEnvApiUrl}" which points to localhost. In production, this must be the actual API URL (e.g., https://api.zzpershub.nl).`,
+      warning 
     }
   }
   
-  return { isMisconfigured: false, reason: '' }
+  return { isMisconfigured: false, reason: '', warning }
 }
 
 // Compute API_BASE_URL with /api/v1 suffix
@@ -123,22 +195,35 @@ const checkMisconfiguration = (): { isMisconfigured: boolean; reason: string } =
 // If misconfigured in PROD, we still set the URL (possibly localhost) so the UI can display it,
 // but the misconfiguration banner will warn users
 // NOTE: All API routes are mounted under /api/v1, so we include it in the base URL
+// We use normalizeApiOrigin() to strip any accidental /api/v1 or /api paths from VITE_API_URL
+const devApiOrigin = normalizeApiOrigin(envApiUrl || 'http://localhost:8000').origin
 const API_BASE_URL = isDev 
-  ? `${normalizeBaseUrl(envApiUrl || 'http://localhost:8000')}/api/v1`
+  ? `${devApiOrigin}/api/v1`
   : `${normalizedEnvApiUrl || 'http://api-not-configured.invalid'}/api/v1`
 
 // Store misconfiguration result
 const misconfigurationCheck = checkMisconfiguration()
 
-// Dev mode: log the final API URL for debugging
+// Log API configuration for debugging (both dev and prod for troubleshooting)
 if (isDev) {
-  console.log('[API Config] VITE_API_URL:', envApiUrl ?? '(not set)')
-  console.log('[API Config] Normalized Base URL:', API_BASE_URL)
+  console.log('[API Config] VITE_API_URL:', rawViteApiUrl)
+  console.log('[API Config] Normalized Origin:', normalizedEnvApiUrl ?? '(not set)')
+  console.log('[API Config] Had API Path Stripped:', envApiUrlHadApiPath)
+  console.log('[API Config] Final Base URL:', API_BASE_URL)
   console.log('[API Config] Register endpoint:', `${API_BASE_URL}/auth/register`)
+} else if (envApiUrlHadApiPath) {
+  // In production, warn if we had to strip a path
+  console.warn('[API Config] ⚠️ VITE_API_URL pad automatisch verwijderd. Configureer als:', normalizedEnvApiUrl)
 }
 
 // Export API base for display purposes
 export const getApiBaseUrl = () => API_BASE_URL
+
+// Export the raw VITE_API_URL value for diagnostics
+export const getRawViteApiUrl = () => rawViteApiUrl
+
+// Export window.location.origin for diagnostics
+export const getWindowOrigin = () => typeof window !== 'undefined' ? window.location.origin : '(SSR)'
 
 // Export misconfiguration status for UI display
 export const isApiMisconfigured = () => misconfigurationCheck.isMisconfigured
@@ -427,11 +512,11 @@ export const checkApiHealth = async (): Promise<HealthCheckResult> => {
       success: isHealthy,
       status: isHealthy ? 'healthy' : 'unhealthy',
       message: isHealthy 
-        ? `API is healthy (${responseTime}ms)` 
-        : `API reports unhealthy status: ${healthData?.status || 'unknown'}`,
+        ? `API is gezond (${responseTime}ms)` 
+        : `API meldt ongezonde status: ${healthData?.status || 'onbekend'}`,
       details: healthData?.components 
-        ? `Components: ${Object.entries(healthData.components)
-            .map(([k, v]) => `${k}: ${(v as { status: string })?.status || 'unknown'}`)
+        ? `Componenten: ${Object.entries(healthData.components)
+            .map(([k, v]) => `${k}: ${(v as { status: string })?.status || 'onbekend'}`)
             .join(', ')}`
         : undefined,
       responseTime,
@@ -443,46 +528,46 @@ export const checkApiHealth = async (): Promise<HealthCheckResult> => {
       // Log detailed error for debugging
       logApiError(error, 'Health Check')
       
-      // Network error - could be CORS, TLS, DNS, or connectivity
+      // Network error - could be CORS, TLS, DNS, or connectivity (Dutch)
       if (error.message === 'Network Error') {
         return {
           success: false,
           status: 'unreachable',
-          message: 'Cannot reach API server',
-          details: `Failed to connect to ${API_BASE_URL}. Possible causes: CORS policy blocking the request, invalid/expired TLS certificate, DNS resolution failure, or the server is down.`,
+          message: 'Kan API-server niet bereiken',
+          details: `Kan geen verbinding maken met ${API_BASE_URL}. Mogelijke oorzaken: CORS, TLS-certificaat, DNS, of server offline.`,
           responseTime,
         }
       }
       
-      // Timeout
+      // Timeout (Dutch)
       if (error.code === 'ECONNABORTED') {
         return {
           success: false,
           status: 'unreachable',
-          message: 'API request timed out',
-          details: `Request to ${API_BASE_URL}/health timed out after ${responseTime}ms. The server may be overloaded or unresponsive.`,
+          message: 'API-verzoek verlopen',
+          details: `Verzoek naar ${API_BASE_URL}/health is verlopen na ${responseTime}ms. De server is mogelijk overbelast of reageert niet.`,
           responseTime,
         }
       }
       
-      // Server responded with an error status
+      // Server responded with an error status (Dutch)
       if (error.response) {
         return {
           success: false,
           status: 'error',
-          message: `API returned error: HTTP ${error.response.status}`,
-          details: error.response.data?.message || error.response.statusText || 'Unknown error',
+          message: `API fout: HTTP ${error.response.status}`,
+          details: error.response.data?.message || error.response.statusText || 'Onbekende fout',
           responseTime,
         }
       }
     }
     
-    // Generic error
+    // Generic error (Dutch)
     return {
       success: false,
       status: 'error',
-      message: 'Health check failed',
-      details: error instanceof Error ? error.message : 'Unknown error occurred',
+      message: 'Gezondheidscontrole mislukt',
+      details: error instanceof Error ? error.message : 'Onbekende fout opgetreden',
       responseTime,
     }
   }
@@ -1313,36 +1398,42 @@ export const getErrorMessage = (error: unknown): string => {
     }
     
     // Network error - could be CORS, TLS, or connectivity issue
+    // Dutch message with helpful troubleshooting hint
     if (error.message === 'Network Error') {
-      return `Cannot connect to server at ${API_BASE_URL}. This could be caused by: network connectivity issues, CORS misconfiguration, or invalid TLS certificate on the API server.`
+      const baseHint = normalizedEnvApiUrl 
+        ? `VITE_API_URL moet alleen ${normalizedEnvApiUrl} zijn (zonder /api paden).`
+        : 'VITE_API_URL moet alleen het domein bevatten (zonder /api paden).'
+      return `Kan geen verbinding maken met de server op ${API_BASE_URL}. ` +
+        `Mogelijke oorzaken: netwerkproblemen, CORS-fout, of ongeldig TLS-certificaat. ` +
+        `Controleer Coolify build env: ${baseHint}`
     }
     
-    // Timeout
+    // Timeout - Dutch message
     if (error.code === 'ECONNABORTED') {
-      return `Request to ${API_BASE_URL} timed out. The server may be slow or unresponsive.`
+      return `Verzoek naar ${API_BASE_URL} is verlopen. De server reageert mogelijk traag of is niet bereikbaar.`
     }
     
-    // HTTP status errors with better messages
+    // HTTP status errors with better messages (Dutch)
     if (status) {
       if (status === 401) {
-        return 'Authentication failed. Your credentials are incorrect or your session has expired.'
+        return 'Authenticatie mislukt. Je inloggegevens zijn onjuist of je sessie is verlopen.'
       }
       if (status === 403) {
-        return 'Access denied. You do not have permission for this action.'
+        return 'Geen toegang. Je hebt geen rechten voor deze actie.'
       }
       if (status === 404) {
-        return 'The requested resource was not found on the server.'
+        return 'De gevraagde gegevens zijn niet gevonden op de server.'
       }
       if (status === 409) {
-        return 'This resource already exists or conflicts with existing data.'
+        return 'Dit item bestaat al of conflicteert met bestaande gegevens.'
       }
       if (status === 422) {
-        return 'Invalid request data. Please check your input.'
+        return 'Ongeldige invoer. Controleer je gegevens.'
       }
       if (status >= 500) {
-        return `Server error (${status}). Please try again later or contact support.`
+        return `Serverfout (${status}). Probeer het later opnieuw of neem contact op met support.`
       }
-      return `Request failed with status ${status}: ${error.response?.statusText || error.message}`
+      return `Verzoek mislukt met status ${status}: ${error.response?.statusText || error.message}`
     }
     
     return error.message
@@ -1353,7 +1444,7 @@ export const getErrorMessage = (error: unknown): string => {
     return error.message
   }
   
-  return 'An unexpected error occurred'
+  return 'Er is een onverwachte fout opgetreden'
 }
 
 /**

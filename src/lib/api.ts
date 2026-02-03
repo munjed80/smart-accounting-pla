@@ -1,5 +1,51 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 
+/**
+ * ==== DATA MAP: Accountant Screens → Endpoints ====
+ * 
+ * 1. ACTIVA (Bank & Kas)
+ *    - Screen: BankReconciliationPage
+ *    - Endpoints:
+ *      * GET  /accountant/bank/transactions?administration_id=X       → List bank transactions
+ *      * POST /accountant/bank/import                                 → Import bank CSV
+ *      * POST /accountant/bank/transactions/{id}/suggest              → Get match suggestions
+ *      * POST /accountant/bank/transactions/{id}/apply                → Apply reconciliation action
+ *    - API: bankReconciliationApi
+ * 
+ * 2. DEBITEUREN (Klanten/Customers)
+ *    - Screen: AccountantClientsPage
+ *    - Endpoints:
+ *      * GET  /accountant/clients/links                               → List client links with consent status
+ *      * POST /accountant/clients/invite                              → Invite client by email
+ *      * GET  /accountant/clients/{client_id}/reports/ar              → Accounts receivable report
+ *    - API: accountantApi, ledgerApi.getAccountsReceivable()
+ * 
+ * 3. CREDITEUREN (Leveranciers/Suppliers)
+ *    - Screen: CrediteurenPage
+ *    - Endpoints:
+ *      * GET  /accountant/clients/{client_id}/reports/ap              → Accounts payable report (leveranciers)
+ *    - API: ledgerApi.getAccountsPayable()
+ *    - Note: Suppliers derived from AP open items grouped by party_name
+ * 
+ * 4. GROOTBOEK (General Ledger)
+ *    - Screen: GrootboekPage (NEW)
+ *    - Endpoints:
+ *      * GET  /accountant/clients/{client_id}/reports/balance-sheet   → Balance sheet for account overview
+ *      * GET  /accountant/clients/{client_id}/reports/pnl             → P&L for expense/revenue accounts
+ *      * GET  /transactions?administration_id=X                       → Transaction list for line details
+ *    - API: ledgerApi, transactionApi
+ *    - Note: Category mapping done in frontend via account_type heuristics
+ * 
+ * 5. WINST- EN VERLIESREKENING (Profit & Loss)
+ *    - Screen: ProfitLossPage
+ *    - Endpoints:
+ *      * GET  /accountant/clients/{client_id}/reports/pnl             → Full P&L report
+ *    - API: ledgerApi.getProfitAndLoss()
+ *    - Note: Shows revenue, COGS, gross profit, operating expenses, net income
+ * 
+ * ==== END DATA MAP ====
+ */
+
 // Determine API_BASE_URL based on environment
 // In DEV mode: Allow fallback to localhost for development convenience
 // In PROD mode: VITE_API_URL must be set and must NOT point to localhost

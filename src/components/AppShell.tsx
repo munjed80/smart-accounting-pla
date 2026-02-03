@@ -36,6 +36,7 @@ import {
   Bank,
   Storefront,
   ChartLineUp,
+  Books,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 
@@ -97,6 +98,14 @@ const menuItems: MenuItem[] = [
     label: t('sidebar.beoordelenGrootboek'),
     tabValue: 'reviewqueue',
     icon: <MagnifyingGlass size={20} weight="duotone" />,
+    rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
+    accountingSection: 'grootboek',
+  },
+  {
+    label: 'Rekeningschema',
+    tabValue: 'grootboek',
+    icon: <Books size={20} weight="duotone" />,
     rolesAllowed: ['accountant', 'admin'],
     section: 'main',
     accountingSection: 'grootboek',

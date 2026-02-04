@@ -10,7 +10,22 @@ from app.core.database import Base
 
 
 class DocumentStatus(str, enum.Enum):
-    """Document workflow states for the intake pipeline."""
+    """
+    Document workflow states for the intake pipeline.
+    
+    IMPORTANT: When adding new status values to this enum, you MUST also create
+    an Alembic migration to add the value to the PostgreSQL 'documentstatus' enum type.
+    
+    PostgreSQL enums are fixed at database level and do not auto-sync with Python enums.
+    Use: ALTER TYPE documentstatus ADD VALUE IF NOT EXISTS 'NEW_STATUS';
+    
+    See migration 015_add_document_status_enum_values.py for the correct pattern.
+    
+    Historical note: The EXTRACTED, NEEDS_REVIEW, POSTED, and REJECTED values were
+    added in migration 008 Python code but the PostgreSQL enum was not updated,
+    causing production error: "invalid input value for enum documentstatus: NEEDS_REVIEW"
+    This was fixed in migration 015.
+    """
     UPLOADED = "UPLOADED"           # Just uploaded, waiting for processing
     PROCESSING = "PROCESSING"       # Being processed/extracted
     EXTRACTED = "EXTRACTED"         # Fields extracted, ready for matching

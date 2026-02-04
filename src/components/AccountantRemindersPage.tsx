@@ -374,11 +374,15 @@ export const AccountantRemindersPage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('reminders.allClients')}</SelectItem>
-                  {clients.filter(c => c.administration_id).map((client) => (
-                    <SelectItem key={client.administration_id} value={client.administration_id!}>
-                      {client.name || client.administration_name}
-                    </SelectItem>
-                  ))}
+                  {clients
+                    .filter((c): c is AccountantClientListItem & { administration_id: string } => 
+                      c.administration_id !== null
+                    )
+                    .map((client) => (
+                      <SelectItem key={client.administration_id} value={client.administration_id}>
+                        {client.name || client.administration_name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               

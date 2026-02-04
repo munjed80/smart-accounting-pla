@@ -56,8 +56,12 @@ def log_enum_and_router_status() -> None:
     status_values = [s.value for s in DocumentStatus]
     logger.info(f"DocumentStatus enum values: {status_values}")
     
-    # Log router mount confirmation
-    logger.info("Router mount confirmed: /api/v1/accountant/bank (bank-reconciliation)")
+    # Log bank routes that should be mounted under /api/v1
+    bank_routes = [route.path for route in bank.router.routes]
+    logger.info(
+        "Router mount confirmed: /api/v1/accountant/bank (bank-reconciliation), routes=%s",
+        bank_routes,
+    )
 
 
 async def verify_database_enums() -> None:

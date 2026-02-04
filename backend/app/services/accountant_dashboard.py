@@ -150,31 +150,43 @@ class AccountantDashboardService:
             document_backlog_total = 0
         
         # Alert counts by severity
-        alerts_result = await self.db.execute(
-            select(Alert.severity, func.count(Alert.id))
-            .where(or_(
-                Alert.administration_id.in_(client_ids),
-                Alert.administration_id.is_(None)
-            ))
-            .where(Alert.resolved_at.is_(None))
-            .group_by(Alert.severity)
-        )
         alerts_by_severity = {"critical": 0, "warning": 0, "info": 0}
-        for severity, count in alerts_result.all():
-            if severity == AlertSeverity.CRITICAL:
-                alerts_by_severity["critical"] = count
-            elif severity == AlertSeverity.WARNING:
-                alerts_by_severity["warning"] = count
-            elif severity == AlertSeverity.INFO:
-                alerts_by_severity["info"] = count
-        
+        try:
+            alerts_result = await self.db.execute(
+                select(Alert.severity, func.count(Alert.id))
+                .where(or_(
+                    Alert.administration_id.in_(client_ids),
+                    Alert.administration_id.is_(None)
+                ))
+                .where(Alert.resolved_at.is_(None))
+                .group_by(Alert.severity)
+            )
+            for severity, count in alerts_result.all():
+                if severity == AlertSeverity.CRITICAL:
+                    alerts_by_severity["critical"] = count
+                elif severity == AlertSeverity.WARNING:
+                    alerts_by_severity["warning"] = count
+                elif severity == AlertSeverity.INFO:
+                    alerts_by_severity["info"] = count
+        except Exception as exc:
+            logger.warning(
+                "Accountant dashboard alerts query failed; returning 0s. error=%s", exc
+            )
+
         # Calculate VAT deadlines
         today = date.today()
-        vat_deadlines = await self._get_vat_deadlines(client_ids, today)
+        try:
+            vat_deadlines = await self._get_vat_deadlines(client_ids, today)
+        except Exception as exc:
+            logger.warning(
+                "Accountant dashboard VAT deadline calculation failed; returning empty list. error=%s",
+                exc,
+            )
+            vat_deadlines = []
         
-        upcoming_7d = sum(1 for d in vat_deadlines if d["days_remaining"] <= 7)
-        upcoming_14d = sum(1 for d in vat_deadlines if d["days_remaining"] <= 14)
-        upcoming_30d = sum(1 for d in vat_deadlines if d["days_remaining"] <= 30)
+        upcoming_7d = sum(1 for d in vat_deadlines if d.get("days_remaining", 0) <= 7)
+        upcoming_14d = sum(1 for d in vat_deadlines if d.get("days_remaining", 0) <= 14)
+        upcoming_30d = sum(1 for d in vat_deadlines if d.get("days_remaining", 0) <= 30)
         
         return {
             "total_clients": total_clients,

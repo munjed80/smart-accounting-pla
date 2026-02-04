@@ -82,7 +82,8 @@ async def get_version() -> VersionResponse:
     if build_time_str:
         build_time = build_time_str
     else:
-        build_time = datetime.utcnow().isoformat()
+        from datetime import timezone as tz
+        build_time = datetime.now(tz.utc).isoformat()
 
     # Get environment name from settings
     env_name = settings.ENV

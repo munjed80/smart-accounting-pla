@@ -2167,6 +2167,21 @@ export interface RejectLinkResponse {
   message: string
 }
 
+export interface ActiveAccountantLink {
+  assignment_id: string
+  accountant_id: string
+  accountant_email: string
+  accountant_name: string
+  administration_id: string
+  administration_name: string
+  approved_at: string | null
+}
+
+export interface ZZPActiveLinksResponse {
+  active_links: ActiveAccountantLink[]
+  total_count: number
+}
+
 // Accountant Client Assignment API with Consent
 export const accountantApi = {
   /**
@@ -2197,6 +2212,14 @@ export const zzpApi = {
   },
 
   /**
+   * Get list of active accountant links for ZZP client
+   */
+  getActiveLinks: async (): Promise<ZZPActiveLinksResponse> => {
+    const response = await api.get<ZZPActiveLinksResponse>('/zzp/links/active')
+    return response.data
+  },
+
+  /**
    * Approve an accountant link request
    */
   approveLink: async (assignmentId: string): Promise<ApproveLinkResponse> => {
@@ -2209,6 +2232,14 @@ export const zzpApi = {
    */
   rejectLink: async (assignmentId: string): Promise<RejectLinkResponse> => {
     const response = await api.post<RejectLinkResponse>(`/zzp/links/${assignmentId}/reject`)
+    return response.data
+  },
+
+  /**
+   * Revoke an active accountant link (withdraw previously granted access)
+   */
+  revokeLink: async (assignmentId: string): Promise<RejectLinkResponse> => {
+    const response = await api.post<RejectLinkResponse>(`/zzp/links/${assignmentId}/revoke`)
     return response.data
   },
 }

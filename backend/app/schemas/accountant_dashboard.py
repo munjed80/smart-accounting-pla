@@ -378,3 +378,26 @@ class RejectLinkResponse(BaseModel):
     status: str  # REVOKED
     revoked_at: datetime
     message: str
+
+
+# ============ ZZP Active Links Schemas ============
+
+class ActiveAccountantLink(BaseModel):
+    """
+    Active accountant link for ZZP client view.
+    
+    Shows an accountant with approved access to the client's administration.
+    """
+    assignment_id: UUID
+    accountant_id: UUID
+    accountant_email: str
+    accountant_name: str
+    administration_id: UUID
+    administration_name: str
+    approved_at: Optional[datetime] = None
+
+
+class ZZPActiveLinksResponse(BaseModel):
+    """Response for ZZP client's active accountant links."""
+    active_links: List[ActiveAccountantLink]
+    total_count: int

@@ -6,6 +6,7 @@ Service layer for:
 - Bulk operations execution
 - Rate limiting and audit logging
 """
+import logging
 import uuid
 import hashlib
 from datetime import datetime, timezone, date, timedelta
@@ -31,6 +32,9 @@ from app.models.accountant_dashboard import (
 from app.services.validation import ConsistencyEngine
 from app.services.vat.report import VatReportService
 from app.services.period import PeriodControlService
+
+
+logger = logging.getLogger(__name__)
 
 
 class DashboardServiceError(Exception):
@@ -130,12 +134,20 @@ class AccountantDashboardService:
         clients_in_review = review_result.scalar() or 0
         
         # Document backlog (NEEDS_REVIEW status)
-        doc_backlog_result = await self.db.execute(
-            select(func.count(Document.id))
-            .where(Document.administration_id.in_(client_ids))
-            .where(Document.status == DocumentStatus.NEEDS_REVIEW)
-        )
-        document_backlog_total = doc_backlog_result.scalar() or 0
+        try:
+            doc_backlog_result = await self.db.execute(
+                select(func.count(Document.id))
+                .where(Document.administration_id.in_(client_ids))
+                .where(Document.status == DocumentStatus.NEEDS_REVIEW)
+            )
+            document_backlog_total = doc_backlog_result.scalar() or 0
+        except Exception as exc:
+            # Defensive: if the database enum is missing NEEDS_REVIEW (production mismatch) or any other
+            # unexpected error occurs, do not crash the dashboard. Return a safe default and warn.
+            logger.warning(
+                "Accountant dashboard backlog query failed; returning 0. error=%s", exc
+            )
+            document_backlog_total = 0
         
         # Alert counts by severity
         alerts_result = await self.db.execute(

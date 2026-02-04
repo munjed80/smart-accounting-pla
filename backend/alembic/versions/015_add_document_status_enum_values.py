@@ -7,24 +7,25 @@ Create Date: 2024-02-01 00:00:00.000000
 This migration adds the missing document status enum values that were
 omitted from the original migration 008_document_intake_pipeline.
 
+ROOT CAUSE OF THE ENUM MISMATCH:
 The original enum in 001_initial.py only created:
   ('UPLOADED', 'PROCESSING', 'DRAFT_READY', 'FAILED')
 
-But migration 008 introduced new document workflow states without
-expanding the enum. This caused production errors:
+But migration 008_document_intake_pipeline introduced new document workflow
+states (EXTRACTED, NEEDS_REVIEW, POSTED, REJECTED) in the Python code without
+also expanding the PostgreSQL enum type. This caused production errors:
   invalid input value for enum documentstatus: "NEEDS_REVIEW"
 
-This migration adds:
-  - EXTRACTED: Fields extracted, ready for matching
-  - NEEDS_REVIEW: Needs accountant review
-  - POSTED: Successfully posted to journal
-  - REJECTED: Rejected by accountant
+This migration adds the missing values using 'ADD VALUE IF NOT EXISTS' syntax
+(PostgreSQL 9.3+) which is idempotent and safe to re-run.
 
-The migration is idempotent - it checks pg_enum before adding values.
+IMPORTANT: This migration uses autocommit mode because ALTER TYPE ... ADD VALUE
+cannot be executed inside a transaction block in PostgreSQL.
 """
 from typing import Sequence, Union
 
 from alembic import op
+from sqlalchemy import text
 
 
 # revision identifiers, used by Alembic.
@@ -35,63 +36,45 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add missing enum values idempotently using DO block
-    # This checks pg_enum before attempting to add each value
-    op.execute("""
-        DO $$
-        BEGIN
-            -- Add EXTRACTED if not exists
-            IF NOT EXISTS (
-                SELECT 1 FROM pg_enum 
-                WHERE enumlabel = 'EXTRACTED' 
-                AND enumtypid = 'documentstatus'::regtype
-            ) THEN
-                ALTER TYPE documentstatus ADD VALUE 'EXTRACTED';
-            END IF;
-        END $$;
-    """)
+    # IMPORTANT: ALTER TYPE ... ADD VALUE cannot run inside a transaction block.
+    # We use the IF NOT EXISTS clause (PostgreSQL 9.3+) for idempotency.
+    # 
+    # We commit any existing transaction first and then execute the ALTER TYPE
+    # statements. The commit is wrapped in try/except in case there's no active
+    # transaction (some database configurations start without one).
     
-    op.execute("""
-        DO $$
-        BEGIN
-            -- Add NEEDS_REVIEW if not exists
-            IF NOT EXISTS (
-                SELECT 1 FROM pg_enum 
-                WHERE enumlabel = 'NEEDS_REVIEW' 
-                AND enumtypid = 'documentstatus'::regtype
-            ) THEN
-                ALTER TYPE documentstatus ADD VALUE 'NEEDS_REVIEW';
-            END IF;
-        END $$;
-    """)
+    # Get the current connection
+    connection = op.get_bind()
     
-    op.execute("""
-        DO $$
-        BEGIN
-            -- Add POSTED if not exists
-            IF NOT EXISTS (
-                SELECT 1 FROM pg_enum 
-                WHERE enumlabel = 'POSTED' 
-                AND enumtypid = 'documentstatus'::regtype
-            ) THEN
-                ALTER TYPE documentstatus ADD VALUE 'POSTED';
-            END IF;
-        END $$;
-    """)
+    # Commit any existing transaction to allow ALTER TYPE ADD VALUE
+    # This is safe even if no transaction is active (wrapped in try/except)
+    try:
+        connection.execute(text("COMMIT"))
+    except Exception:
+        # No active transaction to commit, which is fine
+        pass
     
-    op.execute("""
-        DO $$
-        BEGIN
-            -- Add REJECTED if not exists
-            IF NOT EXISTS (
-                SELECT 1 FROM pg_enum 
-                WHERE enumlabel = 'REJECTED' 
-                AND enumtypid = 'documentstatus'::regtype
-            ) THEN
-                ALTER TYPE documentstatus ADD VALUE 'REJECTED';
-            END IF;
-        END $$;
-    """)
+    # Add EXTRACTED - Fields extracted, ready for matching
+    # Using IF NOT EXISTS for idempotency (safe to re-run)
+    connection.execute(
+        text("ALTER TYPE documentstatus ADD VALUE IF NOT EXISTS 'EXTRACTED'")
+    )
+    
+    # Add NEEDS_REVIEW - Document needs accountant review before posting
+    # This is the critical status that caused the production error
+    connection.execute(
+        text("ALTER TYPE documentstatus ADD VALUE IF NOT EXISTS 'NEEDS_REVIEW'")
+    )
+    
+    # Add POSTED - Successfully posted to journal
+    connection.execute(
+        text("ALTER TYPE documentstatus ADD VALUE IF NOT EXISTS 'POSTED'")
+    )
+    
+    # Add REJECTED - Rejected by accountant
+    connection.execute(
+        text("ALTER TYPE documentstatus ADD VALUE IF NOT EXISTS 'REJECTED'")
+    )
 
 
 def downgrade() -> None:

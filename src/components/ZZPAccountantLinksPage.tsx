@@ -226,10 +226,10 @@ export const ZZPAccountantLinksPage = () => {
     setApprovingIds(prev => new Set(prev).add(assignmentId))
     
     try {
-      await zzpApi.approveLink(assignmentId)
+      const response = await zzpApi.approveLink(assignmentId)
       toast.success(t('zzpAccountantLinks.approvedSuccess'))
       
-      // Move from pending to active
+      // Move from pending to active, using server timestamp from response
       setPendingRequests(prev => prev.filter(r => r.assignment_id !== assignmentId))
       setActiveLinks(prev => [...prev, {
         assignment_id: request.assignment_id,
@@ -238,7 +238,7 @@ export const ZZPAccountantLinksPage = () => {
         accountant_name: request.accountant_name,
         administration_id: request.administration_id,
         administration_name: request.administration_name,
-        approved_at: new Date().toISOString(),
+        approved_at: response.approved_at,
       }])
     } catch (err) {
       toast.error(getErrorMessage(err))

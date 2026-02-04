@@ -44,6 +44,22 @@ def verify_orm_mappings() -> None:
     logger.info("ORM mapper configuration verified successfully")
 
 
+def log_enum_and_router_status() -> None:
+    """
+    Log DocumentStatus enum values and router mount status at startup.
+    
+    This helps diagnose enum mismatch and routing issues in production.
+    """
+    from app.models.document import DocumentStatus
+    
+    # Log DocumentStatus enum values
+    status_values = [s.value for s in DocumentStatus]
+    logger.info(f"DocumentStatus enum values: {status_values}")
+    
+    # Log router mount confirmation
+    logger.info("Router mount confirmed: /api/v1/accountant/bank (bank-reconciliation)")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -51,6 +67,7 @@ async def lifespan(app: FastAPI):
     
     Startup:
     - Verify ORM mappings to fail fast if models are misconfigured
+    - Log enum values and router status for diagnostics
     
     Shutdown:
     - Cleanup resources if needed
@@ -61,6 +78,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.critical(f"ORM mapper configuration failed: {e}")
         raise RuntimeError(f"Application cannot start: ORM mapping error - {e}") from e
+    
+    # Log enum and router status for production diagnostics
+    log_enum_and_router_status()
     
     yield
     

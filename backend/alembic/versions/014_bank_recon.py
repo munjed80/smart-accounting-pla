@@ -6,7 +6,7 @@ Adds tables for bank statement import and reconciliation:
 - reconciliation_actions
 
 Revision ID: 014_bank_recon
-Revises: 013_client_consent_workflow
+Revises: 014_bank_reconciliation
 Create Date: 2024-01-22 00:00:00.000000
 """
 from typing import Sequence, Union

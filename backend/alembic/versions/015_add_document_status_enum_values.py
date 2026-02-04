@@ -38,19 +38,24 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # IMPORTANT: ALTER TYPE ... ADD VALUE cannot run inside a transaction block.
     # We use the IF NOT EXISTS clause (PostgreSQL 9.3+) for idempotency.
-    # Each statement must be executed with autocommit enabled.
-    #
-    # Note: If running via alembic upgrade, ensure the migration runs outside
-    # a transaction or use op.execute() with execution_options({"isolation_level": "AUTOCOMMIT"}).
+    # 
+    # We commit any existing transaction first and then execute the ALTER TYPE
+    # statements. The commit is wrapped in try/except in case there's no active
+    # transaction (some database configurations start without one).
     
-    # Get the current connection and enable autocommit for enum modifications
+    # Get the current connection
     connection = op.get_bind()
     
-    # Execute each ADD VALUE outside transaction context
-    # Using IF NOT EXISTS for idempotency (safe to re-run)
-    connection.execute(text("COMMIT"))  # Commit any existing transaction
+    # Commit any existing transaction to allow ALTER TYPE ADD VALUE
+    # This is safe even if no transaction is active (wrapped in try/except)
+    try:
+        connection.execute(text("COMMIT"))
+    except Exception:
+        # No active transaction to commit, which is fine
+        pass
     
     # Add EXTRACTED - Fields extracted, ready for matching
+    # Using IF NOT EXISTS for idempotency (safe to re-run)
     connection.execute(
         text("ALTER TYPE documentstatus ADD VALUE IF NOT EXISTS 'EXTRACTED'")
     )

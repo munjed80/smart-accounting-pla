@@ -449,7 +449,7 @@ export const AccountantWorkQueue = () => {
               <TabsTrigger value="red" className="text-red-600">
                 <WarningCircle size={16} className="mr-1" />
                 Red Issues
-                {workQueue?.counts?.red_issues > 0 && (
+                {workQueue?.counts?.red_issues && workQueue.counts.red_issues > 0 && (
                   <Badge variant="destructive" className="ml-2">
                     {workQueue.counts.red_issues}
                   </Badge>

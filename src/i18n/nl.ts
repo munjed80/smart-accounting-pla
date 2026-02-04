@@ -46,6 +46,7 @@ export const nl = {
     success: "Gelukt",
     warning: "Waarschuwing",
     info: "Informatie",
+    unknown: "Onbekend",
   },
 
   // Brand

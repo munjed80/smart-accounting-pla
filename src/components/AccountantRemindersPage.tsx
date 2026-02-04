@@ -33,7 +33,8 @@ import {
 import { useAuth } from '@/lib/AuthContext'
 import { 
   reminderApi, 
-  accountantClientApi, 
+  accountantClientApi,
+  accountantMasterDashboardApi,
   ReminderResponse,
   ReminderHistoryResponse,
   BulkOperationResponse,
@@ -250,7 +251,7 @@ export const AccountantRemindersPage = () => {
     setBulkOpsError(null)
     
     try {
-      const response = await accountantClientApi.listBulkOperations(50)
+      const response = await accountantMasterDashboardApi.listBulkOperations(50)
       setBulkOperations(response.operations)
     } catch (err) {
       setBulkOpsError(getErrorMessage(err))
@@ -373,11 +374,15 @@ export const AccountantRemindersPage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('reminders.allClients')}</SelectItem>
-                  {clients.map((client) => (
-                    <SelectItem key={client.administration_id} value={client.administration_id}>
-                      {client.name || client.administration_name}
-                    </SelectItem>
-                  ))}
+                  {clients
+                    .filter((c): c is AccountantClientListItem & { administration_id: string } => 
+                      c.administration_id !== null
+                    )
+                    .map((client) => (
+                      <SelectItem key={client.administration_id} value={client.administration_id}>
+                        {client.name || client.administration_name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               

@@ -16,8 +16,11 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
+# Note: 014_bank_reconciliation is an empty placeholder to preserve the
+# revision history for deployments stamped with that revision. This file
+# carries the actual bank reconciliation schema changes.
 revision: str = "014_bank_recon"
-down_revision: Union[str, None] = "013_client_consent_workflow"
+down_revision: Union[str, None] = "014_bank_reconciliation"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

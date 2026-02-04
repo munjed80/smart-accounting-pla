@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/lib/AuthContext'
-import { administrationApi, Administration, getApiBaseUrl, getRawViteApiUrl, getWindowOrigin } from '@/lib/api'
+import { administrationApi, Administration, getApiBaseUrl, getRawViteApiUrl, getWindowOrigin, metaApi, VersionInfo } from '@/lib/api'
 import { 
   User,
   Buildings,
@@ -39,6 +39,8 @@ export const SettingsPage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [backendVersion, setBackendVersion] = useState<VersionInfo | null>(null)
+  const [backendVersionError, setBackendVersionError] = useState<string | null>(null)
   
   // Notification preferences (local state - would be stored in backend in full implementation)
   const [notifications, setNotifications] = useState({
@@ -63,6 +65,19 @@ export const SettingsPage = () => {
       }
     }
     fetchData()
+    
+    // Fetch backend version info (non-blocking)
+    const fetchVersion = async () => {
+      try {
+        const version = await metaApi.getVersion()
+        setBackendVersion(version)
+        setBackendVersionError(null)
+      } catch (error) {
+        console.error('Failed to fetch backend version:', error)
+        setBackendVersionError('Could not fetch backend version')
+      }
+    }
+    fetchVersion()
   }, [])
 
   const handleSaveNotifications = async () => {
@@ -343,19 +358,50 @@ export const SettingsPage = () => {
           <Card className="bg-secondary/30 border-dashed">
             <CardContent className="py-4">
               <div className="flex flex-col gap-3 text-sm text-muted-foreground">
-                {/* Version and build info */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-4">
-                    <span>
-                      <strong>{t('settings.version')}:</strong> {BUILD_VERSION}
-                    </span>
-                    <span>
-                      <strong>{t('settings.build')}:</strong> {BUILD_TIMESTAMP === 'development' ? t('settings.development') : new Date(BUILD_TIMESTAMP).toLocaleString('nl-NL')}
-                    </span>
+                {/* Frontend Version Info */}
+                <div>
+                  <h4 className="font-semibold text-foreground mb-2">Frontend</h4>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-4">
+                      <span>
+                        <strong>{t('settings.version')}:</strong> {BUILD_VERSION}
+                      </span>
+                      <span>
+                        <strong>{t('settings.build')}:</strong> {BUILD_TIMESTAMP === 'development' ? t('settings.development') : new Date(BUILD_TIMESTAMP).toLocaleString('nl-NL')}
+                      </span>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {import.meta.env.DEV ? t('settings.development') : t('settings.production')}
+                    </Badge>
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    {import.meta.env.DEV ? t('settings.development') : t('settings.production')}
-                  </Badge>
+                </div>
+                
+                {/* Backend Version Info */}
+                <Separator className="my-1" />
+                <div>
+                  <h4 className="font-semibold text-foreground mb-2">Backend</h4>
+                  {backendVersionError ? (
+                    <p className="text-xs text-destructive">{backendVersionError}</p>
+                  ) : backendVersion ? (
+                    <div className="flex flex-wrap items-center gap-4 font-mono text-xs">
+                      <span>
+                        <strong>Git SHA:</strong>{' '}
+                        <code className="bg-secondary px-1 rounded">{backendVersion.git_sha.substring(0, 8)}</code>
+                      </span>
+                      <span>
+                        <strong>Build:</strong>{' '}
+                        <code className="bg-secondary px-1 rounded">
+                          {backendVersion.build_time === 'unknown' ? 'unknown' : new Date(backendVersion.build_time).toLocaleString('nl-NL')}
+                        </code>
+                      </span>
+                      <span>
+                        <strong>Env:</strong>{' '}
+                        <code className="bg-secondary px-1 rounded">{backendVersion.env_name}</code>
+                      </span>
+                    </div>
+                  ) : (
+                    <Skeleton className="h-4 w-64" />
+                  )}
                 </div>
                 
                 {/* API Diagnostics - non-intrusive but visible for debugging */}

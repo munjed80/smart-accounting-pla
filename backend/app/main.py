@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.core.database import engine
-from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank
+from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,60 @@ def log_enum_and_router_status() -> None:
     logger.info("Router mount confirmed: /api/v1/accountant/bank (bank-reconciliation)")
 
 
+async def verify_database_enums() -> None:
+    """
+    Verify that database enum values match the required Python enum values.
+    
+    This check runs at startup and fails fast if critical enum values are missing,
+    providing a clear error message pointing to the required migration.
+    
+    Raises:
+        RuntimeError: If required enum values are missing from the database.
+    """
+    from app.models.document import DocumentStatus
+    
+    required_status_values = {s.value for s in DocumentStatus}
+    
+    try:
+        async with engine.begin() as conn:
+            # Query existing enum values from pg_enum
+            result = await conn.execute(text("""
+                SELECT enumlabel 
+                FROM pg_enum 
+                WHERE enumtypid = 'documentstatus'::regtype
+            """))
+            db_values = {row[0] for row in result.fetchall()}
+            
+            # Check for missing values
+            missing = required_status_values - db_values
+            if missing:
+                logger.critical(
+                    f"ENUM MISMATCH: Database 'documentstatus' is missing values: {sorted(missing)}. "
+                    f"Required values: {sorted(required_status_values)}. "
+                    f"Run migration 015_add_document_status_enum_values to fix this. "
+                    f"Command: alembic upgrade head"
+                )
+                raise RuntimeError(
+                    f"Database enum 'documentstatus' is missing required values: {sorted(missing)}. "
+                    f"Please run: alembic upgrade head"
+                )
+            
+            logger.info(f"Database enum 'documentstatus' verified: {sorted(db_values)}")
+            
+    except Exception as e:
+        # If the enum doesn't exist at all, that's also an error
+        if "does not exist" in str(e):
+            logger.critical(
+                "ENUM MISSING: Database type 'documentstatus' does not exist. "
+                "Run migrations to create it: alembic upgrade head"
+            )
+            raise RuntimeError(
+                "Database type 'documentstatus' does not exist. "
+                "Please run: alembic upgrade head"
+            ) from e
+        raise
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -67,6 +121,7 @@ async def lifespan(app: FastAPI):
     
     Startup:
     - Verify ORM mappings to fail fast if models are misconfigured
+    - Verify database enum values match Python enums
     - Log enum values and router status for diagnostics
     
     Shutdown:
@@ -78,6 +133,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.critical(f"ORM mapper configuration failed: {e}")
         raise RuntimeError(f"Application cannot start: ORM mapping error - {e}") from e
+    
+    # Verify database enums match expected values
+    try:
+        await verify_database_enums()
+    except RuntimeError as e:
+        logger.critical(f"Database enum verification failed: {e}")
+        raise
+    except Exception as e:
+        # Non-critical: log warning but allow startup (DB might not be ready yet)
+        logger.warning(f"Could not verify database enums (DB may not be ready): {e}")
     
     # Log enum and router status for production diagnostics
     log_enum_and_router_status()
@@ -145,6 +210,7 @@ api_v1_router.include_router(bank.router, prefix="/accountant", tags=["bank-reco
 api_v1_router.include_router(zzp.router, prefix="/zzp", tags=["zzp-client-consent"])
 api_v1_router.include_router(observability.router, prefix="/ops", tags=["observability"])
 api_v1_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+api_v1_router.include_router(meta.router, tags=["metadata"])
 
 app.include_router(api_v1_router)
 

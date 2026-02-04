@@ -16,6 +16,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Build arguments for version tracking
+ARG GIT_SHA=unknown
+ARG BUILD_TIME
+
+# Set environment variables for version endpoint
+ENV GIT_SHA=$GIT_SHA
+ENV BUILD_TIME=$BUILD_TIME
+
 # Make startup script executable
 RUN chmod +x /app/startup.sh
 

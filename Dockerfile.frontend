@@ -16,6 +16,10 @@ COPY . .
 # Must be set to production API URL (e.g., https://api.zzpershub.nl)
 ARG VITE_API_URL
 
+# Build arguments for version tracking
+ARG VITE_BUILD_VERSION=dev
+ARG VITE_BUILD_TIMESTAMP
+
 # Build-time check: Fail if VITE_API_URL is not set
 # This prevents accidentally deploying with a missing or empty API URL
 RUN if [ -z "$VITE_API_URL" ]; then \
@@ -24,8 +28,10 @@ RUN if [ -z "$VITE_API_URL" ]; then \
       exit 1; \
     fi
 
-# Make VITE_API_URL available as environment variable during build
+# Make build args available as environment variables during build
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_BUILD_VERSION=$VITE_BUILD_VERSION
+ENV VITE_BUILD_TIMESTAMP=$VITE_BUILD_TIMESTAMP
 
 # Build the app
 RUN npm run build

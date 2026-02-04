@@ -5,6 +5,7 @@
  * - View pending accountant link requests
  * - Approve or reject requests
  * - View active accountant links
+ * - Revoke previously approved access
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -13,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
-import { zzpApi, PendingLinkRequest, getErrorMessage } from '@/lib/api'
+import { zzpApi, PendingLinkRequest, ActiveAccountantLink, getErrorMessage } from '@/lib/api'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -29,6 +30,7 @@ import {
   Buildings,
   Envelope,
   WarningCircle,
+  Trash,
 } from '@phosphor-icons/react'
 
 // Pending request card component
@@ -187,41 +189,57 @@ const LoadingSkeleton = () => (
 
 export const ZZPAccountantLinksPage = () => {
   const [pendingRequests, setPendingRequests] = useState<PendingLinkRequest[]>([])
+  const [activeLinks, setActiveLinks] = useState<ActiveAccountantLink[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set())
   const [rejectingIds, setRejectingIds] = useState<Set<string>>(new Set())
+  const [revokingIds, setRevokingIds] = useState<Set<string>>(new Set())
 
-  // Load pending requests
-  const loadRequests = useCallback(async () => {
+  // Load pending requests and active links
+  const loadData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await zzpApi.getPendingLinks()
-      setPendingRequests(response.pending_requests)
+      const [pendingResponse, activeResponse] = await Promise.all([
+        zzpApi.getPendingLinks(),
+        zzpApi.getActiveLinks(),
+      ])
+      setPendingRequests(pendingResponse.pending_requests)
+      setActiveLinks(activeResponse.active_links)
     } catch (err) {
-      console.error('Failed to load pending requests:', err)
+      console.error('Failed to load accountant links:', err)
       setError(getErrorMessage(err))
       setPendingRequests([])
+      setActiveLinks([])
     } finally {
       setIsLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    loadRequests()
-  }, [loadRequests])
+    loadData()
+  }, [loadData])
 
   // Handle approve
-  const handleApprove = async (assignmentId: string) => {
+  const handleApprove = async (assignmentId: string, request: PendingLinkRequest) => {
     setApprovingIds(prev => new Set(prev).add(assignmentId))
     
     try {
-      await zzpApi.approveLink(assignmentId)
+      const response = await zzpApi.approveLink(assignmentId)
       toast.success(t('zzpAccountantLinks.approvedSuccess'))
       
-      // Remove from list
+      // Move from pending to active, using server timestamp from response
       setPendingRequests(prev => prev.filter(r => r.assignment_id !== assignmentId))
+      setActiveLinks(prev => [...prev, {
+        assignment_id: request.assignment_id,
+        accountant_id: request.accountant_id,
+        accountant_email: request.accountant_email,
+        accountant_name: request.accountant_name,
+        administration_id: request.administration_id,
+        administration_name: request.administration_name,
+        approved_at: response.approved_at,
+      }])
     } catch (err) {
       toast.error(getErrorMessage(err))
     } finally {
@@ -254,6 +272,27 @@ export const ZZPAccountantLinksPage = () => {
     }
   }
 
+  // Handle revoke (for active links)
+  const handleRevoke = async (assignmentId: string) => {
+    setRevokingIds(prev => new Set(prev).add(assignmentId))
+    
+    try {
+      await zzpApi.revokeLink(assignmentId)
+      toast.success(t('zzpAccountantLinks.revokedSuccess'))
+      
+      // Remove from active list
+      setActiveLinks(prev => prev.filter(r => r.assignment_id !== assignmentId))
+    } catch (err) {
+      toast.error(getErrorMessage(err))
+    } finally {
+      setRevokingIds(prev => {
+        const next = new Set(prev)
+        next.delete(assignmentId)
+        return next
+      })
+    }
+  }
+
   return (
     <div className="container max-w-3xl mx-auto px-4 py-6 sm:py-8">
       {/* Header */}
@@ -273,7 +312,7 @@ export const ZZPAccountantLinksPage = () => {
           <WarningCircle size={18} />
           <AlertTitle>{t('errors.loadFailed')}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
-          <Button variant="outline" size="sm" onClick={loadRequests} className="mt-2">
+          <Button variant="outline" size="sm" onClick={loadData} className="mt-2">
             {t('common.retry')}
           </Button>
         </Alert>
@@ -305,7 +344,7 @@ export const ZZPAccountantLinksPage = () => {
               <PendingRequestCard
                 key={request.assignment_id}
                 request={request}
-                onApprove={() => handleApprove(request.assignment_id)}
+                onApprove={() => handleApprove(request.assignment_id, request)}
                 onReject={() => handleReject(request.assignment_id)}
                 isApproving={approvingIds.has(request.assignment_id)}
                 isRejecting={rejectingIds.has(request.assignment_id)}
@@ -315,20 +354,83 @@ export const ZZPAccountantLinksPage = () => {
         )}
       </section>
 
-      {/* Info about active links */}
+      {/* Active accountant links section */}
       <section>
         <div className="flex items-center gap-2 mb-4">
           <CheckCircle size={20} className="text-green-600 dark:text-green-400" />
           <h2 className="text-lg font-semibold">{t('zzpAccountantLinks.activeLinks')}</h2>
+          {activeLinks.length > 0 && (
+            <Badge variant="secondary" className="bg-green-500/20 text-green-700 dark:text-green-400">
+              {activeLinks.length}
+            </Badge>
+          )}
         </div>
         
-        <Card className="bg-green-500/5 border-green-500/20">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">
-              {t('zzpAccountantLinks.noActiveLinksDescription')}
-            </p>
-          </CardContent>
-        </Card>
+        {isLoading ? (
+          <LoadingSkeleton />
+        ) : activeLinks.length === 0 ? (
+          <Card className="bg-secondary/30 border-dashed">
+            <CardContent className="p-6 text-center">
+              <User size={48} className="mx-auto mb-4 text-muted-foreground opacity-50" weight="duotone" />
+              <p className="text-muted-foreground">{t('zzpAccountantLinks.noActiveLinksDescription')}</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {activeLinks.map((link) => (
+              <Card key={link.assignment_id} className="border-green-500/30 bg-green-500/5">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
+                        <User size={24} className="text-green-600 dark:text-green-400" weight="duotone" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold text-lg">
+                            {link.accountant_name || link.accountant_email}
+                          </h3>
+                          <Badge variant="outline" className="bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30">
+                            <CheckCircle size={14} className="mr-1" />
+                            {t('zzpAccountantLinks.statusActive')}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{link.accountant_email}</p>
+                        <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                          <Buildings size={16} />
+                          <span>{link.administration_name}</span>
+                        </div>
+                        {link.approved_at && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {t('zzpAccountantLinks.approvedAt')}: {format(new Date(link.approved_at), 'dd MMM yyyy', { locale: nlLocale })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleRevoke(link.assignment_id)}
+                      disabled={revokingIds.has(link.assignment_id)}
+                      className="gap-2 text-destructive hover:text-destructive shrink-0"
+                    >
+                      {revokingIds.has(link.assignment_id) ? (
+                        <>
+                          <span className="animate-spin">⟳</span>
+                          {t('zzpAccountantLinks.revoking')}
+                        </>
+                      ) : (
+                        <>
+                          <Trash size={18} />
+                          {t('zzpAccountantLinks.revoke')}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )

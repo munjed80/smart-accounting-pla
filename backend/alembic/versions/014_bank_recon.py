@@ -29,6 +29,8 @@ def upgrade() -> None:
     bind = op.get_bind()
     inspector = sa.inspect(bind)
 
+    # Create banktransactionstatus enum if it doesn't exist.
+    # Using DO $$ block to make this idempotent on existing databases.
     op.execute(
         """
         DO $$
@@ -45,6 +47,26 @@ def upgrade() -> None:
         $$;
         """
     )
+    # Ensure 'NEEDS_REVIEW' value exists if the enum was created with an older schema.
+    # ALTER TYPE ... ADD VALUE IF NOT EXISTS requires Postgres 9.3+ and cannot run inside a transaction block,
+    # but Alembic runs each op.execute outside of a sub-transaction so this is safe.
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_enum
+                WHERE enumtypid = 'banktransactionstatus'::regtype
+                AND enumlabel = 'NEEDS_REVIEW'
+            ) THEN
+                ALTER TYPE banktransactionstatus ADD VALUE 'NEEDS_REVIEW';
+            END IF;
+        END
+        $$;
+        """
+    )
+    # Create reconciliationactiontype enum if it doesn't exist.
+    # Using DO $$ block to make this idempotent on existing databases.
     op.execute(
         """
         DO $$
@@ -75,6 +97,7 @@ def upgrade() -> None:
             sa.PrimaryKeyConstraint("id"),
             sa.UniqueConstraint("administration_id", "iban", name="uq_bank_accounts_admin_iban"),
         )
+    # Using CREATE INDEX IF NOT EXISTS for idempotency - Alembic's op.create_index doesn't support checkfirst.
     op.execute('CREATE INDEX IF NOT EXISTS ix_bank_accounts_administration_id ON bank_accounts (administration_id)')
 
     if not inspector.has_table("bank_transactions"):
@@ -112,6 +135,7 @@ def upgrade() -> None:
             sa.PrimaryKeyConstraint("id"),
             sa.UniqueConstraint("administration_id", "import_hash", name="uq_bank_transactions_admin_hash"),
         )
+    # Using CREATE INDEX IF NOT EXISTS for idempotency - Alembic's op.create_index doesn't support checkfirst.
     op.execute('CREATE INDEX IF NOT EXISTS ix_bank_transactions_administration_id ON bank_transactions (administration_id)')
 
     if not inspector.has_table("reconciliation_actions"):
@@ -140,6 +164,7 @@ def upgrade() -> None:
             sa.ForeignKeyConstraint(["bank_transaction_id"], ["bank_transactions.id"], ondelete="CASCADE"),
             sa.PrimaryKeyConstraint("id"),
         )
+    # Using CREATE INDEX IF NOT EXISTS for idempotency - Alembic's op.create_index doesn't support checkfirst.
     op.execute('CREATE INDEX IF NOT EXISTS ix_reconciliation_actions_administration_id ON reconciliation_actions (administration_id)')
     op.execute('CREATE INDEX IF NOT EXISTS ix_reconciliation_actions_bank_transaction_id ON reconciliation_actions (bank_transaction_id)')
     op.execute('CREATE INDEX IF NOT EXISTS ix_reconciliation_actions_accountant_user_id ON reconciliation_actions (accountant_user_id)')

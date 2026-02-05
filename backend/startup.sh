@@ -13,7 +13,7 @@ if ! alembic upgrade head; then
     alembic current || true
     alembic heads || true
     echo "---- Alembic history (last 5) ----"
-    alembic history -5 || true
+    alembic history -r -5:head || true
     exit 1
 fi
 

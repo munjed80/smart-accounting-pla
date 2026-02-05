@@ -30,7 +30,7 @@ from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
 revision: str = '015_add_document_status_enum_values'
-down_revision: Union[str, None] = '014_bank_reconciliation'
+down_revision: Union[str, None] = '014_bank_recon'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

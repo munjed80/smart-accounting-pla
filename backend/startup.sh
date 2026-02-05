@@ -12,8 +12,9 @@ if ! alembic upgrade head; then
     echo "---- Alembic diagnostics (current and heads) ----"
     alembic current || true
     alembic heads || true
+    # Fixed: Use proper range syntax for history (the -5 shorthand is not valid)
     echo "---- Alembic history (last 5) ----"
-    alembic history -5 || true
+    alembic history -r-5:head || true
     exit 1
 fi
 

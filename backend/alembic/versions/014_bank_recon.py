@@ -75,7 +75,7 @@ def upgrade() -> None:
             sa.PrimaryKeyConstraint("id"),
             sa.UniqueConstraint("administration_id", "iban", name="uq_bank_accounts_admin_iban"),
         )
-    op.create_index("ix_bank_accounts_administration_id", "bank_accounts", ["administration_id"], checkfirst=True)
+    op.execute('CREATE INDEX IF NOT EXISTS ix_bank_accounts_administration_id ON bank_accounts (administration_id)')
 
     if not inspector.has_table("bank_transactions"):
         op.create_table(
@@ -112,12 +112,7 @@ def upgrade() -> None:
             sa.PrimaryKeyConstraint("id"),
             sa.UniqueConstraint("administration_id", "import_hash", name="uq_bank_transactions_admin_hash"),
         )
-    op.create_index(
-        "ix_bank_transactions_administration_id",
-        "bank_transactions",
-        ["administration_id"],
-        checkfirst=True,
-    )
+    op.execute('CREATE INDEX IF NOT EXISTS ix_bank_transactions_administration_id ON bank_transactions (administration_id)')
 
     if not inspector.has_table("reconciliation_actions"):
         op.create_table(
@@ -145,24 +140,9 @@ def upgrade() -> None:
             sa.ForeignKeyConstraint(["bank_transaction_id"], ["bank_transactions.id"], ondelete="CASCADE"),
             sa.PrimaryKeyConstraint("id"),
         )
-    op.create_index(
-        "ix_reconciliation_actions_administration_id",
-        "reconciliation_actions",
-        ["administration_id"],
-        checkfirst=True,
-    )
-    op.create_index(
-        "ix_reconciliation_actions_bank_transaction_id",
-        "reconciliation_actions",
-        ["bank_transaction_id"],
-        checkfirst=True,
-    )
-    op.create_index(
-        "ix_reconciliation_actions_accountant_user_id",
-        "reconciliation_actions",
-        ["accountant_user_id"],
-        checkfirst=True,
-    )
+    op.execute('CREATE INDEX IF NOT EXISTS ix_reconciliation_actions_administration_id ON reconciliation_actions (administration_id)')
+    op.execute('CREATE INDEX IF NOT EXISTS ix_reconciliation_actions_bank_transaction_id ON reconciliation_actions (bank_transaction_id)')
+    op.execute('CREATE INDEX IF NOT EXISTS ix_reconciliation_actions_accountant_user_id ON reconciliation_actions (accountant_user_id)')
 
 
 def downgrade() -> None:
@@ -171,19 +151,19 @@ def downgrade() -> None:
 
     # Drop indexes and table for reconciliation_actions (if exists)
     if inspector.has_table("reconciliation_actions"):
-        op.drop_index("ix_reconciliation_actions_accountant_user_id", table_name="reconciliation_actions", if_exists=True)
-        op.drop_index("ix_reconciliation_actions_bank_transaction_id", table_name="reconciliation_actions", if_exists=True)
-        op.drop_index("ix_reconciliation_actions_administration_id", table_name="reconciliation_actions", if_exists=True)
+        op.execute('DROP INDEX IF EXISTS ix_reconciliation_actions_accountant_user_id')
+        op.execute('DROP INDEX IF EXISTS ix_reconciliation_actions_bank_transaction_id')
+        op.execute('DROP INDEX IF EXISTS ix_reconciliation_actions_administration_id')
         op.drop_table("reconciliation_actions")
 
     # Drop indexes and table for bank_transactions (if exists)
     if inspector.has_table("bank_transactions"):
-        op.drop_index("ix_bank_transactions_administration_id", table_name="bank_transactions", if_exists=True)
+        op.execute('DROP INDEX IF EXISTS ix_bank_transactions_administration_id')
         op.drop_table("bank_transactions")
 
     # Drop indexes and table for bank_accounts (if exists)
     if inspector.has_table("bank_accounts"):
-        op.drop_index("ix_bank_accounts_administration_id", table_name="bank_accounts", if_exists=True)
+        op.execute('DROP INDEX IF EXISTS ix_bank_accounts_administration_id')
         op.drop_table("bank_accounts")
 
     # Drop enum types (if they exist)

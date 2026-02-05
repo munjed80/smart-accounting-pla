@@ -1,6 +1,17 @@
 #!/bin/bash
 # Smart Accounting Platform - Production-Safe Startup Script
 # Prevents infinite crash loops during migration failures
+#
+# RECOVERY NOTES:
+# If the database is stamped to a missing revision (e.g., "Can't locate revision"):
+#   1. Identify the current broken revision: SELECT version_num FROM alembic_version;
+#   2. Find the closest valid revision in the chain that exists in your code
+#   3. Manually stamp to a known-good revision:
+#        alembic stamp <valid_revision_id>
+#      For example: alembic stamp 014_bank_recon
+#   4. Then run: alembic upgrade head
+#
+# Migration chain: 013_client_consent_workflow -> 014_bank_reconciliation -> 014_bank_recon -> 015_add_document_status_enum_values
 
 echo "======================================"
 echo "Smart Accounting Platform - Startup"
@@ -30,7 +41,7 @@ if [ $MIGRATION_EXIT_CODE -ne 0 ]; then
     alembic heads 2>&1 || true
     echo ""
     echo "Recent history:"
-    alembic history -r -5:head 2>&1 || true
+    alembic history -r=-5:head 2>&1 || true
     echo ""
     echo "======================================="
     echo "STARTUP ABORTED - Migration failed"

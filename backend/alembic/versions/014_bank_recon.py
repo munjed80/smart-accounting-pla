@@ -48,8 +48,10 @@ def upgrade() -> None:
         """
     )
     # Ensure 'NEEDS_REVIEW' value exists if the enum was created with an older schema.
-    # ALTER TYPE ... ADD VALUE IF NOT EXISTS requires Postgres 9.3+ and cannot run inside a transaction block,
-    # but Alembic runs each op.execute outside of a sub-transaction so this is safe.
+    # We use a DO $$ block with a pg_enum lookup (which doesn't "use" the enum type) followed by
+    # ALTER TYPE ADD VALUE. Note: ADD VALUE cannot use IF NOT EXISTS inside a transaction,
+    # so we manually check pg_enum first. This is safe because Alembic migration runs as a single
+    # transaction and the enum type hasn't been accessed yet at this point.
     op.execute(
         """
         DO $$

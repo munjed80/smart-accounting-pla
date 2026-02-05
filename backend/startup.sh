@@ -5,13 +5,13 @@ echo "======================================"
 echo "Smart Accounting Platform - Startup"
 echo "======================================"
 
-# Run database migrations
 echo "Running database migrations..."
 cd /app
-alembic upgrade head
-
-if [ $? -ne 0 ]; then
+if ! alembic upgrade head; then
     echo "ERROR: Database migrations failed!"
+    echo "---- Alembic diagnostics (current and heads) ----"
+    alembic current || true
+    alembic heads || true
     exit 1
 fi
 

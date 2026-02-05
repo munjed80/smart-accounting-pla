@@ -12,6 +12,8 @@ if ! alembic upgrade head; then
     echo "---- Alembic diagnostics (current and heads) ----"
     alembic current || true
     alembic heads || true
+    echo "---- Alembic history (last 5) ----"
+    alembic history -5 || true
     exit 1
 fi
 

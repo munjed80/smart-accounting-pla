@@ -166,16 +166,26 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_reconciliation_actions_accountant_user_id", table_name="reconciliation_actions")
-    op.drop_index("ix_reconciliation_actions_bank_transaction_id", table_name="reconciliation_actions")
-    op.drop_index("ix_reconciliation_actions_administration_id", table_name="reconciliation_actions")
-    op.drop_table("reconciliation_actions")
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
 
-    op.drop_index("ix_bank_transactions_administration_id", table_name="bank_transactions")
-    op.drop_table("bank_transactions")
+    # Drop indexes and table for reconciliation_actions (if exists)
+    if inspector.has_table("reconciliation_actions"):
+        op.drop_index("ix_reconciliation_actions_accountant_user_id", table_name="reconciliation_actions", if_exists=True)
+        op.drop_index("ix_reconciliation_actions_bank_transaction_id", table_name="reconciliation_actions", if_exists=True)
+        op.drop_index("ix_reconciliation_actions_administration_id", table_name="reconciliation_actions", if_exists=True)
+        op.drop_table("reconciliation_actions")
 
-    op.drop_index("ix_bank_accounts_administration_id", table_name="bank_accounts")
-    op.drop_table("bank_accounts")
+    # Drop indexes and table for bank_transactions (if exists)
+    if inspector.has_table("bank_transactions"):
+        op.drop_index("ix_bank_transactions_administration_id", table_name="bank_transactions", if_exists=True)
+        op.drop_table("bank_transactions")
 
-    op.execute("DROP TYPE reconciliationactiontype")
-    op.execute("DROP TYPE banktransactionstatus")
+    # Drop indexes and table for bank_accounts (if exists)
+    if inspector.has_table("bank_accounts"):
+        op.drop_index("ix_bank_accounts_administration_id", table_name="bank_accounts", if_exists=True)
+        op.drop_table("bank_accounts")
+
+    # Drop enum types (if they exist)
+    op.execute("DROP TYPE IF EXISTS reconciliationactiontype")
+    op.execute("DROP TYPE IF EXISTS banktransactionstatus")

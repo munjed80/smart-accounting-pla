@@ -1,5 +1,6 @@
 #!/bin/bash
-set -e
+# Smart Accounting Platform - Production-Safe Startup Script
+# Prevents infinite crash loops during migration failures
 
 echo "======================================"
 echo "Smart Accounting Platform - Startup"
@@ -7,13 +8,35 @@ echo "======================================"
 
 echo "Running database migrations..."
 cd /app
-if ! alembic upgrade head; then
+
+# Attempt migrations with proper error handling
+# Do NOT use 'set -e' here - we need to handle failures gracefully
+MIGRATION_OUTPUT=$(alembic upgrade head 2>&1)
+MIGRATION_EXIT_CODE=$?
+
+if [ $MIGRATION_EXIT_CODE -ne 0 ]; then
+    echo "======================================="
     echo "ERROR: Database migrations failed!"
-    echo "---- Alembic diagnostics (current and heads) ----"
-    alembic current || true
-    alembic heads || true
-    echo "---- Alembic history (last 5) ----"
-    alembic history -r -5:head || true
+    echo "======================================="
+    echo ""
+    echo "Migration output:"
+    echo "$MIGRATION_OUTPUT"
+    echo ""
+    echo "---- Alembic diagnostics ----"
+    echo "Current revision:"
+    alembic current 2>&1 || true
+    echo ""
+    echo "Migration heads:"
+    alembic heads 2>&1 || true
+    echo ""
+    echo "Recent history:"
+    alembic history -r -5:head 2>&1 || true
+    echo ""
+    echo "======================================="
+    echo "STARTUP ABORTED - Migration failed"
+    echo "======================================="
+    echo "The container will now exit to prevent crash loops."
+    echo "Please fix the migration issue and redeploy."
     exit 1
 fi
 

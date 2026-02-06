@@ -41,7 +41,7 @@ if [ $MIGRATION_EXIT_CODE -ne 0 ]; then
     alembic heads 2>&1 || true
     echo ""
     echo "Recent history:"
-    alembic history -r=-5:head 2>&1 || true
+    alembic history 2>&1 | tail -n 20 || true
     echo ""
     echo "======================================="
     echo "STARTUP ABORTED - Migration failed"

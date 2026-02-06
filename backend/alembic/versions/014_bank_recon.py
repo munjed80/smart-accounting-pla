@@ -59,9 +59,6 @@ def upgrade() -> None:
             ) THEN
                 ALTER TYPE banktransactionstatus ADD VALUE 'NEEDS_REVIEW';
             END IF;
-        EXCEPTION WHEN duplicate_object THEN
-            -- Value already exists, ignore
-            NULL;
         END
         $$;
         """

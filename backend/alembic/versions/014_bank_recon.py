@@ -29,6 +29,7 @@ def upgrade() -> None:
     bind = op.get_bind()
     inspector = sa.inspect(bind)
 
+    # Create banktransactionstatus enum if not exists
     op.execute(
         """
         DO $$
@@ -40,6 +41,23 @@ def upgrade() -> None:
                     'IGNORED',
                     'NEEDS_REVIEW'
                 );
+            END IF;
+        END
+        $$;
+        """
+    )
+
+    # Ensure NEEDS_REVIEW value exists in banktransactionstatus enum (idempotent)
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_enum
+                WHERE enumtypid = 'banktransactionstatus'::regtype
+                AND enumlabel = 'NEEDS_REVIEW'
+            ) THEN
+                ALTER TYPE banktransactionstatus ADD VALUE 'NEEDS_REVIEW';
             END IF;
         END
         $$;
@@ -158,6 +176,119 @@ def upgrade() -> None:
             sa.ForeignKeyConstraint(["bank_transaction_id"], ["bank_transactions.id"], ondelete="CASCADE"),
             sa.PrimaryKeyConstraint("id"),
         )
+    else:
+        # Partial migration recovery: table exists but may be missing columns
+        reconciliation_columns = {c["name"] for c in inspector.get_columns("reconciliation_actions")}
+
+        # If administration_id column is missing, add it and backfill from bank_transactions
+        if "administration_id" not in reconciliation_columns:
+            # 1) Add column as nullable first
+            op.add_column(
+                "reconciliation_actions",
+                sa.Column("administration_id", postgresql.UUID(as_uuid=True), nullable=True),
+            )
+
+            # 2) Backfill from bank_transactions via bank_transaction_id
+            op.execute(
+                """
+                UPDATE reconciliation_actions ra
+                SET administration_id = bt.administration_id
+                FROM bank_transactions bt
+                WHERE ra.bank_transaction_id = bt.id
+                  AND ra.administration_id IS NULL
+                """
+            )
+
+            # 3) Check if all rows were backfilled; if so, set NOT NULL
+            # If not all rows can be backfilled, log a warning and keep nullable
+            op.execute(
+                """
+                DO $$
+                DECLARE
+                    null_count INTEGER;
+                BEGIN
+                    SELECT COUNT(*) INTO null_count
+                    FROM reconciliation_actions
+                    WHERE administration_id IS NULL;
+
+                    IF null_count = 0 THEN
+                        ALTER TABLE reconciliation_actions ALTER COLUMN administration_id SET NOT NULL;
+                    ELSE
+                        RAISE NOTICE 'WARNING: % reconciliation_actions rows have NULL administration_id after backfill; column remains nullable', null_count;
+                    END IF;
+                END
+                $$;
+                """
+            )
+
+            # 4) Add FK constraint if missing
+            op.execute(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints
+                        WHERE constraint_name = 'reconciliation_actions_administration_id_fkey'
+                        AND table_name = 'reconciliation_actions'
+                    ) THEN
+                        ALTER TABLE reconciliation_actions
+                        ADD CONSTRAINT reconciliation_actions_administration_id_fkey
+                        FOREIGN KEY (administration_id) REFERENCES administrations(id) ON DELETE CASCADE;
+                    END IF;
+                END
+                $$;
+                """
+            )
+
+        # Also repair accountant_user_id if missing
+        if "accountant_user_id" not in reconciliation_columns:
+            op.add_column(
+                "reconciliation_actions",
+                sa.Column("accountant_user_id", postgresql.UUID(as_uuid=True), nullable=True),
+            )
+            # Add FK constraint if missing
+            op.execute(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints
+                        WHERE constraint_name = 'reconciliation_actions_accountant_user_id_fkey'
+                        AND table_name = 'reconciliation_actions'
+                    ) THEN
+                        ALTER TABLE reconciliation_actions
+                        ADD CONSTRAINT reconciliation_actions_accountant_user_id_fkey
+                        FOREIGN KEY (accountant_user_id) REFERENCES users(id) ON DELETE CASCADE;
+                    END IF;
+                END
+                $$;
+                """
+            )
+
+        # Repair bank_transaction_id if missing
+        if "bank_transaction_id" not in reconciliation_columns:
+            op.add_column(
+                "reconciliation_actions",
+                sa.Column("bank_transaction_id", postgresql.UUID(as_uuid=True), nullable=True),
+            )
+            # Add FK constraint if missing
+            op.execute(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints
+                        WHERE constraint_name = 'reconciliation_actions_bank_transaction_id_fkey'
+                        AND table_name = 'reconciliation_actions'
+                    ) THEN
+                        ALTER TABLE reconciliation_actions
+                        ADD CONSTRAINT reconciliation_actions_bank_transaction_id_fkey
+                        FOREIGN KEY (bank_transaction_id) REFERENCES bank_transactions(id) ON DELETE CASCADE;
+                    END IF;
+                END
+                $$;
+                """
+            )
 
     # Safely create indexes only if both table and column exist
     if inspector.has_table("reconciliation_actions"):

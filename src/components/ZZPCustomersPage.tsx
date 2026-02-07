@@ -10,6 +10,7 @@
  * - Responsive table/card design
  * - Two-column modal on desktop
  * - Loading/skeleton states
+ * - Customer detail drawer for viewing all fields
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
@@ -20,6 +21,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
 import { 
   Table, 
   TableBody, 
@@ -36,6 +38,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,6 +77,11 @@ import {
   Envelope,
   Phone,
   SpinnerGap,
+  Eye,
+  MapPin,
+  Buildings,
+  Bank,
+  IdentificationCard,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { 
@@ -186,12 +200,34 @@ const CustomerFormDialog = ({
   onSave: (data: CustomerInput) => void
 }) => {
   const isEdit = !!customer
+  
+  // Contact fields
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  
+  // Address fields
+  const [addressStreet, setAddressStreet] = useState('')
+  const [addressPostalCode, setAddressPostalCode] = useState('')
+  const [addressCity, setAddressCity] = useState('')
+  const [addressCountry, setAddressCountry] = useState('')
+  
+  // Business fields
+  const [kvkNumber, setKvkNumber] = useState('')
+  const [btwNumber, setBtwNumber] = useState('')
+  
+  // Bank fields
+  const [iban, setIban] = useState('')
+  
+  // Status
   const [status, setStatus] = useState<'active' | 'inactive'>('active')
+  
+  // Validation errors
   const [nameError, setNameError] = useState('')
   const [emailError, setEmailError] = useState('')
+  const [kvkError, setKvkError] = useState('')
+  const [btwError, setBtwError] = useState('')
+  const [ibanError, setIbanError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Reset form when dialog opens/closes or customer changes
@@ -201,25 +237,59 @@ const CustomerFormDialog = ({
         setName(customer.name)
         setEmail(customer.email || '')
         setPhone(customer.phone || '')
+        setAddressStreet(customer.address_street || '')
+        setAddressPostalCode(customer.address_postal_code || '')
+        setAddressCity(customer.address_city || '')
+        setAddressCountry(customer.address_country || '')
+        setKvkNumber(customer.kvk_number || '')
+        setBtwNumber(customer.btw_number || '')
+        setIban(customer.iban || '')
         setStatus(customer.status)
       } else {
         setName('')
         setEmail('')
         setPhone('')
+        setAddressStreet('')
+        setAddressPostalCode('')
+        setAddressCity('')
+        setAddressCountry('')
+        setKvkNumber('')
+        setBtwNumber('')
+        setIban('')
         setStatus('active')
       }
+      // Clear errors
       setNameError('')
       setEmailError('')
+      setKvkError('')
+      setBtwError('')
+      setIbanError('')
       setIsSubmitting(false)
     }
   }, [open, customer])
 
-  // Email validation with more comprehensive pattern
+  // Validation functions
   const validateEmail = (value: string): boolean => {
     if (!value) return true // Optional field
-    // More comprehensive email validation
     const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
     return emailRegex.test(value)
+  }
+
+  const validateKvk = (value: string): boolean => {
+    if (!value) return true // Optional field
+    return /^[0-9]{8}$/.test(value.replace(/\s/g, ''))
+  }
+
+  const validateBtw = (value: string): boolean => {
+    if (!value) return true // Optional field
+    const cleaned = value.replace(/[\s.]/g, '').toUpperCase()
+    return /^NL[0-9]{9}B[0-9]{2}$/.test(cleaned)
+  }
+
+  const validateIban = (value: string): boolean => {
+    if (!value) return true // Optional field
+    const cleaned = value.replace(/\s/g, '').toUpperCase()
+    return /^[A-Z]{2}[0-9]{2}[A-Z0-9]{4,30}$/.test(cleaned)
   }
 
   const handleSave = () => {
@@ -237,6 +307,24 @@ const CustomerFormDialog = ({
       hasError = true
     }
 
+    // Validate KVK
+    if (kvkNumber && !validateKvk(kvkNumber)) {
+      setKvkError(t('zzpCustomers.formKvkInvalid'))
+      hasError = true
+    }
+
+    // Validate BTW
+    if (btwNumber && !validateBtw(btwNumber)) {
+      setBtwError(t('zzpCustomers.formBtwInvalid'))
+      hasError = true
+    }
+
+    // Validate IBAN
+    if (iban && !validateIban(iban)) {
+      setIbanError(t('zzpCustomers.formIbanInvalid'))
+      hasError = true
+    }
+
     if (hasError) return
 
     setIsSubmitting(true)
@@ -245,17 +333,43 @@ const CustomerFormDialog = ({
       name: name.trim(),
       email: email.trim() || undefined,
       phone: phone.trim() || undefined,
+      address_street: addressStreet.trim() || undefined,
+      address_postal_code: addressPostalCode.trim().toUpperCase().replace(/\s/g, '') || undefined,
+      address_city: addressCity.trim() || undefined,
+      address_country: addressCountry.trim() || undefined,
+      kvk_number: kvkNumber.replace(/\s/g, '') || undefined,
+      btw_number: btwNumber.replace(/[\s.]/g, '').toUpperCase() || undefined,
+      iban: iban.replace(/\s/g, '').toUpperCase() || undefined,
       status,
     })
     
     setIsSubmitting(false)
   }
 
-  const isFormValid = name.trim() && (!email || validateEmail(email))
+  const isFormValid = name.trim() && 
+    (!email || validateEmail(email)) && 
+    (!kvkNumber || validateKvk(kvkNumber)) &&
+    (!btwNumber || validateBtw(btwNumber)) &&
+    (!iban || validateIban(iban))
+
+  // Section header component
+  const SectionHeader = ({ title }: { title: string }) => (
+    <div className="flex items-center gap-2 pt-2 pb-1">
+      <h4 className="text-sm font-semibold text-foreground">{title}</h4>
+      <div className="flex-1 h-px bg-border/50" />
+    </div>
+  )
+
+  // Optional label component
+  const OptionalLabel = () => (
+    <span className="text-xs text-muted-foreground font-normal ml-1">
+      ({t('zzpCustomers.helperOptional')})
+    </span>
+  )
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="pb-4 border-b border-border/50">
           <DialogTitle className="flex items-center gap-3 text-xl">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -270,7 +384,10 @@ const CustomerFormDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4 space-y-5">
+        <div className="py-4 space-y-4">
+          {/* ==================== CONTACT SECTION ==================== */}
+          <SectionHeader title={t('zzpCustomers.sectionContact')} />
+          
           {/* Name field (required) - full width */}
           <div className="space-y-2">
             <Label htmlFor="customer-name" className="text-sm font-medium">
@@ -296,13 +413,13 @@ const CustomerFormDialog = ({
             )}
           </div>
 
-          {/* Two column layout for email and phone on desktop */}
+          {/* Email and Phone - two columns on desktop */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Email field */}
             <div className="space-y-2">
               <Label htmlFor="customer-email" className="text-sm font-medium flex items-center gap-2">
                 <Envelope size={14} className="text-muted-foreground" />
                 {t('zzpCustomers.formEmail')}
+                <OptionalLabel />
               </Label>
               <Input
                 id="customer-email"
@@ -324,11 +441,11 @@ const CustomerFormDialog = ({
               )}
             </div>
 
-            {/* Phone field */}
             <div className="space-y-2">
               <Label htmlFor="customer-phone" className="text-sm font-medium flex items-center gap-2">
                 <Phone size={14} className="text-muted-foreground" />
                 {t('zzpCustomers.formPhone')}
+                <OptionalLabel />
               </Label>
               <Input
                 id="customer-phone"
@@ -342,7 +459,149 @@ const CustomerFormDialog = ({
             </div>
           </div>
 
-          {/* Status toggle with better visual */}
+          {/* ==================== ADDRESS SECTION ==================== */}
+          <SectionHeader title={t('zzpCustomers.sectionAddress')} />
+          
+          <div className="space-y-2">
+            <Label htmlFor="customer-address-street" className="text-sm font-medium">
+              {t('zzpCustomers.formAddressStreet')}
+              <OptionalLabel />
+            </Label>
+            <Input
+              id="customer-address-street"
+              placeholder={t('zzpCustomers.formAddressStreetPlaceholder')}
+              value={addressStreet}
+              onChange={(e) => setAddressStreet(e.target.value)}
+              className="h-11"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="customer-postal" className="text-sm font-medium">
+                {t('zzpCustomers.formAddressPostalCode')}
+              </Label>
+              <Input
+                id="customer-postal"
+                placeholder={t('zzpCustomers.formAddressPostalCodePlaceholder')}
+                value={addressPostalCode}
+                onChange={(e) => setAddressPostalCode(e.target.value)}
+                className="h-11"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div className="space-y-2 col-span-1 sm:col-span-2">
+              <Label htmlFor="customer-city" className="text-sm font-medium">
+                {t('zzpCustomers.formAddressCity')}
+              </Label>
+              <Input
+                id="customer-city"
+                placeholder={t('zzpCustomers.formAddressCityPlaceholder')}
+                value={addressCity}
+                onChange={(e) => setAddressCity(e.target.value)}
+                className="h-11"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="customer-country" className="text-sm font-medium">
+                {t('zzpCustomers.formAddressCountry')}
+              </Label>
+              <Input
+                id="customer-country"
+                placeholder={t('zzpCustomers.formAddressCountryPlaceholder')}
+                value={addressCountry}
+                onChange={(e) => setAddressCountry(e.target.value)}
+                className="h-11"
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+
+          {/* ==================== BUSINESS IDS SECTION ==================== */}
+          <SectionHeader title={t('zzpCustomers.sectionBusiness')} />
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="customer-kvk" className="text-sm font-medium">
+                {t('zzpCustomers.formKvk')}
+                <OptionalLabel />
+              </Label>
+              <Input
+                id="customer-kvk"
+                placeholder={t('zzpCustomers.formKvkPlaceholder')}
+                value={kvkNumber}
+                onChange={(e) => {
+                  setKvkNumber(e.target.value)
+                  setKvkError('')
+                }}
+                className={`h-11 ${kvkError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                disabled={isSubmitting}
+              />
+              {kvkError && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <XCircle size={14} />
+                  {kvkError}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="customer-btw" className="text-sm font-medium">
+                {t('zzpCustomers.formBtw')}
+                <OptionalLabel />
+              </Label>
+              <Input
+                id="customer-btw"
+                placeholder={t('zzpCustomers.formBtwPlaceholder')}
+                value={btwNumber}
+                onChange={(e) => {
+                  setBtwNumber(e.target.value)
+                  setBtwError('')
+                }}
+                className={`h-11 ${btwError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                disabled={isSubmitting}
+              />
+              {btwError && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <XCircle size={14} />
+                  {btwError}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* ==================== BANK SECTION ==================== */}
+          <SectionHeader title={t('zzpCustomers.sectionBank')} />
+          
+          <div className="space-y-2">
+            <Label htmlFor="customer-iban" className="text-sm font-medium">
+              {t('zzpCustomers.formIban')}
+              <OptionalLabel />
+            </Label>
+            <Input
+              id="customer-iban"
+              placeholder={t('zzpCustomers.formIbanPlaceholder')}
+              value={iban}
+              onChange={(e) => {
+                setIban(e.target.value)
+                setIbanError('')
+              }}
+              className={`h-11 ${ibanError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+              disabled={isSubmitting}
+            />
+            {ibanError && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <XCircle size={14} />
+                {ibanError}
+              </p>
+            )}
+          </div>
+
+          {/* ==================== STATUS SECTION ==================== */}
           <div className="pt-2 pb-1">
             <div className="flex items-center justify-between p-4 rounded-xl bg-secondary/50 border border-border/50">
               <div className="space-y-1">
@@ -436,6 +695,143 @@ const DeleteConfirmDialog = ({
   )
 }
 
+// Customer detail sheet/drawer for viewing all fields
+const CustomerDetailSheet = ({
+  open,
+  onOpenChange,
+  customer,
+  onEdit,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  customer?: Customer
+  onEdit: () => void
+}) => {
+  if (!customer) return null
+
+  // Helper to format address
+  const formatAddress = () => {
+    const parts = [
+      customer.address_street,
+      [customer.address_postal_code, customer.address_city].filter(Boolean).join(' '),
+      customer.address_country,
+    ].filter(Boolean)
+    return parts.length > 0 ? parts.join(', ') : null
+  }
+
+  // Detail row component
+  const DetailRow = ({ label, value, icon: Icon }: { label: string; value?: string | null; icon?: React.ElementType }) => {
+    if (!value) return null
+    return (
+      <div className="flex items-start gap-3 py-2">
+        {Icon && <Icon size={18} className="text-muted-foreground mt-0.5 flex-shrink-0" weight="duotone" />}
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-sm font-medium break-words">{value}</p>
+        </div>
+      </div>
+    )
+  }
+
+  const address = formatAddress()
+  const hasContactDetails = customer.email || customer.phone
+  const hasAddressDetails = address
+  const hasBusinessDetails = customer.kvk_number || customer.btw_number
+  const hasBankDetails = customer.iban
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="sm:max-w-md overflow-y-auto">
+        <SheetHeader className="pb-4 border-b border-border/50">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Users size={28} className="text-primary" weight="duotone" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <SheetTitle className="text-xl truncate">{customer.name}</SheetTitle>
+              <SheetDescription className="flex items-center gap-2 mt-1">
+                <StatusBadge status={customer.status} size="sm" />
+              </SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+
+        <div className="py-4 space-y-4">
+          {/* Contact Section */}
+          {hasContactDetails && (
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                {t('zzpCustomers.sectionContact')}
+              </h4>
+              <div className="bg-secondary/30 rounded-lg p-3 space-y-1">
+                <DetailRow label={t('zzpCustomers.formEmail')} value={customer.email} icon={Envelope} />
+                <DetailRow label={t('zzpCustomers.formPhone')} value={customer.phone} icon={Phone} />
+              </div>
+            </div>
+          )}
+
+          {/* Address Section */}
+          {hasAddressDetails && (
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                {t('zzpCustomers.sectionAddress')}
+              </h4>
+              <div className="bg-secondary/30 rounded-lg p-3">
+                <DetailRow label={t('zzpCustomers.sectionAddress')} value={address} icon={MapPin} />
+              </div>
+            </div>
+          )}
+
+          {/* Business IDs Section */}
+          {hasBusinessDetails && (
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                {t('zzpCustomers.sectionBusiness')}
+              </h4>
+              <div className="bg-secondary/30 rounded-lg p-3 space-y-1">
+                <DetailRow label={t('zzpCustomers.formKvk')} value={customer.kvk_number} icon={Buildings} />
+                <DetailRow label={t('zzpCustomers.formBtw')} value={customer.btw_number} icon={IdentificationCard} />
+              </div>
+            </div>
+          )}
+
+          {/* Bank Section */}
+          {hasBankDetails && (
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                {t('zzpCustomers.sectionBank')}
+              </h4>
+              <div className="bg-secondary/30 rounded-lg p-3">
+                <DetailRow label={t('zzpCustomers.formIban')} value={customer.iban} icon={Bank} />
+              </div>
+            </div>
+          )}
+
+          {/* Show message if no extra details */}
+          {!hasContactDetails && !hasAddressDetails && !hasBusinessDetails && !hasBankDetails && (
+            <div className="text-center py-8 text-muted-foreground">
+              <IdentificationCard size={40} className="mx-auto mb-3 opacity-50" weight="duotone" />
+              <p className="text-sm">{t('zzpCustomers.noDetailsAvailable')}</p>
+            </div>
+          )}
+        </div>
+
+        <Separator className="my-2" />
+
+        <div className="pt-4 flex gap-2">
+          <Button onClick={onEdit} className="flex-1 gap-2">
+            <PencilSimple size={18} />
+            {t('common.edit')}
+          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {t('common.close')}
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
 // Empty state component
 const EmptyState = ({ onAddCustomer }: { onAddCustomer: () => void }) => (
   <Card className="bg-card/80 backdrop-blur-sm border-2 border-dashed border-primary/20">
@@ -458,16 +854,18 @@ const EmptyState = ({ onAddCustomer }: { onAddCustomer: () => void }) => (
 // Mobile customer card component
 const CustomerCard = ({ 
   customer, 
+  onView,
   onEdit, 
   onDelete 
 }: { 
   customer: Customer
+  onView: () => void
   onEdit: () => void
   onDelete: () => void 
 }) => (
   <Card className="bg-card/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-colors">
     <CardContent className="p-4">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 cursor-pointer" onClick={onView}>
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
             <Users size={20} className="text-primary" weight="duotone" />
@@ -491,6 +889,15 @@ const CustomerCard = ({
         <StatusBadge status={customer.status} size="sm" />
       </div>
       <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-border/50">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onView}
+          className="h-9 px-3 gap-2"
+        >
+          <Eye size={16} />
+          {t('zzpCustomers.viewDetails')}
+        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -528,6 +935,7 @@ export const ZZPCustomersPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>()
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | undefined>()
+  const [viewingCustomer, setViewingCustomer] = useState<Customer | undefined>()
 
   // Load customers from localStorage
   useEffect(() => {
@@ -726,6 +1134,7 @@ export const ZZPCustomersPage = () => {
                     <CustomerCard
                       key={customer.id}
                       customer={customer}
+                      onView={() => setViewingCustomer(customer)}
                       onEdit={() => openEditForm(customer)}
                       onDelete={() => setDeletingCustomer(customer)}
                     />
@@ -781,6 +1190,15 @@ export const ZZPCustomersPage = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => setViewingCustomer(customer)}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Eye size={16} />
+                                <span className="sr-only">{t('zzpCustomers.viewDetails')}</span>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => openEditForm(customer)}
                                 className="h-8 w-8 p-0"
                               >
@@ -818,6 +1236,21 @@ export const ZZPCustomersPage = () => {
         }}
         customer={editingCustomer}
         onSave={handleSaveCustomer}
+      />
+
+      {/* Customer detail sheet */}
+      <CustomerDetailSheet
+        open={!!viewingCustomer}
+        onOpenChange={(open) => {
+          if (!open) setViewingCustomer(undefined)
+        }}
+        customer={viewingCustomer}
+        onEdit={() => {
+          if (viewingCustomer) {
+            setViewingCustomer(undefined)
+            openEditForm(viewingCustomer)
+          }
+        }}
       />
 
       {/* Delete confirmation dialog */}

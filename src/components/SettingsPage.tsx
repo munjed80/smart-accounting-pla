@@ -2,6 +2,7 @@
  * Settings Page
  * 
  * Profile settings, company info, and notification preferences.
+ * Includes editable Business Profile for ZZP users.
  * Includes version footer for debugging.
  */
 
@@ -18,13 +19,26 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/lib/AuthContext'
 import { administrationApi, Administration, getApiBaseUrl, getRawViteApiUrl, getWindowOrigin, metaApi, VersionInfo } from '@/lib/api'
 import { 
+  getBusinessProfile, 
+  saveBusinessProfile, 
+  BusinessProfile, 
+  BusinessProfileInput 
+} from '@/lib/storage/zzp'
+import { 
   User,
   Buildings,
   Bell,
   Gear,
   CheckCircle,
   Info,
-  ArrowsClockwise
+  ArrowsClockwise,
+  FloppyDisk,
+  MapPin,
+  Envelope,
+  Phone,
+  Globe,
+  Bank,
+  IdentificationCard,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { t } from '@/i18n'
@@ -38,9 +52,28 @@ export const SettingsPage = () => {
   const [administrations, setAdministrations] = useState<Administration[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [backendVersion, setBackendVersion] = useState<VersionInfo | null>(null)
   const [backendVersionError, setBackendVersionError] = useState<string | null>(null)
+  
+  // Business profile state (for ZZP users)
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null)
+  const [profileForm, setProfileForm] = useState<BusinessProfileInput>({
+    company_name: '',
+    trading_name: '',
+    address_street: '',
+    address_postal_code: '',
+    address_city: '',
+    address_country: 'Nederland',
+    kvk_number: '',
+    btw_number: '',
+    iban: '',
+    email: '',
+    phone: '',
+    website: '',
+    logo_url: '',
+  })
   
   // Notification preferences (local state - would be stored in backend in full implementation)
   const [notifications, setNotifications] = useState({
@@ -66,6 +99,29 @@ export const SettingsPage = () => {
     }
     fetchData()
     
+    // Load business profile from localStorage (for ZZP users)
+    if (user?.id && user?.role === 'zzp') {
+      const profile = getBusinessProfile(user.id)
+      if (profile) {
+        setBusinessProfile(profile)
+        setProfileForm({
+          company_name: profile.company_name || '',
+          trading_name: profile.trading_name || '',
+          address_street: profile.address_street || '',
+          address_postal_code: profile.address_postal_code || '',
+          address_city: profile.address_city || '',
+          address_country: profile.address_country || 'Nederland',
+          kvk_number: profile.kvk_number || '',
+          btw_number: profile.btw_number || '',
+          iban: profile.iban || '',
+          email: profile.email || '',
+          phone: profile.phone || '',
+          website: profile.website || '',
+          logo_url: profile.logo_url || '',
+        })
+      }
+    }
+    
     // Fetch backend version info (non-blocking)
     const fetchVersion = async () => {
       try {
@@ -78,7 +134,7 @@ export const SettingsPage = () => {
       }
     }
     fetchVersion()
-  }, [])
+  }, [user?.id, user?.role])
 
   const handleSaveNotifications = async () => {
     setIsSaving(true)
@@ -86,6 +142,33 @@ export const SettingsPage = () => {
     await new Promise(resolve => setTimeout(resolve, 500))
     toast.success(t('settings.preferencesSaved'))
     setIsSaving(false)
+  }
+  
+  const handleSaveBusinessProfile = () => {
+    if (!user?.id) return
+    
+    // Validate required field
+    if (!profileForm.company_name.trim()) {
+      toast.error(t('settings.businessProfileError'))
+      return
+    }
+    
+    setIsSavingProfile(true)
+    
+    try {
+      const saved = saveBusinessProfile(user.id, profileForm)
+      setBusinessProfile(saved)
+      toast.success(t('settings.businessProfileSaved'))
+    } catch (error) {
+      console.error('Failed to save business profile:', error)
+      toast.error(t('settings.businessProfileError'))
+    } finally {
+      setIsSavingProfile(false)
+    }
+  }
+  
+  const updateProfileField = (field: keyof BusinessProfileInput, value: string) => {
+    setProfileForm(prev => ({ ...prev, [field]: value }))
   }
 
   const primaryAdmin = administrations[0]
@@ -169,87 +252,196 @@ export const SettingsPage = () => {
             </CardContent>
           </Card>
 
-          {/* Company/Administration Section - Only for ZZP users */}
+          {/* Business Profile Section - Editable for ZZP users */}
           {user?.role === 'zzp' && (
             <Card className="bg-card/80 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Buildings size={20} weight="duotone" />
-                  {t('settings.companyInfo')}
+                  {t('settings.businessProfile')}
                 </CardTitle>
                 <CardDescription>
-                  {t('settings.companyDescription')}
+                  {t('settings.businessProfileDescription')}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {isLoading ? (
+              <CardContent className="space-y-6">
+                {/* Company Identity */}
+                <div>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <Buildings size={16} />
+                    {t('settings.companyInfo')}
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="profileCompanyName">{t('settings.companyName')} *</Label>
+                      <Input 
+                        id="profileCompanyName" 
+                        value={profileForm.company_name}
+                        onChange={(e) => updateProfileField('company_name', e.target.value)}
+                        placeholder="Mijn Bedrijf B.V."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="profileTradingName">{t('settings.tradingName')}</Label>
+                      <Input 
+                        id="profileTradingName" 
+                        value={profileForm.trading_name || ''}
+                        onChange={(e) => updateProfileField('trading_name', e.target.value)}
+                        placeholder={t('settings.tradingNamePlaceholder')}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Address */}
+                <div>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <MapPin size={16} />
+                    Adres
+                  </h4>
                   <div className="space-y-4">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                ) : loadError ? (
-                  <Alert variant="destructive">
-                    <AlertDescription>{loadError}</AlertDescription>
-                  </Alert>
-                ) : primaryAdmin ? (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="profileAddressStreet">{t('settings.addressStreet')}</Label>
+                      <Input 
+                        id="profileAddressStreet" 
+                        value={profileForm.address_street || ''}
+                        onChange={(e) => updateProfileField('address_street', e.target.value)}
+                        placeholder="Hoofdstraat 123"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="companyName">{t('settings.companyName')}</Label>
+                        <Label htmlFor="profileAddressPostalCode">{t('settings.addressPostalCode')}</Label>
                         <Input 
-                          id="companyName" 
-                          value={primaryAdmin.name} 
-                          readOnly 
-                          className="bg-secondary/50"
+                          id="profileAddressPostalCode" 
+                          value={profileForm.address_postal_code || ''}
+                          onChange={(e) => updateProfileField('address_postal_code', e.target.value)}
+                          placeholder="1234 AB"
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="kvkNumber">{t('settings.kvkNumber')}</Label>
+                      <div className="space-y-2 col-span-1 md:col-span-2">
+                        <Label htmlFor="profileAddressCity">{t('settings.addressCity')}</Label>
                         <Input 
-                          id="kvkNumber" 
-                          value={primaryAdmin.kvk_number || t('settings.notSet')} 
-                          readOnly 
-                          className="bg-secondary/50"
+                          id="profileAddressCity" 
+                          value={profileForm.address_city || ''}
+                          onChange={(e) => updateProfileField('address_city', e.target.value)}
+                          placeholder="Amsterdam"
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="btwNumber">{t('settings.btwNumber')}</Label>
-                        <Input 
-                          id="btwNumber" 
-                          value={primaryAdmin.btw_number || t('settings.notSet')} 
-                          readOnly 
-                          className="bg-secondary/50"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="description">{t('settings.description')}</Label>
-                        <Input 
-                          id="description" 
-                          value={primaryAdmin.description || t('settings.noDescription')} 
-                          readOnly 
-                          className="bg-secondary/50"
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="profileAddressCountry">{t('settings.addressCountry')}</Label>
+                      <Input 
+                        id="profileAddressCountry" 
+                        value={profileForm.address_country || ''}
+                        onChange={(e) => updateProfileField('address_country', e.target.value)}
+                        placeholder="Nederland"
+                      />
                     </div>
-                    <Alert>
-                      <Info size={16} />
-                      <AlertDescription>
-                        {t('settings.companyInfoUpdate')}
-                      </AlertDescription>
-                    </Alert>
-                  </>
-                ) : (
-                  <div className="text-center py-8">
-                    <Buildings size={48} className="mx-auto mb-4 text-muted-foreground opacity-50" weight="duotone" />
-                    <p className="text-muted-foreground">{t('settings.noAdministrationSetup')}</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {t('settings.completeOnboarding')}
-                    </p>
                   </div>
-                )}
+                </div>
+
+                <Separator />
+
+                {/* Business IDs */}
+                <div>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <IdentificationCard size={16} />
+                    Bedrijfsgegevens
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="profileKvk">{t('settings.kvkNumber')}</Label>
+                      <Input 
+                        id="profileKvk" 
+                        value={profileForm.kvk_number || ''}
+                        onChange={(e) => updateProfileField('kvk_number', e.target.value)}
+                        placeholder="12345678"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="profileBtw">{t('settings.btwNumber')}</Label>
+                      <Input 
+                        id="profileBtw" 
+                        value={profileForm.btw_number || ''}
+                        onChange={(e) => updateProfileField('btw_number', e.target.value)}
+                        placeholder="NL123456789B01"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Bank Details */}
+                <div>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <Bank size={16} />
+                    Bankgegevens
+                  </h4>
+                  <div className="space-y-2">
+                    <Label htmlFor="profileIban">{t('settings.iban')}</Label>
+                    <Input 
+                      id="profileIban" 
+                      value={profileForm.iban || ''}
+                      onChange={(e) => updateProfileField('iban', e.target.value)}
+                      placeholder={t('settings.ibanPlaceholder')}
+                    />
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Contact Details */}
+                <div>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <Envelope size={16} />
+                    Contactgegevens
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="profileEmail">{t('settings.email')}</Label>
+                      <Input 
+                        id="profileEmail" 
+                        type="email"
+                        value={profileForm.email || ''}
+                        onChange={(e) => updateProfileField('email', e.target.value)}
+                        placeholder={t('settings.emailPlaceholder')}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="profilePhone">{t('settings.phone')}</Label>
+                      <Input 
+                        id="profilePhone" 
+                        value={profileForm.phone || ''}
+                        onChange={(e) => updateProfileField('phone', e.target.value)}
+                        placeholder={t('settings.phonePlaceholder')}
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="profileWebsite">{t('settings.website')}</Label>
+                      <Input 
+                        id="profileWebsite" 
+                        value={profileForm.website || ''}
+                        onChange={(e) => updateProfileField('website', e.target.value)}
+                        placeholder={t('settings.websitePlaceholder')}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4">
+                  <Button onClick={handleSaveBusinessProfile} disabled={isSavingProfile} className="gap-2">
+                    {isSavingProfile ? (
+                      <ArrowsClockwise size={18} className="animate-spin" />
+                    ) : (
+                      <FloppyDisk size={18} />
+                    )}
+                    {t('settings.saveProfile')}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}

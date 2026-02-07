@@ -1,10 +1,10 @@
 /**
  * ZZP Storage Module
  * 
- * Provides localStorage-based persistence for Customer and Invoice entities.
- * Each user's data is stored with a prefix: zzp:{userId}:customers / zzp:{userId}:invoices
+ * Provides localStorage-based persistence for Customer, Invoice, and BusinessProfile entities.
+ * Each user's data is stored with a prefix: zzp:{userId}:customers / zzp:{userId}:invoices / zzp:{userId}:profile
  * 
- * This is a frontend-only storage solution - no backend calls.
+ * This is a frontend-only storage solution - no backend calls (for MVP).
  */
 
 // ============================================================================
@@ -16,7 +16,43 @@ export interface Customer {
   name: string
   email?: string
   phone?: string
+  // Address fields
+  address_street?: string
+  address_postal_code?: string
+  address_city?: string
+  address_country?: string
+  // Business identifiers
+  kvk_number?: string
+  btw_number?: string
+  // Bank details
+  iban?: string
+  // Status
   status: 'active' | 'inactive'
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BusinessProfile {
+  id: string
+  company_name: string
+  trading_name?: string
+  // Address fields
+  address_street?: string
+  address_postal_code?: string
+  address_city?: string
+  address_country?: string
+  // Business identifiers
+  kvk_number?: string
+  btw_number?: string
+  // Bank details
+  iban?: string
+  // Contact details
+  email?: string
+  phone?: string
+  website?: string
+  // Logo
+  logo_url?: string
+  // Timestamps
   createdAt: string
   updatedAt: string
 }
@@ -31,12 +67,23 @@ export interface Invoice {
   currency: 'EUR'
   status: 'draft' | 'sent' | 'paid' | 'overdue'
   notes?: string
+  // Seller snapshot (from BusinessProfile at time of creation)
+  seller_company_name?: string
+  seller_address?: string
+  seller_kvk?: string
+  seller_btw?: string
+  seller_iban?: string
+  seller_email?: string
+  seller_phone?: string
   createdAt: string
   updatedAt: string
 }
 
 export type CustomerInput = Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>
 export type CustomerUpdate = Partial<CustomerInput>
+
+export type BusinessProfileInput = Omit<BusinessProfile, 'id' | 'createdAt' | 'updatedAt'>
+export type BusinessProfileUpdate = Partial<BusinessProfileInput>
 
 export type InvoiceInput = Omit<Invoice, 'id' | 'number' | 'createdAt' | 'updatedAt'>
 export type InvoiceUpdate = Partial<Omit<InvoiceInput, 'customerId'>>
@@ -45,7 +92,7 @@ export type InvoiceUpdate = Partial<Omit<InvoiceInput, 'customerId'>>
 // Storage Keys
 // ============================================================================
 
-const getStorageKey = (userId: string, entity: 'customers' | 'invoices') => 
+const getStorageKey = (userId: string, entity: 'customers' | 'invoices' | 'profile') => 
   `zzp:${userId}:${entity}`
 
 const getInvoiceCounterKey = (userId: string) => 
@@ -301,6 +348,68 @@ export function removeInvoice(userId: string, invoiceId: string): boolean {
   safeWrite(key, invoices)
   
   return true
+}
+
+// ============================================================================
+// Business Profile Storage Functions
+// ============================================================================
+
+/**
+ * Get business profile for a user
+ */
+export function getBusinessProfile(userId: string): BusinessProfile | null {
+  const key = getStorageKey(userId, 'profile')
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch (error) {
+    console.warn(`Failed to read business profile for user ${userId}:`, error)
+    return null
+  }
+}
+
+/**
+ * Save or update business profile
+ */
+export function saveBusinessProfile(userId: string, input: BusinessProfileInput): BusinessProfile {
+  const key = getStorageKey(userId, 'profile')
+  const existing = getBusinessProfile(userId)
+  const timestamp = now()
+  
+  const profile: BusinessProfile = {
+    id: existing?.id || generateId(),
+    ...input,
+    createdAt: existing?.createdAt || timestamp,
+    updatedAt: timestamp,
+  }
+  
+  safeWrite(key, profile)
+  return profile
+}
+
+/**
+ * Create seller snapshot from business profile for invoice
+ */
+export function createSellerSnapshot(profile: BusinessProfile | null): Partial<Invoice> {
+  if (!profile) return {}
+  
+  // Format address for display
+  const addressParts = [
+    profile.address_street,
+    [profile.address_postal_code, profile.address_city].filter(Boolean).join(' '),
+    profile.address_country,
+  ].filter(Boolean)
+  
+  return {
+    seller_company_name: profile.company_name,
+    seller_address: addressParts.join(', ') || undefined,
+    seller_kvk: profile.kvk_number,
+    seller_btw: profile.btw_number,
+    seller_iban: profile.iban,
+    seller_email: profile.email,
+    seller_phone: profile.phone,
+  }
 }
 
 // ============================================================================

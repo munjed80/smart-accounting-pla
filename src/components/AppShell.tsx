@@ -40,6 +40,8 @@ import {
   FileText,
   Receipt,
   Users,
+  Clock,
+  CalendarBlank,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 
@@ -185,6 +187,30 @@ const menuItems: MenuItem[] = [
     label: t('sidebar.facturen'),
     tabValue: 'invoices',
     icon: <FileText size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  // 7. Uitgaven (Expenses) - coming soon
+  {
+    label: t('sidebar.uitgaven'),
+    tabValue: 'expenses',
+    icon: <Receipt size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  // 8. Uren (Time Tracking) - coming soon
+  {
+    label: t('sidebar.uren'),
+    tabValue: 'time',
+    icon: <Clock size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  // 9. Agenda - coming soon
+  {
+    label: t('sidebar.agenda'),
+    tabValue: 'agenda',
+    icon: <CalendarBlank size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',
   },

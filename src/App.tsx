@@ -21,6 +21,9 @@ import { GrootboekPage } from '@/components/GrootboekPage'
 import { ZZPAccountantLinksPage } from '@/components/ZZPAccountantLinksPage'
 import { ZZPCustomersPage } from '@/components/ZZPCustomersPage'
 import { ZZPInvoicesPage } from '@/components/ZZPInvoicesPage'
+import { ZZPExpensesPage } from '@/components/ZZPExpensesPage'
+import { ZZPTimeTrackingPage } from '@/components/ZZPTimeTrackingPage'
+import { ZZPAgendaPage } from '@/components/ZZPAgendaPage'
 import { ClientDossierPage } from '@/components/ClientDossierPage'
 import { BulkOperationsHistoryPage } from '@/components/BulkOperationsHistoryPage'
 import { BankReconciliationPage } from '@/components/BankReconciliationPage'
@@ -157,6 +160,12 @@ const pathToTab = (path: string, isAccountant: boolean): string => {
       return 'customers'
     case '/zzp/invoices':
       return 'invoices'
+    case '/zzp/expenses':
+      return 'expenses'
+    case '/zzp/time':
+      return 'time'
+    case '/zzp/agenda':
+      return 'agenda'
     case '/':
     default:
       // Default based on role
@@ -201,6 +210,12 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
       return '/zzp/customers'
     case 'invoices':
       return '/zzp/invoices'
+    case 'expenses':
+      return '/zzp/expenses'
+    case 'time':
+      return '/zzp/time'
+    case 'agenda':
+      return '/zzp/agenda'
     default:
       return isAccountant ? '/accountant' : '/dashboard'
   }
@@ -210,7 +225,7 @@ const AppContent = () => {
   const { user, isAuthenticated, isLoading } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
   const isAccountantOnly = user?.role === 'accountant'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'expenses' | 'time' | 'agenda'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
   // Onboarding state - tracks if user needs onboarding (no administrations for ZZP, no clients for accountants)
@@ -492,6 +507,15 @@ const AppContent = () => {
       case 'invoices':
         // ZZP-only page for managing invoices
         return !isAccountant ? <ZZPInvoicesPage /> : <SmartDashboard />
+      case 'expenses':
+        // ZZP-only page for expenses (coming soon)
+        return !isAccountant ? <ZZPExpensesPage /> : <SmartDashboard />
+      case 'time':
+        // ZZP-only page for time tracking (coming soon)
+        return !isAccountant ? <ZZPTimeTrackingPage /> : <SmartDashboard />
+      case 'agenda':
+        // ZZP-only page for agenda (coming soon)
+        return !isAccountant ? <ZZPAgendaPage /> : <SmartDashboard />
       case 'dashboard':
         return <SmartDashboard />
       case 'transactions':

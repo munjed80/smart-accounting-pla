@@ -167,7 +167,8 @@ class CustomerUpdate(BaseModel):
             email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
             if not email_pattern.match(v):
                 raise ValueError("Invalid email format")
-        return v
+            return v
+        return None
 
     @field_validator('phone', 'address_street', 'address_city', 'address_country')
     @classmethod
@@ -192,7 +193,8 @@ class CustomerUpdate(BaseModel):
                 return None
             if not KVK_PATTERN.match(v):
                 raise ValueError("KVK number must be 8 digits")
-        return v
+            return v
+        return None
 
     @field_validator('btw_number')
     @classmethod
@@ -203,7 +205,8 @@ class CustomerUpdate(BaseModel):
                 return None
             if not BTW_PATTERN.match(v):
                 raise ValueError("BTW number must be in format NL000000000B00")
-        return v
+            return v
+        return None
 
     @field_validator('iban')
     @classmethod
@@ -214,7 +217,8 @@ class CustomerUpdate(BaseModel):
                 return None
             if not IBAN_PATTERN.match(v):
                 raise ValueError("Invalid IBAN format")
-        return v
+            return v
+        return None
 
 
 class CustomerResponse(BaseModel):

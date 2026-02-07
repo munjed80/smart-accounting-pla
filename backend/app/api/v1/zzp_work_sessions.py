@@ -59,9 +59,9 @@ def round_to_5_minutes(hours: float) -> float:
     Round hours to nearest 5 minutes (0.0833... hours).
     
     Examples:
-    - 1.02 hours -> 1.0 hours (62 min -> 60 min)
-    - 1.05 hours -> 1.08 hours (63 min -> 65 min)
-    - 2.75 hours -> 2.75 hours (165 min -> 165 min, already aligned)
+    - 1.02 hours (61.2 min) -> 1.0 hours (60 min)
+    - 1.05 hours (63 min) -> 1.08 hours (65 min, since 1.0833... rounds to 1.08)
+    - 2.75 hours (165 min) -> 2.75 hours (already aligned to 5 min)
     """
     # Convert to minutes
     minutes = hours * 60

@@ -245,7 +245,7 @@ class TestRoundToFiveMinutes:
         """Hours close to next 5-minute boundary round up."""
         from app.api.v1.zzp_work_sessions import round_to_5_minutes
         
-        # 63 minutes = 1.05 hours -> 65 minutes = 1.08 hours
+        # 63 minutes = 1.05 hours -> rounds to 65 minutes = 1.0833... hours ≈ 1.08
         assert round_to_5_minutes(63 / 60) == 1.08
         
     def test_already_aligned(self):

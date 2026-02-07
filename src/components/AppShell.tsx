@@ -39,6 +39,7 @@ import {
   Books,
   FileText,
   Receipt,
+  Users,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 
@@ -168,6 +169,22 @@ const menuItems: MenuItem[] = [
     label: t('sidebar.boekhouder'),
     tabValue: 'boekhouder',
     icon: <Handshake size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  // 5. Klanten (Customers)
+  {
+    label: t('sidebar.klanten'),
+    tabValue: 'customers',
+    icon: <Users size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  // 6. Facturen (Invoices)
+  {
+    label: t('sidebar.facturen'),
+    tabValue: 'invoices',
+    icon: <FileText size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',
   },

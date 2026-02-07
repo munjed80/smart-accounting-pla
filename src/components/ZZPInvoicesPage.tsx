@@ -801,18 +801,28 @@ const InvoiceFormDialog = ({
 
             {/* Totals */}
             <div className="pt-3 border-t border-border/50 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('zzpInvoices.subtotal')}</span>
-                <span>{formatAmountEUR(isReadOnly && invoice ? invoice.subtotal_cents : calculatedTotals.subtotal)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('zzpInvoices.vatTotal')}</span>
-                <span>{formatAmountEUR(isReadOnly && invoice ? invoice.vat_total_cents : calculatedTotals.vatTotal)}</span>
-              </div>
-              <div className="flex justify-between text-base font-bold pt-2 border-t border-border/50">
-                <span>{t('zzpInvoices.total')}</span>
-                <span>{formatAmountEUR(isReadOnly && invoice ? invoice.total_cents : calculatedTotals.total)}</span>
-              </div>
+              {(() => {
+                // Use server-calculated totals for read-only view, otherwise use local calculation
+                const displayTotals = isReadOnly && invoice
+                  ? { subtotal: invoice.subtotal_cents, vatTotal: invoice.vat_total_cents, total: invoice.total_cents }
+                  : calculatedTotals
+                return (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{t('zzpInvoices.subtotal')}</span>
+                      <span>{formatAmountEUR(displayTotals.subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{t('zzpInvoices.vatTotal')}</span>
+                      <span>{formatAmountEUR(displayTotals.vatTotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-bold pt-2 border-t border-border/50">
+                      <span>{t('zzpInvoices.total')}</span>
+                      <span>{formatAmountEUR(displayTotals.total)}</span>
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           </div>
 

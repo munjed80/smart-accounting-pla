@@ -465,7 +465,10 @@ const InvoiceFormDialog = ({
       hasError = true
     }
 
-    if (hasError || !validLines) return
+    if (hasError || !validLines) {
+      toast.error(t('zzpInvoices.formValidationError'))
+      return
+    }
 
     setIsSubmitting(true)
 
@@ -478,6 +481,9 @@ const InvoiceFormDialog = ({
         lines: validLines,
       }
       await onSave(invoiceData, isEdit)
+    } catch (err) {
+      // Error toast is handled by the parent onSave callback
+      console.error('Failed to save invoice:', err)
     } finally {
       setIsSubmitting(false)
     }
@@ -548,7 +554,7 @@ const InvoiceFormDialog = ({
                     </div>
                   ) : (
                     activeCustomers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
+                      <SelectItem key={customer.id} value={String(customer.id)}>
                         <div className="flex items-center gap-2">
                           <Users size={14} className="text-muted-foreground" />
                           {customer.name}

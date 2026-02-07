@@ -82,9 +82,12 @@ import {
   Buildings,
   Bank,
   IdentificationCard,
+  Receipt,
+  ArrowRight,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { zzpApi, ZZPCustomer, ZZPCustomerCreate, ZZPCustomerUpdate } from '@/lib/api'
+import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -1056,6 +1059,10 @@ export const ZZPCustomersPage = () => {
   const [editingCustomer, setEditingCustomer] = useState<ZZPCustomer | undefined>()
   const [deletingCustomer, setDeletingCustomer] = useState<ZZPCustomer | undefined>()
   const [viewingCustomer, setViewingCustomer] = useState<ZZPCustomer | undefined>()
+  
+  // Success dialog state (for CTA after creating customer)
+  const [newlyCreatedCustomer, setNewlyCreatedCustomer] = useState<ZZPCustomer | undefined>()
+  const [showCreateInvoiceCta, setShowCreateInvoiceCta] = useState(false)
 
   // Load customers from API
   const loadCustomers = useCallback(async () => {
@@ -1118,9 +1125,10 @@ export const ZZPCustomersPage = () => {
         await zzpApi.customers.update(editingCustomer.id, data as ZZPCustomerUpdate)
         toast.success(t('zzpCustomers.customerSaved'))
       } else {
-        // Add new
-        await zzpApi.customers.create(data)
-        toast.success(t('zzpCustomers.customerSaved'))
+        // Add new - show CTA to create invoice
+        const newCustomer = await zzpApi.customers.create(data)
+        setNewlyCreatedCustomer(newCustomer)
+        setShowCreateInvoiceCta(true)
       }
 
       // Reload customers list
@@ -1133,6 +1141,23 @@ export const ZZPCustomersPage = () => {
       toast.error(t('zzpCustomers.errorSavingCustomer'))
     }
   }, [user?.id, editingCustomer, loadCustomers])
+
+  // Handle navigation to invoices with pre-selected customer
+  const handleCreateInvoiceForCustomer = useCallback(() => {
+    if (newlyCreatedCustomer) {
+      // Navigate to invoices page with customer_id in the URL params
+      navigateTo(`/zzp/invoices?customer_id=${newlyCreatedCustomer.id}`)
+    }
+    setShowCreateInvoiceCta(false)
+    setNewlyCreatedCustomer(undefined)
+  }, [newlyCreatedCustomer])
+
+  // Dismiss the CTA dialog
+  const handleDismissCreateInvoiceCta = useCallback(() => {
+    toast.success(t('zzpCustomers.customerSaved'))
+    setShowCreateInvoiceCta(false)
+    setNewlyCreatedCustomer(undefined)
+  }, [])
 
   // Handle delete customer
   const handleDeleteCustomer = useCallback(async () => {
@@ -1401,6 +1426,40 @@ export const ZZPCustomersPage = () => {
         onConfirm={handleDeleteCustomer}
         customerName={deletingCustomer?.name || ''}
       />
+
+      {/* Success CTA dialog - offer to create invoice for new customer */}
+      <AlertDialog open={showCreateInvoiceCta} onOpenChange={(open) => {
+        if (!open) handleDismissCreateInvoiceCta()
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-12 w-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+                <CheckCircle size={28} className="text-green-600" weight="duotone" />
+              </div>
+              <div>
+                <AlertDialogTitle className="text-left">{t('zzpCustomers.customerCreatedTitle')}</AlertDialogTitle>
+                {newlyCreatedCustomer && (
+                  <p className="text-sm text-muted-foreground font-medium">{newlyCreatedCustomer.name}</p>
+                )}
+              </div>
+            </div>
+            <AlertDialogDescription>
+              {t('zzpCustomers.customerCreatedMessage')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel onClick={handleDismissCreateInvoiceCta}>
+              {t('zzpCustomers.maybeLater')}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleCreateInvoiceForCustomer} className="gap-2">
+              <Receipt size={18} weight="duotone" />
+              {t('zzpCustomers.createInvoiceForCustomer')}
+              <ArrowRight size={18} />
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

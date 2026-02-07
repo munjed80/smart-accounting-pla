@@ -16,6 +16,17 @@ export interface Customer {
   name: string
   email?: string
   phone?: string
+  // Address fields
+  address_street?: string
+  address_postal_code?: string
+  address_city?: string
+  address_country?: string
+  // Business identifiers
+  kvk_number?: string
+  btw_number?: string
+  // Bank details
+  iban?: string
+  // Status
   status: 'active' | 'inactive'
   createdAt: string
   updatedAt: string

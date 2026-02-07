@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.core.database import engine
-from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta
+from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta, zzp_customers
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ def verify_orm_mappings() -> None:
         AccountantClientAssignment, BulkOperation, ClientReminder,
         AuthToken,
         BankAccount, BankTransaction, ReconciliationAction,
+        ZZPCustomer,
     )
     
     # This will raise InvalidRequestError if any relationships are misconfigured
@@ -212,6 +213,7 @@ api_v1_router.include_router(accountant_dashboard.router, prefix="/accountant", 
 api_v1_router.include_router(work_queue.router, prefix="/accountant", tags=["work-queue-reminders-evidence"])
 api_v1_router.include_router(bank.router, prefix="/accountant", tags=["bank-reconciliation"])
 api_v1_router.include_router(zzp.router, prefix="/zzp", tags=["zzp-client-consent"])
+api_v1_router.include_router(zzp_customers.router, prefix="/zzp", tags=["zzp-customers"])
 api_v1_router.include_router(observability.router, prefix="/ops", tags=["observability"])
 api_v1_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_v1_router.include_router(meta.router, tags=["metadata"])

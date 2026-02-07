@@ -177,9 +177,9 @@ export const nl = {
     statsTotal: "Totaal",
     statsActive: "Actief",
     statsInactive: "Inactief",
-    // Form fields
+    // Form fields - Contact section
     formName: "Naam",
-    formNamePlaceholder: "Naam van de klant",
+    formNamePlaceholder: "Naam van de klant of bedrijf",
     formNameRequired: "Naam is verplicht",
     formEmail: "E-mail",
     formEmailPlaceholder: "email@voorbeeld.nl",
@@ -189,6 +189,33 @@ export const nl = {
     formStatus: "Status",
     formStatusActive: "Actief",
     formStatusInactive: "Inactief",
+    // Form fields - Address section
+    sectionContact: "Contact",
+    sectionAddress: "Adres",
+    sectionBusiness: "Bedrijfsgegevens",
+    sectionBank: "Bankgegevens",
+    formAddressStreet: "Straat en huisnummer",
+    formAddressStreetPlaceholder: "Hoofdstraat 123",
+    formAddressPostalCode: "Postcode",
+    formAddressPostalCodePlaceholder: "1234 AB",
+    formAddressCity: "Plaats",
+    formAddressCityPlaceholder: "Amsterdam",
+    formAddressCountry: "Land",
+    formAddressCountryPlaceholder: "Nederland",
+    // Form fields - Business IDs
+    formKvk: "KVK-nummer",
+    formKvkPlaceholder: "12345678",
+    formKvkInvalid: "KVK-nummer moet 8 cijfers zijn",
+    formBtw: "BTW-nummer",
+    formBtwPlaceholder: "NL123456789B01",
+    formBtwInvalid: "Ongeldig BTW-nummer formaat",
+    // Form fields - Bank
+    formIban: "IBAN",
+    formIbanPlaceholder: "NL00BANK0123456789",
+    formIbanInvalid: "Ongeldig IBAN formaat",
+    // Helper texts
+    helperOptional: "Optioneel",
+    helperRequired: "Verplicht",
     // Status descriptions
     statusActiveDescription: "Klant kan facturen ontvangen",
     statusInactiveDescription: "Klant is tijdelijk gedeactiveerd",
@@ -210,6 +237,10 @@ export const nl = {
     // Search results
     noCustomersFound: "Geen klanten gevonden",
     tryDifferentSearch: "Probeer een andere zoekterm",
+    // Customer detail view
+    viewDetails: "Bekijk details",
+    customerDetails: "Klantgegevens",
+    noDetailsAvailable: "Geen extra gegevens beschikbaar",
   },
 
   // ZZP Invoices page

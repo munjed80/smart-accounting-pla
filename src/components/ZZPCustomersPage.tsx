@@ -3,15 +3,23 @@
  * 
  * Full CRUD functionality for managing customers.
  * Data is stored in localStorage per user.
+ * 
+ * Premium UI with:
+ * - Stats mini-cards
+ * - Search with debounce
+ * - Responsive table/card design
+ * - Two-column modal on desktop
+ * - Loading/skeleton states
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
+import { Skeleton } from '@/components/ui/skeleton'
 import { 
   Table, 
   TableBody, 
@@ -53,6 +61,13 @@ import {
   TrashSimple,
   CheckCircle,
   XCircle,
+  UserCirclePlus,
+  UsersThree,
+  UserCheck,
+  UserMinus,
+  Envelope,
+  Phone,
+  SpinnerGap,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { 
@@ -62,28 +77,117 @@ import {
   addCustomer, 
   updateCustomer, 
   removeCustomer,
-  formatDate,
 } from '@/lib/storage/zzp'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+  
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+    
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+  
+  return debouncedValue
+}
+
 // Status badge component
-const StatusBadge = ({ status }: { status: 'active' | 'inactive' }) => {
+const StatusBadge = ({ status, size = 'default' }: { status: 'active' | 'inactive'; size?: 'default' | 'sm' }) => {
+  const sizeClasses = size === 'sm' ? 'text-xs py-0.5 px-1.5' : ''
   if (status === 'active') {
     return (
-      <Badge variant="outline" className="bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/40">
-        <CheckCircle size={14} className="mr-1" weight="fill" />
+      <Badge variant="outline" className={`bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/40 ${sizeClasses}`}>
+        <CheckCircle size={size === 'sm' ? 12 : 14} className="mr-1" weight="fill" />
         {t('zzpCustomers.statusActive')}
       </Badge>
     )
   }
   return (
-    <Badge variant="outline" className="bg-gray-500/20 text-gray-600 dark:text-gray-400 border-gray-500/40">
-      <XCircle size={14} className="mr-1" weight="fill" />
+    <Badge variant="outline" className={`bg-gray-500/20 text-gray-600 dark:text-gray-400 border-gray-500/40 ${sizeClasses}`}>
+      <XCircle size={size === 'sm' ? 12 : 14} className="mr-1" weight="fill" />
       {t('zzpCustomers.statusInactive')}
     </Badge>
   )
 }
+
+// Stats card component
+const StatsCard = ({ 
+  title, 
+  value, 
+  icon: Icon, 
+  className = '' 
+}: { 
+  title: string
+  value: number
+  icon: React.ElementType
+  className?: string 
+}) => (
+  <Card className={`bg-card/80 backdrop-blur-sm border border-border/50 ${className}`}>
+    <CardContent className="p-4 sm:p-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs sm:text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="text-2xl sm:text-3xl font-bold mt-1">{value}</p>
+        </div>
+        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+          <Icon size={20} className="text-primary sm:hidden" weight="duotone" />
+          <Icon size={24} className="text-primary hidden sm:block" weight="duotone" />
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+)
+
+// Loading skeleton for stats
+const StatsLoadingSkeleton = () => (
+  <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+    {[1, 2, 3].map((i) => (
+      <Card key={i} className="bg-card/80 backdrop-blur-sm">
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-16 sm:w-20" />
+              <Skeleton className="h-7 w-10 sm:h-8 sm:w-12" />
+            </div>
+            <Skeleton className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl" />
+          </div>
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+)
+
+// Loading skeleton for table
+const TableLoadingSkeleton = () => (
+  <Card className="bg-card/80 backdrop-blur-sm">
+    <CardContent className="p-4 sm:p-6">
+      <div className="space-y-4">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="flex items-center justify-between py-3 border-b border-border/50 last:border-0">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24 sm:w-32" />
+                <Skeleton className="h-3 w-32 sm:w-48" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-6 w-16" />
+              <Skeleton className="h-8 w-8 rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </CardContent>
+  </Card>
+)
 
 // Customer form dialog
 const CustomerFormDialog = ({
@@ -103,6 +207,8 @@ const CustomerFormDialog = ({
   const [phone, setPhone] = useState('')
   const [status, setStatus] = useState<'active' | 'inactive'>('active')
   const [nameError, setNameError] = useState('')
+  const [emailError, setEmailError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Reset form when dialog opens/closes or customer changes
   useEffect(() => {
@@ -119,15 +225,39 @@ const CustomerFormDialog = ({
         setStatus('active')
       }
       setNameError('')
+      setEmailError('')
+      setIsSubmitting(false)
     }
   }, [open, customer])
 
-  const handleSave = () => {
-    // Validate
+  // Email validation
+  const validateEmail = (value: string): boolean => {
+    if (!value) return true // Optional field
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(value)
+  }
+
+  const handleSave = async () => {
+    let hasError = false
+    
+    // Validate name
     if (!name.trim()) {
       setNameError(t('zzpCustomers.formNameRequired'))
-      return
+      hasError = true
     }
+    
+    // Validate email format
+    if (email && !validateEmail(email)) {
+      setEmailError(t('zzpCustomers.formEmailInvalid'))
+      hasError = true
+    }
+
+    if (hasError) return
+
+    setIsSubmitting(true)
+    
+    // Simulate brief processing time for UX
+    await new Promise(resolve => setTimeout(resolve, 200))
 
     onSave({
       name: name.trim(),
@@ -135,27 +265,35 @@ const CustomerFormDialog = ({
       phone: phone.trim() || undefined,
       status,
     })
+    
+    setIsSubmitting(false)
   }
+
+  const isFormValid = name.trim() && (!email || validateEmail(email))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Users size={24} className="text-primary" weight="duotone" />
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="pb-4 border-b border-border/50">
+          <DialogTitle className="flex items-center gap-3 text-xl">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <UserCirclePlus size={24} className="text-primary" weight="duotone" />
+            </div>
             {isEdit ? t('zzpCustomers.editCustomer') : t('zzpCustomers.newCustomer')}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             {isEdit 
-              ? t('zzpCustomers.noCustomersDescription') 
-              : t('zzpCustomers.noCustomersDescription')}
+              ? t('zzpCustomers.editCustomerDescription')
+              : t('zzpCustomers.newCustomerDescription')}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Name field (required) */}
+        <div className="py-4 space-y-5">
+          {/* Name field (required) - full width */}
           <div className="space-y-2">
-            <Label htmlFor="customer-name">{t('zzpCustomers.formName')} *</Label>
+            <Label htmlFor="customer-name" className="text-sm font-medium">
+              {t('zzpCustomers.formName')} <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="customer-name"
               placeholder={t('zzpCustomers.formNamePlaceholder')}
@@ -164,62 +302,115 @@ const CustomerFormDialog = ({
                 setName(e.target.value)
                 setNameError('')
               }}
-              className={nameError ? 'border-destructive' : ''}
+              className={`h-11 ${nameError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+              disabled={isSubmitting}
+              autoFocus
             />
             {nameError && (
-              <p className="text-sm text-destructive">{nameError}</p>
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <XCircle size={14} />
+                {nameError}
+              </p>
             )}
           </div>
 
-          {/* Email field */}
-          <div className="space-y-2">
-            <Label htmlFor="customer-email">{t('zzpCustomers.formEmail')}</Label>
-            <Input
-              id="customer-email"
-              type="email"
-              placeholder={t('zzpCustomers.formEmailPlaceholder')}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-
-          {/* Phone field */}
-          <div className="space-y-2">
-            <Label htmlFor="customer-phone">{t('zzpCustomers.formPhone')}</Label>
-            <Input
-              id="customer-phone"
-              type="tel"
-              placeholder={t('zzpCustomers.formPhonePlaceholder')}
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-          </div>
-
-          {/* Status toggle */}
-          <div className="flex items-center justify-between">
-            <Label htmlFor="customer-status">{t('zzpCustomers.formStatus')}</Label>
-            <div className="flex items-center gap-2">
-              <span className={`text-sm ${status === 'inactive' ? 'text-foreground' : 'text-muted-foreground'}`}>
-                {t('zzpCustomers.formStatusInactive')}
-              </span>
-              <Switch
-                id="customer-status"
-                checked={status === 'active'}
-                onCheckedChange={(checked) => setStatus(checked ? 'active' : 'inactive')}
+          {/* Two column layout for email and phone on desktop */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Email field */}
+            <div className="space-y-2">
+              <Label htmlFor="customer-email" className="text-sm font-medium flex items-center gap-2">
+                <Envelope size={14} className="text-muted-foreground" />
+                {t('zzpCustomers.formEmail')}
+              </Label>
+              <Input
+                id="customer-email"
+                type="email"
+                placeholder={t('zzpCustomers.formEmailPlaceholder')}
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  setEmailError('')
+                }}
+                className={`h-11 ${emailError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                disabled={isSubmitting}
               />
-              <span className={`text-sm ${status === 'active' ? 'text-foreground' : 'text-muted-foreground'}`}>
-                {t('zzpCustomers.formStatusActive')}
-              </span>
+              {emailError && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <XCircle size={14} />
+                  {emailError}
+                </p>
+              )}
+            </div>
+
+            {/* Phone field */}
+            <div className="space-y-2">
+              <Label htmlFor="customer-phone" className="text-sm font-medium flex items-center gap-2">
+                <Phone size={14} className="text-muted-foreground" />
+                {t('zzpCustomers.formPhone')}
+              </Label>
+              <Input
+                id="customer-phone"
+                type="tel"
+                placeholder={t('zzpCustomers.formPhonePlaceholder')}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="h-11"
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+
+          {/* Status toggle with better visual */}
+          <div className="pt-2 pb-1">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-secondary/50 border border-border/50">
+              <div className="space-y-1">
+                <Label htmlFor="customer-status" className="text-sm font-medium">
+                  {t('zzpCustomers.formStatus')}
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {status === 'active' 
+                    ? t('zzpCustomers.statusActiveDescription')
+                    : t('zzpCustomers.statusInactiveDescription')}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <StatusBadge status={status} size="sm" />
+                <Switch
+                  id="customer-status"
+                  checked={status === 'active'}
+                  onCheckedChange={(checked) => setStatus(checked ? 'active' : 'inactive')}
+                  disabled={isSubmitting}
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="pt-4 border-t border-border/50 gap-2 sm:gap-0">
+          <Button 
+            variant="outline" 
+            onClick={() => onOpenChange(false)}
+            disabled={isSubmitting}
+            className="h-11"
+          >
             {t('common.cancel')}
           </Button>
-          <Button onClick={handleSave}>
-            {t('zzpCustomers.saveCustomer')}
+          <Button 
+            onClick={handleSave}
+            disabled={isSubmitting || !isFormValid}
+            className="h-11 min-w-[140px]"
+          >
+            {isSubmitting ? (
+              <>
+                <SpinnerGap size={18} className="mr-2 animate-spin" />
+                {t('common.saving')}
+              </>
+            ) : (
+              <>
+                <CheckCircle size={18} className="mr-2" weight="fill" />
+                {t('zzpCustomers.saveCustomer')}
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -266,16 +457,77 @@ const DeleteConfirmDialog = ({
 // Empty state component
 const EmptyState = ({ onAddCustomer }: { onAddCustomer: () => void }) => (
   <Card className="bg-card/80 backdrop-blur-sm border-2 border-dashed border-primary/20">
-    <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-      <Users size={64} weight="duotone" className="text-muted-foreground mb-4" />
-      <h3 className="text-lg font-semibold mb-2">{t('zzpCustomers.noCustomers')}</h3>
-      <p className="text-muted-foreground mb-6 max-w-sm">
+    <CardContent className="flex flex-col items-center justify-center py-12 sm:py-16 text-center px-4">
+      <div className="h-20 w-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+        <UsersThree size={40} weight="duotone" className="text-primary" />
+      </div>
+      <h3 className="text-xl font-semibold mb-2">{t('zzpCustomers.noCustomers')}</h3>
+      <p className="text-muted-foreground mb-8 max-w-md">
         {t('zzpCustomers.noCustomersDescription')}
       </p>
-      <Button onClick={onAddCustomer} className="gap-2">
-        <Plus size={18} />
+      <Button onClick={onAddCustomer} size="lg" className="gap-2 h-12 px-6">
+        <UserCirclePlus size={20} weight="bold" />
         {t('zzpCustomers.addFirstCustomer')}
       </Button>
+    </CardContent>
+  </Card>
+)
+
+// Mobile customer card component
+const CustomerCard = ({ 
+  customer, 
+  onEdit, 
+  onDelete 
+}: { 
+  customer: Customer
+  onEdit: () => void
+  onDelete: () => void 
+}) => (
+  <Card className="bg-card/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-colors">
+    <CardContent className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Users size={20} className="text-primary" weight="duotone" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h4 className="font-semibold truncate">{customer.name}</h4>
+            {customer.email && (
+              <p className="text-sm text-muted-foreground truncate flex items-center gap-1.5 mt-1">
+                <Envelope size={12} />
+                {customer.email}
+              </p>
+            )}
+            {customer.phone && (
+              <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                <Phone size={12} />
+                {customer.phone}
+              </p>
+            )}
+          </div>
+        </div>
+        <StatusBadge status={customer.status} size="sm" />
+      </div>
+      <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-border/50">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onEdit}
+          className="h-9 px-3 gap-2"
+        >
+          <PencilSimple size={16} />
+          {t('common.edit')}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onDelete}
+          className="h-9 px-3 gap-2 text-destructive hover:text-destructive"
+        >
+          <TrashSimple size={16} />
+          {t('common.delete')}
+        </Button>
+      </div>
     </CardContent>
   </Card>
 )
@@ -285,6 +537,10 @@ export const ZZPCustomersPage = () => {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [isLoading, setIsLoading] = useState(true)
+  
+  // Debounced search for better performance
+  const debouncedSearch = useDebounce(searchQuery, 300)
   
   // Dialog state
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -294,9 +550,23 @@ export const ZZPCustomersPage = () => {
   // Load customers from localStorage
   useEffect(() => {
     if (user?.id) {
-      setCustomers(listCustomers(user.id))
+      // Simulate loading for UX
+      setIsLoading(true)
+      const timer = setTimeout(() => {
+        setCustomers(listCustomers(user.id))
+        setIsLoading(false)
+      }, 300)
+      return () => clearTimeout(timer)
     }
   }, [user?.id])
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    const total = customers.length
+    const active = customers.filter(c => c.status === 'active').length
+    const inactive = customers.filter(c => c.status === 'inactive').length
+    return { total, active, inactive }
+  }, [customers])
 
   // Filter customers based on search and status
   const filteredCustomers = useMemo(() => {
@@ -306,9 +576,9 @@ export const ZZPCustomersPage = () => {
         return false
       }
       
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
+      // Search filter (debounced)
+      if (debouncedSearch) {
+        const query = debouncedSearch.toLowerCase()
         const matchesName = customer.name.toLowerCase().includes(query)
         const matchesEmail = customer.email?.toLowerCase().includes(query)
         const matchesPhone = customer.phone?.toLowerCase().includes(query)
@@ -319,10 +589,10 @@ export const ZZPCustomersPage = () => {
       
       return true
     })
-  }, [customers, searchQuery, statusFilter])
+  }, [customers, debouncedSearch, statusFilter])
 
   // Handle adding/editing customer
-  const handleSaveCustomer = (data: CustomerInput) => {
+  const handleSaveCustomer = useCallback((data: CustomerInput) => {
     if (!user?.id) return
 
     if (editingCustomer) {
@@ -341,10 +611,10 @@ export const ZZPCustomersPage = () => {
 
     setIsFormOpen(false)
     setEditingCustomer(undefined)
-  }
+  }, [user?.id, editingCustomer])
 
   // Handle delete customer
-  const handleDeleteCustomer = () => {
+  const handleDeleteCustomer = useCallback(() => {
     if (!user?.id || !deletingCustomer) return
 
     const success = removeCustomer(user.id, deletingCustomer.id)
@@ -354,55 +624,89 @@ export const ZZPCustomersPage = () => {
     }
 
     setDeletingCustomer(undefined)
-  }
+  }, [user?.id, deletingCustomer])
 
   // Open form for new customer
-  const openNewForm = () => {
+  const openNewForm = useCallback(() => {
     setEditingCustomer(undefined)
     setIsFormOpen(true)
-  }
+  }, [])
 
   // Open form for editing
-  const openEditForm = (customer: Customer) => {
+  const openEditForm = useCallback((customer: Customer) => {
     setEditingCustomer(customer)
     setIsFormOpen(true)
-  }
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
-              <Users size={40} weight="duotone" className="text-primary" />
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
+              <Users size={28} className="text-primary sm:hidden" weight="duotone" />
+              <Users size={40} className="text-primary hidden sm:block" weight="duotone" />
               {t('zzpCustomers.title')}
             </h1>
-            <p className="text-muted-foreground">
-              {customers.length} {customers.length === 1 ? 'klant' : 'klanten'}
+            <p className="text-sm sm:text-base text-muted-foreground">
+              {t('zzpCustomers.pageDescription')}
             </p>
           </div>
-          <Button onClick={openNewForm} className="gap-2">
+          <Button onClick={openNewForm} className="gap-2 h-10 sm:h-11 w-full sm:w-auto">
             <Plus size={18} weight="bold" />
             {t('zzpCustomers.newCustomer')}
           </Button>
         </div>
 
-        {/* Show empty state or table */}
-        {customers.length === 0 ? (
+        {/* Stats Cards */}
+        {isLoading ? (
+          <StatsLoadingSkeleton />
+        ) : (
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+            <StatsCard 
+              title={t('zzpCustomers.statsTotal')} 
+              value={stats.total} 
+              icon={UsersThree}
+              className="border-primary/20"
+            />
+            <StatsCard 
+              title={t('zzpCustomers.statsActive')} 
+              value={stats.active} 
+              icon={UserCheck}
+              className="border-green-500/20"
+            />
+            <StatsCard 
+              title={t('zzpCustomers.statsInactive')} 
+              value={stats.inactive} 
+              icon={UserMinus}
+              className="border-gray-500/20"
+            />
+          </div>
+        )}
+
+        {/* Show loading, empty state or content */}
+        {isLoading ? (
+          <TableLoadingSkeleton />
+        ) : customers.length === 0 ? (
           <EmptyState onAddCustomer={openNewForm} />
         ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('zzpCustomers.title')}</CardTitle>
-              <CardDescription>
-                {t('zzpCustomers.noCustomersDescription')}
-              </CardDescription>
+          <Card className="bg-card/80 backdrop-blur-sm">
+            <CardHeader className="pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-lg">{t('zzpCustomers.listTitle')}</CardTitle>
+                  <CardDescription>
+                    {filteredCustomers.length} {filteredCustomers.length === 1 ? 'klant' : 'klanten'} 
+                    {statusFilter !== 'all' && ` (${statusFilter === 'active' ? t('zzpCustomers.filterActive') : t('zzpCustomers.filterInactive')})`}
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {/* Search and filter controls */}
-              <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <div className="flex flex-col sm:flex-row gap-3 mb-6">
                 <div className="relative flex-1">
                   <MagnifyingGlass 
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" 
@@ -412,14 +716,14 @@ export const ZZPCustomersPage = () => {
                     placeholder={t('zzpCustomers.searchPlaceholder')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 h-11"
                   />
                 </div>
                 <Select 
                   value={statusFilter} 
                   onValueChange={(value) => setStatusFilter(value as 'all' | 'active' | 'inactive')}
                 >
-                  <SelectTrigger className="w-full sm:w-40">
+                  <SelectTrigger className="w-full sm:w-44 h-11">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -430,51 +734,71 @@ export const ZZPCustomersPage = () => {
                 </Select>
               </div>
 
-              {/* Customers table */}
-              <div className="rounded-md border">
+              {/* Mobile: Card list */}
+              <div className="sm:hidden space-y-3">
+                {filteredCustomers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <MagnifyingGlass size={40} className="mb-3 opacity-50" />
+                    <p className="font-medium">{t('zzpCustomers.noCustomersFound')}</p>
+                    <p className="text-sm">{t('zzpCustomers.tryDifferentSearch')}</p>
+                  </div>
+                ) : (
+                  filteredCustomers.map((customer) => (
+                    <CustomerCard
+                      key={customer.id}
+                      customer={customer}
+                      onEdit={() => openEditForm(customer)}
+                      onDelete={() => setDeletingCustomer(customer)}
+                    />
+                  ))
+                )}
+              </div>
+
+              {/* Desktop: Table */}
+              <div className="hidden sm:block rounded-lg border border-border/50 overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('zzpCustomers.columnName')}</TableHead>
-                      <TableHead className="hidden sm:table-cell">{t('zzpCustomers.columnEmail')}</TableHead>
-                      <TableHead className="hidden md:table-cell">{t('zzpCustomers.columnPhone')}</TableHead>
-                      <TableHead>{t('zzpCustomers.columnStatus')}</TableHead>
-                      <TableHead className="text-right">{t('zzpCustomers.columnActions')}</TableHead>
+                    <TableRow className="bg-secondary/50 hover:bg-secondary/50">
+                      <TableHead className="font-semibold">{t('zzpCustomers.columnName')}</TableHead>
+                      <TableHead className="font-semibold">{t('zzpCustomers.columnEmail')}</TableHead>
+                      <TableHead className="font-semibold hidden lg:table-cell">{t('zzpCustomers.columnPhone')}</TableHead>
+                      <TableHead className="font-semibold">{t('zzpCustomers.columnStatus')}</TableHead>
+                      <TableHead className="text-right font-semibold">{t('zzpCustomers.columnActions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredCustomers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center">
+                        <TableCell colSpan={5} className="h-32 text-center">
                           <div className="flex flex-col items-center justify-center text-muted-foreground">
-                            <MagnifyingGlass size={32} className="mb-2 opacity-50" />
-                            <p>{t('zzpCustomers.noCustomersFound')}</p>
+                            <MagnifyingGlass size={40} className="mb-3 opacity-50" />
+                            <p className="font-medium">{t('zzpCustomers.noCustomersFound')}</p>
+                            <p className="text-sm">{t('zzpCustomers.tryDifferentSearch')}</p>
                           </div>
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredCustomers.map((customer) => (
-                        <TableRow key={customer.id}>
+                        <TableRow key={customer.id} className="hover:bg-secondary/30">
                           <TableCell>
-                            <div>
-                              <div className="font-medium">{customer.name}</div>
-                              {/* Show email on mobile in name cell */}
-                              <div className="text-sm text-muted-foreground sm:hidden">
-                                {customer.email || '-'}
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
+                                <Users size={16} className="text-primary" weight="duotone" />
                               </div>
+                              <span className="font-medium">{customer.name}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="hidden sm:table-cell">
+                          <TableCell className="text-muted-foreground">
                             {customer.email || '-'}
                           </TableCell>
-                          <TableCell className="hidden md:table-cell">
+                          <TableCell className="text-muted-foreground hidden lg:table-cell">
                             {customer.phone || '-'}
                           </TableCell>
                           <TableCell>
                             <StatusBadge status={customer.status} />
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex justify-end gap-1">
                               <Button
                                 variant="ghost"
                                 size="sm"

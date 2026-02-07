@@ -418,7 +418,7 @@ const TimeEntryFormDialog = ({
         description: description.trim(),
         hours: hoursNum,
         project_name: projectName.trim() || undefined,
-        customer_id: actualCustomerId || undefined,
+        customer_id: actualCustomerId,
         hourly_rate_cents: rateNum ? Math.round(rateNum * 100) : undefined,
         billable,
       })

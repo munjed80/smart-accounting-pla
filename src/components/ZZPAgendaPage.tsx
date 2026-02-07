@@ -13,6 +13,7 @@ import {
   Receipt,
   ArrowsClockwise,
   Sparkle,
+  EnvelopeSimple,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 
@@ -31,7 +32,7 @@ export const ZZPAgendaPage = () => {
     { icon: Bell, text: t('zzpAgenda.feature2') },
     { icon: Receipt, text: t('zzpAgenda.feature3') },
     { icon: ArrowsClockwise, text: t('zzpAgenda.feature4') },
-    { icon: Bell, text: t('zzpAgenda.feature5') },
+    { icon: EnvelopeSimple, text: t('zzpAgenda.feature5') },
   ]
 
   return (

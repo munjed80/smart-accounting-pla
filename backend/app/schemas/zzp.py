@@ -252,3 +252,252 @@ class CustomerListResponse(BaseModel):
     """Schema for customer list response."""
     customers: List[CustomerResponse]
     total: int
+
+
+# ============================================================================
+# Business Profile Schemas
+# ============================================================================
+
+class BusinessProfileBase(BaseModel):
+    """Base schema for business profile data."""
+    company_name: str = Field(..., min_length=1, max_length=255, description="Official company name (required)")
+    trading_name: Optional[str] = Field(None, max_length=255, description="Trading name / Handelsnaam if different")
+    
+    # Address
+    address_street: Optional[str] = Field(None, max_length=500, description="Street address with house number")
+    address_postal_code: Optional[str] = Field(None, max_length=20, description="Postal/ZIP code")
+    address_city: Optional[str] = Field(None, max_length=100, description="City name")
+    address_country: Optional[str] = Field(None, max_length=100, description="Country (default: Nederland)")
+    
+    # Business identifiers
+    kvk_number: Optional[str] = Field(None, max_length=20, description="Dutch KVK number (8 digits)")
+    btw_number: Optional[str] = Field(None, max_length=30, description="Dutch BTW number (NL000000000B00)")
+    
+    # Bank
+    iban: Optional[str] = Field(None, max_length=34, description="IBAN bank account number")
+    
+    # Contact
+    email: Optional[str] = Field(None, max_length=255, description="Business email address")
+    phone: Optional[str] = Field(None, max_length=50, description="Business phone number")
+    website: Optional[str] = Field(None, max_length=255, description="Business website URL")
+    
+    # Logo
+    logo_url: Optional[str] = Field(None, max_length=500, description="Company logo URL")
+
+    @field_validator('company_name')
+    @classmethod
+    def validate_company_name(cls, v: str) -> str:
+        """Trim whitespace from company name."""
+        if v:
+            v = v.strip()
+            if not v:
+                raise ValueError("Company name cannot be empty")
+        return v
+
+    @field_validator('trading_name', 'address_street', 'address_city', 'address_country', 'website')
+    @classmethod
+    def trim_string_field(cls, v: Optional[str]) -> Optional[str]:
+        """Trim whitespace from string fields."""
+        if v:
+            v = v.strip()
+        return v if v else None
+
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v: Optional[str]) -> Optional[str]:
+        """Validate email format if provided."""
+        if v:
+            v = v.strip()
+            if not v:
+                return None
+            email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+            if not email_pattern.match(v):
+                raise ValueError("Invalid email format")
+            return v
+        return None
+
+    @field_validator('address_postal_code')
+    @classmethod
+    def validate_postal_code(cls, v: Optional[str]) -> Optional[str]:
+        """Trim and uppercase postal code."""
+        if v:
+            v = v.strip().upper().replace(' ', '')
+        return v if v else None
+
+    @field_validator('kvk_number')
+    @classmethod
+    def validate_kvk(cls, v: Optional[str]) -> Optional[str]:
+        """Validate KVK number format (8 digits)."""
+        if v:
+            v = v.strip().replace(' ', '')
+            if not v:
+                return None
+            if not KVK_PATTERN.match(v):
+                raise ValueError("KVK number must be 8 digits")
+            return v
+        return None
+
+    @field_validator('btw_number')
+    @classmethod
+    def validate_btw(cls, v: Optional[str]) -> Optional[str]:
+        """Validate BTW number format (NL000000000B00)."""
+        if v:
+            v = v.strip().upper().replace(' ', '').replace('.', '')
+            if not v:
+                return None
+            if not BTW_PATTERN.match(v):
+                raise ValueError("BTW number must be in format NL000000000B00")
+            return v
+        return None
+
+    @field_validator('iban')
+    @classmethod
+    def validate_iban(cls, v: Optional[str]) -> Optional[str]:
+        """Validate IBAN format (basic check)."""
+        if v:
+            v = v.strip().upper().replace(' ', '')
+            if not v:
+                return None
+            if not IBAN_PATTERN.match(v):
+                raise ValueError("Invalid IBAN format")
+            return v
+        return None
+
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Trim phone number."""
+        if v:
+            v = v.strip()
+        return v if v else None
+
+
+class BusinessProfileCreate(BusinessProfileBase):
+    """Schema for creating a business profile."""
+    pass
+
+
+class BusinessProfileUpdate(BaseModel):
+    """Schema for updating a business profile (all fields optional)."""
+    company_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    trading_name: Optional[str] = Field(None, max_length=255)
+    address_street: Optional[str] = Field(None, max_length=500)
+    address_postal_code: Optional[str] = Field(None, max_length=20)
+    address_city: Optional[str] = Field(None, max_length=100)
+    address_country: Optional[str] = Field(None, max_length=100)
+    kvk_number: Optional[str] = Field(None, max_length=20)
+    btw_number: Optional[str] = Field(None, max_length=30)
+    iban: Optional[str] = Field(None, max_length=34)
+    email: Optional[str] = Field(None, max_length=255)
+    phone: Optional[str] = Field(None, max_length=50)
+    website: Optional[str] = Field(None, max_length=255)
+    logo_url: Optional[str] = Field(None, max_length=500)
+
+    @field_validator('company_name')
+    @classmethod
+    def validate_company_name(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip()
+            if not v:
+                raise ValueError("Company name cannot be empty")
+        return v
+
+    @field_validator('trading_name', 'address_street', 'address_city', 'address_country', 'website')
+    @classmethod
+    def trim_string_field(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip()
+        return v if v else None
+
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip()
+            if not v:
+                return None
+            email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+            if not email_pattern.match(v):
+                raise ValueError("Invalid email format")
+            return v
+        return None
+
+    @field_validator('address_postal_code')
+    @classmethod
+    def validate_postal_code(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip().upper().replace(' ', '')
+        return v if v else None
+
+    @field_validator('kvk_number')
+    @classmethod
+    def validate_kvk(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip().replace(' ', '')
+            if not v:
+                return None
+            if not KVK_PATTERN.match(v):
+                raise ValueError("KVK number must be 8 digits")
+            return v
+        return None
+
+    @field_validator('btw_number')
+    @classmethod
+    def validate_btw(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip().upper().replace(' ', '').replace('.', '')
+            if not v:
+                return None
+            if not BTW_PATTERN.match(v):
+                raise ValueError("BTW number must be in format NL000000000B00")
+            return v
+        return None
+
+    @field_validator('iban')
+    @classmethod
+    def validate_iban(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip().upper().replace(' ', '')
+            if not v:
+                return None
+            if not IBAN_PATTERN.match(v):
+                raise ValueError("Invalid IBAN format")
+            return v
+        return None
+
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip()
+        return v if v else None
+
+
+class BusinessProfileResponse(BaseModel):
+    """Schema for business profile response."""
+    id: UUID
+    administration_id: UUID
+    
+    company_name: str
+    trading_name: Optional[str] = None
+    
+    address_street: Optional[str] = None
+    address_postal_code: Optional[str] = None
+    address_city: Optional[str] = None
+    address_country: Optional[str] = None
+    
+    kvk_number: Optional[str] = None
+    btw_number: Optional[str] = None
+    iban: Optional[str] = None
+    
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    website: Optional[str] = None
+    
+    logo_url: Optional[str] = None
+    
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

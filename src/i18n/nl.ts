@@ -153,7 +153,52 @@ export const nl = {
     boekhouder: "Boekhouder",
     klanten: "Klanten",
     facturen: "Facturen",
+    uitgaven: "Uitgaven",
+    uren: "Uren",
+    agenda: "Agenda",
     backToOverzicht: "Terug naar Overzicht",
+  },
+
+  // ZZP Expenses page (Uitgaven)
+  zzpExpenses: {
+    title: "Uitgaven",
+    pageDescription: "Beheer je zakelijke uitgaven en bonnetjes",
+    comingSoon: "Binnenkort",
+    comingSoonDescription: "Deze module is in ontwikkeling en komt binnenkort beschikbaar.",
+    plannedFeatures: "Geplande functionaliteiten",
+    feature1: "Bon uploaden met AI-herkenning",
+    feature2: "Categorisering van uitgaven",
+    feature3: "Zakelijk vs. privé splitsen",
+    feature4: "BTW-terugvorderingsoverzicht",
+    feature5: "Export naar boekhouder",
+  },
+
+  // ZZP Time Tracking page (Uren)
+  zzpTimeTracking: {
+    title: "Uren",
+    pageDescription: "Registreer je gewerkte uren per klant of project",
+    comingSoon: "Binnenkort",
+    comingSoonDescription: "Deze module is in ontwikkeling en komt binnenkort beschikbaar.",
+    plannedFeatures: "Geplande functionaliteiten",
+    feature1: "Urenregistratie per project/klant",
+    feature2: "Timer voor actieve sessies",
+    feature3: "Weekoverzichten",
+    feature4: "Koppeling met facturatie",
+    feature5: "Export naar boekhouder",
+  },
+
+  // ZZP Agenda page
+  zzpAgenda: {
+    title: "Agenda",
+    pageDescription: "Plan je afspraken en deadlines",
+    comingSoon: "Binnenkort",
+    comingSoonDescription: "Deze module is in ontwikkeling en komt binnenkort beschikbaar.",
+    plannedFeatures: "Geplande functionaliteiten",
+    feature1: "Afsprakenbeheer",
+    feature2: "BTW-deadlines herinnering",
+    feature3: "Factuurdeadlines",
+    feature4: "Synchronisatie met externe agenda's",
+    feature5: "Notificaties",
   },
 
   // ZZP Customers page
@@ -915,6 +960,30 @@ export const nl = {
     apiBase: "API Basis",
     viteApiUrl: "Build VITE_API_URL",
     browserOrigin: "Browser Oorsprong",
+    // Business Profile section
+    businessProfile: "Bedrijfsprofiel",
+    businessProfileDescription: "Je bedrijfsgegevens voor facturen en correspondentie",
+    businessProfileSaved: "Bedrijfsprofiel opgeslagen",
+    businessProfileError: "Kon bedrijfsprofiel niet opslaan",
+    tradingName: "Handelsnaam",
+    tradingNamePlaceholder: "Optioneel - als anders dan bedrijfsnaam",
+    addressStreet: "Straat en huisnummer",
+    addressPostalCode: "Postcode",
+    addressCity: "Plaats",
+    addressCountry: "Land",
+    email: "E-mail",
+    emailPlaceholder: "bedrijf@voorbeeld.nl",
+    phone: "Telefoon",
+    phonePlaceholder: "+31 6 12345678",
+    website: "Website",
+    websitePlaceholder: "https://www.voorbeeld.nl",
+    iban: "IBAN",
+    ibanPlaceholder: "NL00BANK0123456789",
+    logoUrl: "Logo URL",
+    logoUrlPlaceholder: "https://...",
+    saveProfile: "Profiel opslaan",
+    profilePreview: "Factuurvoorbeeld",
+    profilePreviewDescription: "Zo verschijnen je gegevens op facturen",
   },
 
   // Support page

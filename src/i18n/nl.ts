@@ -49,6 +49,7 @@ export const nl = {
     warning: "Waarschuwing",
     info: "Informatie",
     unknown: "Onbekend",
+    optional: "optioneel",
   },
 
   // Brand
@@ -239,14 +240,72 @@ export const nl = {
   zzpTimeTracking: {
     title: "Uren",
     pageDescription: "Registreer je gewerkte uren per klant of project",
-    comingSoon: "Binnenkort",
-    comingSoonDescription: "Deze module is in ontwikkeling en komt binnenkort beschikbaar.",
-    plannedFeatures: "Geplande functionaliteiten",
-    feature1: "Urenregistratie per project/klant",
-    feature2: "Timer voor actieve sessies",
-    feature3: "Weekoverzichten",
-    feature4: "Koppeling met facturatie",
-    feature5: "Export naar boekhouder",
+    
+    // Week navigation
+    previousWeek: "Vorige week",
+    nextWeek: "Volgende week",
+    today: "Vandaag",
+    thisWeek: "deze week",
+    
+    // Stats
+    totalHours: "Totale uren",
+    billableHours: "Factureerbare uren",
+    
+    // Entry form
+    newEntry: "Uren toevoegen",
+    editEntry: "Uren bewerken",
+    newEntryDescription: "Voeg je gewerkte uren toe voor een datum",
+    editEntryDescription: "Bewerk de gegevens van je urenregistratie",
+    addEntry: "Uren toevoegen",
+    
+    // Form fields
+    date: "Datum",
+    description: "Omschrijving",
+    descriptionPlaceholder: "Wat heb je gedaan?",
+    hours: "Uren",
+    project: "Project",
+    projectPlaceholder: "Projectnaam of opdracht",
+    customer: "Klant",
+    selectCustomer: "Selecteer een klant",
+    noCustomer: "Geen klant",
+    hourlyRate: "Uurtarief",
+    markAsBillable: "Factureerbaar",
+    billable: "Factureerbaar",
+    nonBillable: "Niet factureerbaar",
+    
+    // Validation
+    dateRequired: "Datum is verplicht",
+    descriptionRequired: "Omschrijving is verplicht",
+    hoursInvalid: "Voer een geldig aantal uren in (0-24)",
+    
+    // Table columns
+    columnDate: "Datum",
+    columnDescription: "Omschrijving",
+    columnProject: "Project",
+    columnHours: "Uren",
+    columnBillable: "Factureerbaar",
+    columnActions: "Acties",
+    
+    // Entries list
+    entriesTitle: "Urenregistraties",
+    entry: "registratie",
+    entries: "registraties",
+    
+    // Empty state
+    noEntries: "Geen uren geregistreerd",
+    noEntriesDescription: "Je hebt nog geen uren geregistreerd voor deze week. Begin met het bijhouden van je gewerkte tijd.",
+    addFirstEntry: "Eerste uren registreren",
+    
+    // Delete
+    deleteEntry: "Urenregistratie verwijderen",
+    deleteConfirmation: "Weet je zeker dat je deze registratie wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    
+    // Success/error messages
+    entrySaved: "Urenregistratie opgeslagen",
+    entryDeleted: "Urenregistratie verwijderd",
+    errorLoadingEntries: "Fout bij laden van urenregistraties",
+    errorSavingEntry: "Fout bij opslaan van urenregistratie",
+    errorDeletingEntry: "Fout bij verwijderen van urenregistratie",
   },
 
   // ZZP Agenda page

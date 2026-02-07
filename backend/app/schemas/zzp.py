@@ -501,3 +501,456 @@ class BusinessProfileResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ============================================================================
+# Invoice Schemas
+# ============================================================================
+
+class InvoiceLineBase(BaseModel):
+    """Base schema for invoice line item."""
+    description: str = Field(..., min_length=1, max_length=500, description="Line item description")
+    quantity: float = Field(1.0, gt=0, description="Quantity")
+    unit_price_cents: int = Field(..., description="Unit price in cents")
+    vat_rate: float = Field(21.0, ge=0, le=100, description="VAT rate percentage (0, 9, or 21)")
+
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: str) -> str:
+        if v:
+            v = v.strip()
+            if not v:
+                raise ValueError("Description cannot be empty")
+        return v
+
+
+class InvoiceLineCreate(InvoiceLineBase):
+    """Schema for creating an invoice line."""
+    pass
+
+
+class InvoiceLineUpdate(BaseModel):
+    """Schema for updating an invoice line."""
+    description: Optional[str] = Field(None, min_length=1, max_length=500)
+    quantity: Optional[float] = Field(None, gt=0)
+    unit_price_cents: Optional[int] = None
+    vat_rate: Optional[float] = Field(None, ge=0, le=100)
+
+
+class InvoiceLineResponse(BaseModel):
+    """Schema for invoice line response."""
+    id: UUID
+    invoice_id: UUID
+    line_number: int
+    description: str
+    quantity: float
+    unit_price_cents: int
+    vat_rate: float
+    line_total_cents: int
+    vat_amount_cents: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class InvoiceBase(BaseModel):
+    """Base schema for invoice data."""
+    customer_id: UUID = Field(..., description="Customer ID")
+    issue_date: str = Field(..., description="Invoice issue date (YYYY-MM-DD)")
+    due_date: Optional[str] = Field(None, description="Payment due date (YYYY-MM-DD)")
+    notes: Optional[str] = Field(None, max_length=2000, description="Invoice notes")
+
+    @field_validator('issue_date', 'due_date')
+    @classmethod
+    def validate_date(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            try:
+                # Validate date format
+                from datetime import datetime as dt
+                dt.strptime(v, '%Y-%m-%d')
+            except ValueError:
+                raise ValueError("Date must be in YYYY-MM-DD format")
+        return v
+
+
+class InvoiceCreate(InvoiceBase):
+    """Schema for creating an invoice."""
+    lines: List[InvoiceLineCreate] = Field(..., min_length=1, description="Invoice line items (at least one required)")
+
+
+class InvoiceUpdate(BaseModel):
+    """Schema for updating an invoice (draft only)."""
+    customer_id: Optional[UUID] = None
+    issue_date: Optional[str] = None
+    due_date: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=2000)
+    lines: Optional[List[InvoiceLineCreate]] = None
+
+    @field_validator('issue_date', 'due_date')
+    @classmethod
+    def validate_date(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            try:
+                from datetime import datetime as dt
+                dt.strptime(v, '%Y-%m-%d')
+            except ValueError:
+                raise ValueError("Date must be in YYYY-MM-DD format")
+        return v
+
+
+class InvoiceStatusUpdate(BaseModel):
+    """Schema for updating invoice status."""
+    status: str = Field(..., pattern=r'^(sent|paid|cancelled)$', description="New status")
+
+
+class InvoiceResponse(BaseModel):
+    """Schema for invoice response."""
+    id: UUID
+    administration_id: UUID
+    customer_id: UUID
+    invoice_number: str
+    status: str
+    issue_date: str
+    due_date: Optional[str] = None
+    
+    # Seller snapshot
+    seller_company_name: Optional[str] = None
+    seller_trading_name: Optional[str] = None
+    seller_address_street: Optional[str] = None
+    seller_address_postal_code: Optional[str] = None
+    seller_address_city: Optional[str] = None
+    seller_address_country: Optional[str] = None
+    seller_kvk_number: Optional[str] = None
+    seller_btw_number: Optional[str] = None
+    seller_iban: Optional[str] = None
+    seller_email: Optional[str] = None
+    seller_phone: Optional[str] = None
+    
+    # Customer snapshot
+    customer_name: Optional[str] = None
+    customer_address_street: Optional[str] = None
+    customer_address_postal_code: Optional[str] = None
+    customer_address_city: Optional[str] = None
+    customer_address_country: Optional[str] = None
+    customer_kvk_number: Optional[str] = None
+    customer_btw_number: Optional[str] = None
+    
+    # Totals
+    subtotal_cents: int
+    vat_total_cents: int
+    total_cents: int
+    
+    notes: Optional[str] = None
+    
+    # Lines
+    lines: List[InvoiceLineResponse] = []
+    
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class InvoiceListResponse(BaseModel):
+    """Schema for invoice list response."""
+    invoices: List[InvoiceResponse]
+    total: int
+
+
+# ============================================================================
+# Expense Schemas
+# ============================================================================
+
+# Common expense categories
+EXPENSE_CATEGORIES = [
+    "algemeen",
+    "kantoorkosten",
+    "reiskosten",
+    "marketing",
+    "verzekeringen",
+    "abonnementen",
+    "telefoon_internet",
+    "auto",
+    "onderhoud",
+    "opleiding",
+    "representatie",
+    "overig",
+]
+
+
+class ExpenseBase(BaseModel):
+    """Base schema for expense data."""
+    vendor: str = Field(..., min_length=1, max_length=255, description="Vendor/supplier name")
+    description: Optional[str] = Field(None, max_length=500, description="Expense description")
+    expense_date: str = Field(..., description="Expense date (YYYY-MM-DD)")
+    amount_cents: int = Field(..., gt=0, description="Total amount in cents")
+    vat_rate: float = Field(21.0, ge=0, le=100, description="VAT rate percentage")
+    category: str = Field("algemeen", max_length=100, description="Expense category")
+    notes: Optional[str] = Field(None, max_length=2000, description="Additional notes")
+    attachment_url: Optional[str] = Field(None, max_length=500, description="Receipt/document URL")
+
+    @field_validator('vendor')
+    @classmethod
+    def validate_vendor(cls, v: str) -> str:
+        if v:
+            v = v.strip()
+            if not v:
+                raise ValueError("Vendor cannot be empty")
+        return v
+
+    @field_validator('expense_date')
+    @classmethod
+    def validate_date(cls, v: str) -> str:
+        if v:
+            try:
+                from datetime import datetime as dt
+                dt.strptime(v, '%Y-%m-%d')
+            except ValueError:
+                raise ValueError("Date must be in YYYY-MM-DD format")
+        return v
+
+
+class ExpenseCreate(ExpenseBase):
+    """Schema for creating an expense."""
+    pass
+
+
+class ExpenseUpdate(BaseModel):
+    """Schema for updating an expense."""
+    vendor: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=500)
+    expense_date: Optional[str] = None
+    amount_cents: Optional[int] = Field(None, gt=0)
+    vat_rate: Optional[float] = Field(None, ge=0, le=100)
+    category: Optional[str] = Field(None, max_length=100)
+    notes: Optional[str] = Field(None, max_length=2000)
+    attachment_url: Optional[str] = Field(None, max_length=500)
+
+    @field_validator('expense_date')
+    @classmethod
+    def validate_date(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            try:
+                from datetime import datetime as dt
+                dt.strptime(v, '%Y-%m-%d')
+            except ValueError:
+                raise ValueError("Date must be in YYYY-MM-DD format")
+        return v
+
+
+class ExpenseResponse(BaseModel):
+    """Schema for expense response."""
+    id: UUID
+    administration_id: UUID
+    vendor: str
+    description: Optional[str] = None
+    expense_date: str
+    amount_cents: int
+    vat_rate: float
+    vat_amount_cents: int
+    category: str
+    notes: Optional[str] = None
+    attachment_url: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ExpenseListResponse(BaseModel):
+    """Schema for expense list response."""
+    expenses: List[ExpenseResponse]
+    total: int
+    total_amount_cents: int
+    total_vat_cents: int
+
+
+class ExpenseSummary(BaseModel):
+    """Schema for expense summary by month/category."""
+    month: str
+    category: str
+    total_amount_cents: int
+    total_vat_cents: int
+    count: int
+
+
+# ============================================================================
+# Time Entry Schemas
+# ============================================================================
+
+class TimeEntryBase(BaseModel):
+    """Base schema for time entry data."""
+    entry_date: str = Field(..., description="Date of work (YYYY-MM-DD)")
+    description: str = Field(..., min_length=1, max_length=500, description="Description of work")
+    hours: float = Field(..., gt=0, le=24, description="Number of hours")
+    project_name: Optional[str] = Field(None, max_length=255, description="Project or client name")
+    customer_id: Optional[UUID] = Field(None, description="Optional customer reference")
+    hourly_rate_cents: Optional[int] = Field(None, ge=0, description="Hourly rate in cents")
+    billable: bool = Field(True, description="Whether this time is billable")
+
+    @field_validator('entry_date')
+    @classmethod
+    def validate_date(cls, v: str) -> str:
+        if v:
+            try:
+                from datetime import datetime as dt
+                dt.strptime(v, '%Y-%m-%d')
+            except ValueError:
+                raise ValueError("Date must be in YYYY-MM-DD format")
+        return v
+
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: str) -> str:
+        if v:
+            v = v.strip()
+            if not v:
+                raise ValueError("Description cannot be empty")
+        return v
+
+
+class TimeEntryCreate(TimeEntryBase):
+    """Schema for creating a time entry."""
+    pass
+
+
+class TimeEntryUpdate(BaseModel):
+    """Schema for updating a time entry."""
+    entry_date: Optional[str] = None
+    description: Optional[str] = Field(None, min_length=1, max_length=500)
+    hours: Optional[float] = Field(None, gt=0, le=24)
+    project_name: Optional[str] = Field(None, max_length=255)
+    customer_id: Optional[UUID] = None
+    hourly_rate_cents: Optional[int] = Field(None, ge=0)
+    billable: Optional[bool] = None
+
+    @field_validator('entry_date')
+    @classmethod
+    def validate_date(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            try:
+                from datetime import datetime as dt
+                dt.strptime(v, '%Y-%m-%d')
+            except ValueError:
+                raise ValueError("Date must be in YYYY-MM-DD format")
+        return v
+
+
+class TimeEntryResponse(BaseModel):
+    """Schema for time entry response."""
+    id: UUID
+    administration_id: UUID
+    entry_date: str
+    description: str
+    hours: float
+    project_name: Optional[str] = None
+    customer_id: Optional[UUID] = None
+    hourly_rate_cents: Optional[int] = None
+    billable: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TimeEntryListResponse(BaseModel):
+    """Schema for time entry list response."""
+    entries: List[TimeEntryResponse]
+    total: int
+    total_hours: float
+    total_billable_hours: float
+
+
+class WeeklyTimeSummary(BaseModel):
+    """Schema for weekly time summary."""
+    week_start: str
+    week_end: str
+    total_hours: float
+    billable_hours: float
+    entries_by_day: dict  # date -> hours
+
+
+# ============================================================================
+# Calendar Event Schemas
+# ============================================================================
+
+class CalendarEventBase(BaseModel):
+    """Base schema for calendar event data."""
+    title: str = Field(..., min_length=1, max_length=255, description="Event title")
+    start_datetime: str = Field(..., description="Event start (ISO 8601)")
+    end_datetime: str = Field(..., description="Event end (ISO 8601)")
+    location: Optional[str] = Field(None, max_length=500, description="Event location")
+    notes: Optional[str] = Field(None, max_length=2000, description="Event notes")
+
+    @field_validator('title')
+    @classmethod
+    def validate_title(cls, v: str) -> str:
+        if v:
+            v = v.strip()
+            if not v:
+                raise ValueError("Title cannot be empty")
+        return v
+
+    @field_validator('start_datetime', 'end_datetime')
+    @classmethod
+    def validate_datetime(cls, v: str) -> str:
+        if v:
+            try:
+                from datetime import datetime as dt
+                # Parse ISO 8601 format
+                dt.fromisoformat(v.replace('Z', '+00:00'))
+            except ValueError:
+                raise ValueError("Datetime must be in ISO 8601 format")
+        return v
+
+
+class CalendarEventCreate(CalendarEventBase):
+    """Schema for creating a calendar event."""
+    pass
+
+
+class CalendarEventUpdate(BaseModel):
+    """Schema for updating a calendar event."""
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    start_datetime: Optional[str] = None
+    end_datetime: Optional[str] = None
+    location: Optional[str] = Field(None, max_length=500)
+    notes: Optional[str] = Field(None, max_length=2000)
+
+    @field_validator('start_datetime', 'end_datetime')
+    @classmethod
+    def validate_datetime(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            try:
+                from datetime import datetime as dt
+                dt.fromisoformat(v.replace('Z', '+00:00'))
+            except ValueError:
+                raise ValueError("Datetime must be in ISO 8601 format")
+        return v
+
+
+class CalendarEventResponse(BaseModel):
+    """Schema for calendar event response."""
+    id: UUID
+    administration_id: UUID
+    title: str
+    start_datetime: str
+    end_datetime: str
+    location: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CalendarEventListResponse(BaseModel):
+    """Schema for calendar event list response."""
+    events: List[CalendarEventResponse]
+    total: int

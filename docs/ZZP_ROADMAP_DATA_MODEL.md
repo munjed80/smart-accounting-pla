@@ -129,10 +129,10 @@ interface Invoice {
 | `email` | string | No | Email format | Existing |
 | `phone` | string | No | max 20 | Existing |
 | `status` | enum | ✅ Yes | active/inactive | Existing |
-| `iban` | string | No | IBAN format (NL##AAAA##########) | **NEW** |
+| `iban` | string | No | IBAN format (NL00AAAA0000000000, 18 chars) | **NEW** |
 | `address` | text | No | max 500 | **NEW** |
 | `kvk_number` | string | No | 8 digits | **NEW** |
-| `btw_number` | string | No | NL############B## format | **NEW** |
+| `btw_number` | string | No | NL000000000B00 format (14 chars) | **NEW** |
 
 **Files to Change:**
 1. `src/lib/storage/zzp.ts` — Add new fields to Customer interface

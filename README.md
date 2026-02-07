@@ -106,12 +106,19 @@ The docker-compose setup uses the following networking model:
 - **Worker** connects to Redis and PostgreSQL using Docker internal networking (`db:5432`, `redis:6379`)
 
 **Environment Variables:**
-| Variable | Where Used | Description |
-|----------|------------|-------------|
-| `VITE_API_URL` | Frontend build | URL browser uses to call backend API |
-| `CORS_ORIGINS` | Backend | Allowed origins for CORS requests |
-| `DATABASE_URL` | Backend/Worker | PostgreSQL connection (uses `db` hostname) |
-| `REDIS_URL` | Backend/Worker | Redis connection (uses `redis` hostname) |
+
+| Variable | Where Used | Type | Description |
+|----------|------------|------|-------------|
+| `VITE_API_URL` | Frontend | Build-time | URL browser uses to call backend API |
+| `VITE_BUILD_VERSION` | Frontend | Build-time | Git commit SHA for version tracking |
+| `VITE_BUILD_TIMESTAMP` | Frontend | Build-time | Auto-generated build timestamp |
+| `FRONTEND_URL` | Backend | Runtime | Frontend URL for CORS and redirects |
+| `CORS_ORIGINS` | Backend | Runtime | Allowed origins for CORS requests |
+| `DATABASE_URL` | Backend/Worker | Runtime | PostgreSQL connection (uses `db` hostname) |
+| `REDIS_URL` | Backend/Worker | Runtime | Redis connection (uses `redis` hostname) |
+| `SECRET_KEY` | Backend | Runtime | JWT signing secret |
+
+> **Important**: Frontend variables (`VITE_*`) must be set at **build time** (as Docker build args). Backend variables are set at **runtime** (as container env vars). See [DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md) for detailed Coolify configuration.
 
 ### Production Environment Setup
 

@@ -356,18 +356,28 @@ export const SettingsPage = () => {
 
           {/* Version Footer with Diagnostics */}
           <Card className="bg-secondary/30 border-dashed">
+            <CardHeader className="py-3 pb-0">
+              <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                <Info size={16} />
+                Build Information
+              </CardTitle>
+            </CardHeader>
             <CardContent className="py-4">
               <div className="flex flex-col gap-3 text-sm text-muted-foreground">
                 {/* Frontend Version Info */}
                 <div>
                   <h4 className="font-semibold text-foreground mb-2">Frontend</h4>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-4 font-mono text-xs">
                       <span>
-                        <strong>{t('settings.version')}:</strong> {BUILD_VERSION}
+                        <strong>{t('settings.version')}:</strong>{' '}
+                        <code className="bg-secondary px-1 rounded">{BUILD_VERSION}</code>
                       </span>
                       <span>
-                        <strong>{t('settings.build')}:</strong> {BUILD_TIMESTAMP === 'development' ? t('settings.development') : new Date(BUILD_TIMESTAMP).toLocaleString('nl-NL')}
+                        <strong>{t('settings.build')}:</strong>{' '}
+                        <code className="bg-secondary px-1 rounded">
+                          {BUILD_TIMESTAMP === 'development' ? t('settings.development') : new Date(BUILD_TIMESTAMP).toLocaleString('nl-NL')}
+                        </code>
                       </span>
                     </div>
                     <Badge variant="outline" className="text-xs">

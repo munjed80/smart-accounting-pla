@@ -57,6 +57,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { 
   FileText, 
   Plus, 
@@ -81,6 +88,9 @@ import {
   Info,
   Eye,
   X,
+  DotsThreeVertical,
+  Printer,
+  Envelope,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { navigateTo } from '@/lib/navigation'
@@ -1055,6 +1065,8 @@ const InvoiceCard = ({
   onEdit, 
   onDelete,
   onStatusChange,
+  onPrint,
+  onSend,
   canEdit,
 }: { 
   invoice: ZZPInvoice
@@ -1062,6 +1074,8 @@ const InvoiceCard = ({
   onEdit: () => void
   onDelete: () => void
   onStatusChange: (newStatus: 'sent' | 'paid' | 'cancelled') => void
+  onPrint: () => void
+  onSend: () => void
   canEdit: boolean
 }) => (
   <Card className="bg-card/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-colors">
@@ -1122,6 +1136,33 @@ const InvoiceCard = ({
               <TrashSimple size={16} />
             </Button>
           )}
+          {/* More actions dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+                <DotsThreeVertical size={16} />
+                <span className="sr-only">{t('zzpInvoices.moreActions')}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onPrint}>
+                <Printer size={16} className="mr-2" />
+                {t('zzpInvoices.downloadPdf')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={onSend}
+                disabled
+                className="opacity-50"
+              >
+                <Envelope size={16} className="mr-2" />
+                {t('zzpInvoices.sendEmail')}
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {t('common.comingSoon')}
+                </Badge>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </CardContent>
@@ -1315,6 +1356,23 @@ export const ZZPInvoicesPage = () => {
     }
   }, [deletingInvoice, loadData])
 
+  // Handle print/download invoice (opens browser print dialog)
+  const handlePrintInvoice = useCallback((invoice: ZZPInvoice) => {
+    // Open the invoice in view mode and then trigger print
+    setEditingInvoice(undefined)
+    setViewingInvoice(invoice)
+    setIsFormOpen(true)
+    // Use setTimeout to allow the dialog to render before triggering print
+    setTimeout(() => {
+      window.print()
+    }, 500)
+  }, [])
+
+  // Handle send invoice (not implemented - show coming soon message)
+  const handleSendInvoice = useCallback(() => {
+    toast.info(t('common.comingSoon'))
+  }, [])
+
   // Open form for new invoice
   const openNewForm = useCallback(() => {
     setEditingInvoice(undefined)
@@ -1476,6 +1534,8 @@ export const ZZPInvoicesPage = () => {
                         onEdit={() => openEditForm(invoice)}
                         onDelete={() => setDeletingInvoice(invoice)}
                         onStatusChange={(status) => handleStatusChange(invoice, status)}
+                        onPrint={() => handlePrintInvoice(invoice)}
+                        onSend={handleSendInvoice}
                         canEdit={canEdit}
                       />
                     )
@@ -1573,6 +1633,33 @@ export const ZZPInvoicesPage = () => {
                                     <span className="sr-only">{t('common.delete')}</span>
                                   </Button>
                                 )}
+                                {/* More actions dropdown */}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <DotsThreeVertical size={16} />
+                                      <span className="sr-only">{t('zzpInvoices.moreActions')}</span>
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handlePrintInvoice(invoice)}>
+                                      <Printer size={16} className="mr-2" />
+                                      {t('zzpInvoices.downloadPdf')}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem 
+                                      onClick={handleSendInvoice}
+                                      disabled
+                                      className="opacity-50"
+                                    >
+                                      <Envelope size={16} className="mr-2" />
+                                      {t('zzpInvoices.sendEmail')}
+                                      <Badge variant="secondary" className="ml-2 text-xs">
+                                        {t('common.comingSoon')}
+                                      </Badge>
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             </TableCell>
                           </TableRow>

@@ -13,7 +13,9 @@ export const nl = {
   // Common UI elements
   common: {
     save: "Opslaan",
+    saved: "Opgeslagen",
     saving: "Opslaan...",
+    saveFailed: "Opslaan mislukt",
     cancel: "Annuleren",
     close: "Sluiten",
     logout: "Uitloggen",
@@ -50,6 +52,7 @@ export const nl = {
     info: "Informatie",
     unknown: "Onbekend",
     optional: "optioneel",
+    comingSoon: "Binnenkort beschikbaar",
   },
 
   // Brand
@@ -542,6 +545,11 @@ export const nl = {
     invoiceDeleted: "Factuur verwijderd",
     statusChanged: "Status gewijzigd",
     changeStatus: "Status wijzigen",
+    // Invoice action menu
+    downloadPdf: "Downloaden / Printen",
+    sendEmail: "Verzenden via e-mail",
+    duplicateInvoice: "Dupliceren",
+    moreActions: "Meer acties",
     // Error messages
     loadError: "Kon facturen niet laden",
     saveError: "Kon factuur niet opslaan",

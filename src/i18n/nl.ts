@@ -27,6 +27,7 @@ export const nl = {
     no: "Nee",
     search: "Zoeken",
     filter: "Filteren",
+    view: "Bekijken",
     all: "Alle",
     edit: "Bewerken",
     delete: "Verwijderen",
@@ -48,6 +49,7 @@ export const nl = {
     warning: "Waarschuwing",
     info: "Informatie",
     unknown: "Onbekend",
+    optional: "optioneel",
   },
 
   // Brand
@@ -163,42 +165,200 @@ export const nl = {
   zzpExpenses: {
     title: "Uitgaven",
     pageDescription: "Beheer je zakelijke uitgaven en bonnetjes",
-    comingSoon: "Binnenkort",
-    comingSoonDescription: "Deze module is in ontwikkeling en komt binnenkort beschikbaar.",
-    plannedFeatures: "Geplande functionaliteiten",
-    feature1: "Bon uploaden met AI-herkenning",
-    feature2: "Categorisering van uitgaven",
-    feature3: "Zakelijk vs. privé splitsen",
-    feature4: "BTW-terugvorderingsoverzicht",
-    feature5: "Export naar boekhouder",
+    listTitle: "Uitgavenlijst",
+    newExpense: "Nieuwe uitgave",
+    editExpense: "Uitgave bewerken",
+    newExpenseDescription: "Voeg een nieuwe zakelijke uitgave toe.",
+    editExpenseDescription: "Wijzig de gegevens van deze uitgave.",
+    // Table columns
+    columnDate: "Datum",
+    columnVendor: "Leverancier",
+    columnCategory: "Categorie",
+    columnAmount: "Bedrag",
+    columnVat: "BTW",
+    columnActions: "Acties",
+    // Stats
+    statsTotal: "Totaal",
+    statsAmount: "Bedrag",
+    statsVat: "BTW",
+    // Count labels
+    expenseSingular: "uitgave",
+    expensePlural: "uitgaven",
+    // Form fields
+    formVendor: "Leverancier",
+    formVendorPlaceholder: "Naam van de leverancier",
+    formVendorRequired: "Leverancier is verplicht",
+    formDescription: "Omschrijving",
+    formDescriptionPlaceholder: "Korte omschrijving van de uitgave",
+    formDate: "Datum",
+    formDateRequired: "Datum is verplicht",
+    formAmount: "Bedrag",
+    formAmountRequired: "Bedrag moet groter zijn dan 0",
+    formVatRate: "BTW-tarief",
+    formCategory: "Categorie",
+    formCategoryPlaceholder: "Selecteer categorie",
+    formCategoryRequired: "Categorie is verplicht",
+    formNotes: "Notities",
+    formNotesPlaceholder: "Eventuele notities bij deze uitgave",
+    helperOptional: "Optioneel",
+    // Categories
+    category_algemeen: "Algemeen",
+    category_kantoorkosten: "Kantoorkosten",
+    category_reiskosten: "Reiskosten",
+    category_marketing: "Marketing",
+    category_verzekeringen: "Verzekeringen",
+    category_abonnementen: "Abonnementen",
+    category_telefoon_internet: "Telefoon & Internet",
+    category_auto: "Autokosten",
+    category_onderhoud: "Onderhoud",
+    category_opleiding: "Opleiding",
+    category_representatie: "Representatie",
+    category_overig: "Overig",
+    // Filter
+    filterAllMonths: "Alle maanden",
+    filterAllCategories: "Alle categorieën",
+    // Empty states
+    noExpenses: "Nog geen uitgaven",
+    noExpensesDescription: "Voeg je eerste zakelijke uitgave toe om te beginnen met je administratie.",
+    addFirstExpense: "Voeg eerste uitgave toe",
+    noExpensesFound: "Geen uitgaven gevonden",
+    tryDifferentFilter: "Probeer een andere filter",
+    // Actions
+    saveExpense: "Uitgave opslaan",
+    deleteExpense: "Uitgave verwijderen",
+    deleteExpenseConfirm: "Weet je zeker dat je deze uitgave wilt verwijderen?",
+    deleteExpenseWarning: "Dit kan niet ongedaan worden gemaakt.",
+    expenseSaved: "Uitgave opgeslagen",
+    expenseDeleted: "Uitgave verwijderd",
+    // Errors
+    errorLoadingExpenses: "Fout bij laden van uitgaven",
+    errorSavingExpense: "Fout bij opslaan van uitgave",
+    errorDeletingExpense: "Fout bij verwijderen van uitgave",
   },
 
   // ZZP Time Tracking page (Uren)
   zzpTimeTracking: {
     title: "Uren",
     pageDescription: "Registreer je gewerkte uren per klant of project",
-    comingSoon: "Binnenkort",
-    comingSoonDescription: "Deze module is in ontwikkeling en komt binnenkort beschikbaar.",
-    plannedFeatures: "Geplande functionaliteiten",
-    feature1: "Urenregistratie per project/klant",
-    feature2: "Timer voor actieve sessies",
-    feature3: "Weekoverzichten",
-    feature4: "Koppeling met facturatie",
-    feature5: "Export naar boekhouder",
+    
+    // Week navigation
+    previousWeek: "Vorige week",
+    nextWeek: "Volgende week",
+    today: "Vandaag",
+    thisWeek: "deze week",
+    
+    // Stats
+    totalHours: "Totale uren",
+    billableHours: "Factureerbare uren",
+    
+    // Entry form
+    newEntry: "Uren toevoegen",
+    editEntry: "Uren bewerken",
+    newEntryDescription: "Voeg je gewerkte uren toe voor een datum",
+    editEntryDescription: "Bewerk de gegevens van je urenregistratie",
+    addEntry: "Uren toevoegen",
+    
+    // Form fields
+    date: "Datum",
+    description: "Omschrijving",
+    descriptionPlaceholder: "Wat heb je gedaan?",
+    hours: "Uren",
+    project: "Project",
+    projectPlaceholder: "Projectnaam of opdracht",
+    customer: "Klant",
+    selectCustomer: "Selecteer een klant",
+    noCustomer: "Geen klant",
+    hourlyRate: "Uurtarief",
+    markAsBillable: "Factureerbaar",
+    billable: "Factureerbaar",
+    nonBillable: "Niet factureerbaar",
+    
+    // Validation
+    dateRequired: "Datum is verplicht",
+    descriptionRequired: "Omschrijving is verplicht",
+    hoursInvalid: "Voer een geldig aantal uren in (0-24)",
+    
+    // Table columns
+    columnDate: "Datum",
+    columnDescription: "Omschrijving",
+    columnProject: "Project",
+    columnHours: "Uren",
+    columnBillable: "Factureerbaar",
+    columnActions: "Acties",
+    
+    // Entries list
+    entriesTitle: "Urenregistraties",
+    entry: "registratie",
+    entries: "registraties",
+    
+    // Empty state
+    noEntries: "Geen uren geregistreerd",
+    noEntriesDescription: "Je hebt nog geen uren geregistreerd voor deze week. Begin met het bijhouden van je gewerkte tijd.",
+    addFirstEntry: "Eerste uren registreren",
+    
+    // Delete
+    deleteEntry: "Urenregistratie verwijderen",
+    deleteConfirmation: "Weet je zeker dat je deze registratie wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    
+    // Success/error messages
+    entrySaved: "Urenregistratie opgeslagen",
+    entryDeleted: "Urenregistratie verwijderd",
+    errorLoadingEntries: "Fout bij laden van urenregistraties",
+    errorSavingEntry: "Fout bij opslaan van urenregistratie",
+    errorDeletingEntry: "Fout bij verwijderen van urenregistratie",
   },
 
   // ZZP Agenda page
   zzpAgenda: {
     title: "Agenda",
     pageDescription: "Plan je afspraken en deadlines",
-    comingSoon: "Binnenkort",
-    comingSoonDescription: "Deze module is in ontwikkeling en komt binnenkort beschikbaar.",
-    plannedFeatures: "Geplande functionaliteiten",
-    feature1: "Afsprakenbeheer",
-    feature2: "BTW-deadlines herinnering",
-    feature3: "Factuurdeadlines",
-    feature4: "Synchronisatie met externe agenda's",
-    feature5: "Notificaties",
+    // Navigation
+    today: "Vandaag",
+    // Events
+    newEvent: "Nieuwe afspraak",
+    editEvent: "Afspraak bewerken",
+    newEventDescription: "Voeg een nieuwe afspraak toe aan je agenda.",
+    editEventDescription: "Wijzig de gegevens van deze afspraak.",
+    deleteEvent: "Afspraak verwijderen",
+    deleteEventConfirm: "Weet je zeker dat je deze afspraak wilt verwijderen?",
+    deleteEventWarning: "Deze actie kan niet ongedaan worden gemaakt.",
+    saveEvent: "Opslaan",
+    eventSaved: "Afspraak opgeslagen",
+    eventDeleted: "Afspraak verwijderd",
+    eventSingular: "afspraak",
+    eventPlural: "afspraken",
+    // List titles
+    eventsOnDay: "Afspraken op",
+    eventsInMonth: "Afspraken in",
+    showAllMonth: "Toon hele maand",
+    // Empty states
+    noEvents: "Nog geen afspraken",
+    noEventsDescription: "Voeg je eerste afspraak toe om je agenda te vullen.",
+    noEventsOnDay: "Geen afspraken op deze dag",
+    addFirstEvent: "Voeg eerste afspraak toe",
+    // Table columns
+    columnDateTime: "Datum/tijd",
+    columnTitle: "Titel",
+    columnLocation: "Locatie",
+    columnActions: "Acties",
+    // Form fields
+    formTitle: "Titel",
+    formTitlePlaceholder: "Naam van de afspraak",
+    formTitleRequired: "Titel is verplicht",
+    formStart: "Begintijd",
+    formStartRequired: "Begintijd is verplicht",
+    formEnd: "Eindtijd",
+    formEndRequired: "Eindtijd is verplicht",
+    formEndAfterStart: "Eindtijd moet na begintijd liggen",
+    formLocation: "Locatie",
+    formLocationPlaceholder: "Adres of online meeting link",
+    formNotes: "Notities",
+    formNotesPlaceholder: "Extra informatie over deze afspraak",
+    helperOptional: "optioneel",
+    // Errors
+    errorLoadingEvents: "Fout bij laden van afspraken",
+    errorSavingEvent: "Fout bij opslaan van afspraak",
+    errorDeletingEvent: "Fout bij verwijderen van afspraak",
   },
 
   // ZZP Customers page
@@ -286,6 +446,10 @@ export const nl = {
     viewDetails: "Bekijk details",
     customerDetails: "Klantgegevens",
     noDetailsAvailable: "Geen extra gegevens beschikbaar",
+    // Error messages
+    errorLoadingCustomers: "Fout bij het laden van klanten",
+    errorSavingCustomer: "Fout bij het opslaan van klant",
+    errorDeletingCustomer: "Fout bij het verwijderen van klant",
   },
 
   // ZZP Invoices page
@@ -295,8 +459,10 @@ export const nl = {
     listTitle: "Facturenlijst",
     newInvoice: "Nieuwe factuur",
     editInvoice: "Factuur bewerken",
+    viewInvoice: "Factuur bekijken",
     newInvoiceDescription: "Maak een nieuwe factuur aan voor een klant.",
     editInvoiceDescription: "Wijzig de gegevens van deze factuur.",
+    viewInvoiceDescription: "Bekijk de details van deze factuur.",
     columnNumber: "Nummer",
     columnCustomer: "Klant",
     columnDate: "Datum",
@@ -330,6 +496,23 @@ export const nl = {
     formStatus: "Status",
     formNotes: "Notities",
     formNotesPlaceholder: "Optionele opmerkingen...",
+    // Invoice lines
+    invoiceLines: "Factuurregels",
+    addLine: "Regel toevoegen",
+    line: "Regel",
+    lineDescription: "Omschrijving",
+    lineDescriptionPlaceholder: "Beschrijving van dienst of product",
+    lineQuantity: "Aantal",
+    lineUnitPrice: "Prijs",
+    lineVat: "BTW",
+    lineTotal: "Totaal",
+    lineDescriptionRequired: "Voer een omschrijving in voor elke regel",
+    lineQuantityRequired: "Voer een geldig aantal in",
+    lineUnitPriceRequired: "Voer een geldige prijs in",
+    lineVatRateRequired: "Selecteer een BTW-tarief",
+    subtotal: "Subtotaal",
+    vatTotal: "BTW",
+    total: "Totaal",
     // Seller details
     sellerDetails: "Verzendergegevens",
     noBusinessProfile: "Vul je bedrijfsprofiel in via Instellingen om verzendergegevens op facturen te tonen.",
@@ -342,6 +525,11 @@ export const nl = {
     invoiceDeleted: "Factuur verwijderd",
     statusChanged: "Status gewijzigd",
     changeStatus: "Status wijzigen",
+    // Error messages
+    loadError: "Kon facturen niet laden",
+    saveError: "Kon factuur niet opslaan",
+    deleteError: "Kon factuur niet verwijderen",
+    statusChangeError: "Kon status niet wijzigen",
     // Search & Filter
     searchPlaceholder: "Zoeken op nummer, klant of bedrag...",
     filterAll: "Alle",
@@ -349,11 +537,13 @@ export const nl = {
     filterSent: "Verzonden",
     filterPaid: "Betaald",
     filterOverdue: "Verlopen",
+    filterCancelled: "Geannuleerd",
     // Status badges
     statusDraft: "Concept",
     statusSent: "Verzonden",
     statusPaid: "Betaald",
     statusOverdue: "Verlopen",
+    statusCancelled: "Geannuleerd",
     // Search results
     noInvoicesFound: "Geen facturen gevonden",
     tryDifferentSearch: "Probeer een andere zoekterm",

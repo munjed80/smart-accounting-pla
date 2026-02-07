@@ -1,0 +1,584 @@
+"""
+ZZP Invoices API Endpoints
+
+CRUD operations for ZZP invoices with lines, status transitions,
+and race-safe invoice number generation.
+"""
+from datetime import datetime, date
+from decimal import Decimal
+from typing import Annotated, List, Optional
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select, func, and_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.core.database import get_db
+from app.models.zzp import (
+    ZZPInvoice, 
+    ZZPInvoiceLine, 
+    ZZPInvoiceCounter, 
+    ZZPCustomer, 
+    BusinessProfile,
+    InvoiceStatus,
+)
+from app.models.administration import Administration, AdministrationMember
+from app.schemas.zzp import (
+    InvoiceCreate,
+    InvoiceUpdate,
+    InvoiceStatusUpdate,
+    InvoiceResponse,
+    InvoiceListResponse,
+    InvoiceLineResponse,
+)
+from app.api.v1.deps import CurrentUser, require_zzp
+
+router = APIRouter()
+
+
+async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
+    """
+    Get the primary administration for a ZZP user.
+    """
+    result = await db.execute(
+        select(Administration)
+        .join(AdministrationMember)
+        .where(AdministrationMember.user_id == user_id)
+        .where(Administration.is_active == True)
+        .order_by(Administration.created_at)
+        .limit(1)
+    )
+    administration = result.scalar_one_or_none()
+    
+    if not administration:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "NO_ADMINISTRATION",
+                "message": "Geen administratie gevonden. Voltooi eerst de onboarding."
+            }
+        )
+    
+    return administration
+
+
+async def generate_invoice_number(admin_id: UUID, db: AsyncSession) -> str:
+    """
+    Generate a sequential invoice number for an administration.
+    
+    Uses SELECT FOR UPDATE to prevent race conditions.
+    Format: INV-YYYY-0001
+    """
+    current_year = datetime.now().year
+    
+    # Try to get or create counter with lock
+    result = await db.execute(
+        select(ZZPInvoiceCounter)
+        .where(ZZPInvoiceCounter.administration_id == admin_id)
+        .with_for_update()
+    )
+    counter = result.scalar_one_or_none()
+    
+    if counter:
+        # Reset counter if year changed
+        if counter.year != current_year:
+            counter.year = current_year
+            counter.counter = 1
+        else:
+            counter.counter += 1
+    else:
+        # Create new counter
+        counter = ZZPInvoiceCounter(
+            administration_id=admin_id,
+            year=current_year,
+            counter=1
+        )
+        db.add(counter)
+    
+    # Format: INV-2026-0001
+    invoice_number = f"INV-{current_year}-{counter.counter:04d}"
+    return invoice_number
+
+
+def calculate_line_totals(quantity: float, unit_price_cents: int, vat_rate: float) -> tuple[int, int]:
+    """Calculate line total and VAT amount in cents."""
+    line_total = int(Decimal(str(quantity)) * Decimal(str(unit_price_cents)))
+    vat_amount = int(Decimal(str(line_total)) * Decimal(str(vat_rate)) / Decimal('100'))
+    return line_total, vat_amount
+
+
+def invoice_to_response(invoice: ZZPInvoice) -> InvoiceResponse:
+    """Convert invoice model to response schema."""
+    return InvoiceResponse(
+        id=invoice.id,
+        administration_id=invoice.administration_id,
+        customer_id=invoice.customer_id,
+        invoice_number=invoice.invoice_number,
+        status=invoice.status,
+        issue_date=invoice.issue_date.isoformat(),
+        due_date=invoice.due_date.isoformat() if invoice.due_date else None,
+        seller_company_name=invoice.seller_company_name,
+        seller_trading_name=invoice.seller_trading_name,
+        seller_address_street=invoice.seller_address_street,
+        seller_address_postal_code=invoice.seller_address_postal_code,
+        seller_address_city=invoice.seller_address_city,
+        seller_address_country=invoice.seller_address_country,
+        seller_kvk_number=invoice.seller_kvk_number,
+        seller_btw_number=invoice.seller_btw_number,
+        seller_iban=invoice.seller_iban,
+        seller_email=invoice.seller_email,
+        seller_phone=invoice.seller_phone,
+        customer_name=invoice.customer_name,
+        customer_address_street=invoice.customer_address_street,
+        customer_address_postal_code=invoice.customer_address_postal_code,
+        customer_address_city=invoice.customer_address_city,
+        customer_address_country=invoice.customer_address_country,
+        customer_kvk_number=invoice.customer_kvk_number,
+        customer_btw_number=invoice.customer_btw_number,
+        subtotal_cents=invoice.subtotal_cents,
+        vat_total_cents=invoice.vat_total_cents,
+        total_cents=invoice.total_cents,
+        notes=invoice.notes,
+        lines=[
+            InvoiceLineResponse(
+                id=line.id,
+                invoice_id=line.invoice_id,
+                line_number=line.line_number,
+                description=line.description,
+                quantity=float(line.quantity),
+                unit_price_cents=line.unit_price_cents,
+                vat_rate=float(line.vat_rate),
+                line_total_cents=line.line_total_cents,
+                vat_amount_cents=line.vat_amount_cents,
+                created_at=line.created_at,
+                updated_at=line.updated_at,
+            )
+            for line in invoice.lines
+        ],
+        created_at=invoice.created_at,
+        updated_at=invoice.updated_at,
+    )
+
+
+@router.get("/invoices", response_model=InvoiceListResponse)
+async def list_invoices(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    status: Optional[str] = Query(None, pattern=r'^(draft|sent|paid|overdue|cancelled)$'),
+    customer_id: Optional[UUID] = Query(None),
+    from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+):
+    """
+    List all invoices for the current user's administration.
+    """
+    require_zzp(current_user)
+    
+    administration = await get_user_administration(current_user.id, db)
+    
+    # Build query
+    query = (
+        select(ZZPInvoice)
+        .options(selectinload(ZZPInvoice.lines))
+        .where(ZZPInvoice.administration_id == administration.id)
+    )
+    
+    # Apply filters
+    if status:
+        query = query.where(ZZPInvoice.status == status)
+    if customer_id:
+        query = query.where(ZZPInvoice.customer_id == customer_id)
+    if from_date:
+        query = query.where(ZZPInvoice.issue_date >= date.fromisoformat(from_date))
+    if to_date:
+        query = query.where(ZZPInvoice.issue_date <= date.fromisoformat(to_date))
+    
+    query = query.order_by(ZZPInvoice.issue_date.desc(), ZZPInvoice.invoice_number.desc())
+    
+    result = await db.execute(query)
+    invoices = result.scalars().all()
+    
+    return InvoiceListResponse(
+        invoices=[invoice_to_response(inv) for inv in invoices],
+        total=len(invoices)
+    )
+
+
+@router.post("/invoices", response_model=InvoiceResponse, status_code=201)
+async def create_invoice(
+    invoice_in: InvoiceCreate,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Create a new invoice.
+    
+    - Generates sequential invoice number
+    - Snapshots seller info from BusinessProfile
+    - Snapshots customer info from customer record
+    - Calculates line totals and VAT
+    """
+    require_zzp(current_user)
+    
+    administration = await get_user_administration(current_user.id, db)
+    
+    # Verify customer exists and belongs to this administration
+    customer_result = await db.execute(
+        select(ZZPCustomer).where(
+            ZZPCustomer.id == invoice_in.customer_id,
+            ZZPCustomer.administration_id == administration.id
+        )
+    )
+    customer = customer_result.scalar_one_or_none()
+    
+    if not customer:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "CUSTOMER_NOT_FOUND", "message": "Klant niet gevonden."}
+        )
+    
+    # Get business profile for seller snapshot
+    profile_result = await db.execute(
+        select(BusinessProfile).where(
+            BusinessProfile.administration_id == administration.id
+        )
+    )
+    profile = profile_result.scalar_one_or_none()
+    
+    # Generate invoice number (race-safe)
+    invoice_number = await generate_invoice_number(administration.id, db)
+    
+    # Create invoice
+    invoice = ZZPInvoice(
+        administration_id=administration.id,
+        customer_id=customer.id,
+        invoice_number=invoice_number,
+        status=InvoiceStatus.DRAFT.value,
+        issue_date=date.fromisoformat(invoice_in.issue_date),
+        due_date=date.fromisoformat(invoice_in.due_date) if invoice_in.due_date else None,
+        notes=invoice_in.notes,
+        # Seller snapshot
+        seller_company_name=profile.company_name if profile else None,
+        seller_trading_name=profile.trading_name if profile else None,
+        seller_address_street=profile.address_street if profile else None,
+        seller_address_postal_code=profile.address_postal_code if profile else None,
+        seller_address_city=profile.address_city if profile else None,
+        seller_address_country=profile.address_country if profile else None,
+        seller_kvk_number=profile.kvk_number if profile else None,
+        seller_btw_number=profile.btw_number if profile else None,
+        seller_iban=profile.iban if profile else None,
+        seller_email=profile.email if profile else None,
+        seller_phone=profile.phone if profile else None,
+        # Customer snapshot
+        customer_name=customer.name,
+        customer_address_street=customer.address_street,
+        customer_address_postal_code=customer.address_postal_code,
+        customer_address_city=customer.address_city,
+        customer_address_country=customer.address_country,
+        customer_kvk_number=customer.kvk_number,
+        customer_btw_number=customer.btw_number,
+    )
+    
+    db.add(invoice)
+    await db.flush()  # Get invoice ID
+    
+    # Create invoice lines and calculate totals
+    subtotal = 0
+    vat_total = 0
+    
+    for i, line_data in enumerate(invoice_in.lines, start=1):
+        line_total, vat_amount = calculate_line_totals(
+            line_data.quantity, 
+            line_data.unit_price_cents, 
+            line_data.vat_rate
+        )
+        
+        line = ZZPInvoiceLine(
+            invoice_id=invoice.id,
+            line_number=i,
+            description=line_data.description,
+            quantity=Decimal(str(line_data.quantity)),
+            unit_price_cents=line_data.unit_price_cents,
+            vat_rate=Decimal(str(line_data.vat_rate)),
+            line_total_cents=line_total,
+            vat_amount_cents=vat_amount,
+        )
+        db.add(line)
+        
+        subtotal += line_total
+        vat_total += vat_amount
+    
+    # Update invoice totals
+    invoice.subtotal_cents = subtotal
+    invoice.vat_total_cents = vat_total
+    invoice.total_cents = subtotal + vat_total
+    
+    await db.commit()
+    
+    # Reload with lines
+    result = await db.execute(
+        select(ZZPInvoice)
+        .options(selectinload(ZZPInvoice.lines))
+        .where(ZZPInvoice.id == invoice.id)
+    )
+    invoice = result.scalar_one()
+    
+    return invoice_to_response(invoice)
+
+
+@router.get("/invoices/{invoice_id}", response_model=InvoiceResponse)
+async def get_invoice(
+    invoice_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Get a specific invoice by ID.
+    """
+    require_zzp(current_user)
+    
+    administration = await get_user_administration(current_user.id, db)
+    
+    result = await db.execute(
+        select(ZZPInvoice)
+        .options(selectinload(ZZPInvoice.lines))
+        .where(
+            ZZPInvoice.id == invoice_id,
+            ZZPInvoice.administration_id == administration.id
+        )
+    )
+    invoice = result.scalar_one_or_none()
+    
+    if not invoice:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
+        )
+    
+    return invoice_to_response(invoice)
+
+
+@router.put("/invoices/{invoice_id}", response_model=InvoiceResponse)
+async def update_invoice(
+    invoice_id: UUID,
+    invoice_in: InvoiceUpdate,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Update an invoice.
+    
+    Only draft invoices can be fully edited.
+    """
+    require_zzp(current_user)
+    
+    administration = await get_user_administration(current_user.id, db)
+    
+    result = await db.execute(
+        select(ZZPInvoice)
+        .options(selectinload(ZZPInvoice.lines))
+        .where(
+            ZZPInvoice.id == invoice_id,
+            ZZPInvoice.administration_id == administration.id
+        )
+    )
+    invoice = result.scalar_one_or_none()
+    
+    if not invoice:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
+        )
+    
+    if invoice.status != InvoiceStatus.DRAFT.value:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVOICE_NOT_EDITABLE", "message": "Alleen concept-facturen kunnen worden bewerkt."}
+        )
+    
+    # Update basic fields
+    if invoice_in.issue_date:
+        invoice.issue_date = date.fromisoformat(invoice_in.issue_date)
+    if invoice_in.due_date is not None:
+        invoice.due_date = date.fromisoformat(invoice_in.due_date) if invoice_in.due_date else None
+    if invoice_in.notes is not None:
+        invoice.notes = invoice_in.notes
+    
+    # Update customer if changed
+    if invoice_in.customer_id and invoice_in.customer_id != invoice.customer_id:
+        customer_result = await db.execute(
+            select(ZZPCustomer).where(
+                ZZPCustomer.id == invoice_in.customer_id,
+                ZZPCustomer.administration_id == administration.id
+            )
+        )
+        customer = customer_result.scalar_one_or_none()
+        
+        if not customer:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "CUSTOMER_NOT_FOUND", "message": "Klant niet gevonden."}
+            )
+        
+        invoice.customer_id = customer.id
+        # Update customer snapshot
+        invoice.customer_name = customer.name
+        invoice.customer_address_street = customer.address_street
+        invoice.customer_address_postal_code = customer.address_postal_code
+        invoice.customer_address_city = customer.address_city
+        invoice.customer_address_country = customer.address_country
+        invoice.customer_kvk_number = customer.kvk_number
+        invoice.customer_btw_number = customer.btw_number
+    
+    # Update lines if provided
+    if invoice_in.lines is not None:
+        # Delete existing lines
+        for line in invoice.lines:
+            await db.delete(line)
+        
+        # Create new lines
+        subtotal = 0
+        vat_total = 0
+        
+        for i, line_data in enumerate(invoice_in.lines, start=1):
+            line_total, vat_amount = calculate_line_totals(
+                line_data.quantity,
+                line_data.unit_price_cents,
+                line_data.vat_rate
+            )
+            
+            line = ZZPInvoiceLine(
+                invoice_id=invoice.id,
+                line_number=i,
+                description=line_data.description,
+                quantity=Decimal(str(line_data.quantity)),
+                unit_price_cents=line_data.unit_price_cents,
+                vat_rate=Decimal(str(line_data.vat_rate)),
+                line_total_cents=line_total,
+                vat_amount_cents=vat_amount,
+            )
+            db.add(line)
+            
+            subtotal += line_total
+            vat_total += vat_amount
+        
+        invoice.subtotal_cents = subtotal
+        invoice.vat_total_cents = vat_total
+        invoice.total_cents = subtotal + vat_total
+    
+    await db.commit()
+    
+    # Reload with lines
+    result = await db.execute(
+        select(ZZPInvoice)
+        .options(selectinload(ZZPInvoice.lines))
+        .where(ZZPInvoice.id == invoice.id)
+    )
+    invoice = result.scalar_one()
+    
+    return invoice_to_response(invoice)
+
+
+@router.patch("/invoices/{invoice_id}/status", response_model=InvoiceResponse)
+async def update_invoice_status(
+    invoice_id: UUID,
+    status_in: InvoiceStatusUpdate,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Update invoice status.
+    
+    Valid transitions:
+    - draft -> sent
+    - sent -> paid
+    - draft/sent -> cancelled
+    """
+    require_zzp(current_user)
+    
+    administration = await get_user_administration(current_user.id, db)
+    
+    result = await db.execute(
+        select(ZZPInvoice)
+        .options(selectinload(ZZPInvoice.lines))
+        .where(
+            ZZPInvoice.id == invoice_id,
+            ZZPInvoice.administration_id == administration.id
+        )
+    )
+    invoice = result.scalar_one_or_none()
+    
+    if not invoice:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
+        )
+    
+    current_status = invoice.status
+    new_status = status_in.status
+    
+    # Validate status transition
+    valid_transitions = {
+        InvoiceStatus.DRAFT.value: [InvoiceStatus.SENT.value, InvoiceStatus.CANCELLED.value],
+        InvoiceStatus.SENT.value: [InvoiceStatus.PAID.value, InvoiceStatus.CANCELLED.value],
+        InvoiceStatus.PAID.value: [],
+        InvoiceStatus.CANCELLED.value: [],
+        InvoiceStatus.OVERDUE.value: [InvoiceStatus.PAID.value, InvoiceStatus.CANCELLED.value],
+    }
+    
+    if new_status not in valid_transitions.get(current_status, []):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "INVALID_STATUS_TRANSITION",
+                "message": f"Kan status niet wijzigen van '{current_status}' naar '{new_status}'."
+            }
+        )
+    
+    invoice.status = new_status
+    await db.commit()
+    await db.refresh(invoice)
+    
+    return invoice_to_response(invoice)
+
+
+@router.delete("/invoices/{invoice_id}", status_code=204)
+async def delete_invoice(
+    invoice_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Delete an invoice.
+    
+    Only draft invoices can be deleted.
+    """
+    require_zzp(current_user)
+    
+    administration = await get_user_administration(current_user.id, db)
+    
+    result = await db.execute(
+        select(ZZPInvoice).where(
+            ZZPInvoice.id == invoice_id,
+            ZZPInvoice.administration_id == administration.id
+        )
+    )
+    invoice = result.scalar_one_or_none()
+    
+    if not invoice:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
+        )
+    
+    if invoice.status != InvoiceStatus.DRAFT.value:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVOICE_NOT_DELETABLE", "message": "Alleen concept-facturen kunnen worden verwijderd."}
+        )
+    
+    await db.delete(invoice)
+    await db.commit()
+    
+    return None

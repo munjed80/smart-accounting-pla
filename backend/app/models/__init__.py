@@ -26,7 +26,17 @@ from app.models.bank import (
     ReconciliationAction,
     ReconciliationActionType,
 )
-from app.models.zzp import ZZPCustomer, BusinessProfile
+from app.models.zzp import (
+    ZZPCustomer, 
+    BusinessProfile, 
+    InvoiceStatus,
+    ZZPInvoice, 
+    ZZPInvoiceLine, 
+    ZZPInvoiceCounter,
+    ZZPExpense,
+    ZZPTimeEntry,
+    ZZPCalendarEvent,
+)
 
 __all__ = [
     "User",
@@ -72,4 +82,11 @@ __all__ = [
     "ReconciliationActionType",
     "ZZPCustomer",
     "BusinessProfile",
+    "InvoiceStatus",
+    "ZZPInvoice",
+    "ZZPInvoiceLine",
+    "ZZPInvoiceCounter",
+    "ZZPExpense",
+    "ZZPTimeEntry",
+    "ZZPCalendarEvent",
 ]

@@ -17,13 +17,18 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/lib/AuthContext'
-import { administrationApi, Administration, getApiBaseUrl, getRawViteApiUrl, getWindowOrigin, metaApi, VersionInfo } from '@/lib/api'
 import { 
-  getBusinessProfile, 
-  saveBusinessProfile, 
-  BusinessProfile, 
-  BusinessProfileInput 
-} from '@/lib/storage/zzp'
+  administrationApi, 
+  Administration, 
+  getApiBaseUrl, 
+  getRawViteApiUrl, 
+  getWindowOrigin, 
+  metaApi, 
+  VersionInfo,
+  zzpApi,
+  ZZPBusinessProfile,
+  ZZPBusinessProfileCreate 
+} from '@/lib/api'
 import { 
   User,
   Buildings,
@@ -53,13 +58,14 @@ export const SettingsPage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [backendVersion, setBackendVersion] = useState<VersionInfo | null>(null)
   const [backendVersionError, setBackendVersionError] = useState<string | null>(null)
   
   // Business profile state (for ZZP users)
-  const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null)
-  const [profileForm, setProfileForm] = useState<BusinessProfileInput>({
+  const [businessProfile, setBusinessProfile] = useState<ZZPBusinessProfile | null>(null)
+  const [profileForm, setProfileForm] = useState<ZZPBusinessProfileCreate>({
     company_name: '',
     trading_name: '',
     address_street: '',
@@ -99,10 +105,13 @@ export const SettingsPage = () => {
     }
     fetchData()
     
-    // Load business profile from localStorage (for ZZP users)
-    if (user?.id && user?.role === 'zzp') {
-      const profile = getBusinessProfile(user.id)
-      if (profile) {
+    // Fetch business profile from API (for ZZP users)
+    const fetchBusinessProfile = async () => {
+      if (!user?.id || user?.role !== 'zzp') return
+      
+      setIsLoadingProfile(true)
+      try {
+        const profile = await zzpApi.profile.get()
         setBusinessProfile(profile)
         setProfileForm({
           company_name: profile.company_name || '',
@@ -119,8 +128,17 @@ export const SettingsPage = () => {
           website: profile.website || '',
           logo_url: profile.logo_url || '',
         })
+      } catch (error: unknown) {
+        // 404 is expected if profile doesn't exist yet - that's OK
+        const err = error as { response?: { status?: number } }
+        if (err?.response?.status !== 404) {
+          console.error('Failed to fetch business profile:', error)
+        }
+      } finally {
+        setIsLoadingProfile(false)
       }
     }
+    fetchBusinessProfile()
     
     // Fetch backend version info (non-blocking)
     const fetchVersion = async () => {
@@ -144,7 +162,7 @@ export const SettingsPage = () => {
     setIsSaving(false)
   }
   
-  const handleSaveBusinessProfile = () => {
+  const handleSaveBusinessProfile = async () => {
     if (!user?.id) return
     
     // Validate required field
@@ -156,7 +174,7 @@ export const SettingsPage = () => {
     setIsSavingProfile(true)
     
     try {
-      const saved = saveBusinessProfile(user.id, profileForm)
+      const saved = await zzpApi.profile.upsert(profileForm)
       setBusinessProfile(saved)
       toast.success(t('settings.businessProfileSaved'))
     } catch (error) {
@@ -167,7 +185,7 @@ export const SettingsPage = () => {
     }
   }
   
-  const updateProfileField = (field: keyof BusinessProfileInput, value: string) => {
+  const updateProfileField = (field: keyof ZZPBusinessProfileCreate, value: string) => {
     setProfileForm(prev => ({ ...prev, [field]: value }))
   }
 
@@ -265,6 +283,27 @@ export const SettingsPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {isLoadingProfile ? (
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <Skeleton className="h-4 w-32" />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                      </div>
+                    </div>
+                    <Separator />
+                    <div className="space-y-4">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-10 w-full" />
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full col-span-1 md:col-span-2" />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
                 {/* Company Identity */}
                 <div>
                   <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
@@ -442,6 +481,8 @@ export const SettingsPage = () => {
                     {t('settings.saveProfile')}
                   </Button>
                 </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}

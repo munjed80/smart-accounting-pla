@@ -1,16 +1,15 @@
 /**
  * ZZP Invoices Page
  * 
- * Full CRUD functionality for managing invoices.
- * Data is stored in localStorage per user.
+ * Full CRUD functionality for managing invoices via backend API.
  * Invoices are linked to customers.
- * Now includes seller snapshot from Business Profile.
+ * Includes seller snapshot from Business Profile (stored server-side).
  * 
  * Premium UI with:
  * - Stats mini-cards
  * - Search with debounce
  * - Responsive table/card design
- * - Better form grouping
+ * - Invoice lines support
  * - Loading/skeleton states
  * - Seller details preview from Business Profile
  */
@@ -80,31 +79,42 @@ import {
   XCircle,
   Buildings,
   Info,
+  Eye,
+  X,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { navigateTo } from '@/lib/navigation'
 import { 
-  Invoice,
-  InvoiceInput,
-  InvoiceUpdate,
-  Customer,
-  BusinessProfile,
-  listInvoices, 
-  addInvoice, 
-  updateInvoice, 
-  removeInvoice,
-  listCustomers,
-  getBusinessProfile,
-  createSellerSnapshot,
-  formatAmountEUR,
-  formatDate,
-} from '@/lib/storage/zzp'
+  zzpApi,
+  ZZPInvoice,
+  ZZPInvoiceCreate,
+  ZZPInvoiceLineCreate,
+  ZZPCustomer,
+  ZZPBusinessProfile,
+} from '@/lib/api'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 import { useDebounce } from '@/hooks/useDebounce'
 
-// Invoice status types
-type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue'
+// Format amount in cents to EUR currency string
+function formatAmountEUR(amountCents: number): string {
+  return new Intl.NumberFormat('nl-NL', {
+    style: 'currency',
+    currency: 'EUR',
+  }).format(amountCents / 100)
+}
+
+// Format date string for display (Dutch locale)
+function formatDate(isoDate: string): string {
+  return new Intl.DateTimeFormat('nl-NL', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(isoDate))
+}
+
+// Invoice status types (matches backend)
+type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
 
 // Helper function to extract date part from ISO string
 const extractDatePart = (isoString: string | undefined): string => {
@@ -145,6 +155,13 @@ const StatusBadge = ({ status, size = 'default' }: { status: InvoiceStatus; size
       border: 'border-red-500/40',
       icon: <Warning size={iconSize} className="mr-1" weight="fill" />,
       label: t('zzpInvoices.statusOverdue'),
+    },
+    cancelled: {
+      bg: 'bg-slate-500/20',
+      text: 'text-slate-600 dark:text-slate-400',
+      border: 'border-slate-500/40',
+      icon: <XCircle size={iconSize} className="mr-1" weight="fill" />,
+      label: t('zzpInvoices.statusCancelled'),
     },
   }
 
@@ -237,7 +254,32 @@ const TableLoadingSkeleton = () => (
   </Card>
 )
 
-// Invoice form dialog
+// Invoice line item type for form
+interface InvoiceLineFormData {
+  id?: string
+  description: string
+  quantity: string
+  unitPrice: string
+  vatRate: string
+}
+
+// Default empty line
+const createEmptyLine = (): InvoiceLineFormData => ({
+  description: '',
+  quantity: '1',
+  unitPrice: '',
+  vatRate: '21',
+})
+
+// Parse amount string to cents
+const parseAmountToCents = (value: string): number | null => {
+  const normalized = value.replace(',', '.')
+  const parsed = parseFloat(normalized)
+  if (isNaN(parsed) || parsed < 0) return null
+  return Math.round(parsed * 100)
+}
+
+// Invoice form dialog - now supports invoice lines
 const InvoiceFormDialog = ({
   open,
   onOpenChange,
@@ -245,27 +287,28 @@ const InvoiceFormDialog = ({
   customers,
   businessProfile,
   onSave,
+  isReadOnly = false,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  invoice?: Invoice
-  customers: Customer[]
-  businessProfile: BusinessProfile | null
-  onSave: (data: InvoiceInput | InvoiceUpdate, isEdit: boolean) => void
+  invoice?: ZZPInvoice
+  customers: ZZPCustomer[]
+  businessProfile: ZZPBusinessProfile | null
+  onSave: (data: ZZPInvoiceCreate, isEdit: boolean) => Promise<void>
+  isReadOnly?: boolean
 }) => {
   const isEdit = !!invoice
   const [customerId, setCustomerId] = useState('')
-  const [date, setDate] = useState('')
+  const [issueDate, setIssueDate] = useState('')
   const [dueDate, setDueDate] = useState('')
-  const [amount, setAmount] = useState('')
-  const [status, setStatus] = useState<InvoiceStatus>('draft')
   const [notes, setNotes] = useState('')
+  const [lines, setLines] = useState<InvoiceLineFormData[]>([createEmptyLine()])
   const [isSubmitting, setIsSubmitting] = useState(false)
   
   // Validation errors
   const [customerError, setCustomerError] = useState('')
   const [dateError, setDateError] = useState('')
-  const [amountError, setAmountError] = useState('')
+  const [linesError, setLinesError] = useState('')
 
   // Active customers only
   const activeCustomers = useMemo(() => 
@@ -277,37 +320,118 @@ const InvoiceFormDialog = ({
   useEffect(() => {
     if (open) {
       if (invoice) {
-        setCustomerId(invoice.customerId)
-        setDate(extractDatePart(invoice.date))
-        setDueDate(extractDatePart(invoice.dueDate))
-        setAmount((invoice.amountCents / 100).toFixed(2).replace('.', ','))
-        setStatus(invoice.status)
+        setCustomerId(invoice.customer_id)
+        setIssueDate(extractDatePart(invoice.issue_date))
+        setDueDate(extractDatePart(invoice.due_date))
         setNotes(invoice.notes || '')
+        // Convert existing lines to form data
+        if (invoice.lines && invoice.lines.length > 0) {
+          setLines(invoice.lines.map(line => ({
+            id: line.id,
+            description: line.description,
+            quantity: line.quantity.toString(),
+            unitPrice: (line.unit_price_cents / 100).toFixed(2).replace('.', ','),
+            vatRate: line.vat_rate.toString(),
+          })))
+        } else {
+          setLines([createEmptyLine()])
+        }
       } else {
         setCustomerId('')
-        setDate(extractDatePart(new Date().toISOString()))
+        setIssueDate(extractDatePart(new Date().toISOString()))
         setDueDate('')
-        setAmount('')
-        setStatus('draft')
         setNotes('')
+        setLines([createEmptyLine()])
       }
       setCustomerError('')
       setDateError('')
-      setAmountError('')
+      setLinesError('')
       setIsSubmitting(false)
     }
   }, [open, invoice])
 
-  // Parse amount string to cents
-  const parseAmount = (value: string): number | null => {
-    // Replace comma with dot for parsing
-    const normalized = value.replace(',', '.')
-    const parsed = parseFloat(normalized)
-    if (isNaN(parsed) || parsed < 0) return null
-    return Math.round(parsed * 100)
+  // Add new line
+  const addLine = () => {
+    setLines([...lines, createEmptyLine()])
   }
 
-  const handleSave = () => {
+  // Remove line
+  const removeLine = (index: number) => {
+    if (lines.length > 1) {
+      setLines(lines.filter((_, i) => i !== index))
+    }
+  }
+
+  // Update line
+  const updateLine = (index: number, field: keyof InvoiceLineFormData, value: string) => {
+    const newLines = [...lines]
+    newLines[index] = { ...newLines[index], [field]: value }
+    setLines(newLines)
+    setLinesError('')
+  }
+
+  // Calculate line total (for display)
+  const calculateLineTotal = (line: InvoiceLineFormData): number => {
+    const qty = parseFloat(line.quantity.replace(',', '.')) || 0
+    const unitPriceCents = parseAmountToCents(line.unitPrice) || 0
+    return qty * unitPriceCents
+  }
+
+  // Calculate totals (for display)
+  const calculatedTotals = useMemo(() => {
+    let subtotal = 0
+    let vatTotal = 0
+    lines.forEach(line => {
+      const lineTotalCents = calculateLineTotal(line)
+      const vatRate = parseFloat(line.vatRate) || 0
+      const vatAmount = Math.round(lineTotalCents * (vatRate / 100))
+      subtotal += lineTotalCents
+      vatTotal += vatAmount
+    })
+    return {
+      subtotal,
+      vatTotal,
+      total: subtotal + vatTotal,
+    }
+  }, [lines])
+
+  // Validate and convert lines to API format
+  const validateAndConvertLines = (): ZZPInvoiceLineCreate[] | null => {
+    const validLines: ZZPInvoiceLineCreate[] = []
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      if (!line.description.trim()) {
+        setLinesError(t('zzpInvoices.lineDescriptionRequired'))
+        return null
+      }
+      const qty = parseFloat(line.quantity.replace(',', '.'))
+      if (isNaN(qty) || qty <= 0) {
+        setLinesError(t('zzpInvoices.lineQuantityRequired'))
+        return null
+      }
+      const unitPriceCents = parseAmountToCents(line.unitPrice)
+      if (unitPriceCents === null || unitPriceCents <= 0) {
+        setLinesError(t('zzpInvoices.lineUnitPriceRequired'))
+        return null
+      }
+      const vatRate = parseFloat(line.vatRate)
+      if (isNaN(vatRate) || vatRate < 0) {
+        setLinesError(t('zzpInvoices.lineVatRateRequired'))
+        return null
+      }
+      validLines.push({
+        description: line.description.trim(),
+        quantity: qty,
+        unit_price_cents: unitPriceCents,
+        vat_rate: vatRate,
+      })
+    }
+    
+    return validLines
+  }
+
+  const handleSave = async () => {
     let hasError = false
 
     // Validate customer (only required for new invoices)
@@ -317,68 +441,75 @@ const InvoiceFormDialog = ({
     }
 
     // Validate date
-    if (!date) {
+    if (!issueDate) {
       setDateError(t('zzpInvoices.formDateRequired'))
       hasError = true
     }
 
-    // Validate amount
-    const amountCents = parseAmount(amount)
-    if (amountCents === null || amountCents <= 0) {
-      setAmountError(t('zzpInvoices.formAmountRequired'))
+    // Validate lines
+    const validLines = validateAndConvertLines()
+    if (!validLines) {
       hasError = true
     }
 
-    if (hasError) return
+    if (hasError || !validLines) return
 
     setIsSubmitting(true)
 
-    if (isEdit) {
-      // Update existing - don't include customerId
-      const updateData: InvoiceUpdate = {
-        date: new Date(date).toISOString(),
-        dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
-        amountCents: amountCents!,
-        currency: 'EUR',
-        status,
+    try {
+      const invoiceData: ZZPInvoiceCreate = {
+        customer_id: isEdit ? invoice!.customer_id : customerId,
+        issue_date: new Date(issueDate).toISOString(),
+        due_date: dueDate ? new Date(dueDate).toISOString() : undefined,
         notes: notes.trim() || undefined,
+        lines: validLines,
       }
-      onSave(updateData, true)
-    } else {
-      // Create new - include seller snapshot from business profile
-      const sellerSnapshot = createSellerSnapshot(businessProfile)
-      const inputData: InvoiceInput = {
-        customerId,
-        date: new Date(date).toISOString(),
-        dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
-        amountCents: amountCents!,
-        currency: 'EUR',
-        status,
-        notes: notes.trim() || undefined,
-        ...sellerSnapshot,
-      }
-      onSave(inputData, false)
+      await onSave(invoiceData, isEdit)
+    } finally {
+      setIsSubmitting(false)
     }
-    
-    setIsSubmitting(false)
   }
 
-  const isFormValid = (isEdit || customerId) && date && parseAmount(amount) !== null && (parseAmount(amount) ?? 0) > 0
+  const hasValidLines = lines.some(line => 
+    line.description.trim() && 
+    parseFloat(line.quantity.replace(',', '.')) > 0 && 
+    (parseAmountToCents(line.unitPrice) ?? 0) > 0
+  )
+
+  const isFormValid = (isEdit || customerId) && issueDate && hasValidLines
+
+  // For non-draft invoices, form is read-only
+  const formDisabled = isSubmitting || isReadOnly
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="pb-4 border-b border-border/50">
           <DialogTitle className="flex items-center gap-3 text-xl">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Receipt size={24} className="text-primary" weight="duotone" />
+              {isReadOnly ? (
+                <Eye size={24} className="text-primary" weight="duotone" />
+              ) : (
+                <Receipt size={24} className="text-primary" weight="duotone" />
+              )}
             </div>
-            {isEdit ? t('zzpInvoices.editInvoice') : t('zzpInvoices.newInvoice')}
+            {isReadOnly 
+              ? t('zzpInvoices.viewInvoice')
+              : isEdit 
+                ? t('zzpInvoices.editInvoice') 
+                : t('zzpInvoices.newInvoice')}
+            {invoice && (
+              <span className="font-mono text-sm text-muted-foreground">
+                {invoice.invoice_number}
+              </span>
+            )}
           </DialogTitle>
           <DialogDescription className="text-sm">
-            {isEdit 
-              ? t('zzpInvoices.editInvoiceDescription')
-              : t('zzpInvoices.newInvoiceDescription')}
+            {isReadOnly
+              ? t('zzpInvoices.viewInvoiceDescription')
+              : isEdit 
+                ? t('zzpInvoices.editInvoiceDescription')
+                : t('zzpInvoices.newInvoiceDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -393,7 +524,7 @@ const InvoiceFormDialog = ({
               <Select value={customerId} onValueChange={(value) => {
                 setCustomerId(value)
                 setCustomerError('')
-              }} disabled={isSubmitting}>
+              }} disabled={formDisabled}>
                 <SelectTrigger className={`h-11 ${customerError ? 'border-destructive focus-visible:ring-destructive' : ''}`}>
                   <SelectValue placeholder={t('zzpInvoices.formCustomerPlaceholder')} />
                 </SelectTrigger>
@@ -429,7 +560,7 @@ const InvoiceFormDialog = ({
                   <Users size={16} className="text-primary" />
                 </div>
                 <span className="font-medium">
-                  {customers.find(c => c.id === invoice.customerId)?.name || t('zzpInvoices.unknownCustomer')}
+                  {invoice?.customer_name || customers.find(c => c.id === invoice?.customer_id)?.name || t('zzpInvoices.unknownCustomer')}
                 </span>
               </div>
             </div>
@@ -445,13 +576,13 @@ const InvoiceFormDialog = ({
               <Input
                 id="invoice-date"
                 type="date"
-                value={date}
+                value={issueDate}
                 onChange={(e) => {
-                  setDate(e.target.value)
+                  setIssueDate(e.target.value)
                   setDateError('')
                 }}
                 className={`h-11 ${dateError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                disabled={isSubmitting}
+                disabled={formDisabled}
               />
               {dateError && (
                 <p className="text-sm text-destructive flex items-center gap-1">
@@ -471,117 +602,298 @@ const InvoiceFormDialog = ({
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
                 className="h-11"
-                disabled={isSubmitting}
+                disabled={formDisabled}
               />
             </div>
           </div>
 
-          {/* Amount and Status - two columns */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="invoice-amount" className="text-sm font-medium flex items-center gap-2">
-                <CurrencyEur size={14} className="text-muted-foreground" />
-                {t('zzpInvoices.formAmount')} <span className="text-destructive">*</span>
+          {/* Invoice Lines Section */}
+          <div className="space-y-3">
+            <Separator />
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Receipt size={14} className="text-muted-foreground" />
+                {t('zzpInvoices.invoiceLines')} <span className="text-destructive">*</span>
               </Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">€</span>
-                <Input
-                  id="invoice-amount"
-                  type="text"
-                  inputMode="decimal"
-                  placeholder={t('zzpInvoices.formAmountPlaceholder')}
-                  value={amount}
-                  onChange={(e) => {
-                    // Only allow numbers, comma, and dot
-                    const value = e.target.value.replace(/[^0-9,.]/g, '')
-                    setAmount(value)
-                    setAmountError('')
-                  }}
-                  className={`pl-8 h-11 ${amountError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                  disabled={isSubmitting}
-                />
-              </div>
-              {amountError && (
-                <p className="text-sm text-destructive flex items-center gap-1">
-                  <XCircle size={14} />
-                  {amountError}
-                </p>
+              {!isReadOnly && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addLine}
+                  disabled={formDisabled}
+                  className="h-8 gap-1"
+                >
+                  <Plus size={14} />
+                  {t('zzpInvoices.addLine')}
+                </Button>
               )}
             </div>
-            
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">{t('zzpInvoices.formStatus')}</Label>
-              <Select value={status} onValueChange={(value) => setStatus(value as InvoiceStatus)} disabled={isSubmitting}>
-                <SelectTrigger className="h-11">
-                  <StatusBadge status={status} size="sm" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">
-                    <div className="flex items-center gap-2">
-                      <Clock size={14} className="text-gray-500" />
-                      {t('zzpInvoices.statusDraft')}
+
+            {/* Lines table header (desktop) */}
+            <div className="hidden sm:grid sm:grid-cols-12 gap-2 text-xs font-medium text-muted-foreground px-1">
+              <div className="col-span-5">{t('zzpInvoices.lineDescription')}</div>
+              <div className="col-span-2 text-right">{t('zzpInvoices.lineQuantity')}</div>
+              <div className="col-span-2 text-right">{t('zzpInvoices.lineUnitPrice')}</div>
+              <div className="col-span-1 text-right">{t('zzpInvoices.lineVat')}</div>
+              <div className="col-span-2 text-right">{t('zzpInvoices.lineTotal')}</div>
+            </div>
+
+            {/* Lines */}
+            <div className="space-y-3">
+              {lines.map((line, index) => (
+                <div key={index} className="relative group">
+                  {/* Desktop layout */}
+                  <div className="hidden sm:grid sm:grid-cols-12 gap-2 items-start">
+                    <div className="col-span-5">
+                      <Input
+                        placeholder={t('zzpInvoices.lineDescriptionPlaceholder')}
+                        value={line.description}
+                        onChange={(e) => updateLine(index, 'description', e.target.value)}
+                        disabled={formDisabled}
+                        className="h-9"
+                      />
                     </div>
-                  </SelectItem>
-                  <SelectItem value="sent">
-                    <div className="flex items-center gap-2">
-                      <PaperPlaneTilt size={14} className="text-blue-500" />
-                      {t('zzpInvoices.statusSent')}
+                    <div className="col-span-2">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="1"
+                        value={line.quantity}
+                        onChange={(e) => updateLine(index, 'quantity', e.target.value.replace(/[^0-9,.]/g, ''))}
+                        disabled={formDisabled}
+                        className="h-9 text-right"
+                      />
                     </div>
-                  </SelectItem>
-                  <SelectItem value="paid">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle size={14} className="text-green-500" />
-                      {t('zzpInvoices.statusPaid')}
+                    <div className="col-span-2">
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">€</span>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0,00"
+                          value={line.unitPrice}
+                          onChange={(e) => updateLine(index, 'unitPrice', e.target.value.replace(/[^0-9,.]/g, ''))}
+                          disabled={formDisabled}
+                          className="h-9 pl-6 text-right"
+                        />
+                      </div>
                     </div>
-                  </SelectItem>
-                  <SelectItem value="overdue">
-                    <div className="flex items-center gap-2">
-                      <Warning size={14} className="text-red-500" />
-                      {t('zzpInvoices.statusOverdue')}
+                    <div className="col-span-1">
+                      <Select 
+                        value={line.vatRate} 
+                        onValueChange={(value) => updateLine(index, 'vatRate', value)}
+                        disabled={formDisabled}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">0%</SelectItem>
+                          <SelectItem value="9">9%</SelectItem>
+                          <SelectItem value="21">21%</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+                    <div className="col-span-2 flex items-center justify-end gap-1">
+                      <span className="text-sm font-medium">
+                        {formatAmountEUR(calculateLineTotal(line))}
+                      </span>
+                      {!isReadOnly && lines.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeLine(index)}
+                          disabled={formDisabled}
+                          className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
+                        >
+                          <X size={14} />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Mobile layout */}
+                  <div className="sm:hidden space-y-2 p-3 bg-secondary/30 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {t('zzpInvoices.line')} {index + 1}
+                      </span>
+                      {!isReadOnly && lines.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeLine(index)}
+                          disabled={formDisabled}
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                        >
+                          <X size={12} />
+                        </Button>
+                      )}
+                    </div>
+                    <Input
+                      placeholder={t('zzpInvoices.lineDescriptionPlaceholder')}
+                      value={line.description}
+                      onChange={(e) => updateLine(index, 'description', e.target.value)}
+                      disabled={formDisabled}
+                      className="h-9"
+                    />
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">{t('zzpInvoices.lineQuantity')}</Label>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          value={line.quantity}
+                          onChange={(e) => updateLine(index, 'quantity', e.target.value.replace(/[^0-9,.]/g, ''))}
+                          disabled={formDisabled}
+                          className="h-9"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">{t('zzpInvoices.lineUnitPrice')}</Label>
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">€</span>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={line.unitPrice}
+                            onChange={(e) => updateLine(index, 'unitPrice', e.target.value.replace(/[^0-9,.]/g, ''))}
+                            disabled={formDisabled}
+                            className="h-9 pl-5"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">{t('zzpInvoices.lineVat')}</Label>
+                        <Select 
+                          value={line.vatRate} 
+                          onValueChange={(value) => updateLine(index, 'vatRate', value)}
+                          disabled={formDisabled}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">0%</SelectItem>
+                            <SelectItem value="9">9%</SelectItem>
+                            <SelectItem value="21">21%</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="text-right text-sm font-medium">
+                      {t('zzpInvoices.lineTotal')}: {formatAmountEUR(calculateLineTotal(line))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {linesError && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <XCircle size={14} />
+                {linesError}
+              </p>
+            )}
+
+            {/* Totals */}
+            <div className="pt-3 border-t border-border/50 space-y-2">
+              {(() => {
+                // Use server-calculated totals for read-only view, otherwise use local calculation
+                const displayTotals = isReadOnly && invoice
+                  ? { subtotal: invoice.subtotal_cents, vatTotal: invoice.vat_total_cents, total: invoice.total_cents }
+                  : calculatedTotals
+                return (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{t('zzpInvoices.subtotal')}</span>
+                      <span>{formatAmountEUR(displayTotals.subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{t('zzpInvoices.vatTotal')}</span>
+                      <span>{formatAmountEUR(displayTotals.vatTotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-bold pt-2 border-t border-border/50">
+                      <span>{t('zzpInvoices.total')}</span>
+                      <span>{formatAmountEUR(displayTotals.total)}</span>
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           </div>
 
-          {/* Seller Details Preview (for new invoices only) */}
-          {!isEdit && (
+          {/* Seller Details Preview */}
+          {(isReadOnly && invoice?.seller_company_name) ? (
             <div className="space-y-3">
               <Separator />
               <Label className="text-sm font-medium flex items-center gap-2">
                 <Buildings size={14} className="text-muted-foreground" />
                 {t('zzpInvoices.sellerDetails')}
               </Label>
-              {businessProfile ? (
-                <div className="bg-secondary/30 rounded-lg p-4 space-y-2 text-sm">
-                  <p className="font-semibold">{businessProfile.company_name}</p>
-                  {businessProfile.address_street && (
-                    <p className="text-muted-foreground">{businessProfile.address_street}</p>
-                  )}
-                  {(businessProfile.address_postal_code || businessProfile.address_city) && (
-                    <p className="text-muted-foreground">
-                      {[businessProfile.address_postal_code, businessProfile.address_city].filter(Boolean).join(' ')}
-                    </p>
-                  )}
-                  {businessProfile.kvk_number && (
-                    <p className="text-muted-foreground">KVK: {businessProfile.kvk_number}</p>
-                  )}
-                  {businessProfile.btw_number && (
-                    <p className="text-muted-foreground">BTW: {businessProfile.btw_number}</p>
-                  )}
-                  {businessProfile.iban && (
-                    <p className="text-muted-foreground">IBAN: {businessProfile.iban}</p>
-                  )}
-                </div>
-              ) : (
-                <Alert>
-                  <Info size={16} />
-                  <AlertDescription>
-                    {t('zzpInvoices.noBusinessProfile')}
-                  </AlertDescription>
-                </Alert>
-              )}
+              <div className="bg-secondary/30 rounded-lg p-4 space-y-2 text-sm">
+                <p className="font-semibold">{invoice.seller_company_name}</p>
+                {invoice.seller_address_street && (
+                  <p className="text-muted-foreground">{invoice.seller_address_street}</p>
+                )}
+                {(invoice.seller_address_postal_code || invoice.seller_address_city) && (
+                  <p className="text-muted-foreground">
+                    {[invoice.seller_address_postal_code, invoice.seller_address_city].filter(Boolean).join(' ')}
+                  </p>
+                )}
+                {invoice.seller_kvk_number && (
+                  <p className="text-muted-foreground">KVK: {invoice.seller_kvk_number}</p>
+                )}
+                {invoice.seller_btw_number && (
+                  <p className="text-muted-foreground">BTW: {invoice.seller_btw_number}</p>
+                )}
+                {invoice.seller_iban && (
+                  <p className="text-muted-foreground">IBAN: {invoice.seller_iban}</p>
+                )}
+              </div>
+            </div>
+          ) : !isEdit && businessProfile && (
+            <div className="space-y-3">
+              <Separator />
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Buildings size={14} className="text-muted-foreground" />
+                {t('zzpInvoices.sellerDetails')}
+              </Label>
+              <div className="bg-secondary/30 rounded-lg p-4 space-y-2 text-sm">
+                <p className="font-semibold">{businessProfile.company_name}</p>
+                {businessProfile.address_street && (
+                  <p className="text-muted-foreground">{businessProfile.address_street}</p>
+                )}
+                {(businessProfile.address_postal_code || businessProfile.address_city) && (
+                  <p className="text-muted-foreground">
+                    {[businessProfile.address_postal_code, businessProfile.address_city].filter(Boolean).join(' ')}
+                  </p>
+                )}
+                {businessProfile.kvk_number && (
+                  <p className="text-muted-foreground">KVK: {businessProfile.kvk_number}</p>
+                )}
+                {businessProfile.btw_number && (
+                  <p className="text-muted-foreground">BTW: {businessProfile.btw_number}</p>
+                )}
+                {businessProfile.iban && (
+                  <p className="text-muted-foreground">IBAN: {businessProfile.iban}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!isEdit && !businessProfile && (
+            <div className="space-y-3">
+              <Separator />
+              <Alert>
+                <Info size={16} />
+                <AlertDescription>
+                  {t('zzpInvoices.noBusinessProfile')}
+                </AlertDescription>
+              </Alert>
             </div>
           )}
 
@@ -598,7 +910,7 @@ const InvoiceFormDialog = ({
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               className="resize-none"
-              disabled={isSubmitting}
+              disabled={formDisabled}
             />
           </div>
         </div>
@@ -610,25 +922,27 @@ const InvoiceFormDialog = ({
             disabled={isSubmitting}
             className="h-11"
           >
-            {t('common.cancel')}
+            {isReadOnly ? t('common.close') : t('common.cancel')}
           </Button>
-          <Button 
-            onClick={handleSave}
-            disabled={isSubmitting || !isFormValid}
-            className="h-11 min-w-[140px]"
-          >
-            {isSubmitting ? (
-              <>
-                <SpinnerGap size={18} className="mr-2 animate-spin" />
-                {t('common.saving')}
-              </>
-            ) : (
-              <>
-                <CheckCircle size={18} className="mr-2" weight="fill" />
-                {t('zzpInvoices.saveInvoice')}
-              </>
-            )}
-          </Button>
+          {!isReadOnly && (
+            <Button 
+              onClick={handleSave}
+              disabled={isSubmitting || !isFormValid}
+              className="h-11 min-w-[140px]"
+            >
+              {isSubmitting ? (
+                <>
+                  <SpinnerGap size={18} className="mr-2 animate-spin" />
+                  {t('common.saving')}
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={18} className="mr-2" weight="fill" />
+                  {t('zzpInvoices.saveInvoice')}
+                </>
+              )}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -717,16 +1031,18 @@ const EmptyState = ({ onAddInvoice, hasCustomers }: { onAddInvoice: () => void; 
 // Mobile invoice card component
 const InvoiceCard = ({ 
   invoice, 
-  customer,
+  onView,
   onEdit, 
   onDelete,
   onStatusChange,
+  canEdit,
 }: { 
-  invoice: Invoice
-  customer?: Customer
+  invoice: ZZPInvoice
+  onView: () => void
   onEdit: () => void
   onDelete: () => void
-  onStatusChange: (newStatus: InvoiceStatus) => void
+  onStatusChange: (newStatus: 'sent' | 'paid' | 'cancelled') => void
+  canEdit: boolean
 }) => (
   <Card className="bg-card/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-colors">
     <CardContent className="p-4">
@@ -736,51 +1052,56 @@ const InvoiceCard = ({
             <FileText size={20} className="text-primary" weight="duotone" />
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="font-mono text-sm font-semibold truncate">{invoice.number}</h4>
+            <h4 className="font-mono text-sm font-semibold truncate">{invoice.invoice_number}</h4>
             <p className="text-sm text-muted-foreground truncate flex items-center gap-1.5 mt-0.5">
               <Users size={12} />
-              {customer?.name || t('zzpInvoices.unknownCustomer')}
+              {invoice.customer_name || t('zzpInvoices.unknownCustomer')}
             </p>
           </div>
         </div>
         <div className="text-right flex-shrink-0">
-          <p className="font-bold text-lg">{formatAmountEUR(invoice.amountCents)}</p>
-          <p className="text-xs text-muted-foreground">{formatDate(invoice.date)}</p>
+          <p className="font-bold text-lg">{formatAmountEUR(invoice.total_cents)}</p>
+          <p className="text-xs text-muted-foreground">{formatDate(invoice.issue_date)}</p>
         </div>
       </div>
       <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/50">
-        <Select 
-          value={invoice.status} 
-          onValueChange={(value) => onStatusChange(value as InvoiceStatus)}
-        >
-          <SelectTrigger className="w-auto border-0 p-0 h-auto focus:ring-0">
-            <StatusBadge status={invoice.status} size="sm" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="draft">{t('zzpInvoices.statusDraft')}</SelectItem>
-            <SelectItem value="sent">{t('zzpInvoices.statusSent')}</SelectItem>
-            <SelectItem value="paid">{t('zzpInvoices.statusPaid')}</SelectItem>
-            <SelectItem value="overdue">{t('zzpInvoices.statusOverdue')}</SelectItem>
-          </SelectContent>
-        </Select>
+        {invoice.status === 'draft' ? (
+          <StatusBadge status={invoice.status} size="sm" />
+        ) : (
+          <Select 
+            value={invoice.status} 
+            onValueChange={(value) => onStatusChange(value as 'sent' | 'paid' | 'cancelled')}
+          >
+            <SelectTrigger className="w-auto border-0 p-0 h-auto focus:ring-0">
+              <StatusBadge status={invoice.status} size="sm" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sent">{t('zzpInvoices.statusSent')}</SelectItem>
+              <SelectItem value="paid">{t('zzpInvoices.statusPaid')}</SelectItem>
+              <SelectItem value="cancelled">{t('zzpInvoices.statusCancelled')}</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         <div className="flex gap-2">
           <Button
             variant="ghost"
             size="sm"
-            onClick={onEdit}
+            onClick={canEdit ? onEdit : onView}
             className="h-9 px-3 gap-2"
           >
-            <PencilSimple size={16} />
-            {t('common.edit')}
+            {canEdit ? <PencilSimple size={16} /> : <Eye size={16} />}
+            {canEdit ? t('common.edit') : t('common.view')}
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onDelete}
-            className="h-9 px-3 gap-2 text-destructive hover:text-destructive"
-          >
-            <TrashSimple size={16} />
-          </Button>
+          {invoice.status === 'draft' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDelete}
+              className="h-9 px-3 gap-2 text-destructive hover:text-destructive"
+            >
+              <TrashSimple size={16} />
+            </Button>
+          )}
         </div>
       </div>
     </CardContent>
@@ -789,36 +1110,57 @@ const InvoiceCard = ({
 
 export const ZZPInvoicesPage = () => {
   const { user } = useAuth()
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null)
+  const [invoices, setInvoices] = useState<ZZPInvoice[]>([])
+  const [customers, setCustomers] = useState<ZZPCustomer[]>([])
+  const [businessProfile, setBusinessProfile] = useState<ZZPBusinessProfile | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | InvoiceStatus>('all')
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   
   // Debounced search for better performance
   const debouncedSearch = useDebounce(searchQuery, 300)
   
   // Dialog state
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [editingInvoice, setEditingInvoice] = useState<Invoice | undefined>()
-  const [deletingInvoice, setDeletingInvoice] = useState<Invoice | undefined>()
+  const [editingInvoice, setEditingInvoice] = useState<ZZPInvoice | undefined>()
+  const [viewingInvoice, setViewingInvoice] = useState<ZZPInvoice | undefined>()
+  const [deletingInvoice, setDeletingInvoice] = useState<ZZPInvoice | undefined>()
 
-  // Load data from localStorage
-  useEffect(() => {
-    if (user?.id) {
-      setIsLoading(true)
-      // Load data synchronously from localStorage
-      setInvoices(listInvoices(user.id))
-      setCustomers(listCustomers(user.id))
-      setBusinessProfile(getBusinessProfile(user.id))
+  // Load data from API
+  const loadData = useCallback(async () => {
+    if (!user?.id) return
+    
+    setIsLoading(true)
+    setError(null)
+    
+    try {
+      // Load invoices, customers, and business profile in parallel
+      const [invoicesResponse, customersResponse, profileData] = await Promise.all([
+        zzpApi.invoices.list(),
+        zzpApi.customers.list(),
+        zzpApi.profile.get().catch(() => null), // Profile might not exist
+      ])
+      
+      setInvoices(invoicesResponse.invoices)
+      setCustomers(customersResponse.customers)
+      setBusinessProfile(profileData)
+    } catch (err) {
+      console.error('Failed to load data:', err)
+      setError(t('zzpInvoices.loadError'))
+      toast.error(t('zzpInvoices.loadError'))
+    } finally {
       setIsLoading(false)
     }
   }, [user?.id])
 
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
   // Create customer lookup map
   const customerMap = useMemo(() => {
-    const map = new Map<string, Customer>()
+    const map = new Map<string, ZZPCustomer>()
     customers.forEach(c => map.set(c.id, c))
     return map
   }, [customers])
@@ -830,9 +1172,9 @@ export const ZZPInvoicesPage = () => {
     const sent = invoices.filter(i => i.status === 'sent').length
     const paid = invoices.filter(i => i.status === 'paid').length
     const overdue = invoices.filter(i => i.status === 'overdue').length
-    const totalAmount = invoices.reduce((sum, i) => sum + i.amountCents, 0)
-    const paidAmount = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amountCents, 0)
-    const openAmount = invoices.filter(i => i.status === 'sent' || i.status === 'overdue').reduce((sum, i) => sum + i.amountCents, 0)
+    const totalAmount = invoices.reduce((sum, i) => sum + i.total_cents, 0)
+    const paidAmount = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.total_cents, 0)
+    const openAmount = invoices.filter(i => i.status === 'sent' || i.status === 'overdue').reduce((sum, i) => sum + i.total_cents, 0)
     return { total, draft, sent, paid, overdue, totalAmount, paidAmount, openAmount }
   }, [invoices])
 
@@ -847,11 +1189,10 @@ export const ZZPInvoicesPage = () => {
       // Search filter (debounced)
       if (debouncedSearch) {
         const query = debouncedSearch.toLowerCase()
-        const matchesNumber = invoice.number.toLowerCase().includes(query)
-        const customer = customerMap.get(invoice.customerId)
-        const matchesCustomer = customer?.name.toLowerCase().includes(query)
+        const matchesNumber = invoice.invoice_number.toLowerCase().includes(query)
+        const matchesCustomer = invoice.customer_name?.toLowerCase().includes(query)
         // Also search in amount
-        const matchesAmount = formatAmountEUR(invoice.amountCents).toLowerCase().includes(query)
+        const matchesAmount = formatAmountEUR(invoice.total_cents).toLowerCase().includes(query)
         if (!matchesNumber && !matchesCustomer && !matchesAmount) {
           return false
         }
@@ -859,7 +1200,7 @@ export const ZZPInvoicesPage = () => {
       
       return true
     })
-  }, [invoices, debouncedSearch, statusFilter, customerMap])
+  }, [invoices, debouncedSearch, statusFilter])
 
   // Check if we have active customers
   const hasActiveCustomers = useMemo(() => {
@@ -867,60 +1208,82 @@ export const ZZPInvoicesPage = () => {
   }, [customers])
 
   // Handle adding/editing invoice
-  const handleSaveInvoice = useCallback((data: InvoiceInput | InvoiceUpdate, isEdit: boolean) => {
-    if (!user?.id) return
-
-    if (isEdit && editingInvoice) {
-      // Update existing
-      const updated = updateInvoice(user.id, editingInvoice.id, data as InvoiceUpdate)
-      if (updated) {
-        setInvoices(listInvoices(user.id))
+  const handleSaveInvoice = useCallback(async (data: ZZPInvoiceCreate, isEdit: boolean) => {
+    try {
+      if (isEdit && editingInvoice) {
+        // Update existing
+        await zzpApi.invoices.update(editingInvoice.id, {
+          customer_id: data.customer_id,
+          issue_date: data.issue_date,
+          due_date: data.due_date,
+          notes: data.notes,
+          lines: data.lines,
+        })
+        toast.success(t('zzpInvoices.invoiceSaved'))
+      } else {
+        // Create new
+        await zzpApi.invoices.create(data)
         toast.success(t('zzpInvoices.invoiceSaved'))
       }
-    } else {
-      // Add new
-      addInvoice(user.id, data as InvoiceInput)
-      setInvoices(listInvoices(user.id))
-      toast.success(t('zzpInvoices.invoiceSaved'))
-    }
 
-    setIsFormOpen(false)
-    setEditingInvoice(undefined)
-  }, [user?.id, editingInvoice])
+      setIsFormOpen(false)
+      setEditingInvoice(undefined)
+      // Reload data
+      await loadData()
+    } catch (err) {
+      console.error('Failed to save invoice:', err)
+      toast.error(t('zzpInvoices.saveError'))
+      throw err // Re-throw so the dialog knows it failed
+    }
+  }, [editingInvoice, loadData])
 
   // Handle quick status change
-  const handleStatusChange = useCallback((invoice: Invoice, newStatus: InvoiceStatus) => {
-    if (!user?.id) return
-
-    const updated = updateInvoice(user.id, invoice.id, { status: newStatus })
-    if (updated) {
-      setInvoices(listInvoices(user.id))
+  const handleStatusChange = useCallback(async (invoice: ZZPInvoice, newStatus: 'sent' | 'paid' | 'cancelled') => {
+    try {
+      await zzpApi.invoices.updateStatus(invoice.id, newStatus)
       toast.success(t('zzpInvoices.statusChanged'))
+      // Reload data
+      await loadData()
+    } catch (err) {
+      console.error('Failed to update status:', err)
+      toast.error(t('zzpInvoices.statusChangeError'))
     }
-  }, [user?.id])
+  }, [loadData])
 
   // Handle delete invoice
-  const handleDeleteInvoice = useCallback(() => {
-    if (!user?.id || !deletingInvoice) return
+  const handleDeleteInvoice = useCallback(async () => {
+    if (!deletingInvoice) return
 
-    const success = removeInvoice(user.id, deletingInvoice.id)
-    if (success) {
-      setInvoices(listInvoices(user.id))
+    try {
+      await zzpApi.invoices.delete(deletingInvoice.id)
       toast.success(t('zzpInvoices.invoiceDeleted'))
+      setDeletingInvoice(undefined)
+      // Reload data
+      await loadData()
+    } catch (err) {
+      console.error('Failed to delete invoice:', err)
+      toast.error(t('zzpInvoices.deleteError'))
     }
-
-    setDeletingInvoice(undefined)
-  }, [user?.id, deletingInvoice])
+  }, [deletingInvoice, loadData])
 
   // Open form for new invoice
   const openNewForm = useCallback(() => {
     setEditingInvoice(undefined)
+    setViewingInvoice(undefined)
     setIsFormOpen(true)
   }, [])
 
-  // Open form for editing
-  const openEditForm = useCallback((invoice: Invoice) => {
+  // Open form for editing (only for draft invoices)
+  const openEditForm = useCallback((invoice: ZZPInvoice) => {
+    setViewingInvoice(undefined)
     setEditingInvoice(invoice)
+    setIsFormOpen(true)
+  }, [])
+
+  // Open form for viewing (for non-draft invoices)
+  const openViewForm = useCallback((invoice: ZZPInvoice) => {
+    setEditingInvoice(undefined)
+    setViewingInvoice(invoice)
     setIsFormOpen(true)
   }, [])
 
@@ -1002,7 +1365,13 @@ export const ZZPInvoicesPage = () => {
                   <CardTitle className="text-lg">{t('zzpInvoices.listTitle')}</CardTitle>
                   <CardDescription>
                     {filteredInvoices.length} {filteredInvoices.length === 1 ? 'factuur' : 'facturen'}
-                    {statusFilter !== 'all' && ` (${t(`zzpInvoices.filter${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}`)})`}
+                    {statusFilter !== 'all' && ` (${
+                      statusFilter === 'draft' ? t('zzpInvoices.filterDraft') :
+                      statusFilter === 'sent' ? t('zzpInvoices.filterSent') :
+                      statusFilter === 'paid' ? t('zzpInvoices.filterPaid') :
+                      statusFilter === 'overdue' ? t('zzpInvoices.filterOverdue') :
+                      statusFilter === 'cancelled' ? t('zzpInvoices.filterCancelled') : ''
+                    })`}
                   </CardDescription>
                 </div>
               </div>
@@ -1048,16 +1417,20 @@ export const ZZPInvoicesPage = () => {
                     <p className="text-sm">{t('zzpInvoices.tryDifferentSearch')}</p>
                   </div>
                 ) : (
-                  filteredInvoices.map((invoice) => (
-                    <InvoiceCard
-                      key={invoice.id}
-                      invoice={invoice}
-                      customer={customerMap.get(invoice.customerId)}
-                      onEdit={() => openEditForm(invoice)}
-                      onDelete={() => setDeletingInvoice(invoice)}
-                      onStatusChange={(status) => handleStatusChange(invoice, status)}
-                    />
-                  ))
+                  filteredInvoices.map((invoice) => {
+                    const canEdit = invoice.status === 'draft'
+                    return (
+                      <InvoiceCard
+                        key={invoice.id}
+                        invoice={invoice}
+                        onView={() => openViewForm(invoice)}
+                        onEdit={() => openEditForm(invoice)}
+                        onDelete={() => setDeletingInvoice(invoice)}
+                        onStatusChange={(status) => handleStatusChange(invoice, status)}
+                        canEdit={canEdit}
+                      />
+                    )
+                  })
                 )}
               </div>
 
@@ -1087,7 +1460,7 @@ export const ZZPInvoicesPage = () => {
                       </TableRow>
                     ) : (
                       filteredInvoices.map((invoice) => {
-                        const customer = customerMap.get(invoice.customerId)
+                        const canEdit = invoice.status === 'draft'
                         return (
                           <TableRow key={invoice.id} className="hover:bg-secondary/30">
                             <TableCell>
@@ -1095,57 +1468,62 @@ export const ZZPInvoicesPage = () => {
                                 <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
                                   <FileText size={16} className="text-primary" weight="duotone" />
                                 </div>
-                                <span className="font-mono text-sm font-medium">{invoice.number}</span>
+                                <span className="font-mono text-sm font-medium">{invoice.invoice_number}</span>
                               </div>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Users size={14} className="text-muted-foreground" />
-                                <span>{customer?.name || t('zzpInvoices.unknownCustomer')}</span>
+                                <span>{invoice.customer_name || t('zzpInvoices.unknownCustomer')}</span>
                               </div>
                             </TableCell>
                             <TableCell className="hidden lg:table-cell text-muted-foreground">
-                              {formatDate(invoice.date)}
+                              {formatDate(invoice.issue_date)}
                             </TableCell>
                             <TableCell className="text-right font-medium">
-                              {formatAmountEUR(invoice.amountCents)}
+                              {formatAmountEUR(invoice.total_cents)}
                             </TableCell>
                             <TableCell>
-                              <Select 
-                                value={invoice.status} 
-                                onValueChange={(value) => handleStatusChange(invoice, value as InvoiceStatus)}
-                              >
-                                <SelectTrigger className="w-auto border-0 p-0 h-auto focus:ring-0">
-                                  <StatusBadge status={invoice.status} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="draft">{t('zzpInvoices.statusDraft')}</SelectItem>
-                                  <SelectItem value="sent">{t('zzpInvoices.statusSent')}</SelectItem>
-                                  <SelectItem value="paid">{t('zzpInvoices.statusPaid')}</SelectItem>
-                                  <SelectItem value="overdue">{t('zzpInvoices.statusOverdue')}</SelectItem>
-                                </SelectContent>
-                              </Select>
+                              {invoice.status === 'draft' ? (
+                                <StatusBadge status={invoice.status} />
+                              ) : (
+                                <Select 
+                                  value={invoice.status} 
+                                  onValueChange={(value) => handleStatusChange(invoice, value as 'sent' | 'paid' | 'cancelled')}
+                                >
+                                  <SelectTrigger className="w-auto border-0 p-0 h-auto focus:ring-0">
+                                    <StatusBadge status={invoice.status} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="sent">{t('zzpInvoices.statusSent')}</SelectItem>
+                                    <SelectItem value="paid">{t('zzpInvoices.statusPaid')}</SelectItem>
+                                    <SelectItem value="cancelled">{t('zzpInvoices.statusCancelled')}</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => openEditForm(invoice)}
+                                  onClick={() => canEdit ? openEditForm(invoice) : openViewForm(invoice)}
                                   className="h-8 w-8 p-0"
                                 >
-                                  <PencilSimple size={16} />
-                                  <span className="sr-only">{t('common.edit')}</span>
+                                  {canEdit ? <PencilSimple size={16} /> : <Eye size={16} />}
+                                  <span className="sr-only">{canEdit ? t('common.edit') : t('common.view')}</span>
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setDeletingInvoice(invoice)}
-                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                >
-                                  <TrashSimple size={16} />
-                                  <span className="sr-only">{t('common.delete')}</span>
-                                </Button>
+                                {invoice.status === 'draft' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setDeletingInvoice(invoice)}
+                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                  >
+                                    <TrashSimple size={16} />
+                                    <span className="sr-only">{t('common.delete')}</span>
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -1165,12 +1543,16 @@ export const ZZPInvoicesPage = () => {
         open={isFormOpen}
         onOpenChange={(open) => {
           setIsFormOpen(open)
-          if (!open) setEditingInvoice(undefined)
+          if (!open) {
+            setEditingInvoice(undefined)
+            setViewingInvoice(undefined)
+          }
         }}
-        invoice={editingInvoice}
+        invoice={editingInvoice || viewingInvoice}
         customers={customers}
         businessProfile={businessProfile}
         onSave={handleSaveInvoice}
+        isReadOnly={!!viewingInvoice}
       />
 
       {/* Delete confirmation dialog */}
@@ -1180,7 +1562,7 @@ export const ZZPInvoicesPage = () => {
           if (!open) setDeletingInvoice(undefined)
         }}
         onConfirm={handleDeleteInvoice}
-        invoiceNumber={deletingInvoice?.number || ''}
+        invoiceNumber={deletingInvoice?.invoice_number || ''}
       />
     </div>
   )

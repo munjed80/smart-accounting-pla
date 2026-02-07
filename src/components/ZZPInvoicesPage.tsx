@@ -475,8 +475,8 @@ const InvoiceFormDialog = ({
     try {
       const invoiceData: ZZPInvoiceCreate = {
         customer_id: isEdit ? invoice!.customer_id : customerId,
-        issue_date: new Date(issueDate).toISOString(),
-        due_date: dueDate ? new Date(dueDate).toISOString() : undefined,
+        issue_date: issueDate, // Already in YYYY-MM-DD format from input
+        due_date: dueDate || undefined, // Already in YYYY-MM-DD format from input
         notes: notes.trim() || undefined,
         lines: validLines,
       }

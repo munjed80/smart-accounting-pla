@@ -81,6 +81,12 @@ import { toast } from 'sonner'
 // Invoice status types
 type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue'
 
+// Helper function to extract date part from ISO string
+const extractDatePart = (isoString: string | undefined): string => {
+  if (!isoString) return ''
+  return isoString.split('T')[0]
+}
+
 // Status badge component
 const StatusBadge = ({ status }: { status: InvoiceStatus }) => {
   const config: Record<InvoiceStatus, { bg: string; text: string; border: string; icon: React.ReactNode; label: string }> = {
@@ -156,14 +162,14 @@ const InvoiceFormDialog = ({
     if (open) {
       if (invoice) {
         setCustomerId(invoice.customerId)
-        setDate(invoice.date.split('T')[0]) // Extract date part from ISO string
-        setDueDate(invoice.dueDate?.split('T')[0] || '')
+        setDate(extractDatePart(invoice.date))
+        setDueDate(extractDatePart(invoice.dueDate))
         setAmount((invoice.amountCents / 100).toFixed(2).replace('.', ','))
         setStatus(invoice.status)
         setNotes(invoice.notes || '')
       } else {
         setCustomerId('')
-        setDate(new Date().toISOString().split('T')[0])
+        setDate(extractDatePart(new Date().toISOString()))
         setDueDate('')
         setAmount('')
         setStatus('draft')
@@ -280,7 +286,7 @@ const InvoiceFormDialog = ({
               <div className="flex items-center gap-2 p-2 bg-secondary/50 rounded-md">
                 <Users size={16} className="text-muted-foreground" />
                 <span className="text-sm">
-                  {customers.find(c => c.id === invoice.customerId)?.name || 'Onbekende klant'}
+                  {customers.find(c => c.id === invoice.customerId)?.name || t('zzpInvoices.unknownCustomer')}
                 </span>
               </div>
             </div>
@@ -657,7 +663,7 @@ export const ZZPInvoicesPage = () => {
                         <TableCell colSpan={6} className="h-24 text-center">
                           <div className="flex flex-col items-center justify-center text-muted-foreground">
                             <MagnifyingGlass size={32} className="mb-2 opacity-50" />
-                            <p>Geen facturen gevonden</p>
+                            <p>{t('zzpInvoices.noInvoicesFound')}</p>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -671,7 +677,7 @@ export const ZZPInvoicesPage = () => {
                             </TableCell>
                             <TableCell>
                               <div>
-                                <div className="font-medium">{customer?.name || 'Onbekend'}</div>
+                                <div className="font-medium">{customer?.name || t('zzpInvoices.unknownCustomer')}</div>
                                 {/* Show date on mobile in customer cell */}
                                 <div className="text-sm text-muted-foreground sm:hidden">
                                   {formatDate(invoice.date)}

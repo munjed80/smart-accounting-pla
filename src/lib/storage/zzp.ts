@@ -181,9 +181,13 @@ export function updateCustomer(
   const index = customers.findIndex(c => c.id === customerId)
   if (index === -1) return undefined
   
+  const existing = customers[index]
   const updated: Customer = {
-    ...customers[index],
+    ...existing,
     ...updates,
+    // Preserve immutable fields
+    id: existing.id,
+    createdAt: existing.createdAt,
     updatedAt: now(),
   }
   
@@ -265,9 +269,15 @@ export function updateInvoice(
   const index = invoices.findIndex(i => i.id === invoiceId)
   if (index === -1) return undefined
   
+  const existing = invoices[index]
   const updated: Invoice = {
-    ...invoices[index],
+    ...existing,
     ...updates,
+    // Preserve immutable fields
+    id: existing.id,
+    number: existing.number,
+    customerId: existing.customerId,
+    createdAt: existing.createdAt,
     updatedAt: now(),
   }
   

@@ -194,6 +194,8 @@ export const nl = {
     // Status badges
     statusActive: "Actief",
     statusInactive: "Inactief",
+    // Search results
+    noCustomersFound: "Geen klanten gevonden",
   },
 
   // ZZP Invoices page
@@ -246,6 +248,9 @@ export const nl = {
     statusSent: "Verzonden",
     statusPaid: "Betaald",
     statusOverdue: "Verlopen",
+    // Search results
+    noInvoicesFound: "Geen facturen gevonden",
+    unknownCustomer: "Onbekend",
   },
 
   // Dashboard

@@ -448,7 +448,7 @@ export const ZZPCustomersPage = () => {
                         <TableCell colSpan={5} className="h-24 text-center">
                           <div className="flex flex-col items-center justify-center text-muted-foreground">
                             <MagnifyingGlass size={32} className="mb-2 opacity-50" />
-                            <p>Geen klanten gevonden</p>
+                            <p>{t('zzpCustomers.noCustomersFound')}</p>
                           </div>
                         </TableCell>
                       </TableRow>

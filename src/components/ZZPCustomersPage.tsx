@@ -873,9 +873,9 @@ const CustomerDetailSheet = ({
                 {t('zzpCustomers.sectionContact')}
               </h4>
               <div className="bg-secondary/30 rounded-lg p-3 space-y-1">
-                <DetailRow label={t('zzpCustomers.formContactPerson')} value={customer.contact_person} icon={Users} />
                 <DetailRow label={t('zzpCustomers.formEmail')} value={customer.email} icon={Envelope} />
                 <DetailRow label={t('zzpCustomers.formPhone')} value={customer.phone} icon={Phone} />
+                <DetailRow label={t('zzpCustomers.formContactPerson')} value={customer.contact_person} icon={Users} />
               </div>
             </div>
           )}

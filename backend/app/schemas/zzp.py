@@ -269,7 +269,7 @@ class CustomerUpdate(BaseModel):
             if not v:
                 return None
             if not BIC_PATTERN.match(v):
-                raise ValueError("Invalid BIC/SWIFT code format")
+                raise ValueError("Invalid BIC/SWIFT code format (must be 8 or 11 characters)")
             return v
         return None
 

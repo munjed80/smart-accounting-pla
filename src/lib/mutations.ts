@@ -9,6 +9,17 @@ import { toast } from 'sonner'
 import { t } from '@/i18n'
 
 /**
+ * Expected shape of API error responses from axios
+ */
+interface ApiErrorResponse {
+  response?: {
+    data?: {
+      detail?: string | { message?: string; code?: string }
+    }
+  }
+}
+
+/**
  * Options for running a mutation
  */
 export interface MutationOptions<T> {
@@ -54,6 +65,18 @@ export interface MutationResult<T> {
 }
 
 /**
+ * Extract error message from API response
+ */
+function extractApiErrorMessage(error: unknown): string | undefined {
+  const apiError = error as ApiErrorResponse
+  if (apiError?.response?.data?.detail) {
+    const detail = apiError.response.data.detail
+    return typeof detail === 'string' ? detail : detail?.message
+  }
+  return undefined
+}
+
+/**
  * Run a mutation with standardized error handling and user feedback.
  * 
  * Example usage:
@@ -95,12 +118,7 @@ export async function runMutation<T>(options: MutationOptions<T>): Promise<Mutat
     const err = error instanceof Error ? error : new Error(String(error))
     
     // Extract error message from API response if available
-    let apiErrorMessage: string | undefined
-    const apiError = error as { response?: { data?: { detail?: string | { message?: string } } } }
-    if (apiError?.response?.data?.detail) {
-      const detail = apiError.response.data.detail
-      apiErrorMessage = typeof detail === 'string' ? detail : detail?.message
-    }
+    const apiErrorMessage = extractApiErrorMessage(error)
     
     // Show error toast with API message if available
     const displayMessage = apiErrorMessage ? `${errorMsg}: ${apiErrorMessage}` : errorMsg

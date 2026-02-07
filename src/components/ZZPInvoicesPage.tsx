@@ -1362,10 +1362,13 @@ export const ZZPInvoicesPage = () => {
     setEditingInvoice(undefined)
     setViewingInvoice(invoice)
     setIsFormOpen(true)
-    // Use setTimeout to allow the dialog to render before triggering print
-    setTimeout(() => {
-      window.print()
-    }, 500)
+    // Wait for the next render cycle using requestAnimationFrame twice
+    // (first waits for state update, second ensures dialog is painted)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.print()
+      })
+    })
   }, [])
 
   // Handle send invoice (not implemented - show coming soon message)

@@ -2973,6 +2973,37 @@ export interface ZZPCalendarEventListResponse {
   total: number
 }
 
+// Work Session Types (Clock-in/out)
+export interface WorkSession {
+  id: string
+  user_id: string
+  administration_id: string
+  started_at: string
+  ended_at?: string | null
+  break_minutes: number
+  note?: string | null
+  time_entry_id?: string | null
+  created_at: string
+  updated_at: string
+  duration_seconds?: number | null
+}
+
+export interface WorkSessionStart {
+  note?: string
+}
+
+export interface WorkSessionStop {
+  break_minutes?: number
+  note?: string
+}
+
+export interface WorkSessionStopResponse {
+  session: WorkSession
+  time_entry: ZZPTimeEntry
+  hours_added: number
+  message: string
+}
+
 // ============ ZZP API Functions ============
 
 export const zzpApi = {
@@ -3153,6 +3184,36 @@ export const zzpApi = {
 
     delete: async (entryId: string): Promise<void> => {
       await api.delete(`/zzp/time-entries/${entryId}`)
+    },
+  },
+
+  // ------------ Work Sessions (Clock-in/out) ------------
+  workSessions: {
+    /**
+     * Get the currently active work session.
+     * Returns null if no active session exists.
+     */
+    getActive: async (): Promise<WorkSession | null> => {
+      const response = await api.get<WorkSession | null>('/zzp/work-sessions/active')
+      return response.data
+    },
+
+    /**
+     * Start a new work session (clock-in).
+     * Only one active session per user is allowed.
+     */
+    start: async (data?: WorkSessionStart): Promise<WorkSession> => {
+      const response = await api.post<WorkSession>('/zzp/work-sessions/start', data || {})
+      return response.data
+    },
+
+    /**
+     * Stop the active work session (clock-out).
+     * Creates a time entry with the calculated duration.
+     */
+    stop: async (data?: WorkSessionStop): Promise<WorkSessionStopResponse> => {
+      const response = await api.post<WorkSessionStopResponse>('/zzp/work-sessions/stop', data || {})
+      return response.data
     },
   },
 

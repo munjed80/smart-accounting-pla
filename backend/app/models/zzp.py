@@ -492,3 +492,74 @@ class ZZPCalendarEvent(Base):
     
     # Relationships
     administration = relationship("Administration")
+
+
+class WorkSession(Base):
+    """
+    Work session for clock-in/out functionality.
+    
+    Tracks when a ZZP user starts and stops work. On stop, automatically
+    creates a ZZPTimeEntry with the calculated duration (rounded to 5 minutes).
+    
+    Rules:
+    - Only ONE active session per user per administration (enforced by partial unique index)
+    - A session is "active" when ended_at IS NULL
+    - On stop: ended_at must be > started_at
+    - Duration is calculated as (ended_at - started_at) - break_minutes
+    
+    Fields:
+    - started_at (required): When work started
+    - ended_at (nullable): When work ended (null = session is active)
+    - break_minutes: Minutes of break time to subtract
+    - note: Optional note about the work
+    - time_entry_id: Reference to the created time entry (set on stop)
+    """
+    __tablename__ = "work_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False,
+        index=True
+    )
+    administration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("administrations.id", ondelete="CASCADE"), 
+        nullable=False,
+        index=True
+    )
+    
+    # Session timestamps
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    ended_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    
+    # Break and notes
+    break_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Reference to created time entry
+    time_entry_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("zzp_time_entries.id", ondelete="SET NULL"), 
+        nullable=True
+    )
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    
+    # Relationships
+    user = relationship("User")
+    administration = relationship("Administration")
+    time_entry = relationship("ZZPTimeEntry")

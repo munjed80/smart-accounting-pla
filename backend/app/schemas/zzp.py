@@ -1012,3 +1012,60 @@ class CalendarEventListResponse(BaseModel):
     """Schema for calendar event list response."""
     events: List[CalendarEventResponse]
     total: int
+
+
+# ============================================================================
+# Work Session Schemas (Clock-in/out functionality)
+# ============================================================================
+
+class WorkSessionStart(BaseModel):
+    """Schema for starting a work session (clock-in)."""
+    note: Optional[str] = Field(None, max_length=2000, description="Optional note about the work")
+
+    @field_validator('note')
+    @classmethod
+    def trim_note(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip()
+        return v if v else None
+
+
+class WorkSessionStop(BaseModel):
+    """Schema for stopping a work session (clock-out)."""
+    break_minutes: int = Field(0, ge=0, le=480, description="Minutes of break time to subtract (max 8 hours)")
+    note: Optional[str] = Field(None, max_length=2000, description="Optional note about the work")
+
+    @field_validator('note')
+    @classmethod
+    def trim_note(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip()
+        return v if v else None
+
+
+class WorkSessionResponse(BaseModel):
+    """Schema for work session response."""
+    id: UUID
+    user_id: UUID
+    administration_id: UUID
+    started_at: datetime
+    ended_at: Optional[datetime] = None
+    break_minutes: int
+    note: Optional[str] = None
+    time_entry_id: Optional[UUID] = None
+    created_at: datetime
+    updated_at: datetime
+    
+    # Computed field for duration display (in seconds)
+    duration_seconds: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class WorkSessionStopResponse(BaseModel):
+    """Schema for stop session response with created time entry info."""
+    session: WorkSessionResponse
+    time_entry: TimeEntryResponse
+    hours_added: float
+    message: str

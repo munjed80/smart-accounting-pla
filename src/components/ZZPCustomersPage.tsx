@@ -84,14 +84,7 @@ import {
   IdentificationCard,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
-import { 
-  Customer, 
-  CustomerInput, 
-  listCustomers, 
-  addCustomer, 
-  updateCustomer, 
-  removeCustomer,
-} from '@/lib/storage/zzp'
+import { zzpApi, ZZPCustomer, ZZPCustomerCreate, ZZPCustomerUpdate } from '@/lib/api'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -196,8 +189,8 @@ const CustomerFormDialog = ({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  customer?: Customer
-  onSave: (data: CustomerInput) => void
+  customer?: ZZPCustomer
+  onSave: (data: ZZPCustomerCreate) => Promise<void>
 }) => {
   const isEdit = !!customer
   
@@ -292,7 +285,7 @@ const CustomerFormDialog = ({
     return /^[A-Z]{2}[0-9]{2}[A-Z0-9]{4,30}$/.test(cleaned)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     let hasError = false
     
     // Validate name
@@ -329,21 +322,23 @@ const CustomerFormDialog = ({
 
     setIsSubmitting(true)
 
-    onSave({
-      name: name.trim(),
-      email: email.trim() || undefined,
-      phone: phone.trim() || undefined,
-      address_street: addressStreet.trim() || undefined,
-      address_postal_code: addressPostalCode.trim().toUpperCase().replace(/\s/g, '') || undefined,
-      address_city: addressCity.trim() || undefined,
-      address_country: addressCountry.trim() || undefined,
-      kvk_number: kvkNumber.replace(/\s/g, '') || undefined,
-      btw_number: btwNumber.replace(/[\s.]/g, '').toUpperCase() || undefined,
-      iban: iban.replace(/\s/g, '').toUpperCase() || undefined,
-      status,
-    })
-    
-    setIsSubmitting(false)
+    try {
+      await onSave({
+        name: name.trim(),
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
+        address_street: addressStreet.trim() || undefined,
+        address_postal_code: addressPostalCode.trim().toUpperCase().replace(/\s/g, '') || undefined,
+        address_city: addressCity.trim() || undefined,
+        address_country: addressCountry.trim() || undefined,
+        kvk_number: kvkNumber.replace(/\s/g, '') || undefined,
+        btw_number: btwNumber.replace(/[\s.]/g, '').toUpperCase() || undefined,
+        iban: iban.replace(/\s/g, '').toUpperCase() || undefined,
+        status,
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const isFormValid = name.trim() && 
@@ -704,7 +699,7 @@ const CustomerDetailSheet = ({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  customer?: Customer
+  customer?: ZZPCustomer
   onEdit: () => void
 }) => {
   if (!customer) return null
@@ -858,7 +853,7 @@ const CustomerCard = ({
   onEdit, 
   onDelete 
 }: { 
-  customer: Customer
+  customer: ZZPCustomer
   onView: () => void
   onEdit: () => void
   onDelete: () => void 
@@ -923,7 +918,7 @@ const CustomerCard = ({
 
 export const ZZPCustomersPage = () => {
   const { user } = useAuth()
-  const [customers, setCustomers] = useState<Customer[]>([])
+  const [customers, setCustomers] = useState<ZZPCustomer[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [isLoading, setIsLoading] = useState(true)
@@ -933,19 +928,29 @@ export const ZZPCustomersPage = () => {
   
   // Dialog state
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>()
-  const [deletingCustomer, setDeletingCustomer] = useState<Customer | undefined>()
-  const [viewingCustomer, setViewingCustomer] = useState<Customer | undefined>()
+  const [editingCustomer, setEditingCustomer] = useState<ZZPCustomer | undefined>()
+  const [deletingCustomer, setDeletingCustomer] = useState<ZZPCustomer | undefined>()
+  const [viewingCustomer, setViewingCustomer] = useState<ZZPCustomer | undefined>()
 
-  // Load customers from localStorage
-  useEffect(() => {
-    if (user?.id) {
-      setIsLoading(true)
-      // Load data synchronously from localStorage
-      setCustomers(listCustomers(user.id))
+  // Load customers from API
+  const loadCustomers = useCallback(async () => {
+    if (!user?.id) return
+    
+    setIsLoading(true)
+    try {
+      const response = await zzpApi.customers.list()
+      setCustomers(response.customers)
+    } catch (error) {
+      console.error('Failed to load customers:', error)
+      toast.error(t('zzpCustomers.errorLoadingCustomers'))
+    } finally {
       setIsLoading(false)
     }
   }, [user?.id])
+
+  useEffect(() => {
+    loadCustomers()
+  }, [loadCustomers])
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -979,39 +984,48 @@ export const ZZPCustomersPage = () => {
   }, [customers, debouncedSearch, statusFilter])
 
   // Handle adding/editing customer
-  const handleSaveCustomer = useCallback((data: CustomerInput) => {
+  const handleSaveCustomer = useCallback(async (data: ZZPCustomerCreate) => {
     if (!user?.id) return
 
-    if (editingCustomer) {
-      // Update existing
-      const updated = updateCustomer(user.id, editingCustomer.id, data)
-      if (updated) {
-        setCustomers(listCustomers(user.id))
+    try {
+      if (editingCustomer) {
+        // Update existing
+        await zzpApi.customers.update(editingCustomer.id, data as ZZPCustomerUpdate)
+        toast.success(t('zzpCustomers.customerSaved'))
+      } else {
+        // Add new
+        await zzpApi.customers.create(data)
         toast.success(t('zzpCustomers.customerSaved'))
       }
-    } else {
-      // Add new
-      addCustomer(user.id, data)
-      setCustomers(listCustomers(user.id))
-      toast.success(t('zzpCustomers.customerSaved'))
-    }
 
-    setIsFormOpen(false)
-    setEditingCustomer(undefined)
-  }, [user?.id, editingCustomer])
+      // Reload customers list
+      await loadCustomers()
+
+      setIsFormOpen(false)
+      setEditingCustomer(undefined)
+    } catch (error) {
+      console.error('Failed to save customer:', error)
+      toast.error(t('zzpCustomers.errorSavingCustomer'))
+    }
+  }, [user?.id, editingCustomer, loadCustomers])
 
   // Handle delete customer
-  const handleDeleteCustomer = useCallback(() => {
+  const handleDeleteCustomer = useCallback(async () => {
     if (!user?.id || !deletingCustomer) return
 
-    const success = removeCustomer(user.id, deletingCustomer.id)
-    if (success) {
-      setCustomers(listCustomers(user.id))
+    try {
+      await zzpApi.customers.delete(deletingCustomer.id)
       toast.success(t('zzpCustomers.customerDeleted'))
+      
+      // Reload customers list
+      await loadCustomers()
+    } catch (error) {
+      console.error('Failed to delete customer:', error)
+      toast.error(t('zzpCustomers.errorDeletingCustomer'))
     }
 
     setDeletingCustomer(undefined)
-  }, [user?.id, deletingCustomer])
+  }, [user?.id, deletingCustomer, loadCustomers])
 
   // Open form for new customer
   const openNewForm = useCallback(() => {
@@ -1020,7 +1034,7 @@ export const ZZPCustomersPage = () => {
   }, [])
 
   // Open form for editing
-  const openEditForm = useCallback((customer: Customer) => {
+  const openEditForm = useCallback((customer: ZZPCustomer) => {
     setEditingCustomer(customer)
     setIsFormOpen(true)
   }, [])

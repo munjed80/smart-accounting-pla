@@ -2202,7 +2202,7 @@ export const accountantApi = {
 }
 
 // ZZP Client Consent API
-export const zzpApi = {
+const zzpConsentApi = {
   /**
    * Get list of pending accountant link requests for ZZP client
    */
@@ -2696,4 +2696,495 @@ export const metaApi = {
     const response = await api.get<VersionInfo>('/meta/version')
     return response.data
   },
+}
+
+// ============ ZZP API Types ============
+
+// Customer Types (matching backend schemas)
+export interface ZZPCustomer {
+  id: string
+  administration_id: string
+  name: string
+  email?: string
+  phone?: string
+  address_street?: string
+  address_postal_code?: string
+  address_city?: string
+  address_country?: string
+  kvk_number?: string
+  btw_number?: string
+  iban?: string
+  status: 'active' | 'inactive'
+  created_at: string
+  updated_at: string
+}
+
+export interface ZZPCustomerCreate {
+  name: string
+  email?: string
+  phone?: string
+  address_street?: string
+  address_postal_code?: string
+  address_city?: string
+  address_country?: string
+  kvk_number?: string
+  btw_number?: string
+  iban?: string
+  status?: 'active' | 'inactive'
+}
+
+export interface ZZPCustomerUpdate extends Partial<ZZPCustomerCreate> {}
+
+export interface ZZPCustomerListResponse {
+  customers: ZZPCustomer[]
+  total: number
+}
+
+// Business Profile Types
+export interface ZZPBusinessProfile {
+  id: string
+  administration_id: string
+  company_name: string
+  trading_name?: string
+  address_street?: string
+  address_postal_code?: string
+  address_city?: string
+  address_country?: string
+  kvk_number?: string
+  btw_number?: string
+  iban?: string
+  email?: string
+  phone?: string
+  website?: string
+  logo_url?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ZZPBusinessProfileCreate {
+  company_name: string
+  trading_name?: string
+  address_street?: string
+  address_postal_code?: string
+  address_city?: string
+  address_country?: string
+  kvk_number?: string
+  btw_number?: string
+  iban?: string
+  email?: string
+  phone?: string
+  website?: string
+  logo_url?: string
+}
+
+// Invoice Types
+export interface ZZPInvoiceLine {
+  id: string
+  invoice_id: string
+  line_number: number
+  description: string
+  quantity: number
+  unit_price_cents: number
+  vat_rate: number
+  line_total_cents: number
+  vat_amount_cents: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ZZPInvoiceLineCreate {
+  description: string
+  quantity: number
+  unit_price_cents: number
+  vat_rate: number
+}
+
+export interface ZZPInvoice {
+  id: string
+  administration_id: string
+  customer_id: string
+  invoice_number: string
+  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+  issue_date: string
+  due_date?: string
+  // Seller snapshot
+  seller_company_name?: string
+  seller_trading_name?: string
+  seller_address_street?: string
+  seller_address_postal_code?: string
+  seller_address_city?: string
+  seller_address_country?: string
+  seller_kvk_number?: string
+  seller_btw_number?: string
+  seller_iban?: string
+  seller_email?: string
+  seller_phone?: string
+  // Customer snapshot
+  customer_name?: string
+  customer_address_street?: string
+  customer_address_postal_code?: string
+  customer_address_city?: string
+  customer_address_country?: string
+  customer_kvk_number?: string
+  customer_btw_number?: string
+  // Totals
+  subtotal_cents: number
+  vat_total_cents: number
+  total_cents: number
+  notes?: string
+  lines: ZZPInvoiceLine[]
+  created_at: string
+  updated_at: string
+}
+
+export interface ZZPInvoiceCreate {
+  customer_id: string
+  issue_date: string
+  due_date?: string
+  notes?: string
+  lines: ZZPInvoiceLineCreate[]
+}
+
+export interface ZZPInvoiceUpdate {
+  customer_id?: string
+  issue_date?: string
+  due_date?: string
+  notes?: string
+  lines?: ZZPInvoiceLineCreate[]
+}
+
+export interface ZZPInvoiceListResponse {
+  invoices: ZZPInvoice[]
+  total: number
+}
+
+// Expense Types
+export interface ZZPExpense {
+  id: string
+  administration_id: string
+  vendor: string
+  description?: string
+  expense_date: string
+  amount_cents: number
+  vat_rate: number
+  vat_amount_cents: number
+  category: string
+  notes?: string
+  attachment_url?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ZZPExpenseCreate {
+  vendor: string
+  description?: string
+  expense_date: string
+  amount_cents: number
+  vat_rate: number
+  category: string
+  notes?: string
+  attachment_url?: string
+}
+
+export interface ZZPExpenseUpdate extends Partial<ZZPExpenseCreate> {}
+
+export interface ZZPExpenseListResponse {
+  expenses: ZZPExpense[]
+  total: number
+  total_amount_cents: number
+  total_vat_cents: number
+}
+
+// Time Entry Types
+export interface ZZPTimeEntry {
+  id: string
+  administration_id: string
+  entry_date: string
+  description: string
+  hours: number
+  project_name?: string
+  customer_id?: string
+  hourly_rate_cents?: number
+  billable: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ZZPTimeEntryCreate {
+  entry_date: string
+  description: string
+  hours: number
+  project_name?: string
+  customer_id?: string
+  hourly_rate_cents?: number
+  billable: boolean
+}
+
+export interface ZZPTimeEntryUpdate extends Partial<ZZPTimeEntryCreate> {}
+
+export interface ZZPTimeEntryListResponse {
+  entries: ZZPTimeEntry[]
+  total: number
+  total_hours: number
+  total_billable_hours: number
+}
+
+export interface ZZPWeeklyTimeSummary {
+  week_start: string
+  week_end: string
+  total_hours: number
+  billable_hours: number
+  entries_by_day: Record<string, number>
+}
+
+// Calendar Event Types
+export interface ZZPCalendarEvent {
+  id: string
+  administration_id: string
+  title: string
+  start_datetime: string
+  end_datetime: string
+  location?: string
+  notes?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ZZPCalendarEventCreate {
+  title: string
+  start_datetime: string
+  end_datetime: string
+  location?: string
+  notes?: string
+}
+
+export interface ZZPCalendarEventUpdate extends Partial<ZZPCalendarEventCreate> {}
+
+export interface ZZPCalendarEventListResponse {
+  events: ZZPCalendarEvent[]
+  total: number
+}
+
+// ============ ZZP API Functions ============
+
+export const zzpApi = {
+  // ------------ Customers ------------
+  customers: {
+    list: async (options?: { status?: string; search?: string }): Promise<ZZPCustomerListResponse> => {
+      const params: Record<string, string> = {}
+      if (options?.status) params.status = options.status
+      if (options?.search) params.search = options.search
+      const response = await api.get<ZZPCustomerListResponse>('/zzp/customers', { params })
+      return response.data
+    },
+
+    get: async (customerId: string): Promise<ZZPCustomer> => {
+      const response = await api.get<ZZPCustomer>(`/zzp/customers/${customerId}`)
+      return response.data
+    },
+
+    create: async (data: ZZPCustomerCreate): Promise<ZZPCustomer> => {
+      const response = await api.post<ZZPCustomer>('/zzp/customers', data)
+      return response.data
+    },
+
+    update: async (customerId: string, data: ZZPCustomerUpdate): Promise<ZZPCustomer> => {
+      const response = await api.put<ZZPCustomer>(`/zzp/customers/${customerId}`, data)
+      return response.data
+    },
+
+    delete: async (customerId: string): Promise<void> => {
+      await api.delete(`/zzp/customers/${customerId}`)
+    },
+  },
+
+  // ------------ Business Profile ------------
+  profile: {
+    get: async (): Promise<ZZPBusinessProfile> => {
+      const response = await api.get<ZZPBusinessProfile>('/zzp/profile')
+      return response.data
+    },
+
+    upsert: async (data: ZZPBusinessProfileCreate): Promise<ZZPBusinessProfile> => {
+      const response = await api.put<ZZPBusinessProfile>('/zzp/profile', data)
+      return response.data
+    },
+
+    update: async (data: Partial<ZZPBusinessProfileCreate>): Promise<ZZPBusinessProfile> => {
+      const response = await api.patch<ZZPBusinessProfile>('/zzp/profile', data)
+      return response.data
+    },
+  },
+
+  // ------------ Invoices ------------
+  invoices: {
+    list: async (options?: {
+      status?: string
+      customer_id?: string
+      from_date?: string
+      to_date?: string
+    }): Promise<ZZPInvoiceListResponse> => {
+      const params: Record<string, string> = {}
+      if (options?.status) params.status = options.status
+      if (options?.customer_id) params.customer_id = options.customer_id
+      if (options?.from_date) params.from_date = options.from_date
+      if (options?.to_date) params.to_date = options.to_date
+      const response = await api.get<ZZPInvoiceListResponse>('/zzp/invoices', { params })
+      return response.data
+    },
+
+    get: async (invoiceId: string): Promise<ZZPInvoice> => {
+      const response = await api.get<ZZPInvoice>(`/zzp/invoices/${invoiceId}`)
+      return response.data
+    },
+
+    create: async (data: ZZPInvoiceCreate): Promise<ZZPInvoice> => {
+      const response = await api.post<ZZPInvoice>('/zzp/invoices', data)
+      return response.data
+    },
+
+    update: async (invoiceId: string, data: ZZPInvoiceUpdate): Promise<ZZPInvoice> => {
+      const response = await api.put<ZZPInvoice>(`/zzp/invoices/${invoiceId}`, data)
+      return response.data
+    },
+
+    updateStatus: async (invoiceId: string, status: 'sent' | 'paid' | 'cancelled'): Promise<ZZPInvoice> => {
+      const response = await api.patch<ZZPInvoice>(`/zzp/invoices/${invoiceId}/status`, { status })
+      return response.data
+    },
+
+    delete: async (invoiceId: string): Promise<void> => {
+      await api.delete(`/zzp/invoices/${invoiceId}`)
+    },
+  },
+
+  // ------------ Expenses ------------
+  expenses: {
+    list: async (options?: {
+      category?: string
+      year?: number
+      month?: number
+      from_date?: string
+      to_date?: string
+    }): Promise<ZZPExpenseListResponse> => {
+      const params: Record<string, string | number> = {}
+      if (options?.category) params.category = options.category
+      if (options?.year) params.year = options.year
+      if (options?.month) params.month = options.month
+      if (options?.from_date) params.from_date = options.from_date
+      if (options?.to_date) params.to_date = options.to_date
+      const response = await api.get<ZZPExpenseListResponse>('/zzp/expenses', { params })
+      return response.data
+    },
+
+    get: async (expenseId: string): Promise<ZZPExpense> => {
+      const response = await api.get<ZZPExpense>(`/zzp/expenses/${expenseId}`)
+      return response.data
+    },
+
+    create: async (data: ZZPExpenseCreate): Promise<ZZPExpense> => {
+      const response = await api.post<ZZPExpense>('/zzp/expenses', data)
+      return response.data
+    },
+
+    update: async (expenseId: string, data: ZZPExpenseUpdate): Promise<ZZPExpense> => {
+      const response = await api.put<ZZPExpense>(`/zzp/expenses/${expenseId}`, data)
+      return response.data
+    },
+
+    delete: async (expenseId: string): Promise<void> => {
+      await api.delete(`/zzp/expenses/${expenseId}`)
+    },
+
+    getCategories: async (): Promise<{ categories: string[] }> => {
+      const response = await api.get<{ categories: string[] }>('/zzp/expenses/categories/list')
+      return response.data
+    },
+  },
+
+  // ------------ Time Entries ------------
+  timeEntries: {
+    list: async (options?: {
+      project_name?: string
+      customer_id?: string
+      billable?: boolean
+      from_date?: string
+      to_date?: string
+    }): Promise<ZZPTimeEntryListResponse> => {
+      const params: Record<string, string | boolean> = {}
+      if (options?.project_name) params.project_name = options.project_name
+      if (options?.customer_id) params.customer_id = options.customer_id
+      if (options?.billable !== undefined) params.billable = options.billable
+      if (options?.from_date) params.from_date = options.from_date
+      if (options?.to_date) params.to_date = options.to_date
+      const response = await api.get<ZZPTimeEntryListResponse>('/zzp/time-entries', { params })
+      return response.data
+    },
+
+    getWeekly: async (weekOf?: string): Promise<ZZPWeeklyTimeSummary> => {
+      const params: Record<string, string> = {}
+      if (weekOf) params.week_of = weekOf
+      const response = await api.get<ZZPWeeklyTimeSummary>('/zzp/time-entries/weekly', { params })
+      return response.data
+    },
+
+    get: async (entryId: string): Promise<ZZPTimeEntry> => {
+      const response = await api.get<ZZPTimeEntry>(`/zzp/time-entries/${entryId}`)
+      return response.data
+    },
+
+    create: async (data: ZZPTimeEntryCreate): Promise<ZZPTimeEntry> => {
+      const response = await api.post<ZZPTimeEntry>('/zzp/time-entries', data)
+      return response.data
+    },
+
+    update: async (entryId: string, data: ZZPTimeEntryUpdate): Promise<ZZPTimeEntry> => {
+      const response = await api.put<ZZPTimeEntry>(`/zzp/time-entries/${entryId}`, data)
+      return response.data
+    },
+
+    delete: async (entryId: string): Promise<void> => {
+      await api.delete(`/zzp/time-entries/${entryId}`)
+    },
+  },
+
+  // ------------ Calendar Events ------------
+  calendarEvents: {
+    list: async (options?: {
+      year?: number
+      month?: number
+      from_date?: string
+      to_date?: string
+    }): Promise<ZZPCalendarEventListResponse> => {
+      const params: Record<string, string | number> = {}
+      if (options?.year) params.year = options.year
+      if (options?.month) params.month = options.month
+      if (options?.from_date) params.from_date = options.from_date
+      if (options?.to_date) params.to_date = options.to_date
+      const response = await api.get<ZZPCalendarEventListResponse>('/zzp/calendar-events', { params })
+      return response.data
+    },
+
+    get: async (eventId: string): Promise<ZZPCalendarEvent> => {
+      const response = await api.get<ZZPCalendarEvent>(`/zzp/calendar-events/${eventId}`)
+      return response.data
+    },
+
+    create: async (data: ZZPCalendarEventCreate): Promise<ZZPCalendarEvent> => {
+      const response = await api.post<ZZPCalendarEvent>('/zzp/calendar-events', data)
+      return response.data
+    },
+
+    update: async (eventId: string, data: ZZPCalendarEventUpdate): Promise<ZZPCalendarEvent> => {
+      const response = await api.put<ZZPCalendarEvent>(`/zzp/calendar-events/${eventId}`, data)
+      return response.data
+    },
+
+    delete: async (eventId: string): Promise<void> => {
+      await api.delete(`/zzp/calendar-events/${eventId}`)
+    },
+  },
+
+  // ------------ Links / Consent (from zzpConsentApi) ------------
+  ...zzpConsentApi,
 }

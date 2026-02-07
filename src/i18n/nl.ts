@@ -286,6 +286,10 @@ export const nl = {
     viewDetails: "Bekijk details",
     customerDetails: "Klantgegevens",
     noDetailsAvailable: "Geen extra gegevens beschikbaar",
+    // Error messages
+    errorLoadingCustomers: "Fout bij het laden van klanten",
+    errorSavingCustomer: "Fout bij het opslaan van klant",
+    errorDeletingCustomer: "Fout bij het verwijderen van klant",
   },
 
   // ZZP Invoices page

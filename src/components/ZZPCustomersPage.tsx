@@ -82,9 +82,12 @@ import {
   Buildings,
   Bank,
   IdentificationCard,
+  Receipt,
+  ArrowRight,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { zzpApi, ZZPCustomer, ZZPCustomerCreate, ZZPCustomerUpdate } from '@/lib/api'
+import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -198,9 +201,11 @@ const CustomerFormDialog = ({
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [contactPerson, setContactPerson] = useState('')
   
   // Address fields
   const [addressStreet, setAddressStreet] = useState('')
+  const [addressLine2, setAddressLine2] = useState('')
   const [addressPostalCode, setAddressPostalCode] = useState('')
   const [addressCity, setAddressCity] = useState('')
   const [addressCountry, setAddressCountry] = useState('')
@@ -211,6 +216,10 @@ const CustomerFormDialog = ({
   
   // Bank fields
   const [iban, setIban] = useState('')
+  const [bankBic, setBankBic] = useState('')
+  
+  // Notes
+  const [notes, setNotes] = useState('')
   
   // Status
   const [status, setStatus] = useState<'active' | 'inactive'>('active')
@@ -221,6 +230,7 @@ const CustomerFormDialog = ({
   const [kvkError, setKvkError] = useState('')
   const [btwError, setBtwError] = useState('')
   const [ibanError, setIbanError] = useState('')
+  const [bicError, setBicError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Reset form when dialog opens/closes or customer changes
@@ -230,25 +240,33 @@ const CustomerFormDialog = ({
         setName(customer.name)
         setEmail(customer.email || '')
         setPhone(customer.phone || '')
+        setContactPerson(customer.contact_person || '')
         setAddressStreet(customer.address_street || '')
+        setAddressLine2(customer.address_line2 || '')
         setAddressPostalCode(customer.address_postal_code || '')
         setAddressCity(customer.address_city || '')
         setAddressCountry(customer.address_country || '')
         setKvkNumber(customer.kvk_number || '')
         setBtwNumber(customer.btw_number || '')
         setIban(customer.iban || '')
+        setBankBic(customer.bank_bic || '')
+        setNotes(customer.notes || '')
         setStatus(customer.status)
       } else {
         setName('')
         setEmail('')
         setPhone('')
+        setContactPerson('')
         setAddressStreet('')
+        setAddressLine2('')
         setAddressPostalCode('')
         setAddressCity('')
         setAddressCountry('')
         setKvkNumber('')
         setBtwNumber('')
         setIban('')
+        setBankBic('')
+        setNotes('')
         setStatus('active')
       }
       // Clear errors
@@ -257,6 +275,7 @@ const CustomerFormDialog = ({
       setKvkError('')
       setBtwError('')
       setIbanError('')
+      setBicError('')
       setIsSubmitting(false)
     }
   }, [open, customer])
@@ -283,6 +302,12 @@ const CustomerFormDialog = ({
     if (!value) return true // Optional field
     const cleaned = value.replace(/\s/g, '').toUpperCase()
     return /^[A-Z]{2}[0-9]{2}[A-Z0-9]{4,30}$/.test(cleaned)
+  }
+
+  const validateBic = (value: string): boolean => {
+    if (!value) return true // Optional field
+    const cleaned = value.replace(/\s/g, '').toUpperCase()
+    return /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(cleaned)
   }
 
   const handleSave = async () => {
@@ -318,6 +343,12 @@ const CustomerFormDialog = ({
       hasError = true
     }
 
+    // Validate BIC
+    if (bankBic && !validateBic(bankBic)) {
+      setBicError(t('zzpCustomers.formBicInvalid'))
+      hasError = true
+    }
+
     if (hasError) return
 
     setIsSubmitting(true)
@@ -327,13 +358,17 @@ const CustomerFormDialog = ({
         name: name.trim(),
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
+        contact_person: contactPerson.trim() || undefined,
         address_street: addressStreet.trim() || undefined,
+        address_line2: addressLine2.trim() || undefined,
         address_postal_code: addressPostalCode.trim().toUpperCase().replace(/\s/g, '') || undefined,
         address_city: addressCity.trim() || undefined,
         address_country: addressCountry.trim() || undefined,
         kvk_number: kvkNumber.replace(/\s/g, '') || undefined,
         btw_number: btwNumber.replace(/[\s.]/g, '').toUpperCase() || undefined,
         iban: iban.replace(/\s/g, '').toUpperCase() || undefined,
+        bank_bic: bankBic.replace(/\s/g, '').toUpperCase() || undefined,
+        notes: notes.trim() || undefined,
         status,
       })
     } finally {
@@ -345,7 +380,8 @@ const CustomerFormDialog = ({
     (!email || validateEmail(email)) && 
     (!kvkNumber || validateKvk(kvkNumber)) &&
     (!btwNumber || validateBtw(btwNumber)) &&
-    (!iban || validateIban(iban))
+    (!iban || validateIban(iban)) &&
+    (!bankBic || validateBic(bankBic))
 
   // Section header component
   const SectionHeader = ({ title }: { title: string }) => (
@@ -454,6 +490,22 @@ const CustomerFormDialog = ({
             </div>
           </div>
 
+          {/* Contact person field */}
+          <div className="space-y-2">
+            <Label htmlFor="customer-contact-person" className="text-sm font-medium">
+              {t('zzpCustomers.formContactPerson')}
+              <OptionalLabel />
+            </Label>
+            <Input
+              id="customer-contact-person"
+              placeholder={t('zzpCustomers.formContactPersonPlaceholder')}
+              value={contactPerson}
+              onChange={(e) => setContactPerson(e.target.value)}
+              className="h-11"
+              disabled={isSubmitting}
+            />
+          </div>
+
           {/* ==================== ADDRESS SECTION ==================== */}
           <SectionHeader title={t('zzpCustomers.sectionAddress')} />
           
@@ -467,6 +519,22 @@ const CustomerFormDialog = ({
               placeholder={t('zzpCustomers.formAddressStreetPlaceholder')}
               value={addressStreet}
               onChange={(e) => setAddressStreet(e.target.value)}
+              className="h-11"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          {/* Secondary address line */}
+          <div className="space-y-2">
+            <Label htmlFor="customer-address-line2" className="text-sm font-medium">
+              {t('zzpCustomers.formAddressLine2')}
+              <OptionalLabel />
+            </Label>
+            <Input
+              id="customer-address-line2"
+              placeholder={t('zzpCustomers.formAddressLine2Placeholder')}
+              value={addressLine2}
+              onChange={(e) => setAddressLine2(e.target.value)}
               className="h-11"
               disabled={isSubmitting}
             />
@@ -572,28 +640,72 @@ const CustomerFormDialog = ({
           {/* ==================== BANK SECTION ==================== */}
           <SectionHeader title={t('zzpCustomers.sectionBank')} />
           
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="customer-iban" className="text-sm font-medium">
+                {t('zzpCustomers.formIban')}
+                <OptionalLabel />
+              </Label>
+              <Input
+                id="customer-iban"
+                placeholder={t('zzpCustomers.formIbanPlaceholder')}
+                value={iban}
+                onChange={(e) => {
+                  setIban(e.target.value)
+                  setIbanError('')
+                }}
+                className={`h-11 ${ibanError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                disabled={isSubmitting}
+              />
+              {ibanError && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <XCircle size={14} />
+                  {ibanError}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="customer-bic" className="text-sm font-medium">
+                {t('zzpCustomers.formBic')}
+                <OptionalLabel />
+              </Label>
+              <Input
+                id="customer-bic"
+                placeholder={t('zzpCustomers.formBicPlaceholder')}
+                value={bankBic}
+                onChange={(e) => {
+                  setBankBic(e.target.value)
+                  setBicError('')
+                }}
+                className={`h-11 ${bicError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                disabled={isSubmitting}
+              />
+              {bicError && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <XCircle size={14} />
+                  {bicError}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* ==================== NOTES SECTION ==================== */}
+          <SectionHeader title={t('zzpCustomers.sectionNotes')} />
+          
           <div className="space-y-2">
-            <Label htmlFor="customer-iban" className="text-sm font-medium">
-              {t('zzpCustomers.formIban')}
+            <Label htmlFor="customer-notes" className="text-sm font-medium">
+              {t('zzpCustomers.formNotes')}
               <OptionalLabel />
             </Label>
-            <Input
-              id="customer-iban"
-              placeholder={t('zzpCustomers.formIbanPlaceholder')}
-              value={iban}
-              onChange={(e) => {
-                setIban(e.target.value)
-                setIbanError('')
-              }}
-              className={`h-11 ${ibanError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+            <textarea
+              id="customer-notes"
+              placeholder={t('zzpCustomers.formNotesPlaceholder')}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
               disabled={isSubmitting}
             />
-            {ibanError && (
-              <p className="text-sm text-destructive flex items-center gap-1">
-                <XCircle size={14} />
-                {ibanError}
-              </p>
-            )}
           </div>
 
           {/* ==================== STATUS SECTION ==================== */}
@@ -708,6 +820,7 @@ const CustomerDetailSheet = ({
   const formatAddress = () => {
     const parts = [
       customer.address_street,
+      customer.address_line2,
       [customer.address_postal_code, customer.address_city].filter(Boolean).join(' '),
       customer.address_country,
     ].filter(Boolean)
@@ -729,10 +842,11 @@ const CustomerDetailSheet = ({
   }
 
   const address = formatAddress()
-  const hasContactDetails = customer.email || customer.phone
+  const hasContactDetails = customer.email || customer.phone || customer.contact_person
   const hasAddressDetails = address
   const hasBusinessDetails = customer.kvk_number || customer.btw_number
-  const hasBankDetails = customer.iban
+  const hasBankDetails = customer.iban || customer.bank_bic
+  const hasNotes = customer.notes
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -761,6 +875,7 @@ const CustomerDetailSheet = ({
               <div className="bg-secondary/30 rounded-lg p-3 space-y-1">
                 <DetailRow label={t('zzpCustomers.formEmail')} value={customer.email} icon={Envelope} />
                 <DetailRow label={t('zzpCustomers.formPhone')} value={customer.phone} icon={Phone} />
+                <DetailRow label={t('zzpCustomers.formContactPerson')} value={customer.contact_person} icon={Users} />
               </div>
             </div>
           )}
@@ -796,14 +911,27 @@ const CustomerDetailSheet = ({
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                 {t('zzpCustomers.sectionBank')}
               </h4>
-              <div className="bg-secondary/30 rounded-lg p-3">
+              <div className="bg-secondary/30 rounded-lg p-3 space-y-1">
                 <DetailRow label={t('zzpCustomers.formIban')} value={customer.iban} icon={Bank} />
+                <DetailRow label={t('zzpCustomers.formBic')} value={customer.bank_bic} icon={Bank} />
+              </div>
+            </div>
+          )}
+
+          {/* Notes Section */}
+          {hasNotes && (
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                {t('zzpCustomers.sectionNotes')}
+              </h4>
+              <div className="bg-secondary/30 rounded-lg p-3">
+                <p className="text-sm whitespace-pre-wrap">{customer.notes}</p>
               </div>
             </div>
           )}
 
           {/* Show message if no extra details */}
-          {!hasContactDetails && !hasAddressDetails && !hasBusinessDetails && !hasBankDetails && (
+          {!hasContactDetails && !hasAddressDetails && !hasBusinessDetails && !hasBankDetails && !hasNotes && (
             <div className="text-center py-8 text-muted-foreground">
               <IdentificationCard size={40} className="mx-auto mb-3 opacity-50" weight="duotone" />
               <p className="text-sm">{t('zzpCustomers.noDetailsAvailable')}</p>
@@ -931,6 +1059,10 @@ export const ZZPCustomersPage = () => {
   const [editingCustomer, setEditingCustomer] = useState<ZZPCustomer | undefined>()
   const [deletingCustomer, setDeletingCustomer] = useState<ZZPCustomer | undefined>()
   const [viewingCustomer, setViewingCustomer] = useState<ZZPCustomer | undefined>()
+  
+  // Success dialog state (for CTA after creating customer)
+  const [newlyCreatedCustomer, setNewlyCreatedCustomer] = useState<ZZPCustomer | undefined>()
+  const [showCreateInvoiceCta, setShowCreateInvoiceCta] = useState(false)
 
   // Load customers from API
   const loadCustomers = useCallback(async () => {
@@ -993,9 +1125,10 @@ export const ZZPCustomersPage = () => {
         await zzpApi.customers.update(editingCustomer.id, data as ZZPCustomerUpdate)
         toast.success(t('zzpCustomers.customerSaved'))
       } else {
-        // Add new
-        await zzpApi.customers.create(data)
-        toast.success(t('zzpCustomers.customerSaved'))
+        // Add new - show CTA to create invoice
+        const newCustomer = await zzpApi.customers.create(data)
+        setNewlyCreatedCustomer(newCustomer)
+        setShowCreateInvoiceCta(true)
       }
 
       // Reload customers list
@@ -1008,6 +1141,23 @@ export const ZZPCustomersPage = () => {
       toast.error(t('zzpCustomers.errorSavingCustomer'))
     }
   }, [user?.id, editingCustomer, loadCustomers])
+
+  // Handle navigation to invoices with pre-selected customer
+  const handleCreateInvoiceForCustomer = useCallback(() => {
+    if (newlyCreatedCustomer) {
+      // Navigate to invoices page with customer_id in the URL params
+      navigateTo(`/zzp/invoices?customer_id=${newlyCreatedCustomer.id}`)
+    }
+    setShowCreateInvoiceCta(false)
+    setNewlyCreatedCustomer(undefined)
+  }, [newlyCreatedCustomer])
+
+  // Dismiss the CTA dialog
+  const handleDismissCreateInvoiceCta = useCallback(() => {
+    toast.success(t('zzpCustomers.customerSaved'))
+    setShowCreateInvoiceCta(false)
+    setNewlyCreatedCustomer(undefined)
+  }, [])
 
   // Handle delete customer
   const handleDeleteCustomer = useCallback(async () => {
@@ -1276,6 +1426,40 @@ export const ZZPCustomersPage = () => {
         onConfirm={handleDeleteCustomer}
         customerName={deletingCustomer?.name || ''}
       />
+
+      {/* Success CTA dialog - offer to create invoice for new customer */}
+      <AlertDialog open={showCreateInvoiceCta} onOpenChange={(open) => {
+        if (!open) handleDismissCreateInvoiceCta()
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-12 w-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+                <CheckCircle size={28} className="text-green-600" weight="duotone" />
+              </div>
+              <div>
+                <AlertDialogTitle className="text-left">{t('zzpCustomers.customerCreatedTitle')}</AlertDialogTitle>
+                {newlyCreatedCustomer && (
+                  <p className="text-sm text-muted-foreground font-medium">{newlyCreatedCustomer.name}</p>
+                )}
+              </div>
+            </div>
+            <AlertDialogDescription>
+              {t('zzpCustomers.customerCreatedMessage')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel onClick={handleDismissCreateInvoiceCta}>
+              {t('zzpCustomers.maybeLater')}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleCreateInvoiceForCustomer} className="gap-2">
+              <Receipt size={18} weight="duotone" />
+              {t('zzpCustomers.createInvoiceForCustomer')}
+              <ArrowRight size={18} />
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

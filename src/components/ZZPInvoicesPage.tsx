@@ -288,6 +288,7 @@ const InvoiceFormDialog = ({
   businessProfile,
   onSave,
   isReadOnly = false,
+  preSelectedCustomerId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -296,6 +297,7 @@ const InvoiceFormDialog = ({
   businessProfile: ZZPBusinessProfile | null
   onSave: (data: ZZPInvoiceCreate, isEdit: boolean) => Promise<void>
   isReadOnly?: boolean
+  preSelectedCustomerId?: string | null
 }) => {
   const isEdit = !!invoice
   const [customerId, setCustomerId] = useState('')
@@ -337,7 +339,8 @@ const InvoiceFormDialog = ({
           setLines([createEmptyLine()])
         }
       } else {
-        setCustomerId('')
+        // New invoice - use pre-selected customer if available
+        setCustomerId(preSelectedCustomerId || '')
         setIssueDate(extractDatePart(new Date().toISOString()))
         setDueDate('')
         setNotes('')
@@ -348,7 +351,7 @@ const InvoiceFormDialog = ({
       setLinesError('')
       setIsSubmitting(false)
     }
-  }, [open, invoice])
+  }, [open, invoice, preSelectedCustomerId])
 
   // Add new line
   const addLine = () => {
@@ -554,14 +557,31 @@ const InvoiceFormDialog = ({
             </div>
           ) : (
             <div className="space-y-2">
-              <Label className="text-sm font-medium">{t('zzpInvoices.formCustomer')}</Label>
-              <div className="flex items-center gap-3 p-3 bg-secondary/50 rounded-xl border border-border/50">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Users size={16} className="text-primary" />
-                </div>
-                <span className="font-medium">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Users size={14} className="text-muted-foreground" />
+                {t('zzpInvoices.customerDetails')}
+              </Label>
+              <div className="bg-secondary/30 rounded-lg p-4 space-y-2 text-sm">
+                <p className="font-semibold">
                   {invoice?.customer_name || customers.find(c => c.id === invoice?.customer_id)?.name || t('zzpInvoices.unknownCustomer')}
-                </span>
+                </p>
+                {invoice?.customer_address_street && (
+                  <p className="text-muted-foreground">{invoice.customer_address_street}</p>
+                )}
+                {(invoice?.customer_address_postal_code || invoice?.customer_address_city) && (
+                  <p className="text-muted-foreground">
+                    {[invoice?.customer_address_postal_code, invoice?.customer_address_city].filter(Boolean).join(' ')}
+                  </p>
+                )}
+                {invoice?.customer_address_country && (
+                  <p className="text-muted-foreground">{invoice.customer_address_country}</p>
+                )}
+                {invoice?.customer_kvk_number && (
+                  <p className="text-muted-foreground">KVK: {invoice.customer_kvk_number}</p>
+                )}
+                {invoice?.customer_btw_number && (
+                  <p className="text-muted-foreground">BTW: {invoice.customer_btw_number}</p>
+                )}
               </div>
             </div>
           )}
@@ -1118,6 +1138,11 @@ export const ZZPInvoicesPage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
+  // Pre-selected customer ID from URL (for CTA from customers page)
+  const [preSelectedCustomerId, setPreSelectedCustomerId] = useState<string | null>(null)
+  // Customer ID to pass to dialog (keeps value until dialog closes)
+  const [dialogCustomerId, setDialogCustomerId] = useState<string | null>(null)
+  
   // Debounced search for better performance
   const debouncedSearch = useDebounce(searchQuery, 300)
   
@@ -1126,6 +1151,17 @@ export const ZZPInvoicesPage = () => {
   const [editingInvoice, setEditingInvoice] = useState<ZZPInvoice | undefined>()
   const [viewingInvoice, setViewingInvoice] = useState<ZZPInvoice | undefined>()
   const [deletingInvoice, setDeletingInvoice] = useState<ZZPInvoice | undefined>()
+
+  // Check for customer_id in URL params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const customerId = params.get('customer_id')
+    if (customerId) {
+      setPreSelectedCustomerId(customerId)
+      // Clear the URL param after reading it
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   // Load data from API
   const loadData = useCallback(async () => {
@@ -1157,6 +1193,19 @@ export const ZZPInvoicesPage = () => {
   useEffect(() => {
     loadData()
   }, [loadData])
+  
+  // Auto-open form when pre-selected customer ID is set and data is loaded
+  useEffect(() => {
+    if (preSelectedCustomerId && customers.length > 0 && !isLoading) {
+      // Check if customer exists
+      const customer = customers.find(c => c.id === preSelectedCustomerId)
+      if (customer && customer.status === 'active') {
+        setDialogCustomerId(preSelectedCustomerId)
+        setIsFormOpen(true)
+      }
+      setPreSelectedCustomerId(null) // Clear URL param after opening
+    }
+  }, [preSelectedCustomerId, customers, isLoading])
 
   // Create customer lookup map
   const customerMap = useMemo(() => {
@@ -1546,6 +1595,7 @@ export const ZZPInvoicesPage = () => {
           if (!open) {
             setEditingInvoice(undefined)
             setViewingInvoice(undefined)
+            setDialogCustomerId(null) // Clear pre-selected customer when dialog closes
           }
         }}
         invoice={editingInvoice || viewingInvoice}
@@ -1553,6 +1603,7 @@ export const ZZPInvoicesPage = () => {
         businessProfile={businessProfile}
         onSave={handleSaveInvoice}
         isReadOnly={!!viewingInvoice}
+        preSelectedCustomerId={dialogCustomerId}
       />
 
       {/* Delete confirmation dialog */}

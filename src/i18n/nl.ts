@@ -330,6 +330,9 @@ export const nl = {
     formStatus: "Status",
     formNotes: "Notities",
     formNotesPlaceholder: "Optionele opmerkingen...",
+    // Seller details
+    sellerDetails: "Verzendergegevens",
+    noBusinessProfile: "Vul je bedrijfsprofiel in via Instellingen om verzendergegevens op facturen te tonen.",
     // Actions
     saveInvoice: "Factuur opslaan",
     deleteInvoice: "Factuur verwijderen",

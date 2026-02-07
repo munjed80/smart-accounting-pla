@@ -4,6 +4,7 @@
  * Full CRUD functionality for managing invoices.
  * Data is stored in localStorage per user.
  * Invoices are linked to customers.
+ * Now includes seller snapshot from Business Profile.
  * 
  * Premium UI with:
  * - Stats mini-cards
@@ -11,6 +12,7 @@
  * - Responsive table/card design
  * - Better form grouping
  * - Loading/skeleton states
+ * - Seller details preview from Business Profile
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
@@ -21,6 +23,8 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Table, 
   TableBody, 
@@ -74,6 +78,8 @@ import {
   Wallet,
   SpinnerGap,
   XCircle,
+  Buildings,
+  Info,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { navigateTo } from '@/lib/navigation'
@@ -82,11 +88,14 @@ import {
   InvoiceInput,
   InvoiceUpdate,
   Customer,
+  BusinessProfile,
   listInvoices, 
   addInvoice, 
   updateInvoice, 
   removeInvoice,
   listCustomers,
+  getBusinessProfile,
+  createSellerSnapshot,
   formatAmountEUR,
   formatDate,
 } from '@/lib/storage/zzp'
@@ -234,12 +243,14 @@ const InvoiceFormDialog = ({
   onOpenChange,
   invoice,
   customers,
+  businessProfile,
   onSave,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   invoice?: Invoice
   customers: Customer[]
+  businessProfile: BusinessProfile | null
   onSave: (data: InvoiceInput | InvoiceUpdate, isEdit: boolean) => void
 }) => {
   const isEdit = !!invoice
@@ -334,7 +345,8 @@ const InvoiceFormDialog = ({
       }
       onSave(updateData, true)
     } else {
-      // Create new
+      // Create new - include seller snapshot from business profile
+      const sellerSnapshot = createSellerSnapshot(businessProfile)
       const inputData: InvoiceInput = {
         customerId,
         date: new Date(date).toISOString(),
@@ -343,6 +355,7 @@ const InvoiceFormDialog = ({
         currency: 'EUR',
         status,
         notes: notes.trim() || undefined,
+        ...sellerSnapshot,
       }
       onSave(inputData, false)
     }
@@ -531,6 +544,46 @@ const InvoiceFormDialog = ({
               </Select>
             </div>
           </div>
+
+          {/* Seller Details Preview (for new invoices only) */}
+          {!isEdit && (
+            <div className="space-y-3">
+              <Separator />
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Buildings size={14} className="text-muted-foreground" />
+                {t('zzpInvoices.sellerDetails')}
+              </Label>
+              {businessProfile ? (
+                <div className="bg-secondary/30 rounded-lg p-4 space-y-2 text-sm">
+                  <p className="font-semibold">{businessProfile.company_name}</p>
+                  {businessProfile.address_street && (
+                    <p className="text-muted-foreground">{businessProfile.address_street}</p>
+                  )}
+                  {(businessProfile.address_postal_code || businessProfile.address_city) && (
+                    <p className="text-muted-foreground">
+                      {[businessProfile.address_postal_code, businessProfile.address_city].filter(Boolean).join(' ')}
+                    </p>
+                  )}
+                  {businessProfile.kvk_number && (
+                    <p className="text-muted-foreground">KVK: {businessProfile.kvk_number}</p>
+                  )}
+                  {businessProfile.btw_number && (
+                    <p className="text-muted-foreground">BTW: {businessProfile.btw_number}</p>
+                  )}
+                  {businessProfile.iban && (
+                    <p className="text-muted-foreground">IBAN: {businessProfile.iban}</p>
+                  )}
+                </div>
+              ) : (
+                <Alert>
+                  <Info size={16} />
+                  <AlertDescription>
+                    {t('zzpInvoices.noBusinessProfile')}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
 
           {/* Notes field */}
           <div className="space-y-2">
@@ -738,6 +791,7 @@ export const ZZPInvoicesPage = () => {
   const { user } = useAuth()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | InvoiceStatus>('all')
   const [isLoading, setIsLoading] = useState(true)
@@ -757,6 +811,7 @@ export const ZZPInvoicesPage = () => {
       // Load data synchronously from localStorage
       setInvoices(listInvoices(user.id))
       setCustomers(listCustomers(user.id))
+      setBusinessProfile(getBusinessProfile(user.id))
       setIsLoading(false)
     }
   }, [user?.id])
@@ -1114,6 +1169,7 @@ export const ZZPInvoicesPage = () => {
         }}
         invoice={editingInvoice}
         customers={customers}
+        businessProfile={businessProfile}
         onSave={handleSaveInvoice}
       />
 

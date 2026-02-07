@@ -99,7 +99,7 @@ export const ZZPInvoicesPage = () => {
             {t('zzpInvoices.title')}
           </CardTitle>
           <CardDescription>
-            {t('zzpInvoices.noInvoicesDescription')}
+            {t('zzpInvoices.description')}
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -74,7 +74,7 @@ export const ZZPCustomersPage = () => {
             {t('zzpCustomers.title')}
           </CardTitle>
           <CardDescription>
-            {t('zzpCustomers.noCustomersDescription')}
+            {t('zzpCustomers.description')}
           </CardDescription>
         </CardHeader>
         <CardContent>

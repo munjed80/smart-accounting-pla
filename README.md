@@ -340,6 +340,34 @@ After deployment, verify the end-to-end flow works correctly:
    - If a document fails processing, verify error message is shown
    - Click "Reprocess" to retry processing
 
+## ZZP Save Verification
+
+Manual checklist to verify all save operations work correctly with user feedback:
+
+1. **Update company profile** (Instellingen → Bedrijfsprofiel)
+   - Edit company name and save → expect "Bedrijfsprofiel opgeslagen" toast
+
+2. **Create customer** (Klanten → Nieuwe klant)
+   - Fill in customer form and save → expect success toast + confirmation dialog
+
+3. **Create invoice** (Facturen → Nieuwe factuur)
+   - Add invoice lines and save → expect "Factuur opgeslagen" toast
+
+4. **Add hours** (Uren → Nieuwe registratie)
+   - Fill in time entry and save → expect "Urenregistratie opgeslagen" toast
+
+5. **Add agenda item** (Agenda → Nieuwe afspraak)
+   - Create calendar event and save → expect "Afspraak opgeslagen" toast
+
+### Invoice Actions Status
+
+| Action | Status | Notes |
+|--------|--------|-------|
+| View/Edit | ✅ Active | Opens invoice in dialog |
+| Delete | ✅ Active | Only for draft invoices |
+| Download/Print | ✅ Active | Opens print dialog via browser |
+| Send via Email | ⏳ Binnenkort | Email infrastructure not implemented |
+
 ## How to Test Sections
 
 The platform includes the following pages/sections that can be accessed via URL or menu navigation:

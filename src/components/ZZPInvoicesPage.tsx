@@ -70,7 +70,6 @@ import {
   CurrencyEur,
   CalendarBlank,
   NotePencil,
-  Coins,
   Hourglass,
   Wallet,
   SpinnerGap,
@@ -93,23 +92,7 @@ import {
 } from '@/lib/storage/zzp'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
-
-// Debounce hook
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value)
-  
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value)
-    }, delay)
-    
-    return () => {
-      clearTimeout(handler)
-    }
-  }, [value, delay])
-  
-  return debouncedValue
-}
+import { useDebounce } from '@/hooks/useDebounce'
 
 // Invoice status types
 type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue'
@@ -313,7 +296,7 @@ const InvoiceFormDialog = ({
     return Math.round(parsed * 100)
   }
 
-  const handleSave = async () => {
+  const handleSave = () => {
     let hasError = false
 
     // Validate customer (only required for new invoices)
@@ -338,9 +321,6 @@ const InvoiceFormDialog = ({
     if (hasError) return
 
     setIsSubmitting(true)
-    
-    // Simulate brief processing time for UX
-    await new Promise(resolve => setTimeout(resolve, 200))
 
     if (isEdit) {
       // Update existing - don't include customerId
@@ -773,14 +753,11 @@ export const ZZPInvoicesPage = () => {
   // Load data from localStorage
   useEffect(() => {
     if (user?.id) {
-      // Simulate loading for UX
       setIsLoading(true)
-      const timer = setTimeout(() => {
-        setInvoices(listInvoices(user.id))
-        setCustomers(listCustomers(user.id))
-        setIsLoading(false)
-      }, 300)
-      return () => clearTimeout(timer)
+      // Load data synchronously from localStorage
+      setInvoices(listInvoices(user.id))
+      setCustomers(listCustomers(user.id))
+      setIsLoading(false)
     }
   }, [user?.id])
 

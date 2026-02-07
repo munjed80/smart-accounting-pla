@@ -80,23 +80,7 @@ import {
 } from '@/lib/storage/zzp'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
-
-// Debounce hook
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value)
-  
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value)
-    }, delay)
-    
-    return () => {
-      clearTimeout(handler)
-    }
-  }, [value, delay])
-  
-  return debouncedValue
-}
+import { useDebounce } from '@/hooks/useDebounce'
 
 // Status badge component
 const StatusBadge = ({ status, size = 'default' }: { status: 'active' | 'inactive'; size?: 'default' | 'sm' }) => {
@@ -230,14 +214,15 @@ const CustomerFormDialog = ({
     }
   }, [open, customer])
 
-  // Email validation
+  // Email validation with more comprehensive pattern
   const validateEmail = (value: string): boolean => {
     if (!value) return true // Optional field
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    // More comprehensive email validation
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
     return emailRegex.test(value)
   }
 
-  const handleSave = async () => {
+  const handleSave = () => {
     let hasError = false
     
     // Validate name
@@ -255,9 +240,6 @@ const CustomerFormDialog = ({
     if (hasError) return
 
     setIsSubmitting(true)
-    
-    // Simulate brief processing time for UX
-    await new Promise(resolve => setTimeout(resolve, 200))
 
     onSave({
       name: name.trim(),
@@ -550,13 +532,10 @@ export const ZZPCustomersPage = () => {
   // Load customers from localStorage
   useEffect(() => {
     if (user?.id) {
-      // Simulate loading for UX
       setIsLoading(true)
-      const timer = setTimeout(() => {
-        setCustomers(listCustomers(user.id))
-        setIsLoading(false)
-      }, 300)
-      return () => clearTimeout(timer)
+      // Load data synchronously from localStorage
+      setCustomers(listCustomers(user.id))
+      setIsLoading(false)
     }
   }, [user?.id])
 

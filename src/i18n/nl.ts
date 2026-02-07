@@ -150,6 +150,8 @@ export const nl = {
     documenten: "Documenten",
     boekingen: "Boekingen",
     boekhouder: "Boekhouder",
+    klanten: "Klanten",
+    facturen: "Facturen",
     backToOverzicht: "Terug naar Overzicht",
   },
 
@@ -1406,6 +1408,33 @@ export const nl = {
     administration: "Administratie",
     whatThisMeans: "Wat betekent dit?",
     approvalExplanation: "Als je goedkeurt, krijgt deze boekhouder toegang tot je financiële gegevens en kan deze je helpen met je boekhouding.",
+  },
+
+  // ZZP Customers page
+  zzpCustomers: {
+    title: "Klanten",
+    newCustomer: "Nieuwe klant",
+    columnName: "Naam",
+    columnEmail: "E-mail",
+    columnPhone: "Telefoon",
+    columnStatus: "Status",
+    buildCheck: "(Build check) This page is new",
+    noCustomers: "Nog geen klanten toegevoegd",
+    noCustomersDescription: "Voeg je eerste klant toe om te beginnen.",
+  },
+
+  // ZZP Invoices page
+  zzpInvoices: {
+    title: "Facturen",
+    newInvoice: "Nieuwe factuur",
+    columnNumber: "Nummer",
+    columnCustomer: "Klant",
+    columnDate: "Datum",
+    columnAmount: "Bedrag",
+    columnStatus: "Status",
+    buildCheck: "(Build check) This page is new",
+    noInvoices: "Nog geen facturen aangemaakt",
+    noInvoicesDescription: "Maak je eerste factuur aan om te beginnen.",
   },
 
   // Sidebar - additional items

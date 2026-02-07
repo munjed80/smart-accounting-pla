@@ -171,6 +171,22 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
+  // 5. Klanten (Customers)
+  {
+    label: t('sidebar.klanten'),
+    tabValue: 'zzp-customers',
+    icon: <UsersThree size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  // 6. Facturen (Invoices)
+  {
+    label: t('sidebar.facturen'),
+    tabValue: 'zzp-invoices',
+    icon: <FileText size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
   // === ZZP Secondary items ===
   // Settings
   {

@@ -13,6 +13,7 @@ export const nl = {
   // Common UI elements
   common: {
     save: "Opslaan",
+    saving: "Opslaan...",
     cancel: "Annuleren",
     close: "Sluiten",
     logout: "Uitloggen",
@@ -158,8 +159,12 @@ export const nl = {
   // ZZP Customers page
   zzpCustomers: {
     title: "Klanten",
+    pageDescription: "Beheer je klantenbestand en contactgegevens",
+    listTitle: "Klantenlijst",
     newCustomer: "Nieuwe klant",
     editCustomer: "Klant bewerken",
+    newCustomerDescription: "Voeg een nieuwe klant toe aan je administratie.",
+    editCustomerDescription: "Wijzig de gegevens van deze klant.",
     columnName: "Naam",
     columnEmail: "E-mail",
     columnPhone: "Telefoon",
@@ -168,17 +173,25 @@ export const nl = {
     noCustomers: "Nog geen klanten",
     noCustomersDescription: "Voeg je eerste klant toe om te beginnen met factureren.",
     addFirstCustomer: "Voeg eerste klant toe",
+    // Stats
+    statsTotal: "Totaal",
+    statsActive: "Actief",
+    statsInactive: "Inactief",
     // Form fields
     formName: "Naam",
     formNamePlaceholder: "Naam van de klant",
     formNameRequired: "Naam is verplicht",
     formEmail: "E-mail",
     formEmailPlaceholder: "email@voorbeeld.nl",
+    formEmailInvalid: "Ongeldig e-mailadres",
     formPhone: "Telefoon",
     formPhonePlaceholder: "+31 6 12345678",
     formStatus: "Status",
     formStatusActive: "Actief",
     formStatusInactive: "Inactief",
+    // Status descriptions
+    statusActiveDescription: "Klant kan facturen ontvangen",
+    statusInactiveDescription: "Klant is tijdelijk gedeactiveerd",
     // Actions
     saveCustomer: "Klant opslaan",
     deleteCustomer: "Klant verwijderen",
@@ -196,13 +209,18 @@ export const nl = {
     statusInactive: "Inactief",
     // Search results
     noCustomersFound: "Geen klanten gevonden",
+    tryDifferentSearch: "Probeer een andere zoekterm",
   },
 
   // ZZP Invoices page
   zzpInvoices: {
     title: "Facturen",
+    pageDescription: "Beheer je facturen en betalingsoverzicht",
+    listTitle: "Facturenlijst",
     newInvoice: "Nieuwe factuur",
     editInvoice: "Factuur bewerken",
+    newInvoiceDescription: "Maak een nieuwe factuur aan voor een klant.",
+    editInvoiceDescription: "Wijzig de gegevens van deze factuur.",
     columnNumber: "Nummer",
     columnCustomer: "Klant",
     columnDate: "Datum",
@@ -213,8 +231,16 @@ export const nl = {
     noInvoices: "Nog geen facturen",
     noInvoicesDescription: "Maak je eerste factuur aan voor een klant.",
     addFirstInvoice: "Maak eerste factuur",
-    noCustomersWarning: "Je hebt nog geen klanten. Voeg eerst een klant toe voordat je een factuur kunt maken.",
-    goToCustomers: "Ga naar Klanten",
+    noCustomersWarning: "Geen actieve klanten",
+    noCustomersWarningDescription: "Voeg eerst een klant toe voordat je een factuur kunt maken.",
+    goToCustomers: "Klanten beheren",
+    noActiveCustomers: "Geen actieve klanten beschikbaar",
+    // Stats
+    statsTotal: "Totaal",
+    statsOpen: "Openstaand",
+    statsPaid: "Betaald",
+    statsDraft: "Concept",
+    statsDraftSubtitle: "Nog niet verzonden",
     // Form fields
     formCustomer: "Klant",
     formCustomerPlaceholder: "Selecteer een klant",
@@ -224,7 +250,7 @@ export const nl = {
     formDueDate: "Vervaldatum",
     formAmount: "Bedrag (EUR)",
     formAmountPlaceholder: "0,00",
-    formAmountRequired: "Bedrag is verplicht",
+    formAmountRequired: "Voer een geldig bedrag in",
     formStatus: "Status",
     formNotes: "Notities",
     formNotesPlaceholder: "Optionele opmerkingen...",
@@ -235,9 +261,10 @@ export const nl = {
     deleteInvoiceWarning: "Dit kan niet ongedaan worden gemaakt.",
     invoiceSaved: "Factuur opgeslagen",
     invoiceDeleted: "Factuur verwijderd",
+    statusChanged: "Status gewijzigd",
     changeStatus: "Status wijzigen",
     // Search & Filter
-    searchPlaceholder: "Zoeken op nummer of klant...",
+    searchPlaceholder: "Zoeken op nummer, klant of bedrag...",
     filterAll: "Alle",
     filterDraft: "Concept",
     filterSent: "Verzonden",
@@ -250,6 +277,7 @@ export const nl = {
     statusOverdue: "Verlopen",
     // Search results
     noInvoicesFound: "Geen facturen gevonden",
+    tryDifferentSearch: "Probeer een andere zoekterm",
     unknownCustomer: "Onbekend",
   },
 

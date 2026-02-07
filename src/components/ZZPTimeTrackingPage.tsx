@@ -82,6 +82,9 @@ import {
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 
+// Sentinel value for "no customer" selection (empty string is not allowed in Radix Select v2+)
+const NO_CUSTOMER_VALUE = "__none__"
+
 // Hook for live timer display
 const useTimer = (startedAt: string | null) => {
   const [elapsed, setElapsed] = useState(0)
@@ -340,7 +343,7 @@ const TimeEntryFormDialog = ({
   const [description, setDescription] = useState('')
   const [hours, setHours] = useState('')
   const [projectName, setProjectName] = useState('')
-  const [customerId, setCustomerId] = useState('')
+  const [customerId, setCustomerId] = useState(NO_CUSTOMER_VALUE)
   const [hourlyRateCents, setHourlyRateCents] = useState('')
   const [billable, setBillable] = useState(true)
   
@@ -358,7 +361,7 @@ const TimeEntryFormDialog = ({
         setDescription(entry.description)
         setHours(entry.hours.toString())
         setProjectName(entry.project_name || '')
-        setCustomerId(entry.customer_id || '')
+        setCustomerId(entry.customer_id || NO_CUSTOMER_VALUE)
         setHourlyRateCents(entry.hourly_rate_cents ? (entry.hourly_rate_cents / 100).toString() : '')
         setBillable(entry.billable)
       } else {
@@ -367,7 +370,7 @@ const TimeEntryFormDialog = ({
         setDescription('')
         setHours('')
         setProjectName('')
-        setCustomerId('')
+        setCustomerId(NO_CUSTOMER_VALUE)
         setHourlyRateCents('')
         setBillable(true)
       }
@@ -407,13 +410,15 @@ const TimeEntryFormDialog = ({
 
     try {
       const rateNum = hourlyRateCents ? parseFloat(hourlyRateCents) : undefined
+      // Convert sentinel value back to undefined for API
+      const actualCustomerId = customerId === NO_CUSTOMER_VALUE ? undefined : customerId
       
       await onSave({
         entry_date: entryDate,
         description: description.trim(),
         hours: hoursNum,
         project_name: projectName.trim() || undefined,
-        customer_id: customerId || undefined,
+        customer_id: actualCustomerId || undefined,
         hourly_rate_cents: rateNum ? Math.round(rateNum * 100) : undefined,
         billable,
       })
@@ -570,9 +575,9 @@ const TimeEntryFormDialog = ({
                   <SelectValue placeholder={t('zzpTimeTracking.selectCustomer')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{t('zzpTimeTracking.noCustomer')}</SelectItem>
+                  <SelectItem value={NO_CUSTOMER_VALUE}>{t('zzpTimeTracking.noCustomer')}</SelectItem>
                   {customers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
+                    <SelectItem key={customer.id} value={String(customer.id)}>
                       {customer.name}
                     </SelectItem>
                   ))}

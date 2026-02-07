@@ -586,6 +586,7 @@ export const nl = {
     saveError: "Kon factuur niet opslaan",
     deleteError: "Kon factuur niet verwijderen",
     statusChangeError: "Kon status niet wijzigen",
+    formValidationError: "Vul alle verplichte velden correct in",
     // Search & Filter
     searchPlaceholder: "Zoeken op nummer, klant of bedrag...",
     filterAll: "Alle",

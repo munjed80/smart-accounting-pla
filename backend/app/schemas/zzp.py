@@ -24,6 +24,9 @@ KVK_PATTERN = re.compile(r'^[0-9]{8}$')
 # Dutch BTW pattern - NL + 9 digits + B + 2 digits (e.g., NL123456789B01)
 BTW_PATTERN = re.compile(r'^NL[0-9]{9}B[0-9]{2}$')
 
+# BIC/SWIFT pattern - 8 or 11 characters (bank code + country + location + optional branch)
+BIC_PATTERN = re.compile(r'^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$')
+
 
 # ============================================================================
 # Customer Schemas
@@ -33,11 +36,14 @@ class CustomerBase(BaseModel):
     """Base schema for customer data with validation."""
     name: str = Field(..., min_length=1, max_length=255, description="Customer or company name (required)")
     
+    # Contact
     email: Optional[str] = Field(None, max_length=255, description="Contact email address")
     phone: Optional[str] = Field(None, max_length=50, description="Contact phone number")
+    contact_person: Optional[str] = Field(None, max_length=255, description="Contact person name")
     
     # Address
     address_street: Optional[str] = Field(None, max_length=500, description="Street address with house number")
+    address_line2: Optional[str] = Field(None, max_length=500, description="Secondary address line (apt, suite, etc.)")
     address_postal_code: Optional[str] = Field(None, max_length=20, description="Postal/ZIP code")
     address_city: Optional[str] = Field(None, max_length=100, description="City name")
     address_country: Optional[str] = Field(None, max_length=100, description="Country (default: Nederland)")
@@ -48,6 +54,10 @@ class CustomerBase(BaseModel):
     
     # Bank
     iban: Optional[str] = Field(None, max_length=34, description="IBAN bank account number")
+    bank_bic: Optional[str] = Field(None, max_length=11, description="BIC/SWIFT code")
+    
+    # Notes
+    notes: Optional[str] = Field(None, max_length=2000, description="General notes about the customer")
     
     # Status
     status: str = Field("active", pattern=r'^(active|inactive)$', description="Customer status")
@@ -76,10 +86,18 @@ class CustomerBase(BaseModel):
                 raise ValueError("Invalid email format")
         return v if v else None
 
-    @field_validator('phone', 'address_street', 'address_city', 'address_country')
+    @field_validator('phone', 'address_street', 'address_line2', 'address_city', 'address_country', 'contact_person')
     @classmethod
     def trim_string_field(cls, v: Optional[str]) -> Optional[str]:
         """Trim whitespace from string fields."""
+        if v:
+            v = v.strip()
+        return v if v else None
+
+    @field_validator('notes')
+    @classmethod
+    def trim_notes(cls, v: Optional[str]) -> Optional[str]:
+        """Trim whitespace from notes field."""
         if v:
             v = v.strip()
         return v if v else None
@@ -128,6 +146,18 @@ class CustomerBase(BaseModel):
                 raise ValueError("Invalid IBAN format")
         return v if v else None
 
+    @field_validator('bank_bic')
+    @classmethod
+    def validate_bic(cls, v: Optional[str]) -> Optional[str]:
+        """Validate BIC/SWIFT format (8 or 11 characters)."""
+        if v:
+            v = v.strip().upper().replace(' ', '')
+            if not v:
+                return None
+            if not BIC_PATTERN.match(v):
+                raise ValueError("Invalid BIC/SWIFT code format (must be 8 or 11 characters)")
+        return v if v else None
+
 
 class CustomerCreate(CustomerBase):
     """Schema for creating a new customer."""
@@ -139,13 +169,17 @@ class CustomerUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     email: Optional[str] = Field(None, max_length=255)
     phone: Optional[str] = Field(None, max_length=50)
+    contact_person: Optional[str] = Field(None, max_length=255)
     address_street: Optional[str] = Field(None, max_length=500)
+    address_line2: Optional[str] = Field(None, max_length=500)
     address_postal_code: Optional[str] = Field(None, max_length=20)
     address_city: Optional[str] = Field(None, max_length=100)
     address_country: Optional[str] = Field(None, max_length=100)
     kvk_number: Optional[str] = Field(None, max_length=20)
     btw_number: Optional[str] = Field(None, max_length=30)
     iban: Optional[str] = Field(None, max_length=34)
+    bank_bic: Optional[str] = Field(None, max_length=11)
+    notes: Optional[str] = Field(None, max_length=2000)
     status: Optional[str] = Field(None, pattern=r'^(active|inactive)$')
 
     @field_validator('name')
@@ -170,9 +204,16 @@ class CustomerUpdate(BaseModel):
             return v
         return None
 
-    @field_validator('phone', 'address_street', 'address_city', 'address_country')
+    @field_validator('phone', 'address_street', 'address_line2', 'address_city', 'address_country', 'contact_person')
     @classmethod
     def trim_string_field(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip()
+        return v if v else None
+
+    @field_validator('notes')
+    @classmethod
+    def trim_notes(cls, v: Optional[str]) -> Optional[str]:
         if v:
             v = v.strip()
         return v if v else None
@@ -220,6 +261,18 @@ class CustomerUpdate(BaseModel):
             return v
         return None
 
+    @field_validator('bank_bic')
+    @classmethod
+    def validate_bic(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip().upper().replace(' ', '')
+            if not v:
+                return None
+            if not BIC_PATTERN.match(v):
+                raise ValueError("Invalid BIC/SWIFT code format")
+            return v
+        return None
+
 
 class CustomerResponse(BaseModel):
     """Schema for customer response."""
@@ -229,8 +282,10 @@ class CustomerResponse(BaseModel):
     name: str
     email: Optional[str] = None
     phone: Optional[str] = None
+    contact_person: Optional[str] = None
     
     address_street: Optional[str] = None
+    address_line2: Optional[str] = None
     address_postal_code: Optional[str] = None
     address_city: Optional[str] = None
     address_country: Optional[str] = None
@@ -238,6 +293,9 @@ class CustomerResponse(BaseModel):
     kvk_number: Optional[str] = None
     btw_number: Optional[str] = None
     iban: Optional[str] = None
+    bank_bic: Optional[str] = None
+    
+    notes: Optional[str] = None
     
     status: str
     

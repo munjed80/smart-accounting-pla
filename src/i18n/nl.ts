@@ -399,14 +399,20 @@ export const nl = {
     sectionAddress: "Adres",
     sectionBusiness: "Bedrijfsgegevens",
     sectionBank: "Bankgegevens",
+    sectionNotes: "Notities",
     formAddressStreet: "Straat en huisnummer",
     formAddressStreetPlaceholder: "Hoofdstraat 123",
+    formAddressLine2: "Adresregel 2",
+    formAddressLine2Placeholder: "Appartement, suite, gebouw, etc.",
     formAddressPostalCode: "Postcode",
     formAddressPostalCodePlaceholder: "1234 AB",
     formAddressCity: "Plaats",
     formAddressCityPlaceholder: "Amsterdam",
     formAddressCountry: "Land",
     formAddressCountryPlaceholder: "Nederland",
+    // Form fields - Contact
+    formContactPerson: "Contactpersoon",
+    formContactPersonPlaceholder: "Naam van de contactpersoon",
     // Form fields - Business IDs
     formKvk: "KVK-nummer",
     formKvkPlaceholder: "12345678",
@@ -418,6 +424,12 @@ export const nl = {
     formIban: "IBAN",
     formIbanPlaceholder: "NL00BANK0123456789",
     formIbanInvalid: "Ongeldig IBAN formaat",
+    formBic: "BIC/SWIFT",
+    formBicPlaceholder: "INGBNL2A",
+    formBicInvalid: "Ongeldig BIC/SWIFT code formaat",
+    // Form fields - Notes
+    formNotes: "Notities",
+    formNotesPlaceholder: "Algemene notities over deze klant...",
     // Helper texts
     helperOptional: "Optioneel",
     helperRequired: "Verplicht",
@@ -431,6 +443,11 @@ export const nl = {
     deleteCustomerWarning: "Dit kan niet ongedaan worden gemaakt. Alle gekoppelde facturen blijven bestaan.",
     customerSaved: "Klant opgeslagen",
     customerDeleted: "Klant verwijderd",
+    // CTA after creating customer
+    customerCreatedTitle: "Klant aangemaakt!",
+    customerCreatedMessage: "Je klant is succesvol aangemaakt. Wil je nu een factuur maken voor deze klant?",
+    createInvoiceForCustomer: "Maak factuur voor deze klant",
+    maybeLater: "Later",
     // Search & Filter
     searchPlaceholder: "Zoeken op naam, e-mail of telefoon...",
     filterAll: "Alle",
@@ -548,6 +565,15 @@ export const nl = {
     noInvoicesFound: "Geen facturen gevonden",
     tryDifferentSearch: "Probeer een andere zoekterm",
     unknownCustomer: "Onbekend",
+    // Preview
+    previewTitle: "Factuur Preview",
+    previewSubtitle: "Bekijk hoe je factuur eruit ziet",
+    invoiceDetails: "Factuurdetails",
+    customerDetails: "Klantgegevens",
+    sellerAddress: "Van:",
+    customerAddress: "Aan:",
+    backToInvoices: "Terug naar facturen",
+    print: "Afdrukken",
   },
 
   // Dashboard

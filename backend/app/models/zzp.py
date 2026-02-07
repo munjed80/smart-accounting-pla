@@ -34,11 +34,14 @@ class ZZPCustomer(Base):
     
     Fields:
     - name (required): Customer or company name
-    - email, phone (optional): Contact details  
+    - email, phone (optional): Contact details
+    - contact_person (optional): Name of contact person
     - address_* (optional): Full address breakdown
+    - address_line2 (optional): Secondary address line (apt, suite, etc.)
     - kvk_number (optional): Dutch Chamber of Commerce number
     - btw_number (optional): Dutch VAT/BTW number
-    - iban (optional): Bank account number
+    - iban, bank_bic (optional): Bank account details
+    - notes (optional): General notes
     - status: 'active' or 'inactive'
     """
     __tablename__ = "zzp_customers"
@@ -57,9 +60,11 @@ class ZZPCustomer(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    contact_person: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     
     # Address fields
     address_street: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    address_line2: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     address_postal_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     address_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     address_country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default="Nederland")
@@ -70,6 +75,10 @@ class ZZPCustomer(Base):
     
     # Bank details
     iban: Mapped[Optional[str]] = mapped_column(String(34), nullable=True)
+    bank_bic: Mapped[Optional[str]] = mapped_column(String(11), nullable=True)
+    
+    # Notes
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     # Status
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active", index=True)

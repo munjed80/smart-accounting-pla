@@ -2707,13 +2707,17 @@ export interface ZZPCustomer {
   name: string
   email?: string
   phone?: string
+  contact_person?: string
   address_street?: string
+  address_line2?: string
   address_postal_code?: string
   address_city?: string
   address_country?: string
   kvk_number?: string
   btw_number?: string
   iban?: string
+  bank_bic?: string
+  notes?: string
   status: 'active' | 'inactive'
   created_at: string
   updated_at: string
@@ -2723,13 +2727,17 @@ export interface ZZPCustomerCreate {
   name: string
   email?: string
   phone?: string
+  contact_person?: string
   address_street?: string
+  address_line2?: string
   address_postal_code?: string
   address_city?: string
   address_country?: string
   kvk_number?: string
   btw_number?: string
   iban?: string
+  bank_bic?: string
+  notes?: string
   status?: 'active' | 'inactive'
 }
 

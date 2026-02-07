@@ -309,6 +309,37 @@ export const nl = {
     errorLoadingEntries: "Fout bij laden van urenregistraties",
     errorSavingEntry: "Fout bij opslaan van urenregistratie",
     errorDeletingEntry: "Fout bij verwijderen van urenregistratie",
+    
+    // Clock-in/out (Dagstart card)
+    dagstartTitle: "Dagstart",
+    dagstartDescription: "Start en stop je werkdag met een klik",
+    statusActive: "Actief",
+    statusInactive: "Niet actief",
+    clockIn: "Inklokken",
+    clockOut: "Uitklokken",
+    clockingIn: "Inklokken...",
+    clockingOut: "Uitklokken...",
+    workStarted: "Werk gestart",
+    workStopped: "Werk gestopt",
+    hoursAdded: "uur toegevoegd",
+    breakMinutes: "Pauze (minuten)",
+    breakMinutesPlaceholder: "0",
+    workNote: "Notitie",
+    workNotePlaceholder: "Wat heb je gedaan? (optioneel)",
+    showOptions: "Meer opties",
+    hideOptions: "Minder opties",
+    noActiveSession: "Geen actieve sessie gevonden",
+    activeSessionExists: "Er is al een actieve werksessie",
+    errorClockIn: "Fout bij inklokken",
+    errorClockOut: "Fout bij uitklokken",
+    errorLoadingSession: "Fout bij laden van sessie",
+    runningTime: "Looptijd",
+    startedAt: "Gestart om",
+    
+    // Tabs
+    tabThisWeek: "Deze week",
+    tabManualEntry: "Handmatig toevoegen",
+    tabOverview: "Overzicht",
   },
 
   // ZZP Agenda page

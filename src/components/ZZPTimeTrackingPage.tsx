@@ -63,6 +63,10 @@ import {
   SpinnerGap,
   Briefcase,
   User,
+  Play,
+  Stop,
+  CaretDown,
+  CaretUp,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { 
@@ -73,9 +77,44 @@ import {
   ZZPTimeEntryListResponse,
   ZZPWeeklyTimeSummary,
   ZZPCustomer,
+  WorkSession,
 } from '@/lib/api'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
+
+// Hook for live timer display
+const useTimer = (startedAt: string | null) => {
+  const [elapsed, setElapsed] = useState(0)
+  
+  useEffect(() => {
+    if (!startedAt) {
+      setElapsed(0)
+      return
+    }
+    
+    const startTime = new Date(startedAt).getTime()
+    
+    // Calculate initial elapsed time
+    const updateElapsed = () => {
+      const now = Date.now()
+      setElapsed(Math.floor((now - startTime) / 1000))
+    }
+    
+    updateElapsed()
+    const interval = setInterval(updateElapsed, 1000)
+    
+    return () => clearInterval(interval)
+  }, [startedAt])
+  
+  // Format as HH:MM:SS
+  const hours = Math.floor(elapsed / 3600)
+  const minutes = Math.floor((elapsed % 3600) / 60)
+  const seconds = elapsed % 60
+  
+  const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+  
+  return { elapsed, formatted, hours, minutes, seconds }
+}
 
 // Helper functions for date manipulation
 const getMonday = (date: Date): Date => {
@@ -656,6 +695,186 @@ const EmptyState = ({ onAddEntry }: { onAddEntry: () => void }) => (
   </Card>
 )
 
+// Clock-in/out card component (Dagstart)
+const ClockInCard = ({
+  activeSession,
+  onClockIn,
+  onClockOut,
+  isLoading,
+}: {
+  activeSession: WorkSession | null
+  onClockIn: (note?: string) => Promise<void>
+  onClockOut: (breakMinutes: number, note?: string) => Promise<void>
+  isLoading: boolean
+}) => {
+  const [showOptions, setShowOptions] = useState(false)
+  const [breakMinutes, setBreakMinutes] = useState('')
+  const [note, setNote] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  const { formatted: timerDisplay } = useTimer(activeSession?.started_at || null)
+  const isActive = !!activeSession
+  
+  const handleClockIn = async () => {
+    setIsSubmitting(true)
+    try {
+      await onClockIn(note.trim() || undefined)
+      setNote('')
+      setShowOptions(false)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+  
+  const handleClockOut = async () => {
+    setIsSubmitting(true)
+    try {
+      const mins = parseInt(breakMinutes) || 0
+      await onClockOut(mins, note.trim() || undefined)
+      setNote('')
+      setBreakMinutes('')
+      setShowOptions(false)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+  
+  // Format start time for display
+  const startTimeDisplay = activeSession?.started_at
+    ? new Date(activeSession.started_at).toLocaleTimeString('nl-NL', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      })
+    : null
+  
+  return (
+    <Card className="bg-gradient-to-br from-card via-card to-primary/5 backdrop-blur-sm border-2 border-primary/20 mb-6">
+      <CardContent className="p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Left side: Status and timer */}
+          <div className="flex items-center gap-4">
+            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center ${
+              isActive 
+                ? 'bg-green-500/20 animate-pulse' 
+                : 'bg-secondary/50'
+            }`}>
+              <Timer 
+                size={32} 
+                className={isActive ? 'text-green-500' : 'text-muted-foreground'} 
+                weight="duotone" 
+              />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-lg font-semibold">{t('zzpTimeTracking.dagstartTitle')}</h3>
+                <Badge 
+                  variant={isActive ? 'default' : 'secondary'}
+                  className={isActive 
+                    ? 'bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/40' 
+                    : 'bg-secondary text-muted-foreground'
+                  }
+                >
+                  {isActive ? t('zzpTimeTracking.statusActive') : t('zzpTimeTracking.statusInactive')}
+                </Badge>
+              </div>
+              {isActive ? (
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-mono font-bold text-primary">{timerDisplay}</span>
+                  <span className="text-sm text-muted-foreground">
+                    ({t('zzpTimeTracking.startedAt')} {startTimeDisplay})
+                  </span>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {t('zzpTimeTracking.dagstartDescription')}
+                </p>
+              )}
+            </div>
+          </div>
+          
+          {/* Right side: Button */}
+          <div className="flex flex-col gap-2 sm:items-end">
+            <Button
+              onClick={isActive ? handleClockOut : handleClockIn}
+              disabled={isLoading || isSubmitting}
+              size="lg"
+              className={`gap-2 h-12 px-6 min-w-[160px] ${
+                isActive 
+                  ? 'bg-orange-600 hover:bg-orange-700 text-white' 
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <SpinnerGap size={20} className="animate-spin" />
+                  {isActive ? t('zzpTimeTracking.clockingOut') : t('zzpTimeTracking.clockingIn')}
+                </>
+              ) : isActive ? (
+                <>
+                  <Stop size={20} weight="fill" />
+                  {t('zzpTimeTracking.clockOut')}
+                </>
+              ) : (
+                <>
+                  <Play size={20} weight="fill" />
+                  {t('zzpTimeTracking.clockIn')}
+                </>
+              )}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowOptions(!showOptions)}
+              className="gap-1 text-xs text-muted-foreground"
+            >
+              {showOptions ? <CaretUp size={14} /> : <CaretDown size={14} />}
+              {showOptions ? t('zzpTimeTracking.hideOptions') : t('zzpTimeTracking.showOptions')}
+            </Button>
+          </div>
+        </div>
+        
+        {/* Expandable options */}
+        {showOptions && (
+          <div className="mt-4 pt-4 border-t border-border/50 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {isActive && (
+              <div className="space-y-2">
+                <Label htmlFor="break-minutes" className="text-sm font-medium">
+                  {t('zzpTimeTracking.breakMinutes')}
+                </Label>
+                <Input
+                  id="break-minutes"
+                  type="number"
+                  min="0"
+                  max="480"
+                  placeholder={t('zzpTimeTracking.breakMinutesPlaceholder')}
+                  value={breakMinutes}
+                  onChange={(e) => setBreakMinutes(e.target.value)}
+                  className="h-10"
+                  disabled={isSubmitting}
+                />
+              </div>
+            )}
+            <div className={`space-y-2 ${!isActive ? 'sm:col-span-2' : ''}`}>
+              <Label htmlFor="work-note" className="text-sm font-medium">
+                {t('zzpTimeTracking.workNote')}
+              </Label>
+              <Input
+                id="work-note"
+                placeholder={t('zzpTimeTracking.workNotePlaceholder')}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                className="h-10"
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 // Mobile entry card component
 const EntryCard = ({ 
   entry,
@@ -738,6 +957,10 @@ export const ZZPTimeTrackingPage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [isWeeklyLoading, setIsWeeklyLoading] = useState(true)
   
+  // Clock-in/out state
+  const [activeSession, setActiveSession] = useState<WorkSession | null>(null)
+  const [isSessionLoading, setIsSessionLoading] = useState(true)
+  
   // Week navigation
   const [currentWeekStart, setCurrentWeekStart] = useState(() => getMonday(new Date()))
   
@@ -766,6 +989,22 @@ export const ZZPTimeTrackingPage = () => {
       console.error('Failed to load customers:', error)
     }
   }, [])
+
+  // Load active work session
+  const loadActiveSession = useCallback(async () => {
+    if (!user?.id) return
+    
+    setIsSessionLoading(true)
+    try {
+      const session = await zzpApi.workSessions.getActive()
+      setActiveSession(session)
+    } catch (error) {
+      console.error('Failed to load active session:', error)
+      setActiveSession(null)
+    } finally {
+      setIsSessionLoading(false)
+    }
+  }, [user?.id])
 
   // Load weekly summary
   const loadWeeklySummary = useCallback(async () => {
@@ -809,10 +1048,56 @@ export const ZZPTimeTrackingPage = () => {
     }
   }, [user?.id, currentWeekStart, currentWeekEnd])
 
+  // Clock-in handler
+  const handleClockIn = useCallback(async (note?: string) => {
+    if (!user?.id) return
+    
+    try {
+      const session = await zzpApi.workSessions.start({ note })
+      setActiveSession(session)
+      toast.success(t('zzpTimeTracking.workStarted'))
+    } catch (error: any) {
+      console.error('Failed to clock in:', error)
+      const message = error?.response?.data?.detail?.message || t('zzpTimeTracking.errorClockIn')
+      toast.error(message)
+    }
+  }, [user?.id])
+
+  // Clock-out handler
+  const handleClockOut = useCallback(async (breakMinutes: number, note?: string) => {
+    if (!user?.id) return
+    
+    try {
+      const response = await zzpApi.workSessions.stop({ 
+        break_minutes: breakMinutes,
+        note 
+      })
+      setActiveSession(null)
+      toast.success(`${t('zzpTimeTracking.workStopped')} — ${response.hours_added} ${t('zzpTimeTracking.hoursAdded')}`)
+      
+      // Reload entries and weekly summary to reflect the new entry
+      await Promise.all([loadEntries(), loadWeeklySummary()])
+    } catch (error: any) {
+      console.error('Failed to clock out:', error)
+      const message = error?.response?.data?.detail?.message || t('zzpTimeTracking.errorClockOut')
+      toast.error(message)
+    }
+  }, [user?.id, loadEntries, loadWeeklySummary])
+
   // Initial load
   useEffect(() => {
     loadCustomers()
-  }, [loadCustomers])
+    loadActiveSession()
+  }, [loadCustomers, loadActiveSession])
+
+  // Poll for active session every 15 seconds to keep state in sync
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadActiveSession()
+    }, 15000) // 15 seconds
+    
+    return () => clearInterval(interval)
+  }, [loadActiveSession])
 
   // Load data when week changes
   useEffect(() => {
@@ -921,6 +1206,14 @@ export const ZZPTimeTrackingPage = () => {
             {t('zzpTimeTracking.newEntry')}
           </Button>
         </div>
+
+        {/* Clock-in/out Card (Dagstart) */}
+        <ClockInCard
+          activeSession={activeSession}
+          onClockIn={handleClockIn}
+          onClockOut={handleClockOut}
+          isLoading={isSessionLoading}
+        />
 
         {/* Week Navigation */}
         <Card className="bg-card/80 backdrop-blur-sm border border-border/50 mb-6">

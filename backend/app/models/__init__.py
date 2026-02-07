@@ -36,6 +36,7 @@ from app.models.zzp import (
     ZZPExpense,
     ZZPTimeEntry,
     ZZPCalendarEvent,
+    WorkSession,
 )
 
 __all__ = [
@@ -89,4 +90,5 @@ __all__ = [
     "ZZPExpense",
     "ZZPTimeEntry",
     "ZZPCalendarEvent",
+    "WorkSession",
 ]

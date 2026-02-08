@@ -3095,6 +3095,25 @@ export const zzpApi = {
     delete: async (invoiceId: string): Promise<void> => {
       await api.delete(`/zzp/invoices/${invoiceId}`)
     },
+
+    /**
+     * Download invoice as PDF.
+     * Returns a Blob that can be used for download or preview.
+     */
+    downloadPdf: async (invoiceId: string): Promise<Blob> => {
+      const response = await api.get(`/zzp/invoices/${invoiceId}/pdf`, {
+        responseType: 'blob',
+      })
+      return response.data as Blob
+    },
+
+    /**
+     * Get the invoice PDF URL for direct download.
+     * This returns a URL that can be used in an anchor tag or window.open.
+     */
+    getPdfUrl: (invoiceId: string): string => {
+      return `${api.defaults.baseURL}/zzp/invoices/${invoiceId}/pdf`
+    },
   },
 
   // ------------ Expenses ------------

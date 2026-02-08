@@ -2,7 +2,7 @@
 ZZP Invoices API Endpoints
 
 CRUD operations for ZZP invoices with lines, status transitions,
-and race-safe invoice number generation.
+race-safe invoice number generation, and PDF generation.
 """
 from datetime import datetime, date
 from decimal import Decimal
@@ -10,11 +10,13 @@ from typing import Annotated, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
+from app.services.invoice_pdf import generate_invoice_pdf, get_invoice_pdf_filename, WEASYPRINT_AVAILABLE
 from app.models.zzp import (
     ZZPInvoice, 
     ZZPInvoiceLine, 
@@ -519,12 +521,15 @@ async def update_invoice_status(
     new_status = status_in.status
     
     # Validate status transition
+    # Allow more flexible transitions for "Mark as Paid/Unpaid" functionality:
+    # - paid -> sent (mark as unpaid)
+    # - sent -> paid (mark as paid)
     valid_transitions = {
         InvoiceStatus.DRAFT.value: [InvoiceStatus.SENT.value, InvoiceStatus.CANCELLED.value],
         InvoiceStatus.SENT.value: [InvoiceStatus.PAID.value, InvoiceStatus.CANCELLED.value],
-        InvoiceStatus.PAID.value: [],
+        InvoiceStatus.PAID.value: [InvoiceStatus.SENT.value],  # Allow "mark as unpaid"
         InvoiceStatus.CANCELLED.value: [],
-        InvoiceStatus.OVERDUE.value: [InvoiceStatus.PAID.value, InvoiceStatus.CANCELLED.value],
+        InvoiceStatus.OVERDUE.value: [InvoiceStatus.PAID.value, InvoiceStatus.SENT.value, InvoiceStatus.CANCELLED.value],
     }
     
     if new_status not in valid_transitions.get(current_status, []):
@@ -582,3 +587,68 @@ async def delete_invoice(
     await db.commit()
     
     return None
+
+
+@router.get("/invoices/{invoice_id}/pdf")
+async def get_invoice_pdf(
+    invoice_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Generate and download a PDF for an invoice.
+    
+    Returns the invoice as a downloadable PDF file with proper headers:
+    - Content-Type: application/pdf
+    - Content-Disposition: attachment; filename="INV-YYYY-XXXX.pdf"
+    """
+    require_zzp(current_user)
+    
+    # Check if PDF generation is available
+    if not WEASYPRINT_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "PDF_NOT_AVAILABLE",
+                "message": "PDF-generatie is tijdelijk niet beschikbaar. Probeer het later opnieuw."
+            }
+        )
+    
+    administration = await get_user_administration(current_user.id, db)
+    
+    result = await db.execute(
+        select(ZZPInvoice)
+        .options(selectinload(ZZPInvoice.lines))
+        .where(
+            ZZPInvoice.id == invoice_id,
+            ZZPInvoice.administration_id == administration.id
+        )
+    )
+    invoice = result.scalar_one_or_none()
+    
+    if not invoice:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
+        )
+    
+    try:
+        # Generate PDF
+        pdf_bytes = generate_invoice_pdf(invoice)
+        filename = get_invoice_pdf_filename(invoice)
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "PDF_GENERATION_FAILED",
+                "message": "Kon de PDF niet genereren. Probeer het later opnieuw."
+            }
+        )

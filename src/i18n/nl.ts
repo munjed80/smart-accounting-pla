@@ -362,6 +362,7 @@ export const nl = {
     invoiceCreatedGoTo: "Ga naar facturen",
     errorCreatingInvoice: "Fout bij maken van factuur",
     entriesWithoutRate: "uren zonder uurtarief",
+    noRate: "Geen tarief",
   },
 
   // ZZP Agenda page

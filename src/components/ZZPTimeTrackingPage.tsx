@@ -95,6 +95,14 @@ import { toast } from 'sonner'
 // Sentinel value for "no customer" selection (empty string is not allowed in Radix Select v2+)
 const NO_CUSTOMER_VALUE = "__none__"
 
+// Default Dutch VAT rate (%)
+const DEFAULT_VAT_RATE_NL = 21
+
+// Helper function to format time entry as invoice line description
+const formatTimeEntryLineDescription = (entry: ZZPTimeEntry): string => {
+  return `${entry.description}${entry.project_name ? ` (${entry.project_name})` : ''} - ${entry.hours}h`
+}
+
 // Hook for live timer display
 const useTimer = (startedAt: string | null) => {
   const [elapsed, setElapsed] = useState(0)
@@ -785,10 +793,10 @@ const CreateInvoiceDialog = ({
       
       // Create invoice lines from time entries
       const lines: ZZPInvoiceLineCreate[] = selectedEntries.map(entry => ({
-        description: `${entry.description}${entry.project_name ? ` (${entry.project_name})` : ''} - ${entry.hours}h`,
+        description: formatTimeEntryLineDescription(entry),
         quantity: entry.hours,
         unit_price_cents: entry.hourly_rate_cents || 0,
-        vat_rate: 21, // Default Dutch VAT rate
+        vat_rate: DEFAULT_VAT_RATE_NL,
       }))
 
       // Create the invoice
@@ -907,7 +915,7 @@ const CreateInvoiceDialog = ({
                                 {formatAmount(Math.round(entry.hours * entry.hourly_rate_cents))}
                               </span>
                             ) : (
-                              <span className="text-xs text-muted-foreground">Geen tarief</span>
+                              <span className="text-xs text-muted-foreground">{t('zzpTimeTracking.noRate')}</span>
                             )}
                           </div>
                         </label>

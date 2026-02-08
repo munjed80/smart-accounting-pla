@@ -62,6 +62,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { 
   Users, 
   Plus, 
@@ -84,6 +91,7 @@ import {
   IdentificationCard,
   Receipt,
   ArrowRight,
+  DotsThreeVertical,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { zzpApi, ZZPCustomer, ZZPCustomerCreate, ZZPCustomerUpdate } from '@/lib/api'
@@ -989,8 +997,8 @@ const CustomerCard = ({
 }) => (
   <Card className="bg-card/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-colors">
     <CardContent className="p-4">
-      <div className="flex items-start justify-between gap-3 cursor-pointer" onClick={onView}>
-        <div className="flex items-start gap-3 min-w-0 flex-1">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer" onClick={onView}>
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
             <Users size={20} className="text-primary" weight="duotone" />
           </div>
@@ -1010,36 +1018,35 @@ const CustomerCard = ({
             )}
           </div>
         </div>
-        <StatusBadge status={customer.status} size="sm" />
-      </div>
-      <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-border/50">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onView}
-          className="h-9 px-3 gap-2"
-        >
-          <Eye size={16} />
-          {t('zzpCustomers.viewDetails')}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onEdit}
-          className="h-9 px-3 gap-2"
-        >
-          <PencilSimple size={16} />
-          {t('common.edit')}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onDelete}
-          className="h-9 px-3 gap-2 text-destructive hover:text-destructive"
-        >
-          <TrashSimple size={16} />
-          {t('common.delete')}
-        </Button>
+        <div className="flex items-start gap-2">
+          <StatusBadge status={customer.status} size="sm" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+                <DotsThreeVertical size={18} />
+                <span className="sr-only">{t('common.actions')}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onView}>
+                <Eye size={16} className="mr-2" />
+                {t('zzpCustomers.viewDetails')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onEdit}>
+                <PencilSimple size={16} className="mr-2" />
+                {t('common.edit')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={onDelete}
+                className="text-destructive focus:text-destructive"
+              >
+                <TrashSimple size={16} className="mr-2" />
+                {t('common.delete')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </CardContent>
   </Card>

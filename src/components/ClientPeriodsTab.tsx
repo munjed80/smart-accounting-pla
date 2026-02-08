@@ -43,6 +43,7 @@ import {
   AuditLogEntry,
   getErrorMessage 
 } from '@/lib/api'
+import { createDossierLogger } from '@/lib/dossierLogger'
 import { 
   ArrowsClockwise,
   WarningCircle,
@@ -697,15 +698,20 @@ export const ClientPeriodsTab = ({ clientId }: ClientPeriodsTabProps) => {
   const [error, setError] = useState<string | null>(null)
 
   const fetchPeriods = async () => {
+    const logger = createDossierLogger(clientId)
+    const endpoint = `/accountant/clients/${clientId}/periods`
+    
     try {
       setIsLoading(true)
       setError(null)
+      logger.request(endpoint)
       const data = await periodApi.listPeriods(clientId)
+      logger.success(endpoint, { count: data.periods.length })
       setPeriods(data.periods)
     } catch (err) {
+      logger.error(endpoint, err)
       const message = getErrorMessage(err)
       setError(message)
-      console.error('Failed to fetch periods:', err)
     } finally {
       setIsLoading(false)
     }

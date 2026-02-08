@@ -26,6 +26,7 @@ import {
   ActionType,
   getErrorMessage 
 } from '@/lib/api'
+import { createDossierLogger } from '@/lib/dossierLogger'
 import { 
   ArrowsClockwise,
   WarningCircle,
@@ -429,34 +430,44 @@ export const ClientIssuesTab = ({ clientId, onIssueResolved }: ClientIssuesTabPr
   const [recalculateResult, setRecalculateResult] = useState<RecalculateResponse | null>(null)
 
   const fetchIssues = async () => {
+    const logger = createDossierLogger(clientId)
+    const endpoint = `/accountant/clients/${clientId}/issues`
+    
     try {
       setIsLoading(true)
       setError(null)
+      logger.request(endpoint)
       const data = await ledgerApi.getClientIssues(clientId)
+      logger.success(endpoint, { totalIssues: data.total_issues, red: data.red_count, yellow: data.yellow_count })
       setIssues(data)
     } catch (err) {
+      logger.error(endpoint, err)
       const message = getErrorMessage(err)
       setError(message)
-      console.error('Failed to fetch issues:', err)
     } finally {
       setIsLoading(false)
     }
   }
 
   const handleRecalculate = async () => {
+    const logger = createDossierLogger(clientId)
+    const endpoint = `/accountant/clients/${clientId}/journal/recalculate`
+    
     try {
       setIsRecalculating(true)
       setRecalculateResult(null)
+      logger.request(endpoint)
       const result = await ledgerApi.recalculate(clientId, true)
+      logger.success(endpoint, { issuesFound: result.issues_found })
       setRecalculateResult(result)
       // Refresh issues list
       await fetchIssues()
       // Notify parent
       onIssueResolved?.()
     } catch (err) {
+      logger.error(endpoint, err)
       const message = getErrorMessage(err)
       setError(message)
-      console.error('Failed to recalculate:', err)
     } finally {
       setIsRecalculating(false)
     }

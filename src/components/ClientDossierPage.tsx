@@ -23,6 +23,7 @@ import {
   LedgerClientOverview,
   getErrorMessage 
 } from '@/lib/api'
+import { createDossierLogger } from '@/lib/dossierLogger'
 import { 
   ArrowLeft,
   WarningCircle,
@@ -128,11 +129,16 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
   }
 
   const fetchOverview = async () => {
+    const logger = createDossierLogger(clientId)
+    const endpoint = `/accountant/clients/${clientId}/overview`
+    
     try {
       setIsLoading(true)
       setError(null)
       setIsAccessDenied(false)
+      logger.request(endpoint)
       const data = await ledgerApi.getClientOverview(clientId)
+      logger.success(endpoint, { clientName: data.client_name })
       setOverview(data)
       
       // If activeClient context doesn't match, sync it
@@ -144,6 +150,7 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
         }
       }
     } catch (err: unknown) {
+      logger.error(endpoint, err)
       // Check if it's a NOT_ASSIGNED error (403)
       if (isNotAssignedError(err)) {
         setIsAccessDenied(true)
@@ -151,7 +158,6 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
       }
       const message = getErrorMessage(err)
       setError(message)
-      console.error('Failed to fetch client overview:', err)
     } finally {
       setIsLoading(false)
     }

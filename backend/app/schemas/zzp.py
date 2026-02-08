@@ -5,6 +5,7 @@ Pydantic schemas for ZZP-specific API operations including validation.
 """
 import re
 from datetime import datetime
+from enum import Enum
 from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel, Field, field_validator, EmailStr
@@ -699,6 +700,7 @@ class InvoiceResponse(BaseModel):
     subtotal_cents: int
     vat_total_cents: int
     total_cents: int
+    amount_paid_cents: int = 0
     
     notes: Optional[str] = None
     
@@ -1069,3 +1071,354 @@ class WorkSessionStopResponse(BaseModel):
     time_entry: TimeEntryResponse
     hours_added: float
     message: str
+
+
+# ============================================================================
+# ZZP Bank Payment Schemas
+# ============================================================================
+
+class ZZPBankAccountResponse(BaseModel):
+    """Schema for bank account response."""
+    id: UUID
+    administration_id: UUID
+    iban: str
+    bank_name: Optional[str] = None
+    currency: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class ZZPBankAccountListResponse(BaseModel):
+    """Schema for list of bank accounts."""
+    accounts: List[ZZPBankAccountResponse]
+    total: int
+
+
+class ZZPBankTransactionResponse(BaseModel):
+    """Schema for bank transaction response."""
+    id: UUID
+    administration_id: UUID
+    bank_account_id: UUID
+    booking_date: str  # YYYY-MM-DD
+    amount_cents: int  # amount in cents (positive = credit, negative = debit)
+    currency: str
+    counterparty_name: Optional[str] = None
+    counterparty_iban: Optional[str] = None
+    description: str
+    reference: Optional[str] = None
+    status: str  # NEW, MATCHED, IGNORED, NEEDS_REVIEW
+    matched_invoice_id: Optional[UUID] = None
+    matched_invoice_number: Optional[str] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class ZZPBankTransactionListResponse(BaseModel):
+    """Schema for list of bank transactions."""
+    transactions: List[ZZPBankTransactionResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class ZZPBankImportResponse(BaseModel):
+    """Response after importing a bank statement."""
+    imported_count: int
+    skipped_duplicates_count: int
+    total_in_file: int
+    errors: List[str]
+    message: str
+    bank_account_id: Optional[UUID] = None
+
+
+class ZZPInvoiceMatchSuggestion(BaseModel):
+    """A suggested invoice match for a bank transaction."""
+    invoice_id: UUID
+    invoice_number: str
+    customer_name: Optional[str]
+    invoice_total_cents: int
+    invoice_open_cents: int
+    invoice_date: str  # YYYY-MM-DD
+    confidence_score: int  # 0-100
+    match_reason: str  # Dutch explanation
+
+
+class ZZPMatchSuggestionsResponse(BaseModel):
+    """Response with match suggestions for a bank transaction."""
+    transaction_id: UUID
+    suggestions: List[ZZPInvoiceMatchSuggestion]
+    message: str
+
+
+class ZZPMatchInvoiceRequest(BaseModel):
+    """Request to match a transaction to an invoice."""
+    invoice_id: UUID
+    amount_cents: Optional[int] = None  # If null, use full transaction amount
+    notes: Optional[str] = None
+
+
+class ZZPMatchInvoiceResponse(BaseModel):
+    """Response after matching a transaction to an invoice."""
+    transaction_id: UUID
+    invoice_id: UUID
+    invoice_number: str
+    amount_matched_cents: int
+    invoice_new_status: str
+    invoice_amount_paid_cents: int
+    invoice_total_cents: int
+    message: str
+
+
+class ZZPUnmatchResponse(BaseModel):
+    """Response after unmatching a transaction from an invoice."""
+    transaction_id: UUID
+    invoice_id: UUID
+    invoice_number: str
+    amount_unmatched_cents: int
+    invoice_new_status: str
+    invoice_amount_paid_cents: int
+    message: str
+
+
+class ZZPBankTransactionMatchResponse(BaseModel):
+    """Schema for a bank transaction match audit record."""
+    id: UUID
+    bank_transaction_id: UUID
+    invoice_id: UUID
+    invoice_number: str
+    amount_cents: int
+    match_type: str  # manual, auto_amount, auto_reference
+    confidence_score: Optional[int] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    user_id: Optional[UUID] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class ZZPBankTransactionMatchListResponse(BaseModel):
+    """Schema for list of transaction matches."""
+    matches: List[ZZPBankTransactionMatchResponse]
+    total: int
+
+
+# ============================================================================
+# AI Insights Schemas
+# ============================================================================
+
+class InsightType(str, Enum):
+    """Types of AI-generated insights."""
+    INVOICE_OVERDUE = "invoice_overdue"
+    INVOICE_FOLLOWUP = "invoice_followup"
+    UNBILLED_HOURS = "unbilled_hours"
+    BTW_DEADLINE = "btw_deadline"
+    MISSING_PROFILE = "missing_profile"
+    NO_RECENT_ACTIVITY = "no_recent_activity"
+
+
+class InsightSeverity(str, Enum):
+    """Severity level of an insight."""
+    ACTION_NEEDED = "action_needed"  # Red - requires immediate attention
+    SUGGESTION = "suggestion"        # Yellow - recommended action
+    INFO = "info"                    # Blue - informational
+
+
+class InsightAction(BaseModel):
+    """Suggested action for an insight."""
+    type: str = Field(..., description="Action type identifier")
+    label: str = Field(..., description="Human-readable action button label")
+    route: Optional[str] = Field(None, description="Route to navigate to")
+    params: Optional[dict] = Field(None, description="Parameters for the action")
+
+
+class ZZPInsight(BaseModel):
+    """
+    A single AI-generated insight for the ZZP user.
+    
+    AI Logic Rules (transparent, not black-box):
+    - Insights are generated from explicit business rules
+    - Each insight explains WHY it was generated
+    - User can always dismiss or take alternative action
+    """
+    id: str = Field(..., description="Unique insight identifier")
+    type: InsightType
+    severity: InsightSeverity
+    
+    # What the user sees
+    title: str = Field(..., description="Short title (e.g., 'Invoice overdue')")
+    description: str = Field(..., description="Detailed description of the insight")
+    
+    # AI Transparency: explain WHY this insight was generated
+    reason: str = Field(..., description="Explanation of why AI generated this insight")
+    
+    # Suggested action
+    action: Optional[InsightAction] = None
+    
+    # Related data
+    related_id: Optional[str] = Field(None, description="ID of related entity (invoice, customer, etc.)")
+    related_type: Optional[str] = Field(None, description="Type of related entity")
+    amount_cents: Optional[int] = Field(None, description="Related amount in cents")
+    
+    # Timing
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # User can dismiss
+    dismissible: bool = True
+
+
+class ZZPInsightsResponse(BaseModel):
+    """Response containing all AI insights for a ZZP user."""
+    insights: List[ZZPInsight]
+    total_action_needed: int = Field(..., description="Count of ACTION_NEEDED insights")
+    total_suggestions: int = Field(..., description="Count of SUGGESTION insights")
+    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # AI Transparency
+    ai_model_version: str = Field(default="rules-v1", description="Version of AI rules used")
+
+
+# ============================================================================
+# Quote (Offerte) Schemas
+# ============================================================================
+
+class QuoteStatus(str, Enum):
+    """Quote status values."""
+    DRAFT = "draft"
+    SENT = "sent"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+    CONVERTED = "converted"
+
+
+class QuoteLineCreate(BaseModel):
+    """Schema for creating a quote line."""
+    description: str = Field(..., min_length=1, max_length=1000)
+    quantity: float = Field(default=1.0, gt=0)
+    unit_price_cents: int = Field(..., ge=0)
+    vat_rate: float = Field(default=21.0, ge=0, le=100)
+
+
+class QuoteLineUpdate(BaseModel):
+    """Schema for updating a quote line."""
+    description: Optional[str] = Field(None, min_length=1, max_length=1000)
+    quantity: Optional[float] = Field(None, gt=0)
+    unit_price_cents: Optional[int] = Field(None, ge=0)
+    vat_rate: Optional[float] = Field(None, ge=0, le=100)
+
+
+class QuoteLineResponse(BaseModel):
+    """Schema for quote line response."""
+    id: UUID
+    quote_id: UUID
+    line_number: int
+    description: str
+    quantity: float
+    unit_price_cents: int
+    vat_rate: float
+    vat_amount_cents: int
+    line_total_cents: int
+    
+    class Config:
+        from_attributes = True
+
+
+class QuoteCreate(BaseModel):
+    """Schema for creating a quote."""
+    customer_id: UUID
+    issue_date: str = Field(..., pattern=r'^\d{4}-\d{2}-\d{2}$', description="Format: YYYY-MM-DD")
+    valid_until: Optional[str] = Field(None, pattern=r'^\d{4}-\d{2}-\d{2}$', description="Format: YYYY-MM-DD")
+    title: Optional[str] = Field(None, max_length=255)
+    notes: Optional[str] = Field(None, max_length=2000)
+    terms: Optional[str] = Field(None, max_length=5000)
+    lines: List[QuoteLineCreate] = Field(..., min_length=1)
+
+
+class QuoteUpdate(BaseModel):
+    """Schema for updating a quote."""
+    customer_id: Optional[UUID] = None
+    issue_date: Optional[str] = Field(None, pattern=r'^\d{4}-\d{2}-\d{2}$')
+    valid_until: Optional[str] = Field(None, pattern=r'^\d{4}-\d{2}-\d{2}$')
+    title: Optional[str] = Field(None, max_length=255)
+    notes: Optional[str] = Field(None, max_length=2000)
+    terms: Optional[str] = Field(None, max_length=5000)
+    lines: Optional[List[QuoteLineCreate]] = None  # Full replacement if provided
+
+
+class QuoteStatusUpdate(BaseModel):
+    """Schema for updating quote status."""
+    status: QuoteStatus
+
+
+class QuoteResponse(BaseModel):
+    """Schema for quote response."""
+    id: UUID
+    administration_id: UUID
+    customer_id: UUID
+    quote_number: str
+    status: str
+    issue_date: str
+    valid_until: Optional[str] = None
+    invoice_id: Optional[UUID] = None
+    
+    # Seller snapshot
+    seller_company_name: Optional[str] = None
+    seller_trading_name: Optional[str] = None
+    seller_address_street: Optional[str] = None
+    seller_address_postal_code: Optional[str] = None
+    seller_address_city: Optional[str] = None
+    seller_address_country: Optional[str] = None
+    seller_kvk_number: Optional[str] = None
+    seller_btw_number: Optional[str] = None
+    seller_iban: Optional[str] = None
+    seller_email: Optional[str] = None
+    seller_phone: Optional[str] = None
+    
+    # Customer snapshot
+    customer_name: Optional[str] = None
+    customer_address_street: Optional[str] = None
+    customer_address_postal_code: Optional[str] = None
+    customer_address_city: Optional[str] = None
+    customer_address_country: Optional[str] = None
+    customer_kvk_number: Optional[str] = None
+    customer_btw_number: Optional[str] = None
+    
+    # Totals
+    subtotal_cents: int
+    vat_total_cents: int
+    total_cents: int
+    
+    # Content
+    title: Optional[str] = None
+    notes: Optional[str] = None
+    terms: Optional[str] = None
+    
+    # Timestamps
+    created_at: datetime
+    updated_at: datetime
+    
+    # Lines
+    lines: List[QuoteLineResponse] = []
+    
+    class Config:
+        from_attributes = True
+
+
+class QuoteListResponse(BaseModel):
+    """Schema for list of quotes."""
+    quotes: List[QuoteResponse]
+    total: int
+    total_amount_cents: int
+    stats: Optional[dict] = None  # Status counts
+
+
+class QuoteConvertToInvoiceResponse(BaseModel):
+    """Response when converting a quote to an invoice."""
+    quote: QuoteResponse
+    invoice_id: UUID
+    invoice_number: str

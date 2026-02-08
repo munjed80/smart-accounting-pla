@@ -1092,6 +1092,7 @@ const InvoiceCard = ({
   onMarkUnpaid,
   canEdit,
   isDownloading,
+  isUpdatingStatus,
 }: { 
   invoice: ZZPInvoice
   onView: () => void
@@ -1105,6 +1106,7 @@ const InvoiceCard = ({
   onMarkUnpaid: () => void
   canEdit: boolean
   isDownloading: boolean
+  isUpdatingStatus: boolean
 }) => (
   <Card className="bg-card/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-colors">
     <CardContent className="p-4">
@@ -1194,13 +1196,21 @@ const InvoiceCard = ({
               {invoice.status !== 'draft' && invoice.status !== 'cancelled' && (
                 <>
                   {invoice.status === 'paid' ? (
-                    <DropdownMenuItem onClick={onMarkUnpaid}>
-                      <XCircle size={16} className="mr-2" />
+                    <DropdownMenuItem onClick={onMarkUnpaid} disabled={isUpdatingStatus}>
+                      {isUpdatingStatus ? (
+                        <SpinnerGap size={16} className="mr-2 animate-spin" />
+                      ) : (
+                        <XCircle size={16} className="mr-2" />
+                      )}
                       {t('zzpInvoices.markUnpaid')}
                     </DropdownMenuItem>
                   ) : (
-                    <DropdownMenuItem onClick={onMarkPaid}>
-                      <CheckCircle size={16} className="mr-2" />
+                    <DropdownMenuItem onClick={onMarkPaid} disabled={isUpdatingStatus}>
+                      {isUpdatingStatus ? (
+                        <SpinnerGap size={16} className="mr-2 animate-spin" />
+                      ) : (
+                        <CheckCircle size={16} className="mr-2" />
+                      )}
                       {t('zzpInvoices.markPaid')}
                     </DropdownMenuItem>
                   )}
@@ -1251,6 +1261,9 @@ export const ZZPInvoicesPage = () => {
   
   // PDF download state - tracks which invoice is currently downloading
   const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null)
+  
+  // Status change state - tracks which invoice is updating status
+  const [updatingStatusInvoiceId, setUpdatingStatusInvoiceId] = useState<string | null>(null)
 
   // Check for customer_id in URL params
   useEffect(() => {
@@ -1389,6 +1402,7 @@ export const ZZPInvoicesPage = () => {
 
   // Handle quick status change
   const handleStatusChange = useCallback(async (invoice: ZZPInvoice, newStatus: 'sent' | 'paid' | 'cancelled') => {
+    setUpdatingStatusInvoiceId(invoice.id)
     try {
       await zzpApi.invoices.updateStatus(invoice.id, newStatus)
       toast.success(t('zzpInvoices.statusChanged'))
@@ -1397,6 +1411,8 @@ export const ZZPInvoicesPage = () => {
     } catch (err) {
       console.error('Failed to update status:', err)
       toast.error(parseApiError(err))
+    } finally {
+      setUpdatingStatusInvoiceId(null)
     }
   }, [loadData])
 
@@ -1497,6 +1513,7 @@ export const ZZPInvoicesPage = () => {
 
   // Handle mark as paid
   const handleMarkPaid = useCallback(async (invoice: ZZPInvoice) => {
+    setUpdatingStatusInvoiceId(invoice.id)
     try {
       await zzpApi.invoices.updateStatus(invoice.id, 'paid')
       toast.success(t('zzpInvoices.markedPaid'))
@@ -1504,11 +1521,14 @@ export const ZZPInvoicesPage = () => {
     } catch (err) {
       console.error('Failed to mark as paid:', err)
       toast.error(parseApiError(err))
+    } finally {
+      setUpdatingStatusInvoiceId(null)
     }
   }, [loadData])
 
   // Handle mark as unpaid (change back to sent)
   const handleMarkUnpaid = useCallback(async (invoice: ZZPInvoice) => {
+    setUpdatingStatusInvoiceId(invoice.id)
     try {
       await zzpApi.invoices.updateStatus(invoice.id, 'sent')
       toast.success(t('zzpInvoices.markedUnpaid'))
@@ -1516,6 +1536,8 @@ export const ZZPInvoicesPage = () => {
     } catch (err) {
       console.error('Failed to mark as unpaid:', err)
       toast.error(parseApiError(err))
+    } finally {
+      setUpdatingStatusInvoiceId(null)
     }
   }, [loadData])
 
@@ -1687,6 +1709,7 @@ export const ZZPInvoicesPage = () => {
                         onMarkUnpaid={() => handleMarkUnpaid(invoice)}
                         canEdit={canEdit}
                         isDownloading={downloadingInvoiceId === invoice.id}
+                        isUpdatingStatus={updatingStatusInvoiceId === invoice.id}
                       />
                     )
                   })
@@ -1816,13 +1839,27 @@ export const ZZPInvoicesPage = () => {
                                     {invoice.status !== 'draft' && invoice.status !== 'cancelled' && (
                                       <>
                                         {invoice.status === 'paid' ? (
-                                          <DropdownMenuItem onClick={() => handleMarkUnpaid(invoice)}>
-                                            <XCircle size={16} className="mr-2" />
+                                          <DropdownMenuItem 
+                                            onClick={() => handleMarkUnpaid(invoice)}
+                                            disabled={updatingStatusInvoiceId === invoice.id}
+                                          >
+                                            {updatingStatusInvoiceId === invoice.id ? (
+                                              <SpinnerGap size={16} className="mr-2 animate-spin" />
+                                            ) : (
+                                              <XCircle size={16} className="mr-2" />
+                                            )}
                                             {t('zzpInvoices.markUnpaid')}
                                           </DropdownMenuItem>
                                         ) : (
-                                          <DropdownMenuItem onClick={() => handleMarkPaid(invoice)}>
-                                            <CheckCircle size={16} className="mr-2" />
+                                          <DropdownMenuItem 
+                                            onClick={() => handleMarkPaid(invoice)}
+                                            disabled={updatingStatusInvoiceId === invoice.id}
+                                          >
+                                            {updatingStatusInvoiceId === invoice.id ? (
+                                              <SpinnerGap size={16} className="mr-2 animate-spin" />
+                                            ) : (
+                                              <CheckCircle size={16} className="mr-2" />
+                                            )}
                                             {t('zzpInvoices.markPaid')}
                                           </DropdownMenuItem>
                                         )}

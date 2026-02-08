@@ -51,6 +51,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { 
   Receipt, 
   Plus, 
@@ -63,6 +70,7 @@ import {
   Calculator,
   Tag,
   CalendarBlank,
+  DotsThreeVertical,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { zzpApi, ZZPExpense, ZZPExpenseCreate, ZZPExpenseUpdate } from '@/lib/api'
@@ -597,30 +605,34 @@ const ExpenseCard = ({
             </div>
           </div>
         </div>
-        <div className="text-right">
-          <p className="font-semibold">{formatAmount(expense.amount_cents)}</p>
-          <p className="text-xs text-muted-foreground">{expense.vat_rate}% BTW</p>
+        <div className="text-right flex items-start gap-2">
+          <div>
+            <p className="font-semibold">{formatAmount(expense.amount_cents)}</p>
+            <p className="text-xs text-muted-foreground">{expense.vat_rate}% BTW</p>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+                <DotsThreeVertical size={18} />
+                <span className="sr-only">{t('common.actions')}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onEdit}>
+                <PencilSimple size={16} className="mr-2" />
+                {t('common.edit')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={onDelete}
+                className="text-destructive focus:text-destructive"
+              >
+                <TrashSimple size={16} className="mr-2" />
+                {t('common.delete')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </div>
-      <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-border/50">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onEdit}
-          className="h-9 px-3 gap-2"
-        >
-          <PencilSimple size={16} />
-          {t('common.edit')}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onDelete}
-          className="h-9 px-3 gap-2 text-destructive hover:text-destructive"
-        >
-          <TrashSimple size={16} />
-          {t('common.delete')}
-        </Button>
       </div>
     </CardContent>
   </Card>

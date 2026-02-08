@@ -2839,6 +2839,7 @@ export interface ZZPInvoice {
   subtotal_cents: number
   vat_total_cents: number
   total_cents: number
+  amount_paid_cents: number
   notes?: string
   lines: ZZPInvoiceLine[]
   created_at: string
@@ -2864,6 +2865,269 @@ export interface ZZPInvoiceUpdate {
 export interface ZZPInvoiceListResponse {
   invoices: ZZPInvoice[]
   total: number
+}
+
+// Bank Account & Transaction Types
+export interface ZZPBankAccount {
+  id: string
+  administration_id: string
+  iban: string
+  bank_name?: string
+  currency: string
+  created_at: string
+}
+
+export interface ZZPBankAccountListResponse {
+  accounts: ZZPBankAccount[]
+  total: number
+}
+
+export interface ZZPBankTransaction {
+  id: string
+  administration_id: string
+  bank_account_id: string
+  booking_date: string
+  amount_cents: number
+  currency: string
+  counterparty_name?: string
+  counterparty_iban?: string
+  description: string
+  reference?: string
+  status: 'NEW' | 'MATCHED' | 'IGNORED' | 'NEEDS_REVIEW'
+  matched_invoice_id?: string
+  matched_invoice_number?: string
+  created_at: string
+}
+
+export interface ZZPBankTransactionListResponse {
+  transactions: ZZPBankTransaction[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface ZZPBankImportResponse {
+  imported_count: number
+  skipped_duplicates_count: number
+  total_in_file: number
+  errors: string[]
+  message: string
+  bank_account_id?: string
+}
+
+export interface ZZPInvoiceMatchSuggestion {
+  invoice_id: string
+  invoice_number: string
+  customer_name?: string
+  invoice_total_cents: number
+  invoice_open_cents: number
+  invoice_date: string
+  confidence_score: number
+  match_reason: string
+}
+
+export interface ZZPMatchSuggestionsResponse {
+  transaction_id: string
+  suggestions: ZZPInvoiceMatchSuggestion[]
+  message: string
+}
+
+export interface ZZPMatchInvoiceRequest {
+  invoice_id: string
+  amount_cents?: number
+  notes?: string
+}
+
+export interface ZZPMatchInvoiceResponse {
+  transaction_id: string
+  invoice_id: string
+  invoice_number: string
+  amount_matched_cents: number
+  invoice_new_status: string
+  invoice_amount_paid_cents: number
+  invoice_total_cents: number
+  message: string
+}
+
+export interface ZZPUnmatchResponse {
+  transaction_id: string
+  invoice_id: string
+  invoice_number: string
+  amount_unmatched_cents: number
+  invoice_new_status: string
+  invoice_amount_paid_cents: number
+  message: string
+}
+
+export interface ZZPBankTransactionMatch {
+  id: string
+  bank_transaction_id: string
+  invoice_id: string
+  invoice_number: string
+  amount_cents: number
+  match_type: string
+  confidence_score?: number
+  notes?: string
+  created_at: string
+  user_id?: string
+}
+
+export interface ZZPBankTransactionMatchListResponse {
+  matches: ZZPBankTransactionMatch[]
+  total: number
+}
+
+// AI Insights Types
+export type InsightType = 
+  | 'invoice_overdue'
+  | 'invoice_followup'
+  | 'unbilled_hours'
+  | 'btw_deadline'
+  | 'missing_profile'
+  | 'no_recent_activity'
+
+export type InsightSeverity = 'action_needed' | 'suggestion' | 'info'
+
+export interface InsightAction {
+  type: string
+  label: string
+  route?: string
+  params?: Record<string, string>
+}
+
+export interface ZZPInsight {
+  id: string
+  type: InsightType
+  severity: InsightSeverity
+  title: string
+  description: string
+  reason: string
+  action?: InsightAction
+  related_id?: string
+  related_type?: string
+  amount_cents?: number
+  created_at: string
+  dismissible: boolean
+}
+
+export interface ZZPInsightsResponse {
+  insights: ZZPInsight[]
+  total_action_needed: number
+  total_suggestions: number
+  generated_at: string
+  ai_model_version: string
+}
+
+// Quote (Offerte) Types
+export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'converted'
+
+export interface ZZPQuoteLine {
+  id: string
+  quote_id: string
+  line_number: number
+  description: string
+  quantity: number
+  unit_price_cents: number
+  vat_rate: number
+  vat_amount_cents: number
+  line_total_cents: number
+}
+
+export interface ZZPQuoteLineCreate {
+  description: string
+  quantity: number
+  unit_price_cents: number
+  vat_rate: number
+}
+
+export interface ZZPQuote {
+  id: string
+  administration_id: string
+  customer_id: string
+  quote_number: string
+  status: QuoteStatus
+  issue_date: string
+  valid_until?: string
+  invoice_id?: string
+  
+  // Seller snapshot
+  seller_company_name?: string
+  seller_trading_name?: string
+  seller_address_street?: string
+  seller_address_postal_code?: string
+  seller_address_city?: string
+  seller_address_country?: string
+  seller_kvk_number?: string
+  seller_btw_number?: string
+  seller_iban?: string
+  seller_email?: string
+  seller_phone?: string
+  
+  // Customer snapshot
+  customer_name?: string
+  customer_address_street?: string
+  customer_address_postal_code?: string
+  customer_address_city?: string
+  customer_address_country?: string
+  customer_kvk_number?: string
+  customer_btw_number?: string
+  
+  // Totals
+  subtotal_cents: number
+  vat_total_cents: number
+  total_cents: number
+  
+  // Content
+  title?: string
+  notes?: string
+  terms?: string
+  
+  // Timestamps
+  created_at: string
+  updated_at: string
+  
+  // Lines
+  lines: ZZPQuoteLine[]
+}
+
+export interface ZZPQuoteCreate {
+  customer_id: string
+  issue_date: string
+  valid_until?: string
+  title?: string
+  notes?: string
+  terms?: string
+  lines: ZZPQuoteLineCreate[]
+}
+
+export interface ZZPQuoteUpdate {
+  customer_id?: string
+  issue_date?: string
+  valid_until?: string
+  title?: string
+  notes?: string
+  terms?: string
+  lines?: ZZPQuoteLineCreate[]
+}
+
+export interface ZZPQuoteListResponse {
+  quotes: ZZPQuote[]
+  total: number
+  total_amount_cents: number
+  stats?: {
+    draft: number
+    sent: number
+    accepted: number
+    rejected: number
+    expired: number
+    converted: number
+  }
+}
+
+export interface ZZPQuoteConvertResponse {
+  quote: ZZPQuote
+  invoice_id: string
+  invoice_number: string
 }
 
 // Expense Types
@@ -3270,6 +3534,165 @@ export const zzpApi = {
 
     delete: async (eventId: string): Promise<void> => {
       await api.delete(`/zzp/calendar-events/${eventId}`)
+    },
+  },
+
+  // ------------ Bank & Payments ------------
+  bank: {
+    /** List all bank accounts */
+    listAccounts: async (): Promise<ZZPBankAccountListResponse> => {
+      const response = await api.get<ZZPBankAccountListResponse>('/zzp/bank/accounts')
+      return response.data
+    },
+
+    /** Import bank transactions from CSV */
+    importTransactions: async (
+      file: File,
+      bankAccountIban?: string,
+      bankName?: string
+    ): Promise<ZZPBankImportResponse> => {
+      const formData = new FormData()
+      formData.append('file', file)
+      if (bankAccountIban) formData.append('bank_account_iban', bankAccountIban)
+      if (bankName) formData.append('bank_name', bankName)
+      
+      const response = await api.post<ZZPBankImportResponse>('/zzp/bank/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      return response.data
+    },
+
+    /** List bank transactions with filters */
+    listTransactions: async (options?: {
+      status?: 'NEW' | 'MATCHED' | 'IGNORED' | 'NEEDS_REVIEW'
+      bank_account_id?: string
+      date_from?: string
+      date_to?: string
+      q?: string
+      page?: number
+      page_size?: number
+    }): Promise<ZZPBankTransactionListResponse> => {
+      const params: Record<string, string | number> = {}
+      if (options?.status) params.status = options.status
+      if (options?.bank_account_id) params.bank_account_id = options.bank_account_id
+      if (options?.date_from) params.date_from = options.date_from
+      if (options?.date_to) params.date_to = options.date_to
+      if (options?.q) params.q = options.q
+      if (options?.page) params.page = options.page
+      if (options?.page_size) params.page_size = options.page_size
+      
+      const response = await api.get<ZZPBankTransactionListResponse>('/zzp/bank/transactions', { params })
+      return response.data
+    },
+
+    /** Get match suggestions for a transaction */
+    getSuggestions: async (transactionId: string): Promise<ZZPMatchSuggestionsResponse> => {
+      const response = await api.get<ZZPMatchSuggestionsResponse>(
+        `/zzp/bank/transactions/${transactionId}/suggestions`
+      )
+      return response.data
+    },
+
+    /** Match a transaction to an invoice */
+    matchToInvoice: async (
+      transactionId: string,
+      data: ZZPMatchInvoiceRequest
+    ): Promise<ZZPMatchInvoiceResponse> => {
+      const response = await api.post<ZZPMatchInvoiceResponse>(
+        `/zzp/bank/transactions/${transactionId}/match`,
+        data
+      )
+      return response.data
+    },
+
+    /** Unmatch a transaction from its invoice */
+    unmatch: async (transactionId: string): Promise<ZZPUnmatchResponse> => {
+      const response = await api.post<ZZPUnmatchResponse>(
+        `/zzp/bank/transactions/${transactionId}/unmatch`
+      )
+      return response.data
+    },
+
+    /** List all matches (audit trail) */
+    listMatches: async (invoiceId?: string): Promise<ZZPBankTransactionMatchListResponse> => {
+      const params: Record<string, string> = {}
+      if (invoiceId) params.invoice_id = invoiceId
+      
+      const response = await api.get<ZZPBankTransactionMatchListResponse>('/zzp/bank/matches', { params })
+      return response.data
+    },
+  },
+
+  // ------------ AI Insights ------------
+  insights: {
+    /**
+     * Get AI-generated insights for the ZZP user.
+     * 
+     * Returns actionable insights like:
+     * - Overdue invoices needing follow-up
+     * - Unbilled hours that could be invoiced
+     * - BTW deadline reminders
+     * - Missing profile data
+     * 
+     * All insights include an explanation of WHY they were generated.
+     */
+    get: async (): Promise<ZZPInsightsResponse> => {
+      const response = await api.get<ZZPInsightsResponse>('/zzp/insights')
+      return response.data
+    },
+  },
+
+  // ------------ Quotes (Offertes) ------------
+  quotes: {
+    /** List all quotes */
+    list: async (options?: {
+      status?: QuoteStatus
+      customer_id?: string
+      from_date?: string
+      to_date?: string
+    }): Promise<ZZPQuoteListResponse> => {
+      const params: Record<string, string> = {}
+      if (options?.status) params.status = options.status
+      if (options?.customer_id) params.customer_id = options.customer_id
+      if (options?.from_date) params.from_date = options.from_date
+      if (options?.to_date) params.to_date = options.to_date
+      const response = await api.get<ZZPQuoteListResponse>('/zzp/quotes', { params })
+      return response.data
+    },
+
+    /** Get a specific quote */
+    get: async (quoteId: string): Promise<ZZPQuote> => {
+      const response = await api.get<ZZPQuote>(`/zzp/quotes/${quoteId}`)
+      return response.data
+    },
+
+    /** Create a new quote */
+    create: async (data: ZZPQuoteCreate): Promise<ZZPQuote> => {
+      const response = await api.post<ZZPQuote>('/zzp/quotes', data)
+      return response.data
+    },
+
+    /** Update a quote */
+    update: async (quoteId: string, data: ZZPQuoteUpdate): Promise<ZZPQuote> => {
+      const response = await api.put<ZZPQuote>(`/zzp/quotes/${quoteId}`, data)
+      return response.data
+    },
+
+    /** Update quote status */
+    updateStatus: async (quoteId: string, status: QuoteStatus): Promise<ZZPQuote> => {
+      const response = await api.patch<ZZPQuote>(`/zzp/quotes/${quoteId}/status`, { status })
+      return response.data
+    },
+
+    /** Convert quote to invoice */
+    convertToInvoice: async (quoteId: string): Promise<ZZPQuoteConvertResponse> => {
+      const response = await api.post<ZZPQuoteConvertResponse>(`/zzp/quotes/${quoteId}/convert`)
+      return response.data
+    },
+
+    /** Delete a quote (draft only) */
+    delete: async (quoteId: string): Promise<void> => {
+      await api.delete(`/zzp/quotes/${quoteId}`)
     },
   },
 

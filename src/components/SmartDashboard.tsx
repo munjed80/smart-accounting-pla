@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/AuthContext'
 import { transactionApi, TransactionStats, administrationApi, Administration, getErrorMessage } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { NoAdministrationsEmptyState } from '@/components/EmptyState'
+import { AIInsightsPanel } from '@/components/AIInsightsPanel'
 import { 
   Receipt, 
   TrendUp, 
@@ -379,6 +380,53 @@ export const SmartDashboard = () => {
               )}
             </CardContent>
           </Card>
+        </div>
+        
+        {/* AI Insights Panel - Smart Accounting feature */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="lg:col-span-2">
+            <AIInsightsPanel maxItems={4} />
+          </div>
+          <div className="hidden lg:block">
+            {/* Placeholder for future quick actions */}
+            <Card className="bg-card/80 backdrop-blur-sm h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Sparkle size={20} weight="duotone" className="text-primary" />
+                  {t('dashboard.quickActions')}
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  {t('dashboard.quickActionsDescription')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start gap-2 h-10"
+                  onClick={() => navigateTo('/zzp/invoices')}
+                >
+                  <FileText size={18} />
+                  {t('dashboard.newInvoice')}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start gap-2 h-10"
+                  onClick={() => navigateTo('/zzp/time')}
+                >
+                  <Receipt size={18} />
+                  {t('dashboard.logHours')}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start gap-2 h-10"
+                  onClick={() => navigateTo('/zzp/expenses')}
+                >
+                  <TrendDown size={18} />
+                  {t('dashboard.addExpense')}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>

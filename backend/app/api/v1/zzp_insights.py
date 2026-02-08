@@ -65,7 +65,7 @@ async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administra
     """
 )
 async def get_insights(
-    user: Annotated[CurrentUser, Depends(require_zzp)],
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ZZPInsightsResponse:
     """
@@ -81,7 +81,8 @@ async def get_insights(
     
     Returns insights sorted by severity (ACTION_NEEDED first).
     """
-    administration = await get_user_administration(user.id, db)
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
     
     insights_service = ZZPInsightsService(db, administration.id)
     return await insights_service.generate_insights()

@@ -165,7 +165,7 @@ def quote_to_response(quote: ZZPQuote) -> QuoteResponse:
     description="List all quotes for the authenticated ZZP user's administration."
 )
 async def list_quotes(
-    user: Annotated[CurrentUser, Depends(require_zzp)],
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     status: Optional[str] = Query(None, description="Filter by status"),
     customer_id: Optional[UUID] = Query(None, description="Filter by customer"),
@@ -173,7 +173,8 @@ async def list_quotes(
     to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
 ) -> QuoteListResponse:
     """List all quotes with optional filters."""
-    administration = await get_user_administration(user.id, db)
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
     
     query = (
         select(ZZPQuote)
@@ -225,11 +226,12 @@ async def list_quotes(
 )
 async def get_quote(
     quote_id: UUID,
-    user: Annotated[CurrentUser, Depends(require_zzp)],
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> QuoteResponse:
     """Get a specific quote."""
-    administration = await get_user_administration(user.id, db)
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
     
     result = await db.execute(
         select(ZZPQuote)
@@ -257,11 +259,12 @@ async def get_quote(
 )
 async def create_quote(
     data: QuoteCreate,
-    user: Annotated[CurrentUser, Depends(require_zzp)],
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> QuoteResponse:
     """Create a new quote."""
-    administration = await get_user_administration(user.id, db)
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
     
     # Verify customer exists and belongs to this administration
     customer_result = await db.execute(
@@ -381,11 +384,12 @@ async def create_quote(
 async def update_quote(
     quote_id: UUID,
     data: QuoteUpdate,
-    user: Annotated[CurrentUser, Depends(require_zzp)],
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> QuoteResponse:
     """Update a quote."""
-    administration = await get_user_administration(user.id, db)
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
     
     result = await db.execute(
         select(ZZPQuote)
@@ -498,11 +502,12 @@ async def update_quote(
 async def update_quote_status(
     quote_id: UUID,
     data: QuoteStatusUpdate,
-    user: Annotated[CurrentUser, Depends(require_zzp)],
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> QuoteResponse:
     """Update quote status."""
-    administration = await get_user_administration(user.id, db)
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
     
     result = await db.execute(
         select(ZZPQuote)
@@ -551,11 +556,12 @@ async def update_quote_status(
 )
 async def convert_quote_to_invoice(
     quote_id: UUID,
-    user: Annotated[CurrentUser, Depends(require_zzp)],
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> QuoteConvertToInvoiceResponse:
     """Convert a quote to an invoice."""
-    administration = await get_user_administration(user.id, db)
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
     
     result = await db.execute(
         select(ZZPQuote)
@@ -700,11 +706,12 @@ async def convert_quote_to_invoice(
 )
 async def delete_quote(
     quote_id: UUID,
-    user: Annotated[CurrentUser, Depends(require_zzp)],
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     """Delete a quote."""
-    administration = await get_user_administration(user.id, db)
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
     
     result = await db.execute(
         select(ZZPQuote)

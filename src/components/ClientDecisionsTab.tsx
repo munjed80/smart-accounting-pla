@@ -292,6 +292,8 @@ export const ClientDecisionsTab = ({ clientId }: ClientDecisionsTabProps) => {
 
   useEffect(() => {
     fetchHistory()
+    // fetchHistory is defined inline and would cause infinite loop if added to deps.
+    // We only want to re-fetch when clientId changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId])
 

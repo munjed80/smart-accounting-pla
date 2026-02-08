@@ -337,6 +337,12 @@ export const nl = {
     errorLoadingSession: "Fout bij laden van sessie",
     runningTime: "Looptijd",
     startedAt: "Gestart om",
+    notLoggedIn: "Je bent niet ingelogd",
+    clockInFailed: "Inklokken mislukt",
+    clockOutFailed: "Uitklokken mislukt",
+    hourSingular: "uur",
+    hoursPlural: "uur",
+    addedToTimesheet: "toegevoegd aan urenregistratie",
     
     // Tabs
     tabThisWeek: "Deze week",

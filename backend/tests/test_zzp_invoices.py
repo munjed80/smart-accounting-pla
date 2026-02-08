@@ -282,11 +282,16 @@ class TestInvoiceDelete:
 
 
 # Pytest fixtures for test invoices
-# Note: In a real test setup, these would be defined in conftest.py
-# with database transactions for proper test isolation.
+# Note: These fixtures require the conftest.py to provide:
+# - test_user, test_administration, auth_headers
+# - async_client (httpx AsyncClient)
+# - db_session (async SQLAlchemy session)
+#
+# These fixtures are async-compatible and should be used with async tests.
+# In a full integration test setup, ensure conftest.py provides async fixtures.
 
 @pytest.fixture
-def test_invoice_draft(test_user, test_administration, test_customer, db_session):
+async def test_invoice_draft(test_user, test_administration, test_customer, db_session):
     """Create a draft invoice for testing."""
     invoice = ZZPInvoice(
         administration_id=test_administration.id,
@@ -301,13 +306,13 @@ def test_invoice_draft(test_user, test_administration, test_customer, db_session
         total_cents=12100,
     )
     db_session.add(invoice)
-    db_session.commit()
-    db_session.refresh(invoice)
+    await db_session.commit()
+    await db_session.refresh(invoice)
     return invoice
 
 
 @pytest.fixture
-def test_invoice_sent(test_user, test_administration, test_customer, db_session):
+async def test_invoice_sent(test_user, test_administration, test_customer, db_session):
     """Create a sent invoice for testing."""
     invoice = ZZPInvoice(
         administration_id=test_administration.id,
@@ -322,13 +327,13 @@ def test_invoice_sent(test_user, test_administration, test_customer, db_session)
         total_cents=12100,
     )
     db_session.add(invoice)
-    db_session.commit()
-    db_session.refresh(invoice)
+    await db_session.commit()
+    await db_session.refresh(invoice)
     return invoice
 
 
 @pytest.fixture
-def test_invoice_paid(test_user, test_administration, test_customer, db_session):
+async def test_invoice_paid(test_user, test_administration, test_customer, db_session):
     """Create a paid invoice for testing."""
     invoice = ZZPInvoice(
         administration_id=test_administration.id,
@@ -343,13 +348,13 @@ def test_invoice_paid(test_user, test_administration, test_customer, db_session)
         total_cents=12100,
     )
     db_session.add(invoice)
-    db_session.commit()
-    db_session.refresh(invoice)
+    await db_session.commit()
+    await db_session.refresh(invoice)
     return invoice
 
 
 @pytest.fixture
-def test_invoice_cancelled(test_user, test_administration, test_customer, db_session):
+async def test_invoice_cancelled(test_user, test_administration, test_customer, db_session):
     """Create a cancelled invoice for testing."""
     invoice = ZZPInvoice(
         administration_id=test_administration.id,
@@ -364,13 +369,13 @@ def test_invoice_cancelled(test_user, test_administration, test_customer, db_ses
         total_cents=12100,
     )
     db_session.add(invoice)
-    db_session.commit()
-    db_session.refresh(invoice)
+    await db_session.commit()
+    await db_session.refresh(invoice)
     return invoice
 
 
 @pytest.fixture
-def test_customer(test_administration, db_session):
+async def test_customer(test_administration, db_session):
     """Create a test customer for invoice tests."""
     customer = ZZPCustomer(
         administration_id=test_administration.id,
@@ -379,6 +384,6 @@ def test_customer(test_administration, db_session):
         status="active",
     )
     db_session.add(customer)
-    db_session.commit()
-    db_session.refresh(customer)
+    await db_session.commit()
+    await db_session.refresh(customer)
     return customer

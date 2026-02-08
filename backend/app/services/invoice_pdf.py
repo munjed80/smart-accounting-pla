@@ -22,9 +22,21 @@ logger = logging.getLogger(__name__)
 
 
 def format_amount(cents: int) -> str:
-    """Format cents as EUR currency string."""
+    """
+    Format cents as EUR currency string in Dutch format.
+    
+    Dutch format uses period (.) as thousand separator and comma (,) as decimal separator.
+    Example: 1234567 cents -> "€ 12.345,67"
+    """
     euros = Decimal(cents) / 100
-    return f"€ {euros:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    # Format with US-style thousand separators first
+    formatted = f"{euros:,.2f}"
+    # Convert to Dutch format: swap , and . using a temporary placeholder
+    # Step 1: , (thousands) -> temp
+    # Step 2: . (decimal) -> ,
+    # Step 3: temp -> . (thousands)
+    dutch_formatted = formatted.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+    return f"€ {dutch_formatted}"
 
 
 def format_date_nl(date_obj) -> str:
@@ -470,8 +482,10 @@ def generate_invoice_pdf(invoice: ZZPInvoice) -> bytes:
         return pdf_buffer.read()
         
     except Exception as e:
-        logger.error(f"Failed to generate PDF for invoice {invoice.invoice_number}: {e}")
-        raise RuntimeError(f"Failed to generate PDF: {e}") from e
+        # Log full exception details for debugging
+        logger.error(f"Failed to generate PDF for invoice {invoice.invoice_number}: {e}", exc_info=True)
+        # Return user-friendly message without exposing internal details
+        raise RuntimeError("PDF generation failed. Please try again later.") from e
 
 
 def get_invoice_pdf_filename(invoice: ZZPInvoice) -> str:

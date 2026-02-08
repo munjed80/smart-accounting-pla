@@ -1461,7 +1461,7 @@ export const ZZPInvoicesPage = () => {
       // Mobile-optimized download approach
       if (isIOS()) {
         // iOS Safari: Use anchor element with target _blank
-        // This allows the PDF to open in the browser's PDF viewer or download
+        // This allows the PDF to open in the browser's PDF viewer
         // Using anchor instead of window.open to avoid popup blockers
         const link = document.createElement('a')
         link.href = url
@@ -1472,17 +1472,8 @@ export const ZZPInvoicesPage = () => {
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-        
-        // Fallback: if the above doesn't work (some iOS versions),
-        // try opening in a new window after a short delay
-        setTimeout(() => {
-          // Check if the download started - if not, try window.open
-          const newWindow = window.open(url, '_blank')
-          if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-            // Popup was blocked, show user-friendly message
-            toast.info(t('zzpInvoices.pdfOpenInNewTab') || 'PDF opens in nieuw tabblad')
-          }
-        }, 100)
+        // Note: On iOS, the PDF typically opens in a new tab with Safari's PDF viewer
+        // The user can then share/save the PDF from there
       } else if (isAndroid()) {
         // Android: Use anchor with download attribute
         // Most Android browsers support this well

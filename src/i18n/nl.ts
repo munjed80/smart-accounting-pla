@@ -619,7 +619,6 @@ export const nl = {
     pdfDownloading: "PDF wordt gedownload...",
     pdfDownloaded: "PDF gedownload",
     pdfError: "Kon PDF niet downloaden",
-    pdfOpenInNewTab: "PDF opent in nieuw tabblad",
     // Share action
     share: "Delen",
     shareTitle: "Factuur {number}",

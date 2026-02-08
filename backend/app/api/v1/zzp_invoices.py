@@ -4,7 +4,7 @@ ZZP Invoices API Endpoints
 CRUD operations for ZZP invoices with lines, status transitions,
 race-safe invoice number generation, and PDF generation.
 """
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from typing import Annotated, List, Optional
 from uuid import UUID
@@ -547,8 +547,8 @@ async def update_invoice_status(
     
     # Update paid_at timestamp based on status change
     if new_status == InvoiceStatus.PAID.value:
-        # Mark as paid: set paid_at to current time
-        invoice.paid_at = datetime.now()
+        # Mark as paid: set paid_at to current time (timezone-aware)
+        invoice.paid_at = datetime.now(timezone.utc)
     elif current_status == InvoiceStatus.PAID.value and new_status != InvoiceStatus.PAID.value:
         # Mark as unpaid (transitioning from paid to another status): clear paid_at
         invoice.paid_at = None

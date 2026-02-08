@@ -594,6 +594,12 @@ export const nl = {
     pdfDownloading: "PDF wordt gedownload...",
     pdfDownloaded: "PDF gedownload",
     pdfError: "Kon PDF niet downloaden",
+    // Share action
+    share: "Delen",
+    shareTitle: "Factuur {number}",
+    shareText: "Bekijk factuur {number}",
+    shareSuccess: "Factuur gedeeld",
+    shareError: "Kon factuur niet delen",
     // Error messages
     loadError: "Kon facturen niet laden",
     saveError: "Kon factuur niet opslaan",

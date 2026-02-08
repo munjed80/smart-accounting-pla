@@ -41,6 +41,7 @@ import {
   ExecutionStatus,
   getErrorMessage 
 } from '@/lib/api'
+import { createDossierLogger } from '@/lib/dossierLogger'
 import { 
   ArrowsClockwise,
   WarningCircle,
@@ -237,15 +238,20 @@ export const ClientDecisionsTab = ({ clientId }: ClientDecisionsTabProps) => {
   const [decisionToReverse, setDecisionToReverse] = useState<string | null>(null)
 
   const fetchHistory = async () => {
+    const logger = createDossierLogger(clientId)
+    const endpoint = `/accountant/clients/${clientId}/decision-history`
+    
     try {
       setIsLoading(true)
       setError(null)
+      logger.request(endpoint)
       const data = await decisionApi.getDecisionHistory(clientId)
+      logger.success(endpoint, { totalDecisions: data.total_decisions })
       setHistory(data)
     } catch (err) {
+      logger.error(endpoint, err)
       const message = getErrorMessage(err)
       setError(message)
-      console.error('Failed to fetch decision history:', err)
     } finally {
       setIsLoading(false)
     }
@@ -259,18 +265,24 @@ export const ClientDecisionsTab = ({ clientId }: ClientDecisionsTabProps) => {
   const handleConfirmReverse = async () => {
     if (!decisionToReverse) return
     
+    const logger = createDossierLogger(clientId)
+    const endpoint = `/accountant/decisions/${decisionToReverse}/reverse`
+    
     setIsReversingId(decisionToReverse)
     setReverseError(null)
     setReverseSuccess(null)
     setShowReverseDialog(false)
     
     try {
+      logger.request(endpoint)
       await decisionApi.reverseDecision(decisionToReverse)
+      logger.success(endpoint)
       setReverseSuccess(t('decisions.reversedSuccess'))
       // Refresh the list
       await fetchHistory()
       setTimeout(() => setReverseSuccess(null), 3000)
     } catch (err) {
+      logger.error(endpoint, err)
       setReverseError(getErrorMessage(err))
     } finally {
       setIsReversingId(null)
@@ -280,6 +292,7 @@ export const ClientDecisionsTab = ({ clientId }: ClientDecisionsTabProps) => {
 
   useEffect(() => {
     fetchHistory()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId])
 
   if (error && !history) {

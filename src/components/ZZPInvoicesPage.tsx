@@ -91,6 +91,10 @@ import {
   DotsThreeVertical,
   Printer,
   Envelope,
+  Download,
+  ShareNetwork,
+  CopySimple,
+  CurrencyCircleDollar,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { navigateTo } from '@/lib/navigation'
@@ -1072,18 +1076,24 @@ const InvoiceCard = ({
   onEdit, 
   onDelete,
   onStatusChange,
-  onPrint,
-  onSend,
+  onDownloadPdf,
+  onCopyLink,
+  onMarkPaid,
+  onMarkUnpaid,
   canEdit,
+  isDownloading,
 }: { 
   invoice: ZZPInvoice
   onView: () => void
   onEdit: () => void
   onDelete: () => void
   onStatusChange: (newStatus: 'sent' | 'paid' | 'cancelled') => void
-  onPrint: () => void
-  onSend: () => void
+  onDownloadPdf: () => void
+  onCopyLink: () => void
+  onMarkPaid: () => void
+  onMarkUnpaid: () => void
   canEdit: boolean
+  isDownloading: boolean
 }) => (
   <Card className="bg-card/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-colors">
     <CardContent className="p-4">
@@ -1152,22 +1162,46 @@ const InvoiceCard = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onPrint}>
-                <Printer size={16} className="mr-2" />
+              <DropdownMenuItem onClick={onDownloadPdf} disabled={isDownloading}>
+                {isDownloading ? (
+                  <SpinnerGap size={16} className="mr-2 animate-spin" />
+                ) : (
+                  <Download size={16} className="mr-2" />
+                )}
                 {t('zzpInvoices.downloadPdf')}
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={onSend}
-                disabled
-                className="opacity-50"
-              >
-                <Envelope size={16} className="mr-2" />
-                {t('zzpInvoices.sendEmail')}
-                <Badge variant="secondary" className="ml-2 text-xs">
-                  {t('common.comingSoon')}
-                </Badge>
+              <DropdownMenuItem onClick={onCopyLink}>
+                <CopySimple size={16} className="mr-2" />
+                {t('zzpInvoices.copyLink')}
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {/* Mark as Paid / Unpaid - only for non-draft, non-cancelled invoices */}
+              {invoice.status !== 'draft' && invoice.status !== 'cancelled' && (
+                <>
+                  {invoice.status === 'paid' ? (
+                    <DropdownMenuItem onClick={onMarkUnpaid}>
+                      <XCircle size={16} className="mr-2" />
+                      {t('zzpInvoices.markUnpaid')}
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onClick={onMarkPaid}>
+                      <CheckCircle size={16} className="mr-2" />
+                      {t('zzpInvoices.markPaid')}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {/* Delete - only for draft invoices */}
+              {invoice.status === 'draft' && (
+                <DropdownMenuItem 
+                  onClick={onDelete}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <TrashSimple size={16} className="mr-2" />
+                  {t('common.delete')}
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -1199,6 +1233,9 @@ export const ZZPInvoicesPage = () => {
   const [editingInvoice, setEditingInvoice] = useState<ZZPInvoice | undefined>()
   const [viewingInvoice, setViewingInvoice] = useState<ZZPInvoice | undefined>()
   const [deletingInvoice, setDeletingInvoice] = useState<ZZPInvoice | undefined>()
+  
+  // PDF download state - tracks which invoice is currently downloading
+  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null)
 
   // Check for customer_id in URL params
   useEffect(() => {
@@ -1364,25 +1401,69 @@ export const ZZPInvoicesPage = () => {
     }
   }, [deletingInvoice, loadData])
 
-  // Handle print/download invoice (opens browser print dialog)
-  const handlePrintInvoice = useCallback((invoice: ZZPInvoice) => {
-    // Open the invoice in view mode and then trigger print
-    setEditingInvoice(undefined)
-    setViewingInvoice(invoice)
-    setIsFormOpen(true)
-    // Wait for the next render cycle using requestAnimationFrame twice
-    // (first waits for state update, second ensures dialog is painted)
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        window.print()
-      })
-    })
+  // Handle PDF download - download actual PDF from server
+  const handleDownloadPdf = useCallback(async (invoice: ZZPInvoice) => {
+    try {
+      setDownloadingInvoiceId(invoice.id)
+      toast.info(t('zzpInvoices.pdfDownloading'))
+      
+      const blob = await zzpApi.invoices.downloadPdf(invoice.id)
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${invoice.invoice_number}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      toast.success(t('zzpInvoices.pdfDownloaded'))
+    } catch (err) {
+      console.error('Failed to download PDF:', err)
+      toast.error(parseApiError(err) || t('zzpInvoices.pdfError'))
+    } finally {
+      setDownloadingInvoiceId(null)
+    }
   }, [])
 
-  // Handle send invoice (not implemented - show coming soon message)
-  const handleSendInvoice = useCallback(() => {
-    toast.info(t('common.comingSoon'))
+  // Handle copy invoice link to clipboard
+  const handleCopyLink = useCallback(async (invoice: ZZPInvoice) => {
+    try {
+      // Create a link to the invoice - for now, just a reference
+      const invoiceLink = `${window.location.origin}/zzp/invoices?view=${invoice.id}`
+      await navigator.clipboard.writeText(invoiceLink)
+      toast.success(t('zzpInvoices.linkCopied'))
+    } catch (err) {
+      console.error('Failed to copy link:', err)
+      toast.error(t('common.error'))
+    }
   }, [])
+
+  // Handle mark as paid
+  const handleMarkPaid = useCallback(async (invoice: ZZPInvoice) => {
+    try {
+      await zzpApi.invoices.updateStatus(invoice.id, 'paid')
+      toast.success(t('zzpInvoices.markedPaid'))
+      await loadData()
+    } catch (err) {
+      console.error('Failed to mark as paid:', err)
+      toast.error(parseApiError(err))
+    }
+  }, [loadData])
+
+  // Handle mark as unpaid (change back to sent)
+  const handleMarkUnpaid = useCallback(async (invoice: ZZPInvoice) => {
+    try {
+      await zzpApi.invoices.updateStatus(invoice.id, 'sent')
+      toast.success(t('zzpInvoices.markedUnpaid'))
+      await loadData()
+    } catch (err) {
+      console.error('Failed to mark as unpaid:', err)
+      toast.error(parseApiError(err))
+    }
+  }, [loadData])
 
   // Open form for new invoice
   const openNewForm = useCallback(() => {
@@ -1545,9 +1626,12 @@ export const ZZPInvoicesPage = () => {
                         onEdit={() => openEditForm(invoice)}
                         onDelete={() => setDeletingInvoice(invoice)}
                         onStatusChange={(status) => handleStatusChange(invoice, status)}
-                        onPrint={() => handlePrintInvoice(invoice)}
-                        onSend={handleSendInvoice}
+                        onDownloadPdf={() => handleDownloadPdf(invoice)}
+                        onCopyLink={() => handleCopyLink(invoice)}
+                        onMarkPaid={() => handleMarkPaid(invoice)}
+                        onMarkUnpaid={() => handleMarkUnpaid(invoice)}
                         canEdit={canEdit}
+                        isDownloading={downloadingInvoiceId === invoice.id}
                       />
                     )
                   })
@@ -1653,22 +1737,49 @@ export const ZZPInvoicesPage = () => {
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handlePrintInvoice(invoice)}>
-                                      <Printer size={16} className="mr-2" />
+                                    <DropdownMenuItem 
+                                      onClick={() => handleDownloadPdf(invoice)}
+                                      disabled={downloadingInvoiceId === invoice.id}
+                                    >
+                                      {downloadingInvoiceId === invoice.id ? (
+                                        <SpinnerGap size={16} className="mr-2 animate-spin" />
+                                      ) : (
+                                        <Download size={16} className="mr-2" />
+                                      )}
                                       {t('zzpInvoices.downloadPdf')}
                                     </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem 
-                                      onClick={handleSendInvoice}
-                                      disabled
-                                      className="opacity-50"
-                                    >
-                                      <Envelope size={16} className="mr-2" />
-                                      {t('zzpInvoices.sendEmail')}
-                                      <Badge variant="secondary" className="ml-2 text-xs">
-                                        {t('common.comingSoon')}
-                                      </Badge>
+                                    <DropdownMenuItem onClick={() => handleCopyLink(invoice)}>
+                                      <CopySimple size={16} className="mr-2" />
+                                      {t('zzpInvoices.copyLink')}
                                     </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    {/* Mark as Paid / Unpaid - only for non-draft, non-cancelled invoices */}
+                                    {invoice.status !== 'draft' && invoice.status !== 'cancelled' && (
+                                      <>
+                                        {invoice.status === 'paid' ? (
+                                          <DropdownMenuItem onClick={() => handleMarkUnpaid(invoice)}>
+                                            <XCircle size={16} className="mr-2" />
+                                            {t('zzpInvoices.markUnpaid')}
+                                          </DropdownMenuItem>
+                                        ) : (
+                                          <DropdownMenuItem onClick={() => handleMarkPaid(invoice)}>
+                                            <CheckCircle size={16} className="mr-2" />
+                                            {t('zzpInvoices.markPaid')}
+                                          </DropdownMenuItem>
+                                        )}
+                                        <DropdownMenuSeparator />
+                                      </>
+                                    )}
+                                    {/* Delete - only for draft invoices */}
+                                    {invoice.status === 'draft' && (
+                                      <DropdownMenuItem 
+                                        onClick={() => setDeletingInvoice(invoice)}
+                                        className="text-destructive focus:text-destructive"
+                                      >
+                                        <TrashSimple size={16} className="mr-2" />
+                                        {t('common.delete')}
+                                      </DropdownMenuItem>
+                                    )}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </div>

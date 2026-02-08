@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/lib/AuthContext'
+import { useActiveClient } from '@/lib/ActiveClientContext'
 import { 
   ledgerApi, 
   LedgerClientOverview,
@@ -99,6 +100,7 @@ const incrementTodayCompleted = (): number => {
 
 export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDossierPageProps) => {
   const { user } = useAuth()
+  const { activeClientId, allLinks, setActiveClient, refreshLinks } = useActiveClient()
   const [overview, setOverview] = useState<LedgerClientOverview | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -106,12 +108,24 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
   const [activeTab, setActiveTab] = useState<string>(initialTab)
   const [todayCompleted, setTodayCompleted] = useState(getTodayCompleted())
 
-  // Store selected client in localStorage
-  useEffect(() => {
-    if (clientId) {
-      localStorage.setItem('selectedClientId', clientId)
+  /**
+   * Try to sync the active client context from allLinks.
+   * Returns true if sync was successful, false if link not found.
+   */
+  const trySyncActiveClient = (links: typeof allLinks): boolean => {
+    const link = links.find(l => l.administration_id === clientId && l.status === 'ACTIVE')
+    if (link) {
+      setActiveClient({
+        id: link.client_user_id,
+        name: link.client_name,
+        email: link.client_email,
+        administrationId: link.administration_id,
+        administrationName: link.administration_name,
+      })
+      return true
     }
-  }, [clientId])
+    return false
+  }
 
   const fetchOverview = async () => {
     try {
@@ -120,17 +134,19 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
       setIsAccessDenied(false)
       const data = await ledgerApi.getClientOverview(clientId)
       setOverview(data)
-      // Store client name
-      if (data.client_name) {
-        localStorage.setItem('selectedClientName', data.client_name)
+      
+      // If activeClient context doesn't match, sync it
+      if (activeClientId !== clientId) {
+        if (!trySyncActiveClient(allLinks)) {
+          // Links may not be loaded yet; refresh them
+          // After refresh, the ActiveClientContext will auto-select if matching
+          await refreshLinks()
+        }
       }
     } catch (err: unknown) {
       // Check if it's a NOT_ASSIGNED error (403)
       if (isNotAssignedError(err)) {
         setIsAccessDenied(true)
-        // Clear localStorage since user doesn't have access
-        localStorage.removeItem('selectedClientId')
-        localStorage.removeItem('selectedClientName')
         return
       }
       const message = getErrorMessage(err)

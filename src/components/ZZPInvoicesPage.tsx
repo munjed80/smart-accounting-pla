@@ -131,6 +131,15 @@ function formatDate(isoDate: string): string {
 // Invoice status types (matches backend)
 type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
 
+// Helper to detect iOS devices (including iPadOS)
+function isIOS(): boolean {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
+// Delay in ms before revoking PDF blob URL to ensure download/open completes
+const PDF_URL_REVOCATION_DELAY_MS = 30000
+
 // Helper function to extract date part from ISO string
 const extractDatePart = (isoString: string | undefined): string => {
   if (!isoString) return ''
@@ -1078,6 +1087,7 @@ const InvoiceCard = ({
   onStatusChange,
   onDownloadPdf,
   onCopyLink,
+  onShare,
   onMarkPaid,
   onMarkUnpaid,
   canEdit,
@@ -1090,6 +1100,7 @@ const InvoiceCard = ({
   onStatusChange: (newStatus: 'sent' | 'paid' | 'cancelled') => void
   onDownloadPdf: () => void
   onCopyLink: () => void
+  onShare: () => void
   onMarkPaid: () => void
   onMarkUnpaid: () => void
   canEdit: boolean
@@ -1173,6 +1184,10 @@ const InvoiceCard = ({
               <DropdownMenuItem onClick={onCopyLink}>
                 <CopySimple size={16} className="mr-2" />
                 {t('zzpInvoices.copyLink')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onShare}>
+                <ShareNetwork size={16} className="mr-2" />
+                {t('zzpInvoices.share')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {/* Mark as Paid / Unpaid - only for non-draft, non-cancelled invoices */}
@@ -1401,7 +1416,7 @@ export const ZZPInvoicesPage = () => {
     }
   }, [deletingInvoice, loadData])
 
-  // Handle PDF download - download actual PDF from server
+  // Handle PDF download - download actual PDF from server (mobile-safe)
   const handleDownloadPdf = useCallback(async (invoice: ZZPInvoice) => {
     try {
       setDownloadingInvoiceId(invoice.id)
@@ -1409,15 +1424,25 @@ export const ZZPInvoicesPage = () => {
       
       const blob = await zzpApi.invoices.downloadPdf(invoice.id)
       
-      // Create download link
+      // Create object URL for the PDF blob
       const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `${invoice.invoice_number}.pdf`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
+      const filename = `${invoice.invoice_number || `INV-${invoice.id}`}.pdf`
+      
+      // On iOS Safari, download attribute is often ignored - open in new tab instead
+      if (isIOS()) {
+        window.open(url, '_blank')
+      } else {
+        // Standard download flow for desktop and Android
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
+      
+      // Delay URL revocation to ensure download/open completes
+      setTimeout(() => window.URL.revokeObjectURL(url), PDF_URL_REVOCATION_DELAY_MS)
       
       toast.success(t('zzpInvoices.pdfDownloaded'))
     } catch (err) {
@@ -1432,12 +1457,41 @@ export const ZZPInvoicesPage = () => {
   const handleCopyLink = useCallback(async (invoice: ZZPInvoice) => {
     try {
       // Create a link to the invoice - for now, just a reference
-      const invoiceLink = `${window.location.origin}/zzp/invoices?view=${invoice.id}`
+      const invoiceLink = `${window.location.origin}/zzp/invoices?view=${encodeURIComponent(invoice.id)}`
       await navigator.clipboard.writeText(invoiceLink)
       toast.success(t('zzpInvoices.linkCopied'))
     } catch (err) {
       console.error('Failed to copy link:', err)
       toast.error(t('common.error'))
+    }
+  }, [])
+
+  // Handle share invoice (Web Share API with clipboard fallback)
+  const handleShare = useCallback(async (invoice: ZZPInvoice) => {
+    const invoicePublicUrl = `${window.location.origin}/zzp/invoices?view=${encodeURIComponent(invoice.id)}`
+    const invoiceNumber = invoice.invoice_number || `INV-${invoice.id}`
+    
+    try {
+      // Use Web Share API if available (native share sheet on mobile)
+      if (navigator.share) {
+        await navigator.share({
+          title: t('zzpInvoices.shareTitle').replace('{number}', invoiceNumber),
+          text: t('zzpInvoices.shareText').replace('{number}', invoiceNumber),
+          url: invoicePublicUrl,
+        })
+        toast.success(t('zzpInvoices.shareSuccess'))
+      } else {
+        // Fallback: copy link to clipboard
+        await navigator.clipboard.writeText(invoicePublicUrl)
+        toast.success(t('zzpInvoices.linkCopied'))
+      }
+    } catch (err) {
+      // AbortError is thrown when user cancels the share dialog - not an error
+      if (err instanceof Error && err.name === 'AbortError') {
+        return
+      }
+      console.error('Failed to share invoice:', err)
+      toast.error(t('zzpInvoices.shareError'))
     }
   }, [])
 
@@ -1628,6 +1682,7 @@ export const ZZPInvoicesPage = () => {
                         onStatusChange={(status) => handleStatusChange(invoice, status)}
                         onDownloadPdf={() => handleDownloadPdf(invoice)}
                         onCopyLink={() => handleCopyLink(invoice)}
+                        onShare={() => handleShare(invoice)}
                         onMarkPaid={() => handleMarkPaid(invoice)}
                         onMarkUnpaid={() => handleMarkUnpaid(invoice)}
                         canEdit={canEdit}
@@ -1751,6 +1806,10 @@ export const ZZPInvoicesPage = () => {
                                     <DropdownMenuItem onClick={() => handleCopyLink(invoice)}>
                                       <CopySimple size={16} className="mr-2" />
                                       {t('zzpInvoices.copyLink')}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleShare(invoice)}>
+                                      <ShareNetwork size={16} className="mr-2" />
+                                      {t('zzpInvoices.share')}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     {/* Mark as Paid / Unpaid - only for non-draft, non-cancelled invoices */}

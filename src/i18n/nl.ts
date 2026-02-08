@@ -53,6 +53,8 @@ export const nl = {
     unknown: "Onbekend",
     optional: "optioneel",
     comingSoon: "Binnenkort beschikbaar",
+    more: "meer",
+    actions: "Acties",
   },
 
   // Brand
@@ -685,6 +687,12 @@ export const nl = {
     total: "Totaal",
     latestAiProcessed: "Laatste AI-verwerkte facturen",
     uploadToStart: "Upload facturen om te beginnen",
+    // Quick actions
+    quickActions: "Snelle acties",
+    quickActionsDescription: "Veel gebruikte taken",
+    newInvoice: "Nieuwe factuur",
+    logHours: "Uren registreren",
+    addExpense: "Uitgave toevoegen",
   },
 
   // Transaction statuses
@@ -2096,6 +2104,33 @@ export const nl = {
     unknown: "Er ging iets mis",
     unknownDescription: "Er is een onverwachte fout opgetreden. Probeer het opnieuw.",
     retry: "Opnieuw proberen",
+  },
+
+  // AI Insights
+  aiInsights: {
+    title: "Slimme Inzichten",
+    subtitle: "AI suggesties voor je administratie",
+    loading: "Inzichten laden...",
+    noInsights: "Alles ziet er goed uit!",
+    noInsightsDescription: "Je administratie is up-to-date. Er zijn geen acties of suggesties.",
+    actionNeeded: "Actie vereist",
+    suggestion: "Suggestie",
+    info: "Info",
+    dismiss: "Negeren",
+    viewAll: "Bekijk alle inzichten",
+    poweredBy: "Aangedreven door regelgebaseerde AI",
+    modelVersion: "AI versie",
+    why: "Waarom zie ik dit?",
+    // Severity labels
+    severityActionNeeded: "Actie vereist",
+    severitySuggestion: "Aanbeveling",
+    severityInfo: "Informatie",
+    // Action labels (fallbacks)
+    takeAction: "Actie ondernemen",
+    viewDetails: "Bekijken",
+    // Error state
+    error: "Kon inzichten niet laden",
+    errorRetry: "Probeer opnieuw",
   },
 };
 

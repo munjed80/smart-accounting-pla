@@ -2977,6 +2977,47 @@ export interface ZZPBankTransactionMatchListResponse {
   total: number
 }
 
+// AI Insights Types
+export type InsightType = 
+  | 'invoice_overdue'
+  | 'invoice_followup'
+  | 'unbilled_hours'
+  | 'btw_deadline'
+  | 'missing_profile'
+  | 'no_recent_activity'
+
+export type InsightSeverity = 'action_needed' | 'suggestion' | 'info'
+
+export interface InsightAction {
+  type: string
+  label: string
+  route?: string
+  params?: Record<string, string>
+}
+
+export interface ZZPInsight {
+  id: string
+  type: InsightType
+  severity: InsightSeverity
+  title: string
+  description: string
+  reason: string
+  action?: InsightAction
+  related_id?: string
+  related_type?: string
+  amount_cents?: number
+  created_at: string
+  dismissible: boolean
+}
+
+export interface ZZPInsightsResponse {
+  insights: ZZPInsight[]
+  total_action_needed: number
+  total_suggestions: number
+  generated_at: string
+  ai_model_version: string
+}
+
 // Expense Types
 export interface ZZPExpense {
   id: string
@@ -3466,6 +3507,25 @@ export const zzpApi = {
       if (invoiceId) params.invoice_id = invoiceId
       
       const response = await api.get<ZZPBankTransactionMatchListResponse>('/zzp/bank/matches', { params })
+      return response.data
+    },
+  },
+
+  // ------------ AI Insights ------------
+  insights: {
+    /**
+     * Get AI-generated insights for the ZZP user.
+     * 
+     * Returns actionable insights like:
+     * - Overdue invoices needing follow-up
+     * - Unbilled hours that could be invoiced
+     * - BTW deadline reminders
+     * - Missing profile data
+     * 
+     * All insights include an explanation of WHY they were generated.
+     */
+    get: async (): Promise<ZZPInsightsResponse> => {
+      const response = await api.get<ZZPInsightsResponse>('/zzp/insights')
       return response.data
     },
   },

@@ -5,6 +5,7 @@ Pydantic schemas for ZZP-specific API operations including validation.
 """
 import re
 from datetime import datetime
+from enum import Enum
 from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel, Field, field_validator, EmailStr
@@ -1204,3 +1205,78 @@ class ZZPBankTransactionMatchListResponse(BaseModel):
     """Schema for list of transaction matches."""
     matches: List[ZZPBankTransactionMatchResponse]
     total: int
+
+
+# ============================================================================
+# AI Insights Schemas
+# ============================================================================
+
+class InsightType(str, Enum):
+    """Types of AI-generated insights."""
+    INVOICE_OVERDUE = "invoice_overdue"
+    INVOICE_FOLLOWUP = "invoice_followup"
+    UNBILLED_HOURS = "unbilled_hours"
+    BTW_DEADLINE = "btw_deadline"
+    MISSING_PROFILE = "missing_profile"
+    NO_RECENT_ACTIVITY = "no_recent_activity"
+
+
+class InsightSeverity(str, Enum):
+    """Severity level of an insight."""
+    ACTION_NEEDED = "action_needed"  # Red - requires immediate attention
+    SUGGESTION = "suggestion"        # Yellow - recommended action
+    INFO = "info"                    # Blue - informational
+
+
+class InsightAction(BaseModel):
+    """Suggested action for an insight."""
+    type: str = Field(..., description="Action type identifier")
+    label: str = Field(..., description="Human-readable action button label")
+    route: Optional[str] = Field(None, description="Route to navigate to")
+    params: Optional[dict] = Field(None, description="Parameters for the action")
+
+
+class ZZPInsight(BaseModel):
+    """
+    A single AI-generated insight for the ZZP user.
+    
+    AI Logic Rules (transparent, not black-box):
+    - Insights are generated from explicit business rules
+    - Each insight explains WHY it was generated
+    - User can always dismiss or take alternative action
+    """
+    id: str = Field(..., description="Unique insight identifier")
+    type: InsightType
+    severity: InsightSeverity
+    
+    # What the user sees
+    title: str = Field(..., description="Short title (e.g., 'Invoice overdue')")
+    description: str = Field(..., description="Detailed description of the insight")
+    
+    # AI Transparency: explain WHY this insight was generated
+    reason: str = Field(..., description="Explanation of why AI generated this insight")
+    
+    # Suggested action
+    action: Optional[InsightAction] = None
+    
+    # Related data
+    related_id: Optional[str] = Field(None, description="ID of related entity (invoice, customer, etc.)")
+    related_type: Optional[str] = Field(None, description="Type of related entity")
+    amount_cents: Optional[int] = Field(None, description="Related amount in cents")
+    
+    # Timing
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # User can dismiss
+    dismissible: bool = True
+
+
+class ZZPInsightsResponse(BaseModel):
+    """Response containing all AI insights for a ZZP user."""
+    insights: List[ZZPInsight]
+    total_action_needed: int = Field(..., description="Count of ACTION_NEEDED insights")
+    total_suggestions: int = Field(..., description="Count of SUGGESTION insights")
+    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # AI Transparency
+    ai_model_version: str = Field(default="rules-v1", description="Version of AI rules used")

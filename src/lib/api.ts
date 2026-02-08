@@ -2840,6 +2840,8 @@ export interface ZZPInvoice {
   vat_total_cents: number
   total_cents: number
   amount_paid_cents: number
+  // Payment timestamp
+  paid_at?: string
   notes?: string
   lines: ZZPInvoiceLine[]
   created_at: string

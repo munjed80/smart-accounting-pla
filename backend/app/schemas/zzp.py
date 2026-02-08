@@ -699,6 +699,7 @@ class InvoiceResponse(BaseModel):
     subtotal_cents: int
     vat_total_cents: int
     total_cents: int
+    amount_paid_cents: int = 0
     
     notes: Optional[str] = None
     
@@ -1069,3 +1070,137 @@ class WorkSessionStopResponse(BaseModel):
     time_entry: TimeEntryResponse
     hours_added: float
     message: str
+
+
+# ============================================================================
+# ZZP Bank Payment Schemas
+# ============================================================================
+
+class ZZPBankAccountResponse(BaseModel):
+    """Schema for bank account response."""
+    id: UUID
+    administration_id: UUID
+    iban: str
+    bank_name: Optional[str] = None
+    currency: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class ZZPBankAccountListResponse(BaseModel):
+    """Schema for list of bank accounts."""
+    accounts: List[ZZPBankAccountResponse]
+    total: int
+
+
+class ZZPBankTransactionResponse(BaseModel):
+    """Schema for bank transaction response."""
+    id: UUID
+    administration_id: UUID
+    bank_account_id: UUID
+    booking_date: str  # YYYY-MM-DD
+    amount_cents: int  # amount in cents (positive = credit, negative = debit)
+    currency: str
+    counterparty_name: Optional[str] = None
+    counterparty_iban: Optional[str] = None
+    description: str
+    reference: Optional[str] = None
+    status: str  # NEW, MATCHED, IGNORED, NEEDS_REVIEW
+    matched_invoice_id: Optional[UUID] = None
+    matched_invoice_number: Optional[str] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class ZZPBankTransactionListResponse(BaseModel):
+    """Schema for list of bank transactions."""
+    transactions: List[ZZPBankTransactionResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class ZZPBankImportResponse(BaseModel):
+    """Response after importing a bank statement."""
+    imported_count: int
+    skipped_duplicates_count: int
+    total_in_file: int
+    errors: List[str]
+    message: str
+    bank_account_id: Optional[UUID] = None
+
+
+class ZZPInvoiceMatchSuggestion(BaseModel):
+    """A suggested invoice match for a bank transaction."""
+    invoice_id: UUID
+    invoice_number: str
+    customer_name: Optional[str]
+    invoice_total_cents: int
+    invoice_open_cents: int
+    invoice_date: str  # YYYY-MM-DD
+    confidence_score: int  # 0-100
+    match_reason: str  # Dutch explanation
+
+
+class ZZPMatchSuggestionsResponse(BaseModel):
+    """Response with match suggestions for a bank transaction."""
+    transaction_id: UUID
+    suggestions: List[ZZPInvoiceMatchSuggestion]
+    message: str
+
+
+class ZZPMatchInvoiceRequest(BaseModel):
+    """Request to match a transaction to an invoice."""
+    invoice_id: UUID
+    amount_cents: Optional[int] = None  # If null, use full transaction amount
+    notes: Optional[str] = None
+
+
+class ZZPMatchInvoiceResponse(BaseModel):
+    """Response after matching a transaction to an invoice."""
+    transaction_id: UUID
+    invoice_id: UUID
+    invoice_number: str
+    amount_matched_cents: int
+    invoice_new_status: str
+    invoice_amount_paid_cents: int
+    invoice_total_cents: int
+    message: str
+
+
+class ZZPUnmatchResponse(BaseModel):
+    """Response after unmatching a transaction from an invoice."""
+    transaction_id: UUID
+    invoice_id: UUID
+    invoice_number: str
+    amount_unmatched_cents: int
+    invoice_new_status: str
+    invoice_amount_paid_cents: int
+    message: str
+
+
+class ZZPBankTransactionMatchResponse(BaseModel):
+    """Schema for a bank transaction match audit record."""
+    id: UUID
+    bank_transaction_id: UUID
+    invoice_id: UUID
+    invoice_number: str
+    amount_cents: int
+    match_type: str  # manual, auto_amount, auto_reference
+    confidence_score: Optional[int] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    user_id: Optional[UUID] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class ZZPBankTransactionMatchListResponse(BaseModel):
+    """Schema for list of transaction matches."""
+    matches: List[ZZPBankTransactionMatchResponse]
+    total: int

@@ -141,6 +141,7 @@ def invoice_to_response(invoice: ZZPInvoice) -> InvoiceResponse:
         subtotal_cents=invoice.subtotal_cents,
         vat_total_cents=invoice.vat_total_cents,
         total_cents=invoice.total_cents,
+        amount_paid_cents=invoice.amount_paid_cents,
         notes=invoice.notes,
         lines=[
             InvoiceLineResponse(

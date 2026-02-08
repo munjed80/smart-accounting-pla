@@ -234,6 +234,9 @@ class ZZPInvoice(Base):
     vat_total_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     total_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     
+    # Payment tracking for bank reconciliation
+    amount_paid_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    
     # Optional notes
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
@@ -563,3 +566,65 @@ class WorkSession(Base):
     user = relationship("User")
     administration = relationship("Administration")
     time_entry = relationship("ZZPTimeEntry")
+
+
+class ZZPBankTransactionMatch(Base):
+    """
+    Tracks matches between bank transactions and ZZP invoices.
+    
+    Provides audit trail of:
+    - Which transaction was matched to which invoice
+    - Who made the match (user_id)
+    - Amount allocated (supports partial payments)
+    - Match confidence and notes
+    
+    A single transaction can be matched to multiple invoices (split payments)
+    and a single invoice can have multiple payments (partial payments).
+    """
+    __tablename__ = "zzp_bank_transaction_matches"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    administration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("administrations.id", ondelete="CASCADE"), 
+        nullable=False,
+        index=True
+    )
+    bank_transaction_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("bank_transactions.id", ondelete="CASCADE"), 
+        nullable=False,
+        index=True
+    )
+    invoice_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("zzp_invoices.id", ondelete="CASCADE"), 
+        nullable=False,
+        index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True,
+        index=True
+    )
+    
+    # Amount allocated from this transaction to this invoice (in cents)
+    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    
+    # Match metadata
+    match_type: Mapped[str] = mapped_column(String(20), nullable=False, default="manual")  # manual, auto_amount, auto_reference
+    confidence_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 0-100
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    
+    # Relationships
+    administration = relationship("Administration")
+    invoice = relationship("ZZPInvoice")
+    user = relationship("User")

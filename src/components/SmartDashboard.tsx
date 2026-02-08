@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/lib/AuthContext'
-import { transactionApi, TransactionStats, administrationApi, Administration, getErrorMessage } from '@/lib/api'
+import { zzpApi, ZZPDashboardResponse, administrationApi, Administration, getErrorMessage } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { NoAdministrationsEmptyState } from '@/components/EmptyState'
 import { AIInsightsPanel } from '@/components/AIInsightsPanel'
@@ -16,9 +16,14 @@ import {
   FileText, 
   House,
   Sparkle,
-  CheckCircle,
+  Clock,
   ArrowsClockwise,
-  WarningCircle
+  WarningCircle,
+  CheckCircle,
+  Warning,
+  Info,
+  CurrencyEur,
+  CalendarCheck
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 import { nl as nlLocale } from 'date-fns/locale'
@@ -26,7 +31,7 @@ import { t } from '@/i18n'
 
 export const SmartDashboard = () => {
   const { user } = useAuth()
-  const [stats, setStats] = useState<TransactionStats | null>(null)
+  const [dashboardData, setDashboardData] = useState<ZZPDashboardResponse | null>(null)
   const [administrations, setAdministrations] = useState<Administration[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -40,24 +45,24 @@ export const SmartDashboard = () => {
       const admins = await administrationApi.list()
       setAdministrations(admins)
       
-      // Only fetch stats if administrations exist (avoids premature API errors)
+      // Only fetch dashboard data if administrations exist
       if (admins.length > 0) {
         try {
-          const statsData = await transactionApi.getStats()
-          setStats(statsData)
+          const data = await zzpApi.dashboard.get()
+          setDashboardData(data)
         } catch {
-          // Stats may be unavailable if no transactions - this is expected for fresh accounts
-          setStats(null)
+          // Dashboard data may be unavailable for fresh accounts - this is expected
+          setDashboardData(null)
         }
       } else {
-        setStats(null)
+        setDashboardData(null)
       }
       setLastRefresh(new Date())
     } catch (error) {
-      console.error('Failed to fetch administrations:', error)
+      console.error('Failed to fetch dashboard data:', error)
       setFetchError(getErrorMessage(error))
       setAdministrations([])
-      setStats(null)
+      setDashboardData(null)
     } finally {
       setIsLoading(false)
     }
@@ -71,11 +76,15 @@ export const SmartDashboard = () => {
     fetchData()
   }
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('nl-NL', {
       style: 'currency',
       currency: 'EUR',
-    }).format(amount)
+    }).format(cents / 100)
+  }
+
+  const getCurrentMonthName = () => {
+    return format(new Date(), 'MMMM', { locale: nlLocale })
   }
   
   // Show loading state
@@ -134,7 +143,7 @@ export const SmartDashboard = () => {
     )
   }
   
-  // Show error state if fetching administrations failed
+  // Show error state if fetching failed
   if (fetchError) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
@@ -196,6 +205,30 @@ export const SmartDashboard = () => {
     )
   }
 
+  // Get severity icon for action items
+  const getSeverityIcon = (severity: string) => {
+    switch (severity) {
+      case 'error':
+        return <WarningCircle size={18} weight="fill" className="text-destructive" />
+      case 'warning':
+        return <Warning size={18} weight="fill" className="text-amber-500" />
+      default:
+        return <Info size={18} weight="fill" className="text-blue-500" />
+    }
+  }
+
+  // Get badge variant for action severity
+  const getSeverityBadgeClass = (severity: string) => {
+    switch (severity) {
+      case 'error':
+        return 'bg-destructive/20 text-destructive border-destructive/30'
+      case 'warning':
+        return 'bg-amber-500/20 text-amber-700 border-amber-500/30'
+      default:
+        return 'bg-blue-500/20 text-blue-700 border-blue-500/30'
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
@@ -222,159 +255,183 @@ export const SmartDashboard = () => {
           </div>
         </div>
 
+        {/* Main KPI Cards - ZZP focused metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-card/80 backdrop-blur-sm border-2 border-primary/20">
+          {/* Open Invoices Card */}
+          <Card 
+            className="bg-card/80 backdrop-blur-sm border-2 border-primary/20 cursor-pointer hover:border-primary/40 transition-colors"
+            onClick={() => navigateTo('/zzp/invoices')}
+          >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <FileText size={18} weight="duotone" />
-                {t('dashboard.totalTransactions')}
+                <FileText size={18} weight="duotone" className="text-primary" />
+                {t('dashboard.openInvoices')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {stats?.total_transactions || 0}
+                {formatCurrency(dashboardData?.invoices.open_total_cents || 0)}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {stats?.draft_count || 0} {t('transactionStatus.draft').toLowerCase()}, {stats?.posted_count || 0} {t('transactionStatus.posted').toLowerCase()}
+                {dashboardData?.invoices.open_count || 0} {(dashboardData?.invoices.open_count || 0) === 1 ? t('dashboard.invoice') : t('dashboard.invoices')}
+                {(dashboardData?.invoices.overdue_count || 0) > 0 && (
+                  <span className="text-destructive ml-1">
+                    ({dashboardData?.invoices.overdue_count} {t('dashboard.overdue').toLowerCase()})
+                  </span>
+                )}
               </p>
             </CardContent>
           </Card>
 
-          <Card className="bg-card/80 backdrop-blur-sm border-2 border-accent/20">
+          {/* Paid This Month Card */}
+          <Card 
+            className="bg-card/80 backdrop-blur-sm border-2 border-accent/20 cursor-pointer hover:border-accent/40 transition-colors"
+            onClick={() => navigateTo('/zzp/invoices')}
+          >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <TrendDown size={18} weight="duotone" />
-                {t('dashboard.totalDebit')}
+                <TrendUp size={18} weight="duotone" className="text-accent" />
+                {t('dashboard.paidThisMonth')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-accent">
-                {formatCurrency(Number(stats?.total_debit || 0))}
+                {formatCurrency(dashboardData?.invoices.paid_this_month_cents || 0)}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {t('dashboard.sumOfDebits')}
+                {dashboardData?.invoices.paid_this_month_count || 0} {(dashboardData?.invoices.paid_this_month_count || 0) === 1 ? t('dashboard.invoice') : t('dashboard.invoices')} in {getCurrentMonthName()}
               </p>
             </CardContent>
           </Card>
 
-          <Card className="bg-card/80 backdrop-blur-sm border-2 border-border">
+          {/* Expenses This Month Card */}
+          <Card 
+            className="bg-card/80 backdrop-blur-sm border-2 border-border cursor-pointer hover:border-muted-foreground/40 transition-colors"
+            onClick={() => navigateTo('/zzp/expenses')}
+          >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <TrendUp size={18} weight="duotone" />
-                {t('dashboard.totalCredit')}
+                <TrendDown size={18} weight="duotone" />
+                {t('dashboard.expensesThisMonth')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {formatCurrency(Number(stats?.total_credit || 0))}
+                {formatCurrency(dashboardData?.expenses.this_month_total_cents || 0)}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {t('dashboard.sumOfCredits')}
+                {dashboardData?.expenses.this_month_count || 0} {t('dashboard.expenses')} in {getCurrentMonthName()}
               </p>
             </CardContent>
           </Card>
 
-          <Card className="bg-card/80 backdrop-blur-sm border-2 border-accent/20">
+          {/* Hours This Week Card */}
+          <Card 
+            className="bg-card/80 backdrop-blur-sm border-2 border-accent/20 cursor-pointer hover:border-accent/40 transition-colors"
+            onClick={() => navigateTo('/zzp/time')}
+          >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Sparkle size={18} weight="duotone" />
-                {t('dashboard.draftsPending')}
+                <Clock size={18} weight="duotone" className="text-accent" />
+                {t('dashboard.hoursThisWeek')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-accent">
-                {stats?.draft_count || 0}
+                {dashboardData?.time.this_week_hours || 0}u
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {t('dashboard.awaitingReview')}
+                {dashboardData?.time.this_week_billable_hours || 0}u {t('dashboard.billableHours')}
+                {(dashboardData?.time.this_week_value_cents || 0) > 0 && (
+                  <span className="text-accent ml-1">
+                    ({formatCurrency(dashboardData?.time.this_week_value_cents || 0)})
+                  </span>
+                )}
               </p>
             </CardContent>
           </Card>
         </div>
 
+        {/* Second row: BTW tracker + Actions needed */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* BTW Tracker Card */}
           <Card className="bg-card/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CheckCircle size={24} weight="duotone" className="text-accent" />
-                {t('dashboard.processingStatus')}
+                <CurrencyEur size={24} weight="duotone" className="text-primary" />
+                {t('dashboard.btwEstimate')}
               </CardTitle>
-              <CardDescription>{t('dashboard.transactionApprovalWorkflow')}</CardDescription>
+              <CardDescription>
+                {dashboardData?.btw.quarter} - deadline {dashboardData?.btw.deadline ? format(new Date(dashboardData.btw.deadline), 'd MMMM yyyy', { locale: nlLocale }) : ''}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                {/* Net VAT payable */}
+                <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg border border-primary/20">
                   <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-accent" />
-                    <span className="font-medium">{t('dashboard.posted')}</span>
+                    <CalendarCheck size={20} className="text-primary" weight="duotone" />
+                    <span className="font-medium">{t('dashboard.btwToPayLabel')}</span>
                   </div>
-                  <span className="text-2xl font-bold">{stats?.posted_count || 0}</span>
+                  <span className="text-2xl font-bold text-primary">
+                    {formatCurrency(dashboardData?.btw.vat_payable_cents || 0)}
+                  </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-amber-500" />
-                    <span className="font-medium">{t('dashboard.draftPendingReview')}</span>
+                
+                {/* Breakdown */}
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>{t('dashboard.btwCollectedFrom')}</span>
+                    <span className="font-medium">{formatCurrency(dashboardData?.btw.vat_collected_cents || 0)}</span>
                   </div>
-                  <span className="text-2xl font-bold">{stats?.draft_count || 0}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-primary" />
-                    <span className="font-medium">{t('dashboard.total')}</span>
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>{t('dashboard.btwDeductibleFrom')}</span>
+                    <span className="font-medium">- {formatCurrency(dashboardData?.btw.vat_deductible_cents || 0)}</span>
                   </div>
-                  <span className="text-2xl font-bold">{stats?.total_transactions || 0}</span>
                 </div>
+                
+                {/* Days until deadline */}
+                {(dashboardData?.btw.days_until_deadline || 0) <= 30 && (
+                  <div className={`text-xs px-2 py-1 rounded ${(dashboardData?.btw.days_until_deadline || 0) <= 14 ? 'bg-amber-500/20 text-amber-700' : 'bg-blue-500/20 text-blue-700'}`}>
+                    {t('dashboard.daysUntilDeadline').replace('{days}', String(dashboardData?.btw.days_until_deadline || 0))}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
+          {/* Actions Needed Card */}
           <Card className="bg-card/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Receipt size={24} weight="duotone" />
-                {t('dashboard.recentTransactions')}
+                <Sparkle size={24} weight="duotone" className="text-amber-500" />
+                {t('dashboard.actionsNeeded')}
               </CardTitle>
-              <CardDescription>{t('dashboard.latestAiProcessed')}</CardDescription>
+              <CardDescription>{t('dashboard.actionsNeededDescription')}</CardDescription>
             </CardHeader>
             <CardContent>
-              {stats?.recent_transactions && stats.recent_transactions.length > 0 ? (
+              {dashboardData?.actions && dashboardData.actions.length > 0 ? (
                 <div className="space-y-3">
-                  {stats.recent_transactions.map((transaction) => (
+                  {dashboardData.actions.map((action) => (
                     <div 
-                      key={transaction.id} 
-                      className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-accent/5 transition-colors"
+                      key={action.id}
+                      className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-accent/5 transition-colors ${getSeverityBadgeClass(action.severity)}`}
+                      onClick={() => action.route && navigateTo(action.route)}
                     >
-                      <div className="flex items-center gap-3">
-                        <Receipt size={20} className="text-primary" weight="duotone" />
-                        <div>
-                          <p className="font-medium text-sm">{transaction.description}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(transaction.transaction_date), 'dd MMM yyyy', { locale: nlLocale })}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold">{formatCurrency(Number(transaction.total_amount))}</p>
-                        <Badge 
-                          variant="outline" 
-                          className={
-                            transaction.status === 'POSTED' 
-                              ? 'bg-accent/20 text-accent-foreground' 
-                              : 'bg-amber-500/20 text-amber-700'
-                          }
-                        >
-                          {transaction.status === 'POSTED' ? t('transactionStatus.posted') : t('transactionStatus.draft')}
-                        </Badge>
+                      {getSeverityIcon(action.severity)}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm">{action.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{action.description}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <Receipt size={48} className="mx-auto mb-4 text-muted-foreground opacity-50" weight="duotone" />
-                  <p className="text-muted-foreground">{t('dashboard.noTransactions')}</p>
+                  <CheckCircle size={48} className="mx-auto mb-4 text-accent opacity-50" weight="duotone" />
+                  <p className="text-muted-foreground">{t('dashboard.noActionsNeeded')}</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {t('dashboard.uploadToStart')}
+                    {t('dashboard.noActionsNeededDescription')}
                   </p>
                 </div>
               )}
@@ -382,13 +439,13 @@ export const SmartDashboard = () => {
           </Card>
         </div>
         
-        {/* AI Insights Panel - Smart Accounting feature */}
+        {/* AI Insights Panel + Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <div className="lg:col-span-2">
             <AIInsightsPanel maxItems={4} />
           </div>
           <div className="hidden lg:block">
-            {/* Placeholder for future quick actions */}
+            {/* Quick actions */}
             <Card className="bg-card/80 backdrop-blur-sm h-full">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -413,7 +470,7 @@ export const SmartDashboard = () => {
                   className="w-full justify-start gap-2 h-10"
                   onClick={() => navigateTo('/zzp/time')}
                 >
-                  <Receipt size={18} />
+                  <Clock size={18} />
                   {t('dashboard.logHours')}
                 </Button>
                 <Button 

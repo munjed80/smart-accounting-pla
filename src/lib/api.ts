@@ -3018,6 +3018,61 @@ export interface ZZPInsightsResponse {
   ai_model_version: string
 }
 
+// ZZP Dashboard Types
+export interface ZZPDashboardActionItem {
+  id: string
+  type: string  // 'draft_invoice', 'overdue_invoice', 'missing_profile', 'incomplete_profile', 'btw_deadline'
+  title: string
+  description: string
+  severity: 'error' | 'warning' | 'info'
+  route?: string
+  related_id?: string
+}
+
+export interface ZZPDashboardInvoiceStats {
+  open_count: number
+  open_total_cents: number
+  draft_count: number
+  overdue_count: number
+  overdue_total_cents: number
+  paid_this_month_count: number
+  paid_this_month_cents: number
+}
+
+export interface ZZPDashboardExpenseStats {
+  this_month_count: number
+  this_month_total_cents: number
+  this_month_vat_cents: number
+}
+
+export interface ZZPDashboardTimeStats {
+  this_week_hours: number
+  this_week_billable_hours: number
+  this_week_value_cents: number
+}
+
+export interface ZZPDashboardBTWStats {
+  quarter: string
+  quarter_start: string
+  quarter_end: string
+  deadline: string
+  days_until_deadline: number
+  vat_collected_cents: number
+  vat_deductible_cents: number
+  vat_payable_cents: number
+}
+
+export interface ZZPDashboardResponse {
+  invoices: ZZPDashboardInvoiceStats
+  expenses: ZZPDashboardExpenseStats
+  time: ZZPDashboardTimeStats
+  btw: ZZPDashboardBTWStats
+  actions: ZZPDashboardActionItem[]
+  profile_complete: boolean
+  generated_at: string
+  notes: Record<string, string>
+}
+
 // Quote (Offerte) Types
 export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'converted'
 
@@ -3638,6 +3693,25 @@ export const zzpApi = {
      */
     get: async (): Promise<ZZPInsightsResponse> => {
       const response = await api.get<ZZPInsightsResponse>('/zzp/insights')
+      return response.data
+    },
+  },
+
+  // ------------ Dashboard (Overzicht) ------------
+  dashboard: {
+    /**
+     * Get aggregated dashboard metrics for the ZZP user.
+     * 
+     * Returns:
+     * - Open invoices (sent/overdue) total + count
+     * - Paid invoices this month
+     * - Expenses this month
+     * - Hours this week (total and billable)
+     * - BTW estimate for current quarter
+     * - Actions requiring attention
+     */
+    get: async (): Promise<ZZPDashboardResponse> => {
+      const response = await api.get<ZZPDashboardResponse>('/zzp/dashboard')
       return response.data
     },
   },

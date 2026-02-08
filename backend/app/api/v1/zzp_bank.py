@@ -232,6 +232,23 @@ def extract_invoice_numbers(description: str) -> List[str]:
     return list({n.strip() for n in numbers if n and n.strip()})
 
 
+def is_invoice_number_match(invoice_number: str, candidate_numbers: List[str]) -> bool:
+    """
+    Check if an invoice number matches any of the candidate numbers.
+    
+    Matching rules:
+    - Exact match (case insensitive)
+    - Invoice number contained in candidate
+    - Candidate contained in invoice number
+    """
+    inv_upper = invoice_number.upper()
+    for num in candidate_numbers:
+        num_upper = num.upper()
+        if inv_upper == num_upper or inv_upper in num_upper or num_upper in inv_upper:
+            return True
+    return False
+
+
 def transaction_to_response(
     transaction: BankTransaction,
     matched_invoice_id: Optional[uuid.UUID] = None,
@@ -642,7 +659,7 @@ async def get_match_suggestions(
         reason = ""
         
         # Check invoice number match
-        if any(num.upper() == inv.invoice_number.upper() or inv.invoice_number.upper() in num.upper() or num.upper() in inv.invoice_number.upper() for num in invoice_numbers):
+        if is_invoice_number_match(inv.invoice_number, invoice_numbers):
             confidence = 95
             reason = f"Factuurnummer '{inv.invoice_number}' gevonden in omschrijving"
         # Check exact amount match
@@ -741,7 +758,7 @@ async def match_transaction_to_invoice(
     if invoice.status not in [InvoiceStatus.SENT.value, InvoiceStatus.OVERDUE.value, InvoiceStatus.PAID.value]:
         raise HTTPException(
             status_code=400,
-            detail={"code": "INVALID_INVOICE_STATUS", "message": "Alleen verzonden of openstaande facturen kunnen worden gematcht."}
+            detail={"code": "INVALID_INVOICE_STATUS", "message": "Alleen verzonden, openstaande of betaalde facturen kunnen worden gematcht."}
         )
     
     # Determine amount to match

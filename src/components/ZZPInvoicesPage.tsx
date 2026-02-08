@@ -137,6 +137,16 @@ function isIOS(): boolean {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 }
 
+// Helper to detect Android devices
+function isAndroid(): boolean {
+  return /Android/i.test(navigator.userAgent)
+}
+
+// Helper to detect mobile devices (iOS or Android)
+function isMobile(): boolean {
+  return isIOS() || isAndroid()
+}
+
 // Delay in ms before revoking PDF blob URL to ensure download/open completes
 const PDF_URL_REVOCATION_DELAY_MS = 30000
 
@@ -1433,6 +1443,7 @@ export const ZZPInvoicesPage = () => {
   }, [deletingInvoice, loadData])
 
   // Handle PDF download - download actual PDF from server (mobile-safe)
+  // Uses fetch -> blob -> createObjectURL -> anchor click pattern for best mobile compatibility
   const handleDownloadPdf = useCallback(async (invoice: ZZPInvoice) => {
     try {
       setDownloadingInvoiceId(invoice.id)
@@ -1440,15 +1451,50 @@ export const ZZPInvoicesPage = () => {
       
       const blob = await zzpApi.invoices.downloadPdf(invoice.id)
       
+      // Ensure blob has correct MIME type for PDF
+      const pdfBlob = new Blob([blob], { type: 'application/pdf' })
+      
       // Create object URL for the PDF blob
-      const url = window.URL.createObjectURL(blob)
+      const url = window.URL.createObjectURL(pdfBlob)
       const filename = `${invoice.invoice_number || `INV-${invoice.id}`}.pdf`
       
-      // On iOS Safari, download attribute is often ignored - open in new tab instead
+      // Mobile-optimized download approach
       if (isIOS()) {
-        window.open(url, '_blank')
+        // iOS Safari: Use anchor element with target _blank
+        // This allows the PDF to open in the browser's PDF viewer or download
+        // Using anchor instead of window.open to avoid popup blockers
+        const link = document.createElement('a')
+        link.href = url
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+        // Set download attribute as fallback (may be ignored by Safari)
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        
+        // Fallback: if the above doesn't work (some iOS versions),
+        // try opening in a new window after a short delay
+        setTimeout(() => {
+          // Check if the download started - if not, try window.open
+          const newWindow = window.open(url, '_blank')
+          if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+            // Popup was blocked, show user-friendly message
+            toast.info(t('zzpInvoices.pdfOpenInNewTab') || 'PDF opens in nieuw tabblad')
+          }
+        }, 100)
+      } else if (isAndroid()) {
+        // Android: Use anchor with download attribute
+        // Most Android browsers support this well
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
       } else {
-        // Standard download flow for desktop and Android
+        // Desktop: Standard download flow
         const link = document.createElement('a')
         link.href = url
         link.download = filename
@@ -1458,7 +1504,9 @@ export const ZZPInvoicesPage = () => {
       }
       
       // Delay URL revocation to ensure download/open completes
-      setTimeout(() => window.URL.revokeObjectURL(url), PDF_URL_REVOCATION_DELAY_MS)
+      // Longer delay for mobile to ensure PDF viewer has time to load
+      const revokeDelay = isMobile() ? PDF_URL_REVOCATION_DELAY_MS * 2 : PDF_URL_REVOCATION_DELAY_MS
+      setTimeout(() => window.URL.revokeObjectURL(url), revokeDelay)
       
       toast.success(t('zzpInvoices.pdfDownloaded'))
     } catch (err) {

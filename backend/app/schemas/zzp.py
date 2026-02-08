@@ -702,6 +702,9 @@ class InvoiceResponse(BaseModel):
     total_cents: int
     amount_paid_cents: int = 0
     
+    # Payment timestamp
+    paid_at: Optional[datetime] = None
+    
     notes: Optional[str] = None
     
     # Lines

@@ -142,6 +142,7 @@ def invoice_to_response(invoice: ZZPInvoice) -> InvoiceResponse:
         vat_total_cents=invoice.vat_total_cents,
         total_cents=invoice.total_cents,
         amount_paid_cents=invoice.amount_paid_cents,
+        paid_at=invoice.paid_at,
         notes=invoice.notes,
         lines=[
             InvoiceLineResponse(
@@ -543,6 +544,15 @@ async def update_invoice_status(
         )
     
     invoice.status = new_status
+    
+    # Update paid_at timestamp based on status change
+    if new_status == InvoiceStatus.PAID.value:
+        # Mark as paid: set paid_at to current time
+        invoice.paid_at = datetime.now()
+    elif current_status == InvoiceStatus.PAID.value and new_status != InvoiceStatus.PAID.value:
+        # Mark as unpaid (transitioning from paid to another status): clear paid_at
+        invoice.paid_at = None
+    
     await db.commit()
     await db.refresh(invoice)
     

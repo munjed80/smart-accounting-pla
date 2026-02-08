@@ -1388,9 +1388,8 @@ export const ZZPTimeTrackingPage = () => {
       
       // Show success toast with hours added
       const hours = response.hours_added
-      const hoursText = hours === 1 ? t('zzpTimeTracking.hourSingular') : t('zzpTimeTracking.hoursPlural')
       toast.success(t('zzpTimeTracking.workStopped'), {
-        description: `✅ ${hours} ${hoursText} ${t('zzpTimeTracking.addedToTimesheet')}`
+        description: `✅ ${hours} ${t('zzpTimeTracking.hoursAdded')} ${t('zzpTimeTracking.addedToTimesheet')}`
       })
       
       // Reload entries and weekly summary to reflect the new entry

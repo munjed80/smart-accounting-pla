@@ -340,8 +340,6 @@ export const nl = {
     notLoggedIn: "Je bent niet ingelogd",
     clockInFailed: "Inklokken mislukt",
     clockOutFailed: "Uitklokken mislukt",
-    hourSingular: "uur",
-    hoursPlural: "uur",
     addedToTimesheet: "toegevoegd aan urenregistratie",
     
     // Tabs

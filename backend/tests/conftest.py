@@ -23,7 +23,9 @@ from app.models.administration import Administration, AdministrationMember
 from app.core.security import create_access_token, get_password_hash
 
 
-# Use in-memory SQLite for tests
+# Note: Tests require PostgreSQL for UUID column types.
+# In-memory SQLite used here for simple unit tests only.
+# Integration tests should use PostgreSQL.
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 

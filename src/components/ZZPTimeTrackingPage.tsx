@@ -1344,21 +1344,39 @@ export const ZZPTimeTrackingPage = () => {
 
   // Clock-in handler
   const handleClockIn = useCallback(async (note?: string) => {
-    if (!user?.id) return
+    if (!user?.id) {
+      toast.error(t('zzpTimeTracking.notLoggedIn'))
+      return
+    }
+    
+    // Show loading toast
+    const loadingToastId = toast.loading(t('zzpTimeTracking.clockingIn'))
     
     try {
       const session = await zzpApi.workSessions.start({ note })
       setActiveSession(session)
-      toast.success(t('zzpTimeTracking.workStarted'))
+      toast.dismiss(loadingToastId)
+      toast.success(t('zzpTimeTracking.workStarted'), {
+        description: note ? `📝 ${note}` : undefined
+      })
     } catch (error) {
       console.error('Failed to clock in:', error)
-      toast.error(parseApiError(error))
+      toast.dismiss(loadingToastId)
+      toast.error(t('zzpTimeTracking.clockInFailed'), {
+        description: parseApiError(error)
+      })
     }
   }, [user?.id])
 
   // Clock-out handler
   const handleClockOut = useCallback(async (breakMinutes: number, note?: string) => {
-    if (!user?.id) return
+    if (!user?.id) {
+      toast.error(t('zzpTimeTracking.notLoggedIn'))
+      return
+    }
+    
+    // Show loading toast
+    const loadingToastId = toast.loading(t('zzpTimeTracking.clockingOut'))
     
     try {
       const response = await zzpApi.workSessions.stop({ 
@@ -1366,13 +1384,22 @@ export const ZZPTimeTrackingPage = () => {
         note 
       })
       setActiveSession(null)
-      toast.success(`${t('zzpTimeTracking.workStopped')} — ${response.hours_added} ${t('zzpTimeTracking.hoursAdded')}`)
+      toast.dismiss(loadingToastId)
+      
+      // Show success toast with hours added
+      const hours = response.hours_added
+      toast.success(t('zzpTimeTracking.workStopped'), {
+        description: `✅ ${hours} ${t('zzpTimeTracking.hoursAdded')} ${t('zzpTimeTracking.addedToTimesheet')}`
+      })
       
       // Reload entries and weekly summary to reflect the new entry
       await Promise.all([loadEntries(), loadWeeklySummary()])
     } catch (error) {
       console.error('Failed to clock out:', error)
-      toast.error(parseApiError(error))
+      toast.dismiss(loadingToastId)
+      toast.error(t('zzpTimeTracking.clockOutFailed'), {
+        description: parseApiError(error)
+      })
     }
   }, [user?.id, loadEntries, loadWeeklySummary])
 

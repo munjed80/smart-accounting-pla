@@ -100,7 +100,7 @@ const incrementTodayCompleted = (): number => {
 
 export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDossierPageProps) => {
   const { user } = useAuth()
-  const { activeClient, activeClientId, allLinks, setActiveClient, refreshLinks } = useActiveClient()
+  const { activeClientId, allLinks, setActiveClient, refreshLinks } = useActiveClient()
   const [overview, setOverview] = useState<LedgerClientOverview | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -108,17 +108,13 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
   const [activeTab, setActiveTab] = useState<string>(initialTab)
   const [todayCompleted, setTodayCompleted] = useState(getTodayCompleted())
 
-  // Sync activeClient context when clientId from route doesn't match
-  useEffect(() => {
-    if (!clientId) return
-    
-    // If already the active client, nothing to do
-    if (activeClientId === clientId) return
-    
-    // Try to find the client in allLinks
-    const link = allLinks.find(l => l.administration_id === clientId && l.status === 'ACTIVE')
+  /**
+   * Try to sync the active client context from allLinks.
+   * Returns true if sync was successful, false if link not found.
+   */
+  const trySyncActiveClient = (links: typeof allLinks): boolean => {
+    const link = links.find(l => l.administration_id === clientId && l.status === 'ACTIVE')
     if (link) {
-      // Sync to ActiveClientContext
       setActiveClient({
         id: link.client_user_id,
         name: link.client_name,
@@ -126,9 +122,10 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
         administrationId: link.administration_id,
         administrationName: link.administration_name,
       })
+      return true
     }
-    // If not in allLinks, the fetchOverview will handle access check
-  }, [clientId, activeClientId, allLinks, setActiveClient])
+    return false
+  }
 
   const fetchOverview = async () => {
     try {
@@ -138,19 +135,11 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
       const data = await ledgerApi.getClientOverview(clientId)
       setOverview(data)
       
-      // If activeClient context is not set, try to sync from allLinks or refresh
-      if (!activeClientId || activeClientId !== clientId) {
-        const link = allLinks.find(l => l.administration_id === clientId && l.status === 'ACTIVE')
-        if (link) {
-          setActiveClient({
-            id: link.client_user_id,
-            name: link.client_name,
-            email: link.client_email,
-            administrationId: link.administration_id,
-            administrationName: link.administration_name,
-          })
-        } else {
+      // If activeClient context doesn't match, sync it
+      if (activeClientId !== clientId) {
+        if (!trySyncActiveClient(allLinks)) {
           // Links may not be loaded yet; refresh them
+          // After refresh, the ActiveClientContext will auto-select if matching
           await refreshLinks()
         }
       }

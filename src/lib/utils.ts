@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { toast } from 'sonner'
-import { AxiosError } from 'axios'
+import axios from 'axios'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -14,6 +14,15 @@ export interface ToastConfig {
   loading?: string
   success?: string
   error?: string
+}
+
+/**
+ * FastAPI validation error item structure
+ */
+export interface ValidationErrorItem {
+  loc: string[]
+  msg: string
+  type?: string
 }
 
 /**
@@ -82,14 +91,14 @@ export async function withToast<T>(
  * ```
  */
 export function parseApiError(error: unknown): string {
-  // Handle Axios errors
-  if (isAxiosError(error)) {
+  // Handle Axios errors using the built-in type guard
+  if (axios.isAxiosError(error)) {
     const status = error.response?.status
     const detail = error.response?.data?.detail
     
     // Handle 422 validation errors with field-by-field messages
     if (status === 422 && Array.isArray(detail)) {
-      const messages = detail.map((err: { loc: string[]; msg: string }) => {
+      const messages = (detail as ValidationErrorItem[]).map((err) => {
         const field = err.loc?.[err.loc.length - 1] || 'veld'
         return `${field}: ${err.msg}`
       })
@@ -157,16 +166,4 @@ export function parseApiError(error: unknown): string {
   }
   
   return 'Er is een onverwachte fout opgetreden'
-}
-
-/**
- * Type guard to check if an error is an AxiosError
- */
-function isAxiosError(error: unknown): error is AxiosError<{ detail?: unknown }> {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'isAxiosError' in error &&
-    (error as AxiosError).isAxiosError === true
-  )
 }

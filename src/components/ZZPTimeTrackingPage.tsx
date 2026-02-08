@@ -1215,10 +1215,16 @@ export const ZZPTimeTrackingPage = () => {
           <div className="flex gap-2 w-full sm:w-auto">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" disabled className="gap-2 h-10 sm:h-11 flex-1 sm:flex-none">
-                  <Export size={18} />
-                  <span className="hidden sm:inline">{t('zzpTimeTracking.export')}</span>
-                </Button>
+                <span tabIndex={0} className="inline-flex flex-1 sm:flex-none">
+                  <Button 
+                    variant="outline" 
+                    aria-disabled="true" 
+                    className="gap-2 h-10 sm:h-11 w-full opacity-50 cursor-not-allowed"
+                  >
+                    <Export size={18} />
+                    <span className="hidden sm:inline">{t('zzpTimeTracking.export')}</span>
+                  </Button>
+                </span>
               </TooltipTrigger>
               <TooltipContent>
                 <p>{t('zzpTimeTracking.exportTooltip')}</p>

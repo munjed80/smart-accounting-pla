@@ -22,7 +22,8 @@ from app.models.ledger import AccountingPeriod, PeriodStatus, JournalEntry, Jour
 from app.models.issues import ClientIssue, IssueSeverity, ValidationRun
 from app.models.alerts import Alert, AlertSeverity, AlertCode
 from app.models.accountant_dashboard import (
-    AccountantClientAssignment, 
+    AccountantClientAssignment,
+    AssignmentStatus,
     BulkOperation, 
     BulkOperationType,
     BulkOperationStatus,
@@ -67,11 +68,12 @@ class AccountantDashboardService:
         self.accountant_id = accountant_id
     
     async def get_assigned_client_ids(self) -> List[uuid.UUID]:
-        """Get all client IDs assigned to this accountant."""
-        # First check explicit assignments
+        """Get all client IDs assigned to this accountant with ACTIVE consent status."""
+        # First check explicit assignments - only include ACTIVE assignments
         result = await self.db.execute(
             select(AccountantClientAssignment.administration_id)
             .where(AccountantClientAssignment.accountant_id == self.accountant_id)
+            .where(AccountantClientAssignment.status == AssignmentStatus.ACTIVE)
         )
         assigned_ids = [r[0] for r in result.all()]
         

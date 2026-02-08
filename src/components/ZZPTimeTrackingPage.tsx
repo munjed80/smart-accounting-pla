@@ -47,6 +47,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { 
   Clock, 
   Plus, 
@@ -67,6 +72,7 @@ import {
   Stop,
   CaretDown,
   CaretUp,
+  Export,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { 
@@ -1206,10 +1212,29 @@ export const ZZPTimeTrackingPage = () => {
               {t('zzpTimeTracking.pageDescription')}
             </p>
           </div>
-          <Button onClick={openNewForm} className="gap-2 h-10 sm:h-11 w-full sm:w-auto">
-            <Plus size={18} weight="bold" />
-            {t('zzpTimeTracking.newEntry')}
-          </Button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0} className="inline-flex flex-1 sm:flex-none">
+                  <Button 
+                    variant="outline" 
+                    aria-disabled="true" 
+                    className="gap-2 h-10 sm:h-11 w-full opacity-50 cursor-not-allowed"
+                  >
+                    <Export size={18} />
+                    <span className="hidden sm:inline">{t('zzpTimeTracking.export')}</span>
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{t('zzpTimeTracking.exportTooltip')}</p>
+              </TooltipContent>
+            </Tooltip>
+            <Button onClick={openNewForm} className="gap-2 h-10 sm:h-11 flex-1 sm:flex-none">
+              <Plus size={18} weight="bold" />
+              {t('zzpTimeTracking.newEntry')}
+            </Button>
+          </div>
         </div>
 
         {/* Clock-in/out Card (Dagstart) */}

@@ -344,6 +344,24 @@ export const nl = {
     // Export
     export: "Exporteren",
     exportTooltip: "Exporteren naar CSV/PDF komt binnenkort beschikbaar",
+    
+    // Convert to invoice
+    createInvoice: "Factureren",
+    createInvoiceTooltip: "Maak een factuur van je factureerbare uren",
+    createInvoiceTitle: "Uren factureren",
+    createInvoiceDescription: "Selecteer factureerbare uren om een factuur te maken",
+    selectCustomerForInvoice: "Selecteer een klant",
+    selectEntriesForInvoice: "Selecteer uren om te factureren",
+    noCustomerSelected: "Selecteer een klant om facturen te maken",
+    noBillableEntries: "Geen factureerbare uren",
+    noBillableEntriesDescription: "Je hebt geen factureerbare uren geregistreerd voor deze week.",
+    selectedEntries: "Geselecteerde uren",
+    totalToInvoice: "Totaal te factureren",
+    createDraftInvoice: "Conceptfactuur maken",
+    invoiceCreated: "Factuur aangemaakt",
+    invoiceCreatedGoTo: "Ga naar facturen",
+    errorCreatingInvoice: "Fout bij maken van factuur",
+    entriesWithoutRate: "uren zonder uurtarief",
   },
 
   // ZZP Agenda page

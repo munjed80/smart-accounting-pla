@@ -73,8 +73,10 @@ import {
   CaretDown,
   CaretUp,
   Export,
+  FileText,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
+import { navigateTo } from '@/lib/navigation'
 import { 
   zzpApi, 
   ZZPTimeEntry, 
@@ -84,6 +86,7 @@ import {
   ZZPWeeklyTimeSummary,
   ZZPCustomer,
   WorkSession,
+  ZZPInvoiceLineCreate,
 } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
@@ -688,6 +691,276 @@ const DeleteConfirmDialog = ({
   </AlertDialog>
 )
 
+// Create Invoice from Time Entries Dialog
+const CreateInvoiceDialog = ({
+  open,
+  onOpenChange,
+  entries,
+  customers,
+  onSuccess,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  entries: ZZPTimeEntry[]
+  customers: ZZPCustomer[]
+  onSuccess: () => void
+}) => {
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(NO_CUSTOMER_VALUE)
+  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set())
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Filter to billable entries only
+  const billableEntries = useMemo(() => 
+    entries.filter(e => e.billable), 
+    [entries]
+  )
+
+  // Entries for the selected customer
+  const customerEntries = useMemo(() => {
+    if (selectedCustomerId === NO_CUSTOMER_VALUE) return []
+    return billableEntries.filter(e => e.customer_id === selectedCustomerId)
+  }, [billableEntries, selectedCustomerId])
+
+  // Active customers that have billable entries
+  const customersWithEntries = useMemo(() => {
+    const customerIds = new Set(billableEntries.filter(e => e.customer_id).map(e => e.customer_id))
+    return customers.filter(c => c.status === 'active' && customerIds.has(c.id))
+  }, [customers, billableEntries])
+
+  // Reset selections when dialog opens
+  useEffect(() => {
+    if (open) {
+      setSelectedCustomerId(NO_CUSTOMER_VALUE)
+      setSelectedEntryIds(new Set())
+      setIsSubmitting(false)
+    }
+  }, [open])
+
+  // Auto-select all entries when customer changes
+  useEffect(() => {
+    if (selectedCustomerId !== NO_CUSTOMER_VALUE) {
+      setSelectedEntryIds(new Set(customerEntries.map(e => e.id)))
+    } else {
+      setSelectedEntryIds(new Set())
+    }
+  }, [selectedCustomerId, customerEntries])
+
+  // Calculate totals
+  const totals = useMemo(() => {
+    const selected = customerEntries.filter(e => selectedEntryIds.has(e.id))
+    const hours = selected.reduce((sum, e) => sum + e.hours, 0)
+    const entriesWithRate = selected.filter(e => e.hourly_rate_cents)
+    const entriesWithoutRate = selected.filter(e => !e.hourly_rate_cents)
+    const amount = entriesWithRate.reduce((sum, e) => 
+      sum + Math.round(e.hours * (e.hourly_rate_cents || 0)), 0
+    )
+    return { 
+      hours, 
+      amount, 
+      count: selected.length,
+      withoutRateCount: entriesWithoutRate.length 
+    }
+  }, [customerEntries, selectedEntryIds])
+
+  // Toggle entry selection
+  const toggleEntry = (entryId: string) => {
+    setSelectedEntryIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(entryId)) {
+        newSet.delete(entryId)
+      } else {
+        newSet.add(entryId)
+      }
+      return newSet
+    })
+  }
+
+  // Create draft invoice
+  const handleCreateInvoice = async () => {
+    if (selectedCustomerId === NO_CUSTOMER_VALUE || selectedEntryIds.size === 0) return
+
+    setIsSubmitting(true)
+    try {
+      const selectedEntries = customerEntries.filter(e => selectedEntryIds.has(e.id))
+      
+      // Create invoice lines from time entries
+      const lines: ZZPInvoiceLineCreate[] = selectedEntries.map(entry => ({
+        description: `${entry.description}${entry.project_name ? ` (${entry.project_name})` : ''} - ${entry.hours}h`,
+        quantity: entry.hours,
+        unit_price_cents: entry.hourly_rate_cents || 0,
+        vat_rate: 21, // Default Dutch VAT rate
+      }))
+
+      // Create the invoice
+      await zzpApi.invoices.create({
+        customer_id: selectedCustomerId,
+        issue_date: formatDateISO(new Date()),
+        lines,
+      })
+
+      toast.success(t('zzpTimeTracking.invoiceCreated'), {
+        action: {
+          label: t('zzpTimeTracking.invoiceCreatedGoTo'),
+          onClick: () => navigateTo('invoices'),
+        },
+      })
+
+      onOpenChange(false)
+      onSuccess()
+    } catch (error) {
+      console.error('Failed to create invoice:', error)
+      toast.error(parseApiError(error))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Format currency
+  const formatAmount = (cents: number) => 
+    new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(cents / 100)
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="pb-4 border-b border-border/50">
+          <DialogTitle className="flex items-center gap-3 text-xl">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <FileText size={24} className="text-primary" weight="duotone" />
+            </div>
+            {t('zzpTimeTracking.createInvoiceTitle')}
+          </DialogTitle>
+          <DialogDescription>
+            {t('zzpTimeTracking.createInvoiceDescription')}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="py-4 space-y-4">
+          {/* No billable entries message */}
+          {billableEntries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Receipt size={40} className="text-muted-foreground mb-3" />
+              <p className="font-medium">{t('zzpTimeTracking.noBillableEntries')}</p>
+              <p className="text-sm text-muted-foreground">
+                {t('zzpTimeTracking.noBillableEntriesDescription')}
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Customer selection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  {t('zzpTimeTracking.selectCustomerForInvoice')}
+                </Label>
+                <Select 
+                  value={selectedCustomerId} 
+                  onValueChange={setSelectedCustomerId}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder={t('zzpTimeTracking.selectCustomerForInvoice')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_CUSTOMER_VALUE}>{t('zzpTimeTracking.noCustomerSelected')}</SelectItem>
+                    {customersWithEntries.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Entries list for selected customer */}
+              {selectedCustomerId !== NO_CUSTOMER_VALUE && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    {t('zzpTimeTracking.selectEntriesForInvoice')}
+                  </Label>
+                  <div className="border rounded-lg divide-y max-h-60 overflow-y-auto">
+                    {customerEntries.length === 0 ? (
+                      <div className="p-4 text-center text-muted-foreground text-sm">
+                        {t('zzpTimeTracking.noBillableEntries')}
+                      </div>
+                    ) : (
+                      customerEntries.map((entry) => (
+                        <label
+                          key={entry.id}
+                          className="flex items-center gap-3 p-3 hover:bg-secondary/30 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedEntryIds.has(entry.id)}
+                            onChange={() => toggleEntry(entry.id)}
+                            className="h-4 w-4 rounded border-input"
+                            disabled={isSubmitting}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{entry.description}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDateDisplay(entry.entry_date)} • {entry.hours}h
+                              {entry.project_name && ` • ${entry.project_name}`}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            {entry.hourly_rate_cents ? (
+                              <span className="text-sm font-medium">
+                                {formatAmount(Math.round(entry.hours * entry.hourly_rate_cents))}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Geen tarief</span>
+                            )}
+                          </div>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Totals summary */}
+              {selectedEntryIds.size > 0 && (
+                <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>{t('zzpTimeTracking.selectedEntries')}</span>
+                    <span className="font-medium">{totals.count} ({totals.hours.toFixed(1)}h)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">{t('zzpTimeTracking.totalToInvoice')}</span>
+                    <span className="text-lg font-bold text-primary">{formatAmount(totals.amount)}</span>
+                  </div>
+                  {totals.withoutRateCount > 0 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      ⚠️ {totals.withoutRateCount} {t('zzpTimeTracking.entriesWithoutRate')}
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <DialogFooter className="pt-4 border-t border-border/50">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isSubmitting}
+          >
+            {t('common.cancel')}
+          </Button>
+          <Button
+            onClick={handleCreateInvoice}
+            disabled={isSubmitting || selectedCustomerId === NO_CUSTOMER_VALUE || selectedEntryIds.size === 0}
+            className="gap-2"
+          >
+            {isSubmitting && <SpinnerGap size={18} className="animate-spin" />}
+            {t('zzpTimeTracking.createDraftInvoice')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // Empty state component
 const EmptyState = ({ onAddEntry }: { onAddEntry: () => void }) => (
   <Card className="bg-card/80 backdrop-blur-sm border-2 border-dashed border-primary/20">
@@ -980,6 +1253,7 @@ export const ZZPTimeTrackingPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<ZZPTimeEntry | undefined>()
   const [deletingEntry, setDeletingEntry] = useState<ZZPTimeEntry | undefined>()
+  const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false)
 
   // Computed values
   const currentWeekEnd = useMemo(() => getSunday(currentWeekStart), [currentWeekStart])
@@ -1214,6 +1488,21 @@ export const ZZPTimeTrackingPage = () => {
           <div className="flex gap-2 w-full sm:w-auto">
             <Tooltip>
               <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsInvoiceDialogOpen(true)}
+                  className="gap-2 h-10 sm:h-11 flex-1 sm:flex-none"
+                >
+                  <FileText size={18} />
+                  <span className="hidden sm:inline">{t('zzpTimeTracking.createInvoice')}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{t('zzpTimeTracking.createInvoiceTooltip')}</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <span tabIndex={0} className="inline-flex flex-1 sm:flex-none">
                   <Button 
                     variant="outline" 
@@ -1441,6 +1730,15 @@ export const ZZPTimeTrackingPage = () => {
         }}
         onConfirm={handleDeleteEntry}
         entryDescription={deletingEntry?.description || ''}
+      />
+
+      {/* Create invoice dialog */}
+      <CreateInvoiceDialog
+        open={isInvoiceDialogOpen}
+        onOpenChange={setIsInvoiceDialogOpen}
+        entries={entries}
+        customers={customers}
+        onSuccess={loadEntries}
       />
     </div>
   )

@@ -46,6 +46,7 @@ import {
   IdentificationCard,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
 
 // Build timestamp - injected at build time or fallback
@@ -179,7 +180,7 @@ export const SettingsPage = () => {
       toast.success(t('settings.businessProfileSaved'))
     } catch (error) {
       console.error('Failed to save business profile:', error)
-      toast.error(t('settings.businessProfileError'))
+      toast.error(parseApiError(error))
     } finally {
       setIsSavingProfile(false)
     }

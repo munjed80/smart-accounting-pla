@@ -85,6 +85,7 @@ import {
   ZZPCustomer,
   WorkSession,
 } from '@/lib/api'
+import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 
@@ -1053,7 +1054,7 @@ export const ZZPTimeTrackingPage = () => {
       setEntries(response.entries)
     } catch (error) {
       console.error('Failed to load time entries:', error)
-      toast.error(t('zzpTimeTracking.errorLoadingEntries'))
+      toast.error(parseApiError(error))
     } finally {
       setIsLoading(false)
     }
@@ -1067,10 +1068,9 @@ export const ZZPTimeTrackingPage = () => {
       const session = await zzpApi.workSessions.start({ note })
       setActiveSession(session)
       toast.success(t('zzpTimeTracking.workStarted'))
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to clock in:', error)
-      const message = error?.response?.data?.detail?.message || t('zzpTimeTracking.errorClockIn')
-      toast.error(message)
+      toast.error(parseApiError(error))
     }
   }, [user?.id])
 
@@ -1088,10 +1088,9 @@ export const ZZPTimeTrackingPage = () => {
       
       // Reload entries and weekly summary to reflect the new entry
       await Promise.all([loadEntries(), loadWeeklySummary()])
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to clock out:', error)
-      const message = error?.response?.data?.detail?.message || t('zzpTimeTracking.errorClockOut')
-      toast.error(message)
+      toast.error(parseApiError(error))
     }
   }, [user?.id, loadEntries, loadWeeklySummary])
 
@@ -1157,7 +1156,7 @@ export const ZZPTimeTrackingPage = () => {
       setEditingEntry(undefined)
     } catch (error) {
       console.error('Failed to save time entry:', error)
-      toast.error(t('zzpTimeTracking.errorSavingEntry'))
+      toast.error(parseApiError(error))
     }
   }, [user?.id, editingEntry, loadEntries, loadWeeklySummary])
 
@@ -1173,7 +1172,7 @@ export const ZZPTimeTrackingPage = () => {
       await Promise.all([loadEntries(), loadWeeklySummary()])
     } catch (error) {
       console.error('Failed to delete time entry:', error)
-      toast.error(t('zzpTimeTracking.errorDeletingEntry'))
+      toast.error(parseApiError(error))
     }
 
     setDeletingEntry(undefined)

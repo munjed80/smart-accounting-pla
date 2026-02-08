@@ -87,6 +87,7 @@ import {
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { zzpApi, ZZPCustomer, ZZPCustomerCreate, ZZPCustomerUpdate } from '@/lib/api'
+import { parseApiError } from '@/lib/utils'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
@@ -1074,7 +1075,7 @@ export const ZZPCustomersPage = () => {
       setCustomers(response.customers)
     } catch (error) {
       console.error('Failed to load customers:', error)
-      toast.error(t('zzpCustomers.errorLoadingCustomers'))
+      toast.error(parseApiError(error))
     } finally {
       setIsLoading(false)
     }
@@ -1138,7 +1139,7 @@ export const ZZPCustomersPage = () => {
       setEditingCustomer(undefined)
     } catch (error) {
       console.error('Failed to save customer:', error)
-      toast.error(t('zzpCustomers.errorSavingCustomer'))
+      toast.error(parseApiError(error))
     }
   }, [user?.id, editingCustomer, loadCustomers])
 
@@ -1171,7 +1172,7 @@ export const ZZPCustomersPage = () => {
       await loadCustomers()
     } catch (error) {
       console.error('Failed to delete customer:', error)
-      toast.error(t('zzpCustomers.errorDeletingCustomer'))
+      toast.error(parseApiError(error))
     }
 
     setDeletingCustomer(undefined)

@@ -320,7 +320,7 @@ export const SmartDashboard = () => {
                 {formatCurrency(dashboardData?.expenses.this_month_total_cents || 0)}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {dashboardData?.expenses.this_month_count || 0} uitgaven in {getCurrentMonthName()}
+                {dashboardData?.expenses.this_month_count || 0} {t('dashboard.expenses')} in {getCurrentMonthName()}
               </p>
             </CardContent>
           </Card>
@@ -341,7 +341,7 @@ export const SmartDashboard = () => {
                 {dashboardData?.time.this_week_hours || 0}u
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {dashboardData?.time.this_week_billable_hours || 0}u factureerbaar
+                {dashboardData?.time.this_week_billable_hours || 0}u {t('dashboard.billableHours')}
                 {(dashboardData?.time.this_week_value_cents || 0) > 0 && (
                   <span className="text-accent ml-1">
                     ({formatCurrency(dashboardData?.time.this_week_value_cents || 0)})
@@ -381,11 +381,11 @@ export const SmartDashboard = () => {
                 {/* Breakdown */}
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between text-muted-foreground">
-                    <span>{t('dashboard.btwCollectedLabel')} (facturen)</span>
+                    <span>{t('dashboard.btwCollectedFrom')}</span>
                     <span className="font-medium">{formatCurrency(dashboardData?.btw.vat_collected_cents || 0)}</span>
                   </div>
                   <div className="flex items-center justify-between text-muted-foreground">
-                    <span>{t('dashboard.btwDeductibleLabel')} (uitgaven)</span>
+                    <span>{t('dashboard.btwDeductibleFrom')}</span>
                     <span className="font-medium">- {formatCurrency(dashboardData?.btw.vat_deductible_cents || 0)}</span>
                   </div>
                 </div>
@@ -393,7 +393,7 @@ export const SmartDashboard = () => {
                 {/* Days until deadline */}
                 {(dashboardData?.btw.days_until_deadline || 0) <= 30 && (
                   <div className={`text-xs px-2 py-1 rounded ${(dashboardData?.btw.days_until_deadline || 0) <= 14 ? 'bg-amber-500/20 text-amber-700' : 'bg-blue-500/20 text-blue-700'}`}>
-                    Nog {dashboardData?.btw.days_until_deadline} dagen tot de deadline
+                    {t('dashboard.daysUntilDeadline').replace('{days}', String(dashboardData?.btw.days_until_deadline || 0))}
                   </div>
                 )}
               </div>

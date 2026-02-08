@@ -102,7 +102,7 @@ class ZZPDashboardResponse(BaseModel):
     btw: BTWStats
     actions: List[ActionItem] = Field(default_factory=list, description="Actions requiring attention")
     profile_complete: bool = Field(False, description="Whether business profile is complete")
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     # Metric calculation notes for transparency
     notes: dict = Field(default_factory=dict, description="Notes on how metrics were calculated")
@@ -161,27 +161,18 @@ def get_quarter_info(target_date: date) -> tuple[str, date, date, date]:
         next_quarter_month = quarter_start_month + 3
         quarter_end = date(year, next_quarter_month, 1) - timedelta(days=1)
     
-    # BTW deadline (end of month after quarter)
-    deadline_year = year + 1 if quarter == 4 else year
-    deadline_month = 1 if quarter == 4 else quarter_start_month + 4
-    
-    # Last day of deadline month
-    if deadline_month == 12:
-        btw_deadline = date(deadline_year, 12, 31)
-    else:
-        btw_deadline = date(deadline_year, deadline_month, 1) - timedelta(days=1)
-        if deadline_month > 12:
-            # Handle edge case for Q4 -> January next year
-            btw_deadline = date(deadline_year, 1, 31)
-    
-    # Q4 special handling
+    # BTW deadline: end of month after quarter end
+    # Q1 (Jan-Mar) -> April 30
+    # Q2 (Apr-Jun) -> July 31
+    # Q3 (Jul-Sep) -> October 31
+    # Q4 (Oct-Dec) -> January 31 (next year)
     if quarter == 4:
         btw_deadline = date(year + 1, 1, 31)
     elif quarter == 1:
         btw_deadline = date(year, 4, 30)
     elif quarter == 2:
         btw_deadline = date(year, 7, 31)
-    elif quarter == 3:
+    else:  # quarter == 3
         btw_deadline = date(year, 10, 31)
     
     quarter_label = f"Q{quarter} {year}"

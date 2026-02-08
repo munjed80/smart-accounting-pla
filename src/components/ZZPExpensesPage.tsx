@@ -66,6 +66,7 @@ import {
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { zzpApi, ZZPExpense, ZZPExpenseCreate, ZZPExpenseUpdate } from '@/lib/api'
+import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 
@@ -716,7 +717,7 @@ export const ZZPExpensesPage = () => {
       setTotalVatCents(response.total_vat_cents)
     } catch (error) {
       console.error('Failed to load expenses:', error)
-      toast.error(t('zzpExpenses.errorLoadingExpenses'))
+      toast.error(parseApiError(error))
     } finally {
       setIsLoading(false)
     }
@@ -752,7 +753,7 @@ export const ZZPExpensesPage = () => {
       setEditingExpense(undefined)
     } catch (error) {
       console.error('Failed to save expense:', error)
-      toast.error(t('zzpExpenses.errorSavingExpense'))
+      toast.error(parseApiError(error))
     }
   }, [user?.id, editingExpense, loadExpenses])
 
@@ -768,7 +769,7 @@ export const ZZPExpensesPage = () => {
       await loadExpenses()
     } catch (error) {
       console.error('Failed to delete expense:', error)
-      toast.error(t('zzpExpenses.errorDeletingExpense'))
+      toast.error(parseApiError(error))
     }
 
     setDeletingExpense(undefined)

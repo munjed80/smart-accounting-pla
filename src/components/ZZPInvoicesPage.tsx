@@ -102,6 +102,7 @@ import {
   ZZPCustomer,
   ZZPBusinessProfile,
 } from '@/lib/api'
+import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -1230,8 +1231,9 @@ export const ZZPInvoicesPage = () => {
       setBusinessProfile(profileData)
     } catch (err) {
       console.error('Failed to load data:', err)
-      setError(t('zzpInvoices.loadError'))
-      toast.error(t('zzpInvoices.loadError'))
+      const errorMessage = parseApiError(err)
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -1328,7 +1330,7 @@ export const ZZPInvoicesPage = () => {
       await loadData()
     } catch (err) {
       console.error('Failed to save invoice:', err)
-      toast.error(t('zzpInvoices.saveError'))
+      toast.error(parseApiError(err))
       throw err // Re-throw so the dialog knows it failed
     }
   }, [editingInvoice, loadData])
@@ -1342,7 +1344,7 @@ export const ZZPInvoicesPage = () => {
       await loadData()
     } catch (err) {
       console.error('Failed to update status:', err)
-      toast.error(t('zzpInvoices.statusChangeError'))
+      toast.error(parseApiError(err))
     }
   }, [loadData])
 
@@ -1358,7 +1360,7 @@ export const ZZPInvoicesPage = () => {
       await loadData()
     } catch (err) {
       console.error('Failed to delete invoice:', err)
-      toast.error(t('zzpInvoices.deleteError'))
+      toast.error(parseApiError(err))
     }
   }, [deletingInvoice, loadData])
 

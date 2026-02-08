@@ -58,6 +58,7 @@ import {
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { zzpApi, ZZPCalendarEvent, ZZPCalendarEventCreate, ZZPCalendarEventUpdate } from '@/lib/api'
+import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 
@@ -667,7 +668,7 @@ export const ZZPAgendaPage = () => {
       setEvents(response.events)
     } catch (error) {
       console.error('Failed to load events:', error)
-      toast.error(t('zzpAgenda.errorLoadingEvents'))
+      toast.error(parseApiError(error))
     } finally {
       setIsLoading(false)
     }
@@ -781,7 +782,7 @@ export const ZZPAgendaPage = () => {
       setEditingEvent(undefined)
     } catch (error) {
       console.error('Failed to save event:', error)
-      toast.error(t('zzpAgenda.errorSavingEvent'))
+      toast.error(parseApiError(error))
     }
   }, [user?.id, editingEvent, loadEvents])
 
@@ -796,7 +797,7 @@ export const ZZPAgendaPage = () => {
       await loadEvents()
     } catch (error) {
       console.error('Failed to delete event:', error)
-      toast.error(t('zzpAgenda.errorDeletingEvent'))
+      toast.error(parseApiError(error))
     }
 
     setDeletingEvent(undefined)

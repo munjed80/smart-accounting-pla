@@ -340,6 +340,10 @@ export const nl = {
     tabThisWeek: "Deze week",
     tabManualEntry: "Handmatig toevoegen",
     tabOverview: "Overzicht",
+    
+    // Export
+    export: "Exporteren",
+    exportTooltip: "Exporteren naar CSV/PDF komt binnenkort beschikbaar",
   },
 
   // ZZP Agenda page

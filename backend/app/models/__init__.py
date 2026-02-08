@@ -38,6 +38,10 @@ from app.models.zzp import (
     ZZPCalendarEvent,
     WorkSession,
     ZZPBankTransactionMatch,
+    QuoteStatus,
+    ZZPQuote,
+    ZZPQuoteLine,
+    ZZPQuoteCounter,
 )
 
 __all__ = [
@@ -93,4 +97,8 @@ __all__ = [
     "ZZPCalendarEvent",
     "WorkSession",
     "ZZPBankTransactionMatch",
+    "QuoteStatus",
+    "ZZPQuote",
+    "ZZPQuoteLine",
+    "ZZPQuoteCounter",
 ]

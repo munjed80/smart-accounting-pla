@@ -1280,3 +1280,145 @@ class ZZPInsightsResponse(BaseModel):
     
     # AI Transparency
     ai_model_version: str = Field(default="rules-v1", description="Version of AI rules used")
+
+
+# ============================================================================
+# Quote (Offerte) Schemas
+# ============================================================================
+
+class QuoteStatus(str, Enum):
+    """Quote status values."""
+    DRAFT = "draft"
+    SENT = "sent"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+    CONVERTED = "converted"
+
+
+class QuoteLineCreate(BaseModel):
+    """Schema for creating a quote line."""
+    description: str = Field(..., min_length=1, max_length=1000)
+    quantity: float = Field(default=1.0, gt=0)
+    unit_price_cents: int = Field(..., ge=0)
+    vat_rate: float = Field(default=21.0, ge=0, le=100)
+
+
+class QuoteLineUpdate(BaseModel):
+    """Schema for updating a quote line."""
+    description: Optional[str] = Field(None, min_length=1, max_length=1000)
+    quantity: Optional[float] = Field(None, gt=0)
+    unit_price_cents: Optional[int] = Field(None, ge=0)
+    vat_rate: Optional[float] = Field(None, ge=0, le=100)
+
+
+class QuoteLineResponse(BaseModel):
+    """Schema for quote line response."""
+    id: UUID
+    quote_id: UUID
+    line_number: int
+    description: str
+    quantity: float
+    unit_price_cents: int
+    vat_rate: float
+    vat_amount_cents: int
+    line_total_cents: int
+    
+    class Config:
+        from_attributes = True
+
+
+class QuoteCreate(BaseModel):
+    """Schema for creating a quote."""
+    customer_id: UUID
+    issue_date: str = Field(..., pattern=r'^\d{4}-\d{2}-\d{2}$', description="Format: YYYY-MM-DD")
+    valid_until: Optional[str] = Field(None, pattern=r'^\d{4}-\d{2}-\d{2}$', description="Format: YYYY-MM-DD")
+    title: Optional[str] = Field(None, max_length=255)
+    notes: Optional[str] = Field(None, max_length=2000)
+    terms: Optional[str] = Field(None, max_length=5000)
+    lines: List[QuoteLineCreate] = Field(..., min_length=1)
+
+
+class QuoteUpdate(BaseModel):
+    """Schema for updating a quote."""
+    customer_id: Optional[UUID] = None
+    issue_date: Optional[str] = Field(None, pattern=r'^\d{4}-\d{2}-\d{2}$')
+    valid_until: Optional[str] = Field(None, pattern=r'^\d{4}-\d{2}-\d{2}$')
+    title: Optional[str] = Field(None, max_length=255)
+    notes: Optional[str] = Field(None, max_length=2000)
+    terms: Optional[str] = Field(None, max_length=5000)
+    lines: Optional[List[QuoteLineCreate]] = None  # Full replacement if provided
+
+
+class QuoteStatusUpdate(BaseModel):
+    """Schema for updating quote status."""
+    status: QuoteStatus
+
+
+class QuoteResponse(BaseModel):
+    """Schema for quote response."""
+    id: UUID
+    administration_id: UUID
+    customer_id: UUID
+    quote_number: str
+    status: str
+    issue_date: str
+    valid_until: Optional[str] = None
+    invoice_id: Optional[UUID] = None
+    
+    # Seller snapshot
+    seller_company_name: Optional[str] = None
+    seller_trading_name: Optional[str] = None
+    seller_address_street: Optional[str] = None
+    seller_address_postal_code: Optional[str] = None
+    seller_address_city: Optional[str] = None
+    seller_address_country: Optional[str] = None
+    seller_kvk_number: Optional[str] = None
+    seller_btw_number: Optional[str] = None
+    seller_iban: Optional[str] = None
+    seller_email: Optional[str] = None
+    seller_phone: Optional[str] = None
+    
+    # Customer snapshot
+    customer_name: Optional[str] = None
+    customer_address_street: Optional[str] = None
+    customer_address_postal_code: Optional[str] = None
+    customer_address_city: Optional[str] = None
+    customer_address_country: Optional[str] = None
+    customer_kvk_number: Optional[str] = None
+    customer_btw_number: Optional[str] = None
+    
+    # Totals
+    subtotal_cents: int
+    vat_total_cents: int
+    total_cents: int
+    
+    # Content
+    title: Optional[str] = None
+    notes: Optional[str] = None
+    terms: Optional[str] = None
+    
+    # Timestamps
+    created_at: datetime
+    updated_at: datetime
+    
+    # Lines
+    lines: List[QuoteLineResponse] = []
+    
+    class Config:
+        from_attributes = True
+
+
+class QuoteListResponse(BaseModel):
+    """Schema for list of quotes."""
+    quotes: List[QuoteResponse]
+    total: int
+    total_amount_cents: int
+    stats: Optional[dict] = None  # Status counts
+
+
+class QuoteConvertToInvoiceResponse(BaseModel):
+    """Response when converting a quote to an invoice."""
+    quote: QuoteResponse
+    invoice_id: UUID
+    invoice_number: str

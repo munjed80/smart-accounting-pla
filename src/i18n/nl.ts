@@ -2132,6 +2132,82 @@ export const nl = {
     error: "Kon inzichten niet laden",
     errorRetry: "Probeer opnieuw",
   },
+
+  // Quotes (Offertes)
+  zzpQuotes: {
+    title: "Offertes",
+    subtitle: "Beheer je offertes en converteer ze naar facturen",
+    newQuote: "Nieuwe offerte",
+    editQuote: "Offerte bewerken",
+    deleteQuote: "Offerte verwijderen",
+    quoteNumber: "Offertenummer",
+    customer: "Klant",
+    issueDate: "Offertedatum",
+    validUntil: "Geldig tot",
+    quoteTitle: "Onderwerp",
+    total: "Totaal",
+    status: "Status",
+    lines: "Regels",
+    notes: "Notities",
+    terms: "Voorwaarden",
+    
+    // Status labels
+    statusDraft: "Concept",
+    statusSent: "Verzonden",
+    statusAccepted: "Geaccepteerd",
+    statusRejected: "Afgewezen",
+    statusExpired: "Verlopen",
+    statusConverted: "Omgezet",
+    
+    // Actions
+    send: "Verzenden",
+    markAccepted: "Markeer als geaccepteerd",
+    markRejected: "Markeer als afgewezen",
+    convertToInvoice: "Omzetten naar factuur",
+    duplicate: "Dupliceren",
+    preview: "Voorbeeld",
+    
+    // Stats
+    totalQuotes: "Totaal offertes",
+    openQuotes: "Open offertes",
+    acceptedQuotes: "Geaccepteerde offertes",
+    totalValue: "Totale waarde",
+    
+    // Messages
+    quoteCreated: "Offerte aangemaakt",
+    quoteUpdated: "Offerte bijgewerkt",
+    quoteDeleted: "Offerte verwijderd",
+    quoteSent: "Offerte verzonden",
+    quoteAccepted: "Offerte geaccepteerd",
+    quoteRejected: "Offerte afgewezen",
+    quoteConverted: "Offerte omgezet naar factuur",
+    convertSuccess: "Offerte omgezet naar factuur {invoiceNumber}",
+    
+    // Confirmations
+    confirmDelete: "Weet je zeker dat je deze offerte wilt verwijderen?",
+    confirmConvert: "Weet je zeker dat je deze offerte wilt omzetten naar een factuur?",
+    
+    // Empty states
+    noQuotes: "Nog geen offertes",
+    noQuotesDescription: "Maak je eerste offerte aan om te beginnen",
+    noCustomers: "Geen klanten beschikbaar",
+    noCustomersDescription: "Voeg eerst een klant toe voordat je een offerte kunt maken",
+    
+    // Form
+    selectCustomer: "Selecteer een klant",
+    addLine: "Regel toevoegen",
+    removeLine: "Regel verwijderen",
+    lineDescription: "Omschrijving",
+    lineQuantity: "Aantal",
+    lineUnitPrice: "Prijs per stuk",
+    lineVatRate: "BTW %",
+    lineTotal: "Totaal",
+    
+    // Validation
+    customerRequired: "Selecteer een klant",
+    issueDateRequired: "Offertedatum is verplicht",
+    atLeastOneLine: "Voeg minimaal één regel toe",
+  },
 };
 
 /**

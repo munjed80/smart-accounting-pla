@@ -628,3 +628,180 @@ class ZZPBankTransactionMatch(Base):
     administration = relationship("Administration")
     invoice = relationship("ZZPInvoice")
     user = relationship("User")
+
+
+# ============================================================================
+# Quote (Offerte) Models
+# ============================================================================
+
+class QuoteStatus(str, Enum):
+    """Quote status values."""
+    DRAFT = "draft"
+    SENT = "sent"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+    CONVERTED = "converted"  # Converted to invoice
+
+
+class ZZPQuote(Base):
+    """
+    Quote (Offerte) entity for ZZP users.
+    
+    Quotes can be:
+    - Created from scratch or from customer data
+    - Sent to customers
+    - Accepted/rejected by customer
+    - Converted to an invoice with one click
+    
+    Fields mirror ZZPInvoice for easy conversion.
+    """
+    __tablename__ = "zzp_quotes"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    administration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("administrations.id", ondelete="CASCADE"), 
+        nullable=False,
+        index=True
+    )
+    customer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("zzp_customers.id", ondelete="RESTRICT"), 
+        nullable=False,
+        index=True
+    )
+    
+    # Quote number (unique per administration)
+    quote_number: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    
+    # Status
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=QuoteStatus.DRAFT.value, index=True
+    )
+    
+    # Dates
+    issue_date: Mapped[date] = mapped_column(Date, nullable=False)
+    valid_until: Mapped[Optional[date]] = mapped_column(Date, nullable=True)  # Expiry date
+    
+    # Reference to invoice if converted
+    invoice_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("zzp_invoices.id", ondelete="SET NULL"), 
+        nullable=True,
+        index=True
+    )
+    
+    # Seller snapshot (from BusinessProfile at creation time)
+    seller_company_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    seller_trading_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    seller_address_street: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    seller_address_postal_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    seller_address_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    seller_address_country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    seller_kvk_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    seller_btw_number: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    seller_iban: Mapped[Optional[str]] = mapped_column(String(34), nullable=True)
+    seller_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    seller_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    
+    # Customer snapshot (from customer at creation time)
+    customer_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    customer_address_street: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    customer_address_postal_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    customer_address_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    customer_address_country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    customer_kvk_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    customer_btw_number: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    
+    # Totals (calculated from lines)
+    subtotal_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    vat_total_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    
+    # Title and notes
+    title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Quote title/subject
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    terms: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Terms and conditions
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    
+    # Relationships
+    administration = relationship("Administration")
+    customer = relationship("ZZPCustomer")
+    invoice = relationship("ZZPInvoice")
+    lines: Mapped[List["ZZPQuoteLine"]] = relationship(
+        "ZZPQuoteLine", 
+        back_populates="quote", 
+        cascade="all, delete-orphan",
+        order_by="ZZPQuoteLine.line_number"
+    )
+
+
+class ZZPQuoteLine(Base):
+    """
+    Quote line item for ZZP quotes.
+    
+    Fields mirror ZZPInvoiceLine for easy conversion to invoice.
+    """
+    __tablename__ = "zzp_quote_lines"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    quote_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("zzp_quotes.id", ondelete="CASCADE"), 
+        nullable=False,
+        index=True
+    )
+    
+    # Line details
+    line_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=Decimal("1.00"))
+    unit_price_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    
+    # VAT
+    vat_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("21.00"))
+    vat_amount_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    
+    # Calculated total
+    line_total_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    
+    # Relationships
+    quote: Mapped["ZZPQuote"] = relationship("ZZPQuote", back_populates="lines")
+
+
+class ZZPQuoteCounter(Base):
+    """
+    Counter for generating sequential quote numbers per administration.
+    Similar to ZZPInvoiceCounter.
+    """
+    __tablename__ = "zzp_quote_counters"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    administration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("administrations.id", ondelete="CASCADE"), 
+        nullable=False,
+        unique=True,
+        index=True
+    )
+    
+    # Current year and sequence
+    current_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    current_sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    
+    # Relationships
+    administration = relationship("Administration")

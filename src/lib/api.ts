@@ -3018,6 +3018,118 @@ export interface ZZPInsightsResponse {
   ai_model_version: string
 }
 
+// Quote (Offerte) Types
+export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'converted'
+
+export interface ZZPQuoteLine {
+  id: string
+  quote_id: string
+  line_number: number
+  description: string
+  quantity: number
+  unit_price_cents: number
+  vat_rate: number
+  vat_amount_cents: number
+  line_total_cents: number
+}
+
+export interface ZZPQuoteLineCreate {
+  description: string
+  quantity: number
+  unit_price_cents: number
+  vat_rate: number
+}
+
+export interface ZZPQuote {
+  id: string
+  administration_id: string
+  customer_id: string
+  quote_number: string
+  status: QuoteStatus
+  issue_date: string
+  valid_until?: string
+  invoice_id?: string
+  
+  // Seller snapshot
+  seller_company_name?: string
+  seller_trading_name?: string
+  seller_address_street?: string
+  seller_address_postal_code?: string
+  seller_address_city?: string
+  seller_address_country?: string
+  seller_kvk_number?: string
+  seller_btw_number?: string
+  seller_iban?: string
+  seller_email?: string
+  seller_phone?: string
+  
+  // Customer snapshot
+  customer_name?: string
+  customer_address_street?: string
+  customer_address_postal_code?: string
+  customer_address_city?: string
+  customer_address_country?: string
+  customer_kvk_number?: string
+  customer_btw_number?: string
+  
+  // Totals
+  subtotal_cents: number
+  vat_total_cents: number
+  total_cents: number
+  
+  // Content
+  title?: string
+  notes?: string
+  terms?: string
+  
+  // Timestamps
+  created_at: string
+  updated_at: string
+  
+  // Lines
+  lines: ZZPQuoteLine[]
+}
+
+export interface ZZPQuoteCreate {
+  customer_id: string
+  issue_date: string
+  valid_until?: string
+  title?: string
+  notes?: string
+  terms?: string
+  lines: ZZPQuoteLineCreate[]
+}
+
+export interface ZZPQuoteUpdate {
+  customer_id?: string
+  issue_date?: string
+  valid_until?: string
+  title?: string
+  notes?: string
+  terms?: string
+  lines?: ZZPQuoteLineCreate[]
+}
+
+export interface ZZPQuoteListResponse {
+  quotes: ZZPQuote[]
+  total: number
+  total_amount_cents: number
+  stats?: {
+    draft: number
+    sent: number
+    accepted: number
+    rejected: number
+    expired: number
+    converted: number
+  }
+}
+
+export interface ZZPQuoteConvertResponse {
+  quote: ZZPQuote
+  invoice_id: string
+  invoice_number: string
+}
+
 // Expense Types
 export interface ZZPExpense {
   id: string
@@ -3527,6 +3639,60 @@ export const zzpApi = {
     get: async (): Promise<ZZPInsightsResponse> => {
       const response = await api.get<ZZPInsightsResponse>('/zzp/insights')
       return response.data
+    },
+  },
+
+  // ------------ Quotes (Offertes) ------------
+  quotes: {
+    /** List all quotes */
+    list: async (options?: {
+      status?: QuoteStatus
+      customer_id?: string
+      from_date?: string
+      to_date?: string
+    }): Promise<ZZPQuoteListResponse> => {
+      const params: Record<string, string> = {}
+      if (options?.status) params.status = options.status
+      if (options?.customer_id) params.customer_id = options.customer_id
+      if (options?.from_date) params.from_date = options.from_date
+      if (options?.to_date) params.to_date = options.to_date
+      const response = await api.get<ZZPQuoteListResponse>('/zzp/quotes', { params })
+      return response.data
+    },
+
+    /** Get a specific quote */
+    get: async (quoteId: string): Promise<ZZPQuote> => {
+      const response = await api.get<ZZPQuote>(`/zzp/quotes/${quoteId}`)
+      return response.data
+    },
+
+    /** Create a new quote */
+    create: async (data: ZZPQuoteCreate): Promise<ZZPQuote> => {
+      const response = await api.post<ZZPQuote>('/zzp/quotes', data)
+      return response.data
+    },
+
+    /** Update a quote */
+    update: async (quoteId: string, data: ZZPQuoteUpdate): Promise<ZZPQuote> => {
+      const response = await api.put<ZZPQuote>(`/zzp/quotes/${quoteId}`, data)
+      return response.data
+    },
+
+    /** Update quote status */
+    updateStatus: async (quoteId: string, status: QuoteStatus): Promise<ZZPQuote> => {
+      const response = await api.patch<ZZPQuote>(`/zzp/quotes/${quoteId}/status`, { status })
+      return response.data
+    },
+
+    /** Convert quote to invoice */
+    convertToInvoice: async (quoteId: string): Promise<ZZPQuoteConvertResponse> => {
+      const response = await api.post<ZZPQuoteConvertResponse>(`/zzp/quotes/${quoteId}/convert`)
+      return response.data
+    },
+
+    /** Delete a quote (draft only) */
+    delete: async (quoteId: string): Promise<void> => {
+      await api.delete(`/zzp/quotes/${quoteId}`)
     },
   },
 

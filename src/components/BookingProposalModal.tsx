@@ -255,7 +255,7 @@ export const BookingProposalModal = ({
           </Alert>
 
           {/* Date and Description */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4">
             <div>
               <Label htmlFor="entry_date">Datum</Label>
               <Input
@@ -265,7 +265,7 @@ export const BookingProposalModal = ({
                 onChange={(e) => setEntryDate(e.target.value)}
               />
             </div>
-            <div className="col-span-2">
+            <div>
               <Label htmlFor="description">Omschrijving</Label>
               <Textarea
                 id="description"

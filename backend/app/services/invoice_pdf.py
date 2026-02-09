@@ -10,12 +10,6 @@ from typing import Optional
 from decimal import Decimal
 import logging
 
-try:
-    from weasyprint import HTML, CSS
-    WEASYPRINT_AVAILABLE = True
-except ImportError:
-    WEASYPRINT_AVAILABLE = False
-
 from app.models.zzp import ZZPInvoice
 
 logger = logging.getLogger(__name__)
@@ -462,12 +456,20 @@ def generate_invoice_pdf(invoice: ZZPInvoice) -> bytes:
         PDF bytes
         
     Raises:
-        RuntimeError: If WeasyPrint is not available
+        RuntimeError: If WeasyPrint is not available or PDF generation fails
     """
+    # Lazy import WeasyPrint to avoid import-time crashes when system libs are missing
+    try:
+        from weasyprint import HTML, CSS
+        WEASYPRINT_AVAILABLE = True
+    except Exception as e:
+        # Catch any exception (ImportError, OSError, etc.) from missing deps
+        logger.error(f"WeasyPrint unavailable: {e}", exc_info=True)
+        WEASYPRINT_AVAILABLE = False
+    
     if not WEASYPRINT_AVAILABLE:
         raise RuntimeError(
-            "PDF generation is not available. WeasyPrint library is not installed. "
-            "Please install it with: pip install weasyprint"
+            "PDF generation is not available. WeasyPrint library or its system dependencies are not installed."
         )
     
     try:

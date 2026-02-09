@@ -25,11 +25,10 @@ import {
   accountantApi,
   LedgerClientOverview,
   ClientScopesResponse,
-  PermissionScope,
   ALL_SCOPES,
   getErrorMessage,
   getPermissionErrorCode,
-  isScopeMissingError,
+  isNotAssignedError,
 } from '@/lib/api'
 import { createDossierLogger } from '@/lib/dossierLogger'
 import { 
@@ -55,33 +54,6 @@ import { t } from '@/i18n'
 import { ClientIssuesTab } from '@/components/ClientIssuesTab'
 import { ClientPeriodsTab } from '@/components/ClientPeriodsTab'
 import { ClientDecisionsTab } from '@/components/ClientDecisionsTab'
-
-/**
- * Check if an error is a permission-related 403 error.
- * Returns the error code if it's a recognized permission error.
- */
-function getApiPermissionErrorCode(err: unknown): string | null {
-  if (typeof err !== 'object' || err === null || !('response' in err)) {
-    return null
-  }
-  const response = (err as { response?: { status?: number; data?: { detail?: { code?: string } | string } } }).response
-  if (response?.status !== 403) {
-    return null
-  }
-  const detail = response?.data?.detail
-  if (typeof detail === 'object' && detail?.code) {
-    return detail.code as string
-  }
-  return null
-}
-
-/**
- * Check if an error is a NOT_ASSIGNED error (403).
- * Returns true if the user is not assigned to the requested client.
- */
-function isNotAssignedError(err: unknown): boolean {
-  return getApiPermissionErrorCode(err) === 'NOT_ASSIGNED'
-}
 
 interface ClientDossierPageProps {
   clientId: string
@@ -197,7 +169,7 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
     } catch (err: unknown) {
       logger.error(endpoint, err)
       // Check for specific permission error codes
-      const errCode = getApiPermissionErrorCode(err)
+      const errCode = getPermissionErrorCode(err)
       if (errCode) {
         setPermissionErrorCode(errCode)
         if (errCode === 'NOT_ASSIGNED') {
@@ -394,7 +366,6 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
                       variant={showPermissions ? "default" : "outline"} 
                       size="sm"
                       onClick={() => setShowPermissions(!showPermissions)}
-                      className={showPermissions ? "" : ""}
                     >
                       <ShieldCheck size={16} className="mr-1" />
                       {t('permissions.title')}

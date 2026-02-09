@@ -4,7 +4,7 @@ from app.models.administration import Administration, AdministrationMember
 from app.models.document import Document, ExtractedField, DocumentSuggestedAction, DocumentAuditLog
 from app.models.transaction import Transaction, TransactionLine
 from app.models.accounting import ChartOfAccount, VatCode, VatCategory
-from app.models.ledger import AccountingPeriod, JournalEntry, JournalLine
+from app.models.ledger import AccountingPeriod, JournalEntry, JournalLine, BookkeepingAuditLog, BookkeepingAuditAction
 from app.models.subledger import Party, OpenItem, OpenItemAllocation
 from app.models.assets import FixedAsset, DepreciationSchedule
 from app.models.issues import ClientIssue, ValidationRun
@@ -60,6 +60,8 @@ __all__ = [
     "AccountingPeriod",
     "JournalEntry",
     "JournalLine",
+    "BookkeepingAuditLog",
+    "BookkeepingAuditAction",
     "Party",
     "OpenItem",
     "OpenItemAllocation",

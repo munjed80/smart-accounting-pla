@@ -30,6 +30,27 @@ class InvitedBy(str, enum.Enum):
     ADMIN = "ADMIN"            # Admin-created assignment
 
 
+class PermissionScope(str, enum.Enum):
+    """
+    Permission scopes for accountant access to client modules.
+    
+    Each scope grants access to a specific area of the client's data.
+    """
+    INVOICES = "invoices"      # Access to invoices
+    CUSTOMERS = "customers"    # Access to customer data
+    EXPENSES = "expenses"      # Access to expenses
+    HOURS = "hours"            # Access to time tracking
+    DOCUMENTS = "documents"    # Access to documents
+    BOOKKEEPING = "bookkeeping"  # Access to journal entries and transactions
+    SETTINGS = "settings"      # Access to settings
+    VAT = "vat"                # Access to VAT/BTW filing
+    REPORTS = "reports"        # Access to financial reports
+
+
+# Default scopes for new assignments - all access granted for backward compatibility
+DEFAULT_SCOPES = [scope.value for scope in PermissionScope]
+
+
 class AccountantClientAssignment(Base):
     """
     Tracks which accountants are assigned to which clients with consent workflow.
@@ -81,6 +102,12 @@ class AccountantClientAssignment(Base):
     approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
+    # Permission scopes - array of scope strings for module-based access control
+    scopes: Mapped[List[str]] = mapped_column(
+        ARRAY(String(50)),
+        default=lambda: DEFAULT_SCOPES.copy(),
+        nullable=False
+    )
 
     # Relationships
     accountant = relationship("User", foreign_keys=[accountant_id])

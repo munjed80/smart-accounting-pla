@@ -55,6 +55,12 @@ export const nl = {
     comingSoon: "Binnenkort beschikbaar",
     more: "meer",
     actions: "Acties",
+    showingOf: "van",
+    showing: "weergegeven",
+    justNow: "Zojuist",
+    minutesAgo: "min geleden",
+    hoursAgo: "uur geleden",
+    daysAgo: "dagen geleden",
   },
 
   // Brand
@@ -1663,7 +1669,147 @@ export const nl = {
       periods: "Periodes",
       decisions: "Beslissingen",
       overview: "Overzicht",
+      bookkeeping: "Boekingen",
+      audit: "Audit",
     },
+  },
+
+  // Bookkeeping (Journal Entries / Grootboek)
+  bookkeeping: {
+    title: "Boekingen",
+    subtitle: "Journaalposten en grootboekmutaties",
+    newEntry: "Nieuwe boeking",
+    editEntry: "Boeking bewerken",
+    entryDetail: "Boekingsdetails",
+    
+    // List
+    noEntries: "Geen boekingen",
+    noEntriesDescription: "Er zijn nog geen journaalposten aangemaakt voor deze klant.",
+    showDrafts: "Toon concepten",
+    showPosted: "Toon geboekt",
+    showAll: "Toon alles",
+    
+    // Entry fields
+    entryNumber: "Boekingsnummer",
+    entryDate: "Boekdatum",
+    description: "Omschrijving",
+    reference: "Referentie",
+    status: "Status",
+    totalDebit: "Totaal debet",
+    totalCredit: "Totaal credit",
+    balance: "Balans",
+    sourceType: "Bron",
+    createdBy: "Aangemaakt door",
+    postedBy: "Geboekt door",
+    postedAt: "Geboekt op",
+    
+    // Status labels
+    statusDraft: "Concept",
+    statusPosted: "Geboekt",
+    statusReversed: "Teruggeboekt",
+    
+    // Source types
+    sourceManual: "Handmatig",
+    sourceInvoice: "Factuur",
+    sourceExpense: "Uitgave",
+    sourceOcr: "OCR",
+    
+    // Lines
+    lines: "Regels",
+    addLine: "Regel toevoegen",
+    account: "Grootboekrekening",
+    debit: "Debet",
+    credit: "Credit",
+    vatCode: "BTW-code",
+    lineDescription: "Regelomschrijving",
+    
+    // Actions
+    post: "Boeken",
+    posting: "Boeken...",
+    delete: "Verwijderen",
+    deleting: "Verwijderen...",
+    save: "Opslaan",
+    saving: "Opslaan...",
+    cancel: "Annuleren",
+    
+    // Messages
+    postSuccess: "Journaalpost succesvol geboekt",
+    postFailed: "Boeken mislukt",
+    deleteSuccess: "Journaalpost verwijderd",
+    deleteFailed: "Verwijderen mislukt",
+    saveSuccess: "Journaalpost opgeslagen",
+    saveFailed: "Opslaan mislukt",
+    
+    // Validation
+    notBalanced: "Journaalpost is niet in balans",
+    noLines: "Voeg minimaal één regel toe",
+    periodLocked: "Kan niet boeken in afgesloten periode",
+    periodLockedDetail: "De datum valt in een afgesloten of gefinaliseerde periode.",
+    alreadyPosted: "Journaalpost is al geboekt",
+    onlyDraftCanEdit: "Alleen concepten kunnen worden bewerkt",
+    onlyDraftCanDelete: "Alleen concepten kunnen worden verwijderd",
+    
+    // Balance status
+    balanced: "In balans",
+    notBalancedStatus: "Niet in balans",
+    
+    // Confirmation
+    confirmDelete: "Weet je zeker dat je deze journaalpost wilt verwijderen?",
+    confirmPost: "Weet je zeker dat je deze journaalpost wilt boeken? Dit kan niet ongedaan worden gemaakt.",
+  },
+
+  // Audit Log
+  audit: {
+    title: "Audit",
+    subtitle: "Logboek van alle boekhoudbewerkingen",
+    
+    // List
+    noEntries: "Geen audit logs",
+    noEntriesDescription: "Er zijn nog geen boekhoudbewerkingen geregistreerd.",
+    noLogs: "Geen audit logs",
+    noLogsDescription: "Er zijn nog geen acties uitgevoerd op deze periode.",
+    
+    // Entry fields
+    timestamp: "Tijdstip",
+    actor: "Gebruiker",
+    action: "Actie",
+    entityType: "Type",
+    entityDescription: "Beschrijving",
+    details: "Details",
+    from: "Van",
+    to: "Naar",
+    performedBy: "Uitgevoerd door",
+    performedAt: "Uitgevoerd op",
+    notes: "Opmerkingen",
+    
+    // Action labels
+    actions: {
+      CREATE: "Aangemaakt",
+      UPDATE: "Bijgewerkt",
+      POST: "Geboekt",
+      DELETE: "Verwijderd",
+      REVERSE: "Teruggeboekt",
+      LOCK_PERIOD: "Periode vergrendeld",
+      UNLOCK_PERIOD: "Periode ontgrendeld",
+      START_REVIEW: "Review gestart",
+      FINALIZE_PERIOD: "Periode gefinaliseerd",
+      REVIEW_START: "Controle gestart",
+      FINALIZE: "Afgerond",
+      LOCK: "Vergrendeld",
+    },
+    
+    // Entity types
+    entityTypes: {
+      journal_entry: "Journaalpost",
+      period: "Periode",
+      document: "Document",
+    },
+    
+    // Filters
+    filterByAction: "Filter op actie",
+    filterByEntity: "Filter op type",
+    allActions: "Alle acties",
+    allEntities: "Alle types",
   },
 
   // Issues (Validation Engine)
@@ -1861,25 +2007,6 @@ export const nl = {
     noSnapshotDescription: "Snapshots zijn alleen beschikbaar voor afgeronde of vergrendelde periodes.",
   },
 
-  // Audit Logs
-  audit: {
-    title: "Audit log",
-    subtitle: "Chronologisch overzicht van alle periodeacties",
-    noLogs: "Geen audit logs",
-    noLogsDescription: "Er zijn nog geen acties uitgevoerd op deze periode.",
-    action: "Actie",
-    from: "Van",
-    to: "Naar",
-    performedBy: "Uitgevoerd door",
-    performedAt: "Uitgevoerd op",
-    notes: "Opmerkingen",
-    actions: {
-      REVIEW_START: "Controle gestart",
-      FINALIZE: "Afgerond",
-      LOCK: "Vergrendeld",
-    },
-  },
-
   // Errors
   errors: {
     accessDenied: "Geen toegang",
@@ -1898,6 +2025,53 @@ export const nl = {
     userNotFound: "Geen gebruiker gevonden met dit e-mailadres. De gebruiker moet zich eerst registreren.",
     notZzpUser: "Deze gebruiker is geen ZZP-klant.",
     noAdministration: "Deze gebruiker heeft nog geen administratie aangemaakt.",
+    scopeMissing: "Geen toegang tot deze module",
+    scopeMissingDescription: "Je hebt geen machtiging voor deze functie. Neem contact op met de klant om toegang te vragen.",
+  },
+
+  // Permission Scopes
+  permissions: {
+    title: "Machtigingen",
+    subtitle: "Overzicht van je toegangsrechten",
+    fullAccess: "Volledige toegang",
+    partialAccess: "Gedeeltelijke toegang",
+    noAccess: "Geen toegang",
+    granted: "Toegekend",
+    notGranted: "Niet toegekend",
+    scopeTooltip: "Geen toegang (machtiging ontbreekt)",
+    
+    // Scope names
+    scopes: {
+      invoices: "Facturen",
+      customers: "Klanten",
+      expenses: "Uitgaven",
+      hours: "Uren",
+      documents: "Documenten",
+      bookkeeping: "Boekhouding",
+      settings: "Instellingen",
+      vat: "BTW",
+      reports: "Rapporten",
+    },
+    
+    // Scope descriptions
+    scopeDescriptions: {
+      invoices: "Toegang tot facturen bekijken en beheren",
+      customers: "Toegang tot klantgegevens",
+      expenses: "Toegang tot uitgaven en bonnen",
+      hours: "Toegang tot urenregistratie",
+      documents: "Toegang tot documenten uploaden en bekijken",
+      bookkeeping: "Toegang tot journaalposten en transacties",
+      settings: "Toegang tot instellingen",
+      vat: "Toegang tot BTW-aangiften",
+      reports: "Toegang tot financiële rapporten",
+    },
+    
+    // Panel
+    panelTitle: "Je machtigingen",
+    panelDescription: "Hieronder zie je welke onderdelen je mag inzien voor deze klant.",
+    scopesGranted: "machtigingen toegekend",
+    allScopesGranted: "Alle machtigingen",
+    requestAccess: "Meer toegang nodig? Neem contact op met de klant.",
   },
 
   // Consent workflow - Accountant clients page

@@ -5,6 +5,7 @@
  * - Issues tab: View and resolve validation issues
  * - Periods tab: Period control (review/finalize/lock)
  * - Decisions tab: View decision history
+ * - Permissions panel: View granted access scopes
  * 
  * All UI text is Dutch (nl.ts).
  */
@@ -16,12 +17,18 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuth } from '@/lib/AuthContext'
 import { useActiveClient } from '@/lib/ActiveClientContext'
 import { 
   ledgerApi, 
+  accountantApi,
   LedgerClientOverview,
-  getErrorMessage 
+  ClientScopesResponse,
+  ALL_SCOPES,
+  getErrorMessage,
+  getPermissionErrorCode,
+  isNotAssignedError,
 } from '@/lib/api'
 import { createDossierLogger } from '@/lib/dossierLogger'
 import { 
@@ -36,6 +43,11 @@ import {
   LockSimple,
   User,
   Sparkle,
+  ShieldCheck,
+  ShieldSlash,
+  Info,
+  Book,
+  ClockCounterClockwise,
 } from '@phosphor-icons/react'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
@@ -44,26 +56,12 @@ import { t } from '@/i18n'
 import { ClientIssuesTab } from '@/components/ClientIssuesTab'
 import { ClientPeriodsTab } from '@/components/ClientPeriodsTab'
 import { ClientDecisionsTab } from '@/components/ClientDecisionsTab'
-
-/**
- * Check if an error is a NOT_ASSIGNED error (403).
- * Returns true if the user is not assigned to the requested client.
- */
-function isNotAssignedError(err: unknown): boolean {
-  if (typeof err !== 'object' || err === null || !('response' in err)) {
-    return false
-  }
-  const response = (err as { response?: { status?: number; data?: { detail?: { code?: string } | string } } }).response
-  if (response?.status !== 403) {
-    return false
-  }
-  const detail = response?.data?.detail
-  return typeof detail === 'object' && detail?.code === 'NOT_ASSIGNED'
-}
+import { ClientBookkeepingTab } from '@/components/ClientBookkeepingTab'
+import { ClientAuditTab } from '@/components/ClientAuditTab'
 
 interface ClientDossierPageProps {
   clientId: string
-  initialTab?: 'issues' | 'periods' | 'decisions'
+  initialTab?: 'issues' | 'periods' | 'decisions' | 'bookkeeping' | 'audit'
 }
 
 // Session storage key for today's completed actions
@@ -103,11 +101,14 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
   const { user } = useAuth()
   const { activeClientId, allLinks, setActiveClient, refreshLinks } = useActiveClient()
   const [overview, setOverview] = useState<LedgerClientOverview | null>(null)
+  const [scopes, setScopes] = useState<ClientScopesResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [permissionErrorCode, setPermissionErrorCode] = useState<string | null>(null)
   const [isAccessDenied, setIsAccessDenied] = useState(false)
   const [activeTab, setActiveTab] = useState<string>(initialTab)
   const [todayCompleted, setTodayCompleted] = useState(getTodayCompleted())
+  const [showPermissions, setShowPermissions] = useState(false)
 
   /**
    * Try to sync the active client context from allLinks.
@@ -128,6 +129,22 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
     return false
   }
 
+  const fetchScopes = async () => {
+    try {
+      const scopesData = await accountantApi.getClientScopes(clientId)
+      setScopes(scopesData)
+    } catch (err) {
+      console.warn('Could not fetch scopes:', err)
+      // Non-critical - set default full access
+      setScopes({
+        client_id: clientId,
+        client_name: '',
+        scopes: ALL_SCOPES,
+        available_scopes: ALL_SCOPES,
+      })
+    }
+  }
+
   const fetchOverview = async () => {
     const logger = createDossierLogger(clientId)
     const endpoint = `/accountant/clients/${clientId}/overview`
@@ -135,11 +152,15 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
     try {
       setIsLoading(true)
       setError(null)
+      setPermissionErrorCode(null)
       setIsAccessDenied(false)
       logger.request(endpoint)
       const data = await ledgerApi.getClientOverview(clientId)
       logger.success(endpoint, { clientName: data.client_name })
       setOverview(data)
+      
+      // Also fetch scopes
+      await fetchScopes()
       
       // If activeClient context doesn't match, sync it
       if (activeClientId !== clientId) {
@@ -151,10 +172,17 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
       }
     } catch (err: unknown) {
       logger.error(endpoint, err)
-      // Check if it's a NOT_ASSIGNED error (403)
-      if (isNotAssignedError(err)) {
-        setIsAccessDenied(true)
-        return
+      // Check for specific permission error codes
+      const errCode = getPermissionErrorCode(err)
+      if (errCode) {
+        setPermissionErrorCode(errCode)
+        if (errCode === 'NOT_ASSIGNED') {
+          setIsAccessDenied(true)
+          return
+        }
+        // For other permission errors (PENDING_APPROVAL, ACCESS_REVOKED, SCOPE_MISSING)
+        // Still try to fetch scopes to show meaningful info
+        await fetchScopes()
       }
       const message = getErrorMessage(err)
       setError(message)
@@ -230,6 +258,51 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
     )
   }
 
+  // Handle other permission errors (PENDING_APPROVAL, ACCESS_REVOKED)
+  if (permissionErrorCode === 'PENDING_APPROVAL') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background p-8">
+        <div className="max-w-4xl mx-auto">
+          <Alert className="bg-blue-500/10 border-blue-500/40">
+            <Info className="h-5 w-5 text-blue-600" />
+            <AlertTitle className="text-blue-700 dark:text-blue-400">{t('errors.pendingApproval')}</AlertTitle>
+            <AlertDescription className="mt-2">
+              <p className="text-muted-foreground mb-4">
+                {t('errors.pendingApprovalDescription')}
+              </p>
+              <Button onClick={handleBack} variant="outline">
+                <ArrowLeft size={16} className="mr-2" />
+                {t('errors.backToClients')}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    )
+  }
+
+  if (permissionErrorCode === 'ACCESS_REVOKED') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background p-8">
+        <div className="max-w-4xl mx-auto">
+          <Alert className="bg-red-500/10 border-red-500/40">
+            <ShieldSlash className="h-5 w-5 text-red-600" />
+            <AlertTitle className="text-red-700 dark:text-red-400">{t('errors.accessRevoked')}</AlertTitle>
+            <AlertDescription className="mt-2">
+              <p className="text-muted-foreground mb-4">
+                {t('errors.accessRevokedDescription')}
+              </p>
+              <Button onClick={handleBack} variant="outline">
+                <ArrowLeft size={16} className="mr-2" />
+                {t('errors.backToClients')}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    )
+  }
+
   // No client selected
   if (!clientId) {
     return (
@@ -288,13 +361,34 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
               {t('accountant.backToClientList')}
             </Button>
             
-            {/* Today's completed counter */}
-            {todayCompleted > 0 && (
-              <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30 px-3 py-1">
-                <Sparkle size={14} weight="fill" className="mr-1" />
-                {t('dossier.todayCompleted')}: {todayCompleted}
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {/* Permissions toggle button */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant={showPermissions ? "default" : "outline"} 
+                      size="sm"
+                      onClick={() => setShowPermissions(!showPermissions)}
+                    >
+                      <ShieldCheck size={16} className="mr-1" />
+                      {t('permissions.title')}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{t('permissions.panelDescription')}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              
+              {/* Today's completed counter */}
+              {todayCompleted > 0 && (
+                <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30 px-3 py-1">
+                  <Sparkle size={14} weight="fill" className="mr-1" />
+                  {t('dossier.todayCompleted')}: {todayCompleted}
+                </Badge>
+              )}
+            </div>
           </div>
           
           <div className="flex items-center justify-between">
@@ -349,9 +443,78 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
           </div>
         </div>
 
+        {/* Permissions Panel */}
+        {showPermissions && scopes && (
+          <Card className="mb-6 bg-card/80 backdrop-blur-sm border-primary/20">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={20} className="text-primary" />
+                <CardTitle className="text-lg">{t('permissions.panelTitle')}</CardTitle>
+              </div>
+              <CardDescription>
+                {t('permissions.panelDescription')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-3">
+                {ALL_SCOPES.map((scope) => {
+                  const hasScope = scopes.scopes.includes(scope)
+                  return (
+                    <TooltipProvider key={scope}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div 
+                            className={`
+                              flex flex-col items-center justify-center p-3 rounded-lg border transition-colors
+                              ${hasScope 
+                                ? 'bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400' 
+                                : 'bg-muted/50 border-muted text-muted-foreground'
+                              }
+                            `}
+                          >
+                            {hasScope ? (
+                              <CheckCircle size={20} weight="fill" />
+                            ) : (
+                              <LockSimple size={20} />
+                            )}
+                            <span className="text-xs mt-1 text-center">
+                              {t(`permissions.scopes.${scope}`)}
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>
+                            {hasScope 
+                              ? t(`permissions.scopeDescriptions.${scope}`) 
+                              : t('permissions.scopeTooltip')
+                            }
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )
+                })}
+              </div>
+              <div className="mt-4 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {scopes.scopes.length === ALL_SCOPES.length 
+                    ? t('permissions.allScopesGranted')
+                    : `${scopes.scopes.length}/${ALL_SCOPES.length} ${t('permissions.scopesGranted')}`
+                  }
+                </span>
+                {scopes.scopes.length < ALL_SCOPES.length && (
+                  <span className="text-xs text-muted-foreground">
+                    {t('permissions.requestAccess')}
+                  </span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="issues" className="flex items-center gap-2">
               <ClipboardText size={18} />
               {t('dossier.tabs.issues')}
@@ -361,6 +524,10 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="bookkeeping" className="flex items-center gap-2">
+              <Book size={18} />
+              {t('dossier.tabs.bookkeeping')}
+            </TabsTrigger>
             <TabsTrigger value="periods" className="flex items-center gap-2">
               <CalendarBlank size={18} />
               {t('dossier.tabs.periods')}
@@ -368,6 +535,10 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
             <TabsTrigger value="decisions" className="flex items-center gap-2">
               <ListChecks size={18} />
               {t('dossier.tabs.decisions')}
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="flex items-center gap-2">
+              <ClockCounterClockwise size={18} />
+              {t('dossier.tabs.audit')}
             </TabsTrigger>
           </TabsList>
 
@@ -378,12 +549,20 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
             />
           </TabsContent>
 
+          <TabsContent value="bookkeeping">
+            <ClientBookkeepingTab clientId={clientId} />
+          </TabsContent>
+
           <TabsContent value="periods">
             <ClientPeriodsTab clientId={clientId} />
           </TabsContent>
 
           <TabsContent value="decisions">
             <ClientDecisionsTab clientId={clientId} />
+          </TabsContent>
+
+          <TabsContent value="audit">
+            <ClientAuditTab clientId={clientId} />
           </TabsContent>
         </Tabs>
       </div>

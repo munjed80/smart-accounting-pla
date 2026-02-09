@@ -906,6 +906,145 @@ export interface SubledgerReportResponse {
   overdue_amount: number
 }
 
+// ============ Bookkeeping / Journal Entry Types ============
+
+export type JournalEntryStatus = 'DRAFT' | 'POSTED' | 'REVERSED'
+
+export interface JournalLineCreate {
+  account_id: string
+  description?: string
+  debit_amount: number
+  credit_amount: number
+  vat_code_id?: string
+  vat_amount?: number
+  taxable_amount?: number
+  party_type?: 'CUSTOMER' | 'SUPPLIER'
+  party_id?: string
+}
+
+export interface JournalLineResponse {
+  id: string
+  line_number: number
+  account_id: string
+  account_code: string | null
+  account_name: string | null
+  description: string | null
+  debit_amount: number
+  credit_amount: number
+  vat_code_id: string | null
+  vat_code: string | null
+  vat_amount: number | null
+  taxable_amount: number | null
+  party_type: string | null
+  party_id: string | null
+}
+
+export interface JournalEntryCreate {
+  entry_date: string
+  description: string
+  reference?: string
+  document_id?: string
+  source_type?: string
+  source_id?: string
+  lines: JournalLineCreate[]
+  auto_post?: boolean
+}
+
+export interface JournalEntryUpdate {
+  entry_date?: string
+  description?: string
+  reference?: string
+  lines?: JournalLineCreate[]
+}
+
+export interface JournalEntryResponse {
+  id: string
+  administration_id: string
+  entry_number: string
+  entry_date: string
+  description: string
+  reference: string | null
+  status: JournalEntryStatus
+  total_debit: number
+  total_credit: number
+  is_balanced: boolean
+  source_type: string | null
+  document_id: string | null
+  posted_at: string | null
+  posted_by_name: string | null
+  created_by_name: string | null
+  created_at: string
+  updated_at: string
+  lines: JournalLineResponse[]
+}
+
+export interface JournalEntryListItem {
+  id: string
+  entry_number: string
+  entry_date: string
+  description: string
+  status: JournalEntryStatus
+  total_debit: number
+  total_credit: number
+  is_balanced: boolean
+  source_type: string | null
+  posted_at: string | null
+  created_at: string
+}
+
+export interface JournalEntryListResponse {
+  entries: JournalEntryListItem[]
+  total_count: number
+}
+
+export interface JournalEntryPostResponse {
+  id: string
+  status: JournalEntryStatus
+  entry_number: string
+  posted_at: string
+  message: string
+}
+
+export interface PeriodLockCheckResponse {
+  is_locked: boolean
+  period_id: string | null
+  period_name: string | null
+  locked_at: string | null
+  locked_by_name: string | null
+  message: string
+}
+
+// ============ Audit Log Types ============
+
+export type AuditLogAction = 
+  | 'CREATE' 
+  | 'UPDATE' 
+  | 'POST' 
+  | 'DELETE' 
+  | 'REVERSE' 
+  | 'LOCK_PERIOD' 
+  | 'UNLOCK_PERIOD' 
+  | 'START_REVIEW' 
+  | 'FINALIZE_PERIOD'
+
+export interface AuditLogEntry {
+  id: string
+  administration_id: string
+  actor_id: string | null
+  actor_name: string | null
+  action: AuditLogAction | string
+  entity_type: string
+  entity_id: string | null
+  entity_description: string | null
+  payload: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface AuditLogListResponse {
+  entries: AuditLogEntry[]
+  total_count: number
+}
+
 // Core Ledger API
 export const ledgerApi = {
   getClientOverview: async (clientId: string): Promise<LedgerClientOverview> => {
@@ -963,6 +1102,101 @@ export const ledgerApi = {
     const response = await api.get<SubledgerReportResponse>(
       `/accountant/clients/${clientId}/reports/ap`,
       { params }
+    )
+    return response.data
+  },
+}
+
+// ============ Bookkeeping API ============
+
+export const bookkeepingApi = {
+  /**
+   * List journal entries for a client
+   */
+  listJournalEntries: async (
+    clientId: string, 
+    options?: { status?: JournalEntryStatus; startDate?: string; endDate?: string; limit?: number; offset?: number }
+  ): Promise<JournalEntryListResponse> => {
+    const response = await api.get<JournalEntryListResponse>(
+      `/accountant/clients/${clientId}/journal`,
+      { params: options }
+    )
+    return response.data
+  },
+
+  /**
+   * Create a new manual journal entry
+   */
+  createJournalEntry: async (clientId: string, entry: JournalEntryCreate): Promise<JournalEntryResponse> => {
+    const response = await api.post<JournalEntryResponse>(
+      `/accountant/clients/${clientId}/journal`,
+      entry
+    )
+    return response.data
+  },
+
+  /**
+   * Get a specific journal entry with all lines
+   */
+  getJournalEntry: async (clientId: string, entryId: string): Promise<JournalEntryResponse> => {
+    const response = await api.get<JournalEntryResponse>(
+      `/accountant/clients/${clientId}/journal/${entryId}`
+    )
+    return response.data
+  },
+
+  /**
+   * Update a draft journal entry
+   */
+  updateJournalEntry: async (clientId: string, entryId: string, entry: JournalEntryUpdate): Promise<JournalEntryResponse> => {
+    const response = await api.put<JournalEntryResponse>(
+      `/accountant/clients/${clientId}/journal/${entryId}`,
+      entry
+    )
+    return response.data
+  },
+
+  /**
+   * Post a draft journal entry
+   */
+  postJournalEntry: async (clientId: string, entryId: string): Promise<JournalEntryPostResponse> => {
+    const response = await api.post<JournalEntryPostResponse>(
+      `/accountant/clients/${clientId}/journal/${entryId}/post`
+    )
+    return response.data
+  },
+
+  /**
+   * Delete a draft journal entry
+   */
+  deleteJournalEntry: async (clientId: string, entryId: string): Promise<{ message: string }> => {
+    const response = await api.delete<{ message: string }>(
+      `/accountant/clients/${clientId}/journal/${entryId}`
+    )
+    return response.data
+  },
+
+  /**
+   * Check if a date falls within a locked period
+   */
+  checkPeriodLock: async (clientId: string, entryDate: string): Promise<PeriodLockCheckResponse> => {
+    const response = await api.get<PeriodLockCheckResponse>(
+      `/accountant/clients/${clientId}/journal/check-period`,
+      { params: { entry_date: entryDate } }
+    )
+    return response.data
+  },
+
+  /**
+   * List audit log entries for a client
+   */
+  listAuditLog: async (
+    clientId: string,
+    options?: { entityType?: string; action?: string; limit?: number; offset?: number }
+  ): Promise<AuditLogListResponse> => {
+    const response = await api.get<AuditLogListResponse>(
+      `/accountant/clients/${clientId}/audit`,
+      { params: options }
     )
     return response.data
   },
@@ -1483,6 +1717,53 @@ export const getValidationErrors = (error: unknown): Record<string, string> => {
     }
   }
   return {}
+}
+
+/**
+ * Check if an error is a permission-related 403 error.
+ * Returns the error code if it's a recognized permission error, null otherwise.
+ */
+export const getPermissionErrorCode = (error: unknown): string | null => {
+  if (!axios.isAxiosError(error) || error.response?.status !== 403) {
+    return null
+  }
+  const detail = error.response?.data?.detail
+  if (typeof detail === 'object' && detail?.code) {
+    const code = detail.code
+    // List of recognized permission error codes
+    if (['NOT_ASSIGNED', 'PENDING_APPROVAL', 'ACCESS_REVOKED', 'SCOPE_MISSING', 'FORBIDDEN_ROLE'].includes(code)) {
+      return code
+    }
+  }
+  return null
+}
+
+/**
+ * Check if an error is specifically a SCOPE_MISSING error.
+ * Returns the scope details if true, null otherwise.
+ */
+export const isScopeMissingError = (error: unknown): ScopeMissingError | null => {
+  if (!axios.isAxiosError(error) || error.response?.status !== 403) {
+    return null
+  }
+  const detail = error.response?.data?.detail
+  if (typeof detail === 'object' && detail?.code === 'SCOPE_MISSING') {
+    return {
+      code: 'SCOPE_MISSING',
+      message: detail.message || 'Permission scope missing',
+      required_scope: detail.required_scope || 'unknown',
+      granted_scopes: detail.granted_scopes || []
+    }
+  }
+  return null
+}
+
+/**
+ * Check if an error is a NOT_ASSIGNED error (403).
+ * Returns true if the user is not assigned to the requested client.
+ */
+export const isNotAssignedError = (error: unknown): boolean => {
+  return getPermissionErrorCode(error) === 'NOT_ASSIGNED'
 }
 
 // ============ Document Review Queue Types ============
@@ -2138,6 +2419,73 @@ export interface ClientLinksResponse {
   total_count: number
 }
 
+// ============ Permission Scopes Types ============
+
+export type PermissionScope = 
+  | 'invoices'
+  | 'customers'
+  | 'expenses'
+  | 'hours'
+  | 'documents'
+  | 'bookkeeping'
+  | 'settings'
+  | 'vat'
+  | 'reports'
+
+export const ALL_SCOPES: PermissionScope[] = [
+  'invoices',
+  'customers',
+  'expenses',
+  'hours',
+  'documents',
+  'bookkeeping',
+  'settings',
+  'vat',
+  'reports'
+]
+
+export interface ClientScopesResponse {
+  client_id: string
+  client_name: string
+  scopes: PermissionScope[]
+  available_scopes: PermissionScope[]
+}
+
+export interface UpdateScopesRequest {
+  scopes: PermissionScope[]
+}
+
+export interface UpdateScopesResponse {
+  client_id: string
+  scopes: PermissionScope[]
+  message: string
+}
+
+export interface ScopesSummary {
+  total_scopes: number
+  granted_scopes: PermissionScope[]
+  missing_scopes: PermissionScope[]
+}
+
+export interface ClientLinkWithScopes extends ClientLink {
+  scopes: PermissionScope[]
+  scopes_summary: ScopesSummary | null
+}
+
+export interface ClientLinksWithScopesResponse {
+  links: ClientLinkWithScopes[]
+  pending_count: number
+  active_count: number
+  total_count: number
+}
+
+export interface ScopeMissingError {
+  code: 'SCOPE_MISSING'
+  message: string
+  required_scope: string
+  granted_scopes: string[]
+}
+
 export interface PendingLinkRequest {
   assignment_id: string
   accountant_id: string
@@ -2197,6 +2545,30 @@ export const accountantApi = {
    */
   getClientLinks: async (): Promise<ClientLinksResponse> => {
     const response = await api.get<ClientLinksResponse>('/accountant/clients/links')
+    return response.data
+  },
+
+  /**
+   * Get list of client links with scopes summary
+   */
+  getClientLinksWithScopes: async (): Promise<ClientLinksWithScopesResponse> => {
+    const response = await api.get<ClientLinksWithScopesResponse>('/accountant/clients/links/scopes')
+    return response.data
+  },
+
+  /**
+   * Get permission scopes for a specific client
+   */
+  getClientScopes: async (clientId: string): Promise<ClientScopesResponse> => {
+    const response = await api.get<ClientScopesResponse>(`/accountant/clients/${clientId}/scopes`)
+    return response.data
+  },
+
+  /**
+   * Update permission scopes for a specific client (admin only)
+   */
+  updateClientScopes: async (clientId: string, request: UpdateScopesRequest): Promise<UpdateScopesResponse> => {
+    const response = await api.put<UpdateScopesResponse>(`/accountant/clients/${clientId}/scopes`, request)
     return response.data
   },
 }

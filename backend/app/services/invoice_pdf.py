@@ -461,16 +461,13 @@ def generate_invoice_pdf(invoice: ZZPInvoice) -> bytes:
     # Lazy import WeasyPrint to avoid import-time crashes when system libs are missing
     try:
         from weasyprint import HTML, CSS
-        WEASYPRINT_AVAILABLE = True
-    except Exception as e:
-        # Catch any exception (ImportError, OSError, etc.) from missing deps
+    except (ImportError, OSError) as e:
+        # ImportError: Python package not installed
+        # OSError: System libraries missing (e.g., libgobject-2.0-0)
         logger.error(f"WeasyPrint unavailable: {e}", exc_info=True)
-        WEASYPRINT_AVAILABLE = False
-    
-    if not WEASYPRINT_AVAILABLE:
         raise RuntimeError(
             "PDF generation is not available. WeasyPrint library or its system dependencies are not installed."
-        )
+        ) from e
     
     try:
         html_content = generate_invoice_html(invoice)

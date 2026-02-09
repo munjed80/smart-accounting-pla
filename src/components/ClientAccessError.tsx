@@ -5,6 +5,8 @@
  * - No client selected
  * - Client access is pending approval
  * - Client access has been revoked
+ * - Client not assigned
+ * - Scope/permission missing
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,13 +21,15 @@ import {
   UsersThree,
   WarningCircle,
   ArrowRight,
+  ShieldSlash,
 } from '@phosphor-icons/react'
 
-export type ClientAccessErrorType = 'no_client' | 'pending_approval' | 'access_revoked' | 'not_assigned'
+export type ClientAccessErrorType = 'no_client' | 'pending_approval' | 'access_revoked' | 'not_assigned' | 'scope_missing'
 
 interface ClientAccessErrorProps {
   type: ClientAccessErrorType
   clientName?: string
+  missingScope?: string
   onGoToClients?: () => void
 }
 
@@ -66,11 +70,21 @@ const errorConfig = {
     bgColor: 'bg-red-500/10',
     borderColor: 'border-red-500/30',
   },
+  scope_missing: {
+    icon: ShieldSlash,
+    title: () => t('errors.scopeMissing'),
+    description: () => t('errors.scopeMissingDescription'),
+    variant: 'default' as const,
+    iconColor: 'text-amber-600 dark:text-amber-400',
+    bgColor: 'bg-amber-500/10',
+    borderColor: 'border-amber-500/30',
+  },
 }
 
 export const ClientAccessError = ({
   type,
   clientName,
+  missingScope,
   onGoToClients,
 }: ClientAccessErrorProps) => {
   const config = errorConfig[type]
@@ -106,6 +120,12 @@ export const ClientAccessError = ({
             </p>
           )}
 
+          {missingScope && type === 'scope_missing' && (
+            <p className="text-sm text-muted-foreground">
+              <strong>{t('permissions.title')}:</strong> {t(`permissions.scopes.${missingScope}` as any) || missingScope}
+            </p>
+          )}
+
           <Button onClick={handleGoToClients} className="gap-2">
             <UsersThree size={18} />
             {t('clientSwitcher.goToClients')}
@@ -124,20 +144,24 @@ export const parseClientAccessError = (error: unknown): ClientAccessErrorType | 
   if (!error || typeof error !== 'object') return null
   
   // Check for axios/fetch response structure
-  const err = error as { response?: { data?: { code?: string; detail?: string }; status?: number } }
+  const err = error as { response?: { data?: { code?: string; detail?: string | { code?: string } }; status?: number } }
   
   if (err.response?.status === 403) {
-    const code = err.response.data?.code || ''
-    const detail = err.response.data?.detail || ''
+    const detail = err.response.data?.detail
+    const code = typeof detail === 'object' ? detail?.code : err.response.data?.code
+    const detailStr = typeof detail === 'string' ? detail : ''
     
-    if (code === 'PENDING_APPROVAL' || detail.includes('PENDING_APPROVAL')) {
+    if (code === 'PENDING_APPROVAL' || detailStr.includes('PENDING_APPROVAL')) {
       return 'pending_approval'
     }
-    if (code === 'ACCESS_REVOKED' || detail.includes('ACCESS_REVOKED')) {
+    if (code === 'ACCESS_REVOKED' || detailStr.includes('ACCESS_REVOKED')) {
       return 'access_revoked'
     }
-    if (code === 'NOT_ASSIGNED' || detail.includes('NOT_ASSIGNED')) {
+    if (code === 'NOT_ASSIGNED' || detailStr.includes('NOT_ASSIGNED')) {
       return 'not_assigned'
+    }
+    if (code === 'SCOPE_MISSING' || detailStr.includes('SCOPE_MISSING')) {
+      return 'scope_missing'
     }
   }
   

@@ -284,7 +284,7 @@ export const ClientBookkeepingTab = ({ clientId }: ClientBookkeepingTabProps) =>
           
           {totalCount > entries.length && (
             <div className="mt-4 text-center text-sm text-muted-foreground">
-              {entries.length} van {totalCount} weergegeven
+              {entries.length} {t('common.showingOf')} {totalCount} {t('common.showing')}
             </div>
           )}
         </CardContent>
@@ -341,7 +341,7 @@ export const ClientBookkeepingTab = ({ clientId }: ClientBookkeepingTabProps) =>
                   <div>
                     <label className="text-sm text-muted-foreground">{t('bookkeeping.balance')}</label>
                     <p className={`text-lg font-bold ${selectedEntry.is_balanced ? 'text-green-600' : 'text-red-600'}`}>
-                      {selectedEntry.is_balanced ? '✓ In balans' : '✗ Niet in balans'}
+                      {selectedEntry.is_balanced ? `✓ ${t('bookkeeping.balanced')}` : `✗ ${t('bookkeeping.notBalancedStatus')}`}
                     </p>
                   </div>
                 </div>

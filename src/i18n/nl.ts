@@ -55,6 +55,12 @@ export const nl = {
     comingSoon: "Binnenkort beschikbaar",
     more: "meer",
     actions: "Acties",
+    showingOf: "van",
+    showing: "weergegeven",
+    justNow: "Zojuist",
+    minutesAgo: "min geleden",
+    hoursAgo: "uur geleden",
+    daysAgo: "dagen geleden",
   },
 
   // Brand
@@ -1742,6 +1748,10 @@ export const nl = {
     alreadyPosted: "Journaalpost is al geboekt",
     onlyDraftCanEdit: "Alleen concepten kunnen worden bewerkt",
     onlyDraftCanDelete: "Alleen concepten kunnen worden verwijderd",
+    
+    // Balance status
+    balanced: "In balans",
+    notBalancedStatus: "Niet in balans",
     
     // Confirmation
     confirmDelete: "Weet je zeker dat je deze journaalpost wilt verwijderen?",

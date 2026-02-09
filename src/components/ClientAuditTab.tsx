@@ -66,10 +66,10 @@ const formatRelativeTime = (dateStr: string): string => {
   const diffHours = Math.floor(diffMs / 3600000)
   const diffDays = Math.floor(diffMs / 86400000)
 
-  if (diffMins < 1) return 'Zojuist'
-  if (diffMins < 60) return `${diffMins} min geleden`
-  if (diffHours < 24) return `${diffHours} uur geleden`
-  if (diffDays < 7) return `${diffDays} dagen geleden`
+  if (diffMins < 1) return t('common.justNow')
+  if (diffMins < 60) return `${diffMins} ${t('common.minutesAgo')}`
+  if (diffHours < 24) return `${diffHours} ${t('common.hoursAgo')}`
+  if (diffDays < 7) return `${diffDays} ${t('common.daysAgo')}`
   
   return date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
 }
@@ -335,7 +335,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
         
         {totalCount > entries.length && (
           <div className="mt-4 text-center text-sm text-muted-foreground">
-            {entries.length} van {totalCount} weergegeven
+            {entries.length} {t('common.showingOf')} {totalCount} {t('common.showing')}
           </div>
         )}
       </CardContent>

@@ -129,6 +129,29 @@ class TestORMMappings:
         assert document_rel is not None
         assert document_rel.back_populates == 'journal_entry'
 
+    def test_reconciliation_action_relationships_consistent(self):
+        """ReconciliationAction and Administration should have proper bidirectional relationships."""
+        from sqlalchemy.orm import configure_mappers
+        from app.models.bank import ReconciliationAction
+        from app.models.administration import Administration
+        from sqlalchemy import inspect
+        
+        configure_mappers()
+        
+        # Get the mapper for Administration and ReconciliationAction
+        admin_mapper = inspect(Administration)
+        recon_mapper = inspect(ReconciliationAction)
+        
+        # Verify Administration.reconciliation_actions relationship
+        reconciliation_actions_rel = admin_mapper.relationships.get('reconciliation_actions')
+        assert reconciliation_actions_rel is not None
+        assert reconciliation_actions_rel.back_populates == 'administration'
+        
+        # Verify ReconciliationAction.administration relationship
+        administration_rel = recon_mapper.relationships.get('administration')
+        assert administration_rel is not None
+        assert administration_rel.back_populates == 'reconciliation_actions'
+
 
 class TestStartupCheck:
     """Tests for the startup ORM verification function."""
@@ -158,3 +181,35 @@ class TestStartupCheck:
         
         # Should not raise InvalidRequestError
         configure_mappers()
+
+    def test_reconciliation_action_no_overlapping_warning(self):
+        """
+        Test that ReconciliationAction mapper configuration does not raise warnings.
+        
+        This test ensures that the bidirectional relationship between Administration
+        and ReconciliationAction is properly configured and doesn't produce SAWarning
+        about overlapping relationships.
+        """
+        import warnings
+        from sqlalchemy.orm import configure_mappers
+        from app.models.bank import ReconciliationAction, BankAccount, BankTransaction
+        from app.models.administration import Administration
+        
+        # Capture any warnings during mapper configuration
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            
+            # Configure the mappers
+            configure_mappers()
+            
+            # Check that no SAWarning was raised
+            sa_warnings = [warning for warning in w if "SAWarning" in str(warning.category.__name__)]
+            
+            # Also check for "overlapping" specifically in warning messages
+            overlapping_warnings = [
+                warning for warning in w 
+                if "overlapping" in str(warning.message).lower()
+            ]
+            
+            assert len(sa_warnings) == 0, f"SAWarning raised: {[str(warning.message) for warning in sa_warnings]}"
+            assert len(overlapping_warnings) == 0, f"Overlapping relationship warning raised: {[str(warning.message) for warning in overlapping_warnings]}"

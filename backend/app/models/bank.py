@@ -133,5 +133,5 @@ class ReconciliationAction(Base):
 
     # Relationships
     bank_transaction = relationship("BankTransaction", back_populates="reconciliation_actions")
-    administration = relationship("Administration")
+    administration = relationship("Administration", back_populates="reconciliation_actions")
     accountant = relationship("User", back_populates="reconciliation_actions")

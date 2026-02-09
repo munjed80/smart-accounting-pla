@@ -76,6 +76,7 @@ import { BulkActionBar, BulkActionType } from './BulkActionBar'
 import { BulkOperationModal } from './BulkOperationModal'
 import { RecentActionsPanel } from './RecentActionsPanel'
 import { useClientSelection } from '@/hooks/useClientSelection'
+import { WorkQueueSection } from './WorkQueueSection'
 
 // Local storage keys for user preferences
 const PREF_SEARCH = 'accountant_search'
@@ -803,6 +804,27 @@ export const AccountantHomePage = () => {
         {/* Recent Actions Panel */}
         <RecentActionsPanel />
 
+        {/* Work Queue and Client List Tabs */}
+        <Tabs defaultValue="clients" className="space-y-4">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="workqueue">
+              <Stack size={16} className="mr-2" />
+              Werklijst
+            </TabsTrigger>
+            <TabsTrigger value="clients">
+              <Users size={16} className="mr-2" />
+              Klanten Overzicht
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Work Queue Tab */}
+          <TabsContent value="workqueue">
+            <WorkQueueSection onRefresh={fetchData} />
+          </TabsContent>
+
+          {/* Client List Tab */}
+          <TabsContent value="clients">
+
         {/* Main Content Card with Search, Filters, Sorting, and Pagination */}
         <Card id="client-list-section" className="bg-card/80 backdrop-blur-sm">
           <CardHeader className="pb-4">
@@ -1050,6 +1072,9 @@ export const AccountantHomePage = () => {
             )}
           </CardContent>
         </Card>
+
+          </TabsContent>
+        </Tabs>
 
         {/* Bulk Operation Modal - New Component */}
         <BulkOperationModal

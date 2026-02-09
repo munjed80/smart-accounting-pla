@@ -64,6 +64,7 @@ import {
 import { format, formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 import { t } from '@/i18n'
+import { BookingProposalModal } from './BookingProposalModal'
 
 // Status colors and labels
 const statusConfig: Record<DocumentReviewStatus, { bg: string; text: string; label: string }> = {
@@ -146,6 +147,7 @@ export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }:
   const [selectedDoc, setSelectedDoc] = useState<DocumentReviewItem | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [isRejectOpen, setIsRejectOpen] = useState(false)
+  const [isBookingProposalOpen, setIsBookingProposalOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -172,24 +174,17 @@ export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }:
     setIsDetailOpen(true)
   }
 
-  const handlePostDocument = async (doc: DocumentReviewItem) => {
-    try {
-      setIsProcessing(true)
-      await documentReviewApi.postDocument(clientId, doc.id, {})
-      toast.success(t('common.success'), {
-        description: t('reviewQueueActions.posted'),
-      })
-      setIsDetailOpen(false)
-      fetchDocuments()
-      // Invalidate cache in parent
-      onActionComplete?.()
-    } catch (err) {
-      toast.error(t('common.error'), {
-        description: getErrorMessage(err),
-      })
-    } finally {
-      setIsProcessing(false)
-    }
+  const handleOpenBookingProposal = (doc: DocumentReviewItem) => {
+    setSelectedDoc(doc)
+    setIsBookingProposalOpen(true)
+  }
+
+  const handleBookingSuccess = () => {
+    // After successful booking, refresh the list
+    fetchDocuments()
+    onActionComplete?.()
+    setIsDetailOpen(false)
+    setIsBookingProposalOpen(false)
   }
 
   const handleRejectDocument = async () => {
@@ -383,7 +378,7 @@ export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }:
                               variant="ghost" 
                               size="icon" 
                               className="text-green-600"
-                              onClick={() => handlePostDocument(doc)}
+                              onClick={() => handleOpenBookingProposal(doc)}
                             >
                               <CheckFat size={16} />
                             </Button>
@@ -575,7 +570,7 @@ export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }:
                             action={action}
                             onApply={() => {
                               // Apply the suggested action
-                              handlePostDocument(selectedDoc)
+                              handleOpenBookingProposal(selectedDoc)
                             }}
                           />
                         ))}
@@ -596,11 +591,11 @@ export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }:
                       Reject
                     </Button>
                     <Button
-                      onClick={() => handlePostDocument(selectedDoc)}
+                      onClick={() => handleOpenBookingProposal(selectedDoc)}
                       disabled={isProcessing}
                     >
                       <CheckFat size={16} className="mr-2" />
-                      Post to Journal
+                      Boeking Controleren
                     </Button>
                   </>
                 )}
@@ -651,6 +646,17 @@ export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }:
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Booking Proposal Modal */}
+      {selectedDoc && (
+        <BookingProposalModal
+          open={isBookingProposalOpen}
+          onOpenChange={setIsBookingProposalOpen}
+          document={selectedDoc}
+          clientId={clientId}
+          onSuccess={handleBookingSuccess}
+        />
+      )}
     </div>
   )
 }

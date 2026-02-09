@@ -1663,7 +1663,143 @@ export const nl = {
       periods: "Periodes",
       decisions: "Beslissingen",
       overview: "Overzicht",
+      bookkeeping: "Boekingen",
+      audit: "Audit",
     },
+  },
+
+  // Bookkeeping (Journal Entries / Grootboek)
+  bookkeeping: {
+    title: "Boekingen",
+    subtitle: "Journaalposten en grootboekmutaties",
+    newEntry: "Nieuwe boeking",
+    editEntry: "Boeking bewerken",
+    entryDetail: "Boekingsdetails",
+    
+    // List
+    noEntries: "Geen boekingen",
+    noEntriesDescription: "Er zijn nog geen journaalposten aangemaakt voor deze klant.",
+    showDrafts: "Toon concepten",
+    showPosted: "Toon geboekt",
+    showAll: "Toon alles",
+    
+    // Entry fields
+    entryNumber: "Boekingsnummer",
+    entryDate: "Boekdatum",
+    description: "Omschrijving",
+    reference: "Referentie",
+    status: "Status",
+    totalDebit: "Totaal debet",
+    totalCredit: "Totaal credit",
+    balance: "Balans",
+    sourceType: "Bron",
+    createdBy: "Aangemaakt door",
+    postedBy: "Geboekt door",
+    postedAt: "Geboekt op",
+    
+    // Status labels
+    statusDraft: "Concept",
+    statusPosted: "Geboekt",
+    statusReversed: "Teruggeboekt",
+    
+    // Source types
+    sourceManual: "Handmatig",
+    sourceInvoice: "Factuur",
+    sourceExpense: "Uitgave",
+    sourceOcr: "OCR",
+    
+    // Lines
+    lines: "Regels",
+    addLine: "Regel toevoegen",
+    account: "Grootboekrekening",
+    debit: "Debet",
+    credit: "Credit",
+    vatCode: "BTW-code",
+    lineDescription: "Regelomschrijving",
+    
+    // Actions
+    post: "Boeken",
+    posting: "Boeken...",
+    delete: "Verwijderen",
+    deleting: "Verwijderen...",
+    save: "Opslaan",
+    saving: "Opslaan...",
+    cancel: "Annuleren",
+    
+    // Messages
+    postSuccess: "Journaalpost succesvol geboekt",
+    postFailed: "Boeken mislukt",
+    deleteSuccess: "Journaalpost verwijderd",
+    deleteFailed: "Verwijderen mislukt",
+    saveSuccess: "Journaalpost opgeslagen",
+    saveFailed: "Opslaan mislukt",
+    
+    // Validation
+    notBalanced: "Journaalpost is niet in balans",
+    noLines: "Voeg minimaal één regel toe",
+    periodLocked: "Kan niet boeken in afgesloten periode",
+    periodLockedDetail: "De datum valt in een afgesloten of gefinaliseerde periode.",
+    alreadyPosted: "Journaalpost is al geboekt",
+    onlyDraftCanEdit: "Alleen concepten kunnen worden bewerkt",
+    onlyDraftCanDelete: "Alleen concepten kunnen worden verwijderd",
+    
+    // Confirmation
+    confirmDelete: "Weet je zeker dat je deze journaalpost wilt verwijderen?",
+    confirmPost: "Weet je zeker dat je deze journaalpost wilt boeken? Dit kan niet ongedaan worden gemaakt.",
+  },
+
+  // Audit Log
+  audit: {
+    title: "Audit",
+    subtitle: "Logboek van alle boekhoudbewerkingen",
+    
+    // List
+    noEntries: "Geen audit logs",
+    noEntriesDescription: "Er zijn nog geen boekhoudbewerkingen geregistreerd.",
+    noLogs: "Geen audit logs",
+    noLogsDescription: "Er zijn nog geen acties uitgevoerd op deze periode.",
+    
+    // Entry fields
+    timestamp: "Tijdstip",
+    actor: "Gebruiker",
+    action: "Actie",
+    entityType: "Type",
+    entityDescription: "Beschrijving",
+    details: "Details",
+    from: "Van",
+    to: "Naar",
+    performedBy: "Uitgevoerd door",
+    performedAt: "Uitgevoerd op",
+    notes: "Opmerkingen",
+    
+    // Action labels
+    actions: {
+      CREATE: "Aangemaakt",
+      UPDATE: "Bijgewerkt",
+      POST: "Geboekt",
+      DELETE: "Verwijderd",
+      REVERSE: "Teruggeboekt",
+      LOCK_PERIOD: "Periode vergrendeld",
+      UNLOCK_PERIOD: "Periode ontgrendeld",
+      START_REVIEW: "Review gestart",
+      FINALIZE_PERIOD: "Periode gefinaliseerd",
+      REVIEW_START: "Controle gestart",
+      FINALIZE: "Afgerond",
+      LOCK: "Vergrendeld",
+    },
+    
+    // Entity types
+    entityTypes: {
+      journal_entry: "Journaalpost",
+      period: "Periode",
+      document: "Document",
+    },
+    
+    // Filters
+    filterByAction: "Filter op actie",
+    filterByEntity: "Filter op type",
+    allActions: "Alle acties",
+    allEntities: "Alle types",
   },
 
   // Issues (Validation Engine)
@@ -1859,25 +1995,6 @@ export const nl = {
     acknowledgedYellowIssues: "Bevestigde gele problemen",
     noSnapshot: "Geen snapshot beschikbaar",
     noSnapshotDescription: "Snapshots zijn alleen beschikbaar voor afgeronde of vergrendelde periodes.",
-  },
-
-  // Audit Logs
-  audit: {
-    title: "Audit log",
-    subtitle: "Chronologisch overzicht van alle periodeacties",
-    noLogs: "Geen audit logs",
-    noLogsDescription: "Er zijn nog geen acties uitgevoerd op deze periode.",
-    action: "Actie",
-    from: "Van",
-    to: "Naar",
-    performedBy: "Uitgevoerd door",
-    performedAt: "Uitgevoerd op",
-    notes: "Opmerkingen",
-    actions: {
-      REVIEW_START: "Controle gestart",
-      FINALIZE: "Afgerond",
-      LOCK: "Vergrendeld",
-    },
   },
 
   // Errors

@@ -46,6 +46,8 @@ import {
   ShieldCheck,
   ShieldSlash,
   Info,
+  Book,
+  ClockCounterClockwise,
 } from '@phosphor-icons/react'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
@@ -54,10 +56,12 @@ import { t } from '@/i18n'
 import { ClientIssuesTab } from '@/components/ClientIssuesTab'
 import { ClientPeriodsTab } from '@/components/ClientPeriodsTab'
 import { ClientDecisionsTab } from '@/components/ClientDecisionsTab'
+import { ClientBookkeepingTab } from '@/components/ClientBookkeepingTab'
+import { ClientAuditTab } from '@/components/ClientAuditTab'
 
 interface ClientDossierPageProps {
   clientId: string
-  initialTab?: 'issues' | 'periods' | 'decisions'
+  initialTab?: 'issues' | 'periods' | 'decisions' | 'bookkeeping' | 'audit'
 }
 
 // Session storage key for today's completed actions
@@ -510,7 +514,7 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="issues" className="flex items-center gap-2">
               <ClipboardText size={18} />
               {t('dossier.tabs.issues')}
@@ -520,6 +524,10 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="bookkeeping" className="flex items-center gap-2">
+              <Book size={18} />
+              {t('dossier.tabs.bookkeeping')}
+            </TabsTrigger>
             <TabsTrigger value="periods" className="flex items-center gap-2">
               <CalendarBlank size={18} />
               {t('dossier.tabs.periods')}
@@ -527,6 +535,10 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
             <TabsTrigger value="decisions" className="flex items-center gap-2">
               <ListChecks size={18} />
               {t('dossier.tabs.decisions')}
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="flex items-center gap-2">
+              <ClockCounterClockwise size={18} />
+              {t('dossier.tabs.audit')}
             </TabsTrigger>
           </TabsList>
 
@@ -537,12 +549,20 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
             />
           </TabsContent>
 
+          <TabsContent value="bookkeeping">
+            <ClientBookkeepingTab clientId={clientId} />
+          </TabsContent>
+
           <TabsContent value="periods">
             <ClientPeriodsTab clientId={clientId} />
           </TabsContent>
 
           <TabsContent value="decisions">
             <ClientDecisionsTab clientId={clientId} />
+          </TabsContent>
+
+          <TabsContent value="audit">
+            <ClientAuditTab clientId={clientId} />
           </TabsContent>
         </Tabs>
       </div>

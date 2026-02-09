@@ -191,7 +191,7 @@ class TestStartupCheck:
         about overlapping relationships.
         """
         import warnings
-        from sqlalchemy.orm import configure_mappers
+        from sqlalchemy.orm import configure_mappers, clear_mappers
         from app.models.bank import ReconciliationAction, BankAccount, BankTransaction
         from app.models.administration import Administration
         
@@ -199,7 +199,8 @@ class TestStartupCheck:
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             
-            # Configure the mappers
+            # Clear and reconfigure mappers to ensure we capture warnings
+            clear_mappers()
             configure_mappers()
             
             # Check that no SAWarning was raised

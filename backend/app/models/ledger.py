@@ -230,6 +230,9 @@ class JournalEntry(Base):
     posted_by_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    created_by_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -243,6 +246,7 @@ class JournalEntry(Base):
     document = relationship("Document", back_populates="journal_entry", foreign_keys=[document_id])
     lines = relationship("JournalLine", back_populates="journal_entry", cascade="all, delete-orphan")
     posted_by = relationship("User", foreign_keys=[posted_by_id])
+    created_by = relationship("User", foreign_keys=[created_by_id])
     reversed_by = relationship("JournalEntry", foreign_keys=[reversed_by_id], remote_side=[id])
     reverses = relationship("JournalEntry", foreign_keys=[reverses_id], remote_side=[id])
     open_items = relationship("OpenItem", back_populates="journal_entry")
@@ -294,3 +298,50 @@ class JournalLine(Base):
     account = relationship("ChartOfAccount", back_populates="journal_lines")
     vat_code = relationship("VatCode", back_populates="journal_lines")
     open_items = relationship("OpenItem", back_populates="journal_line")
+
+
+class BookkeepingAuditAction(str, enum.Enum):
+    """Actions tracked in the bookkeeping audit log."""
+    CREATE = "CREATE"
+    UPDATE = "UPDATE"
+    POST = "POST"
+    DELETE = "DELETE"
+    REVERSE = "REVERSE"
+    LOCK_PERIOD = "LOCK_PERIOD"
+    UNLOCK_PERIOD = "UNLOCK_PERIOD"
+    START_REVIEW = "START_REVIEW"
+    FINALIZE_PERIOD = "FINALIZE_PERIOD"
+
+
+class BookkeepingAuditLog(Base):
+    """
+    Audit log for all bookkeeping actions.
+    
+    Tracks who did what, when, and why for legal compliance and auditing.
+    """
+    __tablename__ = "bookkeeping_audit_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    administration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("administrations.id", ondelete="CASCADE"), nullable=False
+    )
+    actor_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    actor_name: Mapped[str] = mapped_column(String(255), nullable=True)
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(50), nullable=False)  # journal_entry, period, etc.
+    entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=True)
+    entity_description: Mapped[str] = mapped_column(String(255), nullable=True)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    ip_address: Mapped[str] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    administration = relationship("Administration")
+    actor = relationship("User")

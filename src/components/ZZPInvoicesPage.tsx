@@ -1444,62 +1444,79 @@ export const ZZPInvoicesPage = () => {
 
   // Handle PDF download - download actual PDF from server (mobile-safe)
   // Uses fetch -> blob -> createObjectURL -> anchor click pattern for best mobile compatibility
+  // Falls back to window.open() with direct PDF URL if blob approach fails on mobile
   const handleDownloadPdf = useCallback(async (invoice: ZZPInvoice) => {
+    const filename = `${invoice.invoice_number || `INV-${invoice.id}`}.pdf`
+    
+    // Helper to attempt download via anchor element
+    const downloadViaAnchor = (url: string, isBlob: boolean) => {
+      const link = document.createElement('a')
+      link.href = url
+      link.style.display = 'none'
+      
+      if (isIOS()) {
+        // iOS Safari: Open in new tab with target _blank
+        // iOS often ignores download attribute, so we open in PDF viewer instead
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+      }
+      
+      // Set download attribute for browsers that support it
+      link.download = filename
+      
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      // For blob URLs, schedule revocation
+      if (isBlob) {
+        const revokeDelay = isMobile() ? PDF_URL_REVOCATION_DELAY_MS * 2 : PDF_URL_REVOCATION_DELAY_MS
+        setTimeout(() => window.URL.revokeObjectURL(url), revokeDelay)
+      }
+    }
+    
     try {
       setDownloadingInvoiceId(invoice.id)
       toast.info(t('zzpInvoices.pdfDownloading'))
       
-      const blob = await zzpApi.invoices.downloadPdf(invoice.id)
-      
-      // Ensure blob has correct MIME type for PDF
-      const pdfBlob = new Blob([blob], { type: 'application/pdf' })
-      
-      // Create object URL for the PDF blob
-      const url = window.URL.createObjectURL(pdfBlob)
-      const filename = `${invoice.invoice_number || `INV-${invoice.id}`}.pdf`
-      
-      // Mobile-optimized download approach
-      if (isIOS()) {
-        // iOS Safari: Use anchor element with target _blank
-        // This allows the PDF to open in the browser's PDF viewer
-        // Using anchor instead of window.open to avoid popup blockers
-        const link = document.createElement('a')
-        link.href = url
-        link.target = '_blank'
-        link.rel = 'noopener noreferrer'
-        // Set download attribute as fallback (may be ignored by Safari)
-        link.download = filename
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        // Note: On iOS, the PDF typically opens in a new tab with Safari's PDF viewer
-        // The user can then share/save the PDF from there
-      } else if (isAndroid()) {
-        // Android: Use anchor with download attribute
-        // Most Android browsers support this well
-        const link = document.createElement('a')
-        link.href = url
-        link.download = filename
-        link.style.display = 'none'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-      } else {
-        // Desktop: Standard download flow
-        const link = document.createElement('a')
-        link.href = url
-        link.download = filename
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+      // Try blob-based download first (works best on desktop)
+      try {
+        const blob = await zzpApi.invoices.downloadPdf(invoice.id)
+        
+        // Ensure blob has correct MIME type for PDF
+        const pdfBlob = new Blob([blob], { type: 'application/pdf' })
+        
+        // Check if blob is valid
+        if (pdfBlob.size === 0) {
+          throw new Error('Empty PDF blob received')
+        }
+        
+        // Create object URL for the PDF blob
+        const blobUrl = window.URL.createObjectURL(pdfBlob)
+        
+        downloadViaAnchor(blobUrl, true)
+        toast.success(t('zzpInvoices.pdfDownloaded'))
+      } catch (blobErr) {
+        console.warn('Blob download failed, trying window.open fallback:', blobErr)
+        
+        // Fallback for mobile: Use window.open with direct PDF URL
+        // This is more reliable on iOS Safari and some Android browsers
+        if (isMobile()) {
+          const directUrl = zzpApi.invoices.getPdfUrl(invoice.id)
+          const newWindow = window.open(directUrl, '_blank', 'noopener,noreferrer')
+          
+          if (newWindow) {
+            toast.success(t('zzpInvoices.pdfDownloaded'))
+          } else {
+            // If popup was blocked, try anchor approach with direct URL
+            downloadViaAnchor(directUrl, false)
+            toast.success(t('zzpInvoices.pdfDownloaded'))
+          }
+        } else {
+          // Re-throw for desktop - blob approach should work
+          throw blobErr
+        }
       }
-      
-      // Delay URL revocation to ensure download/open completes
-      // Longer delay for mobile to ensure PDF viewer has time to load
-      const revokeDelay = isMobile() ? PDF_URL_REVOCATION_DELAY_MS * 2 : PDF_URL_REVOCATION_DELAY_MS
-      setTimeout(() => window.URL.revokeObjectURL(url), revokeDelay)
-      
-      toast.success(t('zzpInvoices.pdfDownloaded'))
     } catch (err) {
       console.error('Failed to download PDF:', err)
       toast.error(parseApiError(err) || t('zzpInvoices.pdfError'))

@@ -27,6 +27,8 @@ from app.models.accountant_dashboard import (
     BulkOperation,
     BulkOperationType as ModelBulkOperationType,
     BulkOperationResult,
+    PermissionScope,
+    DEFAULT_SCOPES,
 )
 from app.schemas.accountant_dashboard import (
     DashboardSummaryResponse,
@@ -57,6 +59,13 @@ from app.schemas.accountant_dashboard import (
     InviteClientResponse,
     ClientLinkItem,
     AccountantClientLinksResponse,
+    ClientScopesResponse,
+    UpdateScopesRequest,
+    UpdateScopesResponse,
+    PermissionScopeType,
+    ScopesSummary,
+    ClientLinkItemWithScopes,
+    AccountantClientLinksWithScopesResponse,
 )
 from app.services.accountant_dashboard import (
     AccountantDashboardService,
@@ -1050,4 +1059,252 @@ async def list_assigned_clients(
     return AccountantClientListResponse(
         clients=clients,
         total_count=len(clients),
+    )
+
+
+# ============ Permission Scopes Endpoints ============
+
+@router.get("/clients/{client_id}/scopes", response_model=ClientScopesResponse)
+async def get_client_scopes(
+    client_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Get permission scopes for a specific client assignment.
+    
+    Returns the list of granted scopes and available scope types.
+    
+    Note: For direct members (via AdministrationMember), all scopes are granted.
+    """
+    verify_accountant_role(current_user)
+    
+    # First check for direct membership
+    member_result = await db.execute(
+        select(Administration)
+        .join(AdministrationMember)
+        .where(Administration.id == client_id)
+        .where(AdministrationMember.user_id == current_user.id)
+        .where(AdministrationMember.role.in_([MemberRole.OWNER, MemberRole.ADMIN, MemberRole.ACCOUNTANT]))
+    )
+    administration = member_result.scalar_one_or_none()
+    
+    if administration:
+        # Direct members have full access
+        return ClientScopesResponse(
+            client_id=client_id,
+            client_name=administration.name,
+            scopes=DEFAULT_SCOPES.copy(),
+            available_scopes=[s.value for s in PermissionScopeType],
+        )
+    
+    # Check assignment
+    assignment_result = await db.execute(
+        select(AccountantClientAssignment)
+        .options(selectinload(AccountantClientAssignment.administration))
+        .where(AccountantClientAssignment.administration_id == client_id)
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+    )
+    assignment = assignment_result.scalar_one_or_none()
+    
+    if not assignment:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "NOT_ASSIGNED", "message": "Geen toegang tot deze klant."}
+        )
+    
+    if assignment.status != AssignmentStatus.ACTIVE:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "ASSIGNMENT_NOT_ACTIVE",
+                "message": "Koppeling is niet actief."
+            }
+        )
+    
+    admin_name = assignment.administration.name if assignment.administration else "Unknown"
+    scopes = assignment.scopes or DEFAULT_SCOPES.copy()
+    
+    return ClientScopesResponse(
+        client_id=client_id,
+        client_name=admin_name,
+        scopes=scopes,
+        available_scopes=[s.value for s in PermissionScopeType],
+    )
+
+
+@router.put("/clients/{client_id}/scopes", response_model=UpdateScopesResponse)
+async def update_client_scopes(
+    client_id: UUID,
+    request: UpdateScopesRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Update permission scopes for a specific client assignment.
+    
+    Only valid scope types will be stored. Invalid scopes are ignored.
+    
+    Notes:
+    - Only the ZZP client (owner) can modify the scopes for their administration.
+    - Accountants can view but not modify scopes (they need client approval).
+    - Admins can modify scopes.
+    """
+    verify_accountant_role(current_user)
+    
+    # Check assignment exists
+    assignment_result = await db.execute(
+        select(AccountantClientAssignment)
+        .where(AccountantClientAssignment.administration_id == client_id)
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+    )
+    assignment = assignment_result.scalar_one_or_none()
+    
+    if not assignment:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "NOT_ASSIGNED", "message": "Geen toegang tot deze klant."}
+        )
+    
+    # Only admins can modify scopes (not accountants - they need client approval)
+    # In future, ZZP client can also modify via their own endpoint
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "CANNOT_MODIFY_SCOPES",
+                "message": "Alleen de klant of beheerder kan machtigingen wijzigen."
+            }
+        )
+    
+    # Validate scopes - only allow valid scope types
+    valid_scope_values = {s.value for s in PermissionScopeType}
+    validated_scopes = [s for s in request.scopes if s in valid_scope_values]
+    
+    if not validated_scopes:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "NO_VALID_SCOPES",
+                "message": "Geen geldige machtigingen opgegeven."
+            }
+        )
+    
+    # Update scopes
+    assignment.scopes = validated_scopes
+    await db.commit()
+    
+    return UpdateScopesResponse(
+        client_id=client_id,
+        scopes=validated_scopes,
+        message=f"Machtigingen bijgewerkt: {len(validated_scopes)} scopes.",
+    )
+
+
+@router.get("/clients/links/scopes", response_model=AccountantClientLinksWithScopesResponse)
+async def list_client_links_with_scopes(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Get list of client links with scopes summary for the current accountant.
+    
+    This is an enhanced version of /clients/links that includes:
+    - Permission scopes for each client
+    - Summary of granted vs missing scopes
+    
+    Returns:
+    - PENDING: Awaiting client approval (no scopes)
+    - ACTIVE: Approved and accessible (with scopes)
+    - REVOKED: Rejected or revoked (excluded from this list)
+    """
+    verify_accountant_role(current_user)
+    
+    # Get all non-revoked assignments for current accountant
+    assignments_result = await db.execute(
+        select(AccountantClientAssignment)
+        .options(
+            selectinload(AccountantClientAssignment.client_user),
+            selectinload(AccountantClientAssignment.administration),
+        )
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+        .where(AccountantClientAssignment.status != AssignmentStatus.REVOKED)
+        .order_by(AccountantClientAssignment.assigned_at.desc())
+    )
+    assignments = assignments_result.scalars().all()
+    
+    links = []
+    pending_count = 0
+    active_count = 0
+    all_scopes = set([s.value for s in PermissionScopeType])
+    
+    for assignment in assignments:
+        client_user = assignment.client_user
+        admin = assignment.administration
+        
+        if not client_user or not admin:
+            continue
+        
+        # Count status
+        if assignment.status == AssignmentStatus.PENDING:
+            pending_count += 1
+        elif assignment.status == AssignmentStatus.ACTIVE:
+            active_count += 1
+        
+        # Get issue counts for ACTIVE assignments
+        red_count = 0
+        yellow_count = 0
+        if assignment.status == AssignmentStatus.ACTIVE:
+            red_count_result = await db.execute(
+                select(func.count(ClientIssue.id))
+                .where(ClientIssue.administration_id == admin.id)
+                .where(ClientIssue.severity == IssueSeverity.RED)
+                .where(ClientIssue.is_resolved == False)
+            )
+            red_count = red_count_result.scalar() or 0
+            
+            yellow_count_result = await db.execute(
+                select(func.count(ClientIssue.id))
+                .where(ClientIssue.administration_id == admin.id)
+                .where(ClientIssue.severity == IssueSeverity.YELLOW)
+                .where(ClientIssue.is_resolved == False)
+            )
+            yellow_count = yellow_count_result.scalar() or 0
+        
+        # Get scopes
+        scopes = assignment.scopes or DEFAULT_SCOPES.copy()
+        granted_set = set(scopes)
+        missing_set = all_scopes - granted_set
+        
+        scopes_summary = ScopesSummary(
+            total_scopes=len(all_scopes),
+            granted_scopes=list(granted_set),
+            missing_scopes=list(missing_set),
+        )
+        
+        links.append(
+            ClientLinkItemWithScopes(
+                assignment_id=assignment.id,
+                client_user_id=client_user.id,
+                client_email=client_user.email,
+                client_name=client_user.full_name,
+                administration_id=admin.id,
+                administration_name=admin.name,
+                status=assignment.status.value,
+                invited_by=assignment.invited_by.value,
+                assigned_at=assignment.assigned_at,
+                approved_at=assignment.approved_at,
+                revoked_at=assignment.revoked_at,
+                open_red_count=red_count,
+                open_yellow_count=yellow_count,
+                scopes=scopes,
+                scopes_summary=scopes_summary,
+            )
+        )
+    
+    return AccountantClientLinksWithScopesResponse(
+        links=links,
+        pending_count=pending_count,
+        active_count=active_count,
+        total_count=len(links),
     )

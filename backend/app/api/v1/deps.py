@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional, Tuple, List
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
@@ -11,7 +11,7 @@ from app.core.security import oauth2_scheme, decode_token
 from app.core.roles import UserRole
 from app.models.user import User
 from app.models.administration import Administration, AdministrationMember, MemberRole
-from app.models.accountant_dashboard import AccountantClientAssignment
+from app.models.accountant_dashboard import AccountantClientAssignment, PermissionScope, DEFAULT_SCOPES
 
 
 # =============================================================================
@@ -22,9 +22,11 @@ async def require_assigned_client(
     client_id: UUID,
     current_user: User,
     db: AsyncSession,
+    required_scope: Optional[str] = None,
 ) -> Administration:
     """
     Verify user is an accountant AND is assigned to the client with ACTIVE status.
+    Optionally checks if a required permission scope is granted.
     
     Checks both:
     1. AdministrationMember table (direct membership)
@@ -33,6 +35,12 @@ async def require_assigned_client(
     For AccountantClientAssignment, only ACTIVE assignments grant access.
     PENDING assignments (awaiting client approval) do NOT grant access.
     
+    Args:
+        client_id: The administration UUID to check access for
+        current_user: The authenticated user
+        db: Database session
+        required_scope: Optional scope required for this access (e.g., 'invoices', 'reports')
+    
     Returns:
         Administration: The administration if access is granted
         
@@ -40,11 +48,12 @@ async def require_assigned_client(
         HTTPException: 403 with FORBIDDEN_ROLE if user is not accountant/admin
         HTTPException: 403 with NOT_ASSIGNED if user is not assigned to client
         HTTPException: 403 with PENDING_APPROVAL if assignment is pending client approval
+        HTTPException: 403 with SCOPE_MISSING if required scope is not granted
     """
     # First verify role
     require_accountant(current_user)
     
-    # Check via AdministrationMember (direct membership)
+    # Check via AdministrationMember (direct membership) - full access, no scope check needed
     result = await db.execute(
         select(Administration)
         .join(AdministrationMember)
@@ -96,7 +105,114 @@ async def require_assigned_client(
                 }
             )
     
+    # Check required scope if specified
+    if required_scope:
+        scopes = assignment.scopes or DEFAULT_SCOPES
+        if required_scope not in scopes:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "SCOPE_MISSING",
+                    "message": f"Geen toegang tot deze module. Ontbrekende machtiging: {required_scope}",
+                    "required_scope": required_scope,
+                    "granted_scopes": scopes
+                }
+            )
+    
     return administration
+
+
+async def require_assigned_client_with_scopes(
+    client_id: UUID,
+    current_user: User,
+    db: AsyncSession,
+) -> Tuple[Administration, List[str]]:
+    """
+    Verify user is assigned to client and return both administration and scopes.
+    
+    Returns:
+        Tuple of (Administration, list of granted scopes)
+    """
+    # First verify role
+    require_accountant(current_user)
+    
+    # Check via AdministrationMember (direct membership) - full access
+    result = await db.execute(
+        select(Administration)
+        .join(AdministrationMember)
+        .where(Administration.id == client_id)
+        .where(AdministrationMember.user_id == current_user.id)
+        .where(AdministrationMember.role.in_([MemberRole.OWNER, MemberRole.ADMIN, MemberRole.ACCOUNTANT]))
+    )
+    administration = result.scalar_one_or_none()
+    
+    if administration:
+        # Direct members have full access
+        return administration, DEFAULT_SCOPES.copy()
+    
+    # Check via AccountantClientAssignment
+    from app.models.accountant_dashboard import AssignmentStatus
+    
+    assignment_result = await db.execute(
+        select(Administration, AccountantClientAssignment)
+        .join(AccountantClientAssignment, AccountantClientAssignment.administration_id == Administration.id)
+        .where(Administration.id == client_id)
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+    )
+    result_tuple = assignment_result.first()
+    
+    if not result_tuple:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "NOT_ASSIGNED", "message": "Geen toegang tot deze klant."}
+        )
+    
+    administration, assignment = result_tuple
+    
+    # Check assignment status
+    if assignment.status != AssignmentStatus.ACTIVE:
+        if assignment.status == AssignmentStatus.PENDING:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PENDING_APPROVAL",
+                    "message": "Toegang is in afwachting van goedkeuring door de klant."
+                }
+            )
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "ACCESS_REVOKED",
+                    "message": "Toegang is ingetrokken door de klant."
+                }
+            )
+    
+    scopes = assignment.scopes or DEFAULT_SCOPES.copy()
+    return administration, scopes
+
+
+def require_scope(scope: str):
+    """
+    Factory function to create a scope-checking dependency.
+    
+    Usage:
+        @router.get("/invoices")
+        async def get_invoices(
+            administration: Administration = Depends(require_scope("invoices"))
+        ):
+            ...
+    
+    Args:
+        scope: The required permission scope (e.g., 'invoices', 'reports')
+    """
+    async def dependency(
+        client_id: UUID,
+        current_user: User,
+        db: AsyncSession,
+    ) -> Administration:
+        return await require_assigned_client(client_id, current_user, db, required_scope=scope)
+    return dependency
 
 
 async def get_current_user(

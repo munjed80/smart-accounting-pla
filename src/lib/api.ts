@@ -1485,6 +1485,53 @@ export const getValidationErrors = (error: unknown): Record<string, string> => {
   return {}
 }
 
+/**
+ * Check if an error is a permission-related 403 error.
+ * Returns the error code if it's a recognized permission error, null otherwise.
+ */
+export const getPermissionErrorCode = (error: unknown): string | null => {
+  if (!axios.isAxiosError(error) || error.response?.status !== 403) {
+    return null
+  }
+  const detail = error.response?.data?.detail
+  if (typeof detail === 'object' && detail?.code) {
+    const code = detail.code
+    // List of recognized permission error codes
+    if (['NOT_ASSIGNED', 'PENDING_APPROVAL', 'ACCESS_REVOKED', 'SCOPE_MISSING', 'FORBIDDEN_ROLE'].includes(code)) {
+      return code
+    }
+  }
+  return null
+}
+
+/**
+ * Check if an error is specifically a SCOPE_MISSING error.
+ * Returns the scope details if true, null otherwise.
+ */
+export const isScopeMissingError = (error: unknown): ScopeMissingError | null => {
+  if (!axios.isAxiosError(error) || error.response?.status !== 403) {
+    return null
+  }
+  const detail = error.response?.data?.detail
+  if (typeof detail === 'object' && detail?.code === 'SCOPE_MISSING') {
+    return {
+      code: 'SCOPE_MISSING',
+      message: detail.message || 'Permission scope missing',
+      required_scope: detail.required_scope || 'unknown',
+      granted_scopes: detail.granted_scopes || []
+    }
+  }
+  return null
+}
+
+/**
+ * Check if an error is a NOT_ASSIGNED error (403).
+ * Returns true if the user is not assigned to the requested client.
+ */
+export const isNotAssignedError = (error: unknown): boolean => {
+  return getPermissionErrorCode(error) === 'NOT_ASSIGNED'
+}
+
 // ============ Document Review Queue Types ============
 
 export type DocumentReviewStatus = 'UPLOADED' | 'PROCESSING' | 'EXTRACTED' | 'NEEDS_REVIEW' | 'POSTED' | 'REJECTED' | 'DRAFT_READY' | 'FAILED'
@@ -2138,6 +2185,73 @@ export interface ClientLinksResponse {
   total_count: number
 }
 
+// ============ Permission Scopes Types ============
+
+export type PermissionScope = 
+  | 'invoices'
+  | 'customers'
+  | 'expenses'
+  | 'hours'
+  | 'documents'
+  | 'bookkeeping'
+  | 'settings'
+  | 'vat'
+  | 'reports'
+
+export const ALL_SCOPES: PermissionScope[] = [
+  'invoices',
+  'customers',
+  'expenses',
+  'hours',
+  'documents',
+  'bookkeeping',
+  'settings',
+  'vat',
+  'reports'
+]
+
+export interface ClientScopesResponse {
+  client_id: string
+  client_name: string
+  scopes: PermissionScope[]
+  available_scopes: PermissionScope[]
+}
+
+export interface UpdateScopesRequest {
+  scopes: PermissionScope[]
+}
+
+export interface UpdateScopesResponse {
+  client_id: string
+  scopes: PermissionScope[]
+  message: string
+}
+
+export interface ScopesSummary {
+  total_scopes: number
+  granted_scopes: PermissionScope[]
+  missing_scopes: PermissionScope[]
+}
+
+export interface ClientLinkWithScopes extends ClientLink {
+  scopes: PermissionScope[]
+  scopes_summary: ScopesSummary | null
+}
+
+export interface ClientLinksWithScopesResponse {
+  links: ClientLinkWithScopes[]
+  pending_count: number
+  active_count: number
+  total_count: number
+}
+
+export interface ScopeMissingError {
+  code: 'SCOPE_MISSING'
+  message: string
+  required_scope: string
+  granted_scopes: string[]
+}
+
 export interface PendingLinkRequest {
   assignment_id: string
   accountant_id: string
@@ -2197,6 +2311,30 @@ export const accountantApi = {
    */
   getClientLinks: async (): Promise<ClientLinksResponse> => {
     const response = await api.get<ClientLinksResponse>('/accountant/clients/links')
+    return response.data
+  },
+
+  /**
+   * Get list of client links with scopes summary
+   */
+  getClientLinksWithScopes: async (): Promise<ClientLinksWithScopesResponse> => {
+    const response = await api.get<ClientLinksWithScopesResponse>('/accountant/clients/links/scopes')
+    return response.data
+  },
+
+  /**
+   * Get permission scopes for a specific client
+   */
+  getClientScopes: async (clientId: string): Promise<ClientScopesResponse> => {
+    const response = await api.get<ClientScopesResponse>(`/accountant/clients/${clientId}/scopes`)
+    return response.data
+  },
+
+  /**
+   * Update permission scopes for a specific client (admin only)
+   */
+  updateClientScopes: async (clientId: string, request: UpdateScopesRequest): Promise<UpdateScopesResponse> => {
+    const response = await api.put<UpdateScopesResponse>(`/accountant/clients/${clientId}/scopes`, request)
     return response.data
   },
 }

@@ -1898,6 +1898,53 @@ export const nl = {
     userNotFound: "Geen gebruiker gevonden met dit e-mailadres. De gebruiker moet zich eerst registreren.",
     notZzpUser: "Deze gebruiker is geen ZZP-klant.",
     noAdministration: "Deze gebruiker heeft nog geen administratie aangemaakt.",
+    scopeMissing: "Geen toegang tot deze module",
+    scopeMissingDescription: "Je hebt geen machtiging voor deze functie. Neem contact op met de klant om toegang te vragen.",
+  },
+
+  // Permission Scopes
+  permissions: {
+    title: "Machtigingen",
+    subtitle: "Overzicht van je toegangsrechten",
+    fullAccess: "Volledige toegang",
+    partialAccess: "Gedeeltelijke toegang",
+    noAccess: "Geen toegang",
+    granted: "Toegekend",
+    notGranted: "Niet toegekend",
+    scopeTooltip: "Geen toegang (machtiging ontbreekt)",
+    
+    // Scope names
+    scopes: {
+      invoices: "Facturen",
+      customers: "Klanten",
+      expenses: "Uitgaven",
+      hours: "Uren",
+      documents: "Documenten",
+      bookkeeping: "Boekhouding",
+      settings: "Instellingen",
+      vat: "BTW",
+      reports: "Rapporten",
+    },
+    
+    // Scope descriptions
+    scopeDescriptions: {
+      invoices: "Toegang tot facturen bekijken en beheren",
+      customers: "Toegang tot klantgegevens",
+      expenses: "Toegang tot uitgaven en bonnen",
+      hours: "Toegang tot urenregistratie",
+      documents: "Toegang tot documenten uploaden en bekijken",
+      bookkeeping: "Toegang tot journaalposten en transacties",
+      settings: "Toegang tot instellingen",
+      vat: "Toegang tot BTW-aangiften",
+      reports: "Toegang tot financiële rapporten",
+    },
+    
+    // Panel
+    panelTitle: "Je machtigingen",
+    panelDescription: "Hieronder zie je welke onderdelen je mag inzien voor deze klant.",
+    scopesGranted: "machtigingen toegekend",
+    allScopesGranted: "Alle machtigingen",
+    requestAccess: "Meer toegang nodig? Neem contact op met de klant.",
   },
 
   // Consent workflow - Accountant clients page

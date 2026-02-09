@@ -401,3 +401,66 @@ class ZZPActiveLinksResponse(BaseModel):
     """Response for ZZP client's active accountant links."""
     active_links: List[ActiveAccountantLink]
     total_count: int
+
+
+# ============ Permission Scopes Schemas ============
+
+class PermissionScopeType(str, Enum):
+    """
+    Permission scope types for accountant module access.
+    
+    Each scope grants access to a specific area of the client's data.
+    """
+    INVOICES = "invoices"
+    CUSTOMERS = "customers"
+    EXPENSES = "expenses"
+    HOURS = "hours"
+    DOCUMENTS = "documents"
+    BOOKKEEPING = "bookkeeping"
+    SETTINGS = "settings"
+    VAT = "vat"
+    REPORTS = "reports"
+
+
+class ClientScopesResponse(BaseModel):
+    """Response for getting client permission scopes."""
+    client_id: UUID
+    client_name: str
+    scopes: List[str] = Field(default_factory=list, description="List of granted permission scopes")
+    available_scopes: List[str] = Field(
+        default=[s.value for s in PermissionScopeType],
+        description="All available scope types"
+    )
+
+
+class UpdateScopesRequest(BaseModel):
+    """Request to update client permission scopes."""
+    scopes: List[str] = Field(..., description="List of scopes to grant")
+
+
+class UpdateScopesResponse(BaseModel):
+    """Response after updating client scopes."""
+    client_id: UUID
+    scopes: List[str]
+    message: str
+
+
+class ScopesSummary(BaseModel):
+    """Summary of granted scopes for a client link."""
+    total_scopes: int
+    granted_scopes: List[str]
+    missing_scopes: List[str]
+
+
+class ClientLinkItemWithScopes(ClientLinkItem):
+    """Client link item with scopes summary."""
+    scopes: List[str] = Field(default_factory=list, description="Granted permission scopes")
+    scopes_summary: Optional[ScopesSummary] = None
+
+
+class AccountantClientLinksWithScopesResponse(BaseModel):
+    """Response for listing accountant's client links with scopes."""
+    links: List[ClientLinkItemWithScopes]
+    pending_count: int
+    active_count: int
+    total_count: int

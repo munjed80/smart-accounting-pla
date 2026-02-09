@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.services.invoice_pdf import generate_invoice_pdf, get_invoice_pdf_filename, WEASYPRINT_AVAILABLE
+from app.services.invoice_pdf import generate_invoice_pdf, get_invoice_pdf_filename
 from app.models.zzp import (
     ZZPInvoice, 
     ZZPInvoiceLine, 
@@ -615,16 +615,6 @@ async def get_invoice_pdf(
     """
     require_zzp(current_user)
     
-    # Check if PDF generation is available
-    if not WEASYPRINT_AVAILABLE:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "code": "PDF_NOT_AVAILABLE",
-                "message": "PDF-generatie is tijdelijk niet beschikbaar. Probeer het later opnieuw."
-            }
-        )
-    
     administration = await get_user_administration(current_user.id, db)
     
     result = await db.execute(
@@ -656,10 +646,21 @@ async def get_invoice_pdf(
             }
         )
     except RuntimeError as e:
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "code": "PDF_GENERATION_FAILED",
-                "message": "Kon de PDF niet genereren. Probeer het later opnieuw."
-            }
-        )
+        # Check if this is a WeasyPrint unavailability error
+        error_msg = str(e)
+        if "not available" in error_msg or "not installed" in error_msg:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "PDF_NOT_AVAILABLE",
+                    "message": "PDF-generatie is tijdelijk niet beschikbaar. Probeer het later opnieuw."
+                }
+            )
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "code": "PDF_GENERATION_FAILED",
+                    "message": "Kon de PDF niet genereren. Probeer het later opnieuw."
+                }
+            )

@@ -2,11 +2,26 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies including WeasyPrint runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     curl \
+    # WeasyPrint system dependencies
+    libcairo2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf-2.0-0 \
+    libffi8 \
+    shared-mime-info \
+    libjpeg62-turbo \
+    libpng16-16 \
+    libxml2 \
+    libxslt1.1 \
+    libglib2.0-0 \
+    libgobject-2.0-0 \
+    fonts-dejavu \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies

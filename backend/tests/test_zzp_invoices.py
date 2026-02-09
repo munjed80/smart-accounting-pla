@@ -159,19 +159,18 @@ class TestInvoicePdfEndpoint:
     ):
         """PDF can be downloaded for an existing invoice."""
         # Mock WeasyPrint to avoid dependency issues in tests
-        with patch('app.services.invoice_pdf.WEASYPRINT_AVAILABLE', True):
-            with patch('app.services.invoice_pdf.generate_invoice_pdf') as mock_pdf:
-                mock_pdf.return_value = b'%PDF-1.4 fake pdf content'
-                
-                response = await async_client.get(
-                    f"/api/v1/zzp/invoices/{test_invoice_sent.id}/pdf",
-                    headers=auth_headers
-                )
-                
-                assert response.status_code == 200
-                assert response.headers["content-type"] == "application/pdf"
-                assert "attachment" in response.headers["content-disposition"]
-                assert test_invoice_sent.invoice_number in response.headers["content-disposition"]
+        with patch('app.services.invoice_pdf.generate_invoice_pdf') as mock_pdf:
+            mock_pdf.return_value = b'%PDF-1.4 fake pdf content'
+            
+            response = await async_client.get(
+                f"/api/v1/zzp/invoices/{test_invoice_sent.id}/pdf",
+                headers=auth_headers
+            )
+            
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "application/pdf"
+            assert "attachment" in response.headers["content-disposition"]
+            assert test_invoice_sent.invoice_number in response.headers["content-disposition"]
     
     @pytest.mark.asyncio
     async def test_pdf_download_not_found(
@@ -182,15 +181,14 @@ class TestInvoicePdfEndpoint:
         """PDF download for non-existent invoice returns 404."""
         fake_id = uuid4()
         
-        with patch('app.services.invoice_pdf.WEASYPRINT_AVAILABLE', True):
-            response = await async_client.get(
-                f"/api/v1/zzp/invoices/{fake_id}/pdf",
-                headers=auth_headers
-            )
-            
-            assert response.status_code == 404
-            data = response.json()
-            assert data["detail"]["code"] == "INVOICE_NOT_FOUND"
+        response = await async_client.get(
+            f"/api/v1/zzp/invoices/{fake_id}/pdf",
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 404
+        data = response.json()
+        assert data["detail"]["code"] == "INVOICE_NOT_FOUND"
     
     @pytest.mark.asyncio
     async def test_pdf_unavailable_when_library_not_installed(
@@ -200,7 +198,12 @@ class TestInvoicePdfEndpoint:
         auth_headers: dict
     ):
         """PDF endpoint returns 503 when WeasyPrint is not available."""
-        with patch('app.api.v1.zzp_invoices.WEASYPRINT_AVAILABLE', False):
+        # Mock generate_invoice_pdf to raise RuntimeError (WeasyPrint unavailable)
+        with patch('app.services.invoice_pdf.generate_invoice_pdf') as mock_gen:
+            mock_gen.side_effect = RuntimeError(
+                "PDF generation is not available. WeasyPrint library or its system dependencies are not installed."
+            )
+            
             response = await async_client.get(
                 f"/api/v1/zzp/invoices/{test_invoice_sent.id}/pdf",
                 headers=auth_headers

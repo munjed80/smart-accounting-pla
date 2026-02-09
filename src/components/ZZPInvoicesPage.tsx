@@ -1449,7 +1449,8 @@ export const ZZPInvoicesPage = () => {
     const filename = `${invoice.invoice_number || `INV-${invoice.id}`}.pdf`
     
     // Helper to attempt download via anchor element
-    const downloadViaAnchor = (url: string, isBlob: boolean) => {
+    // shouldRevokeUrl: true for blob URLs that need cleanup, false for direct URLs
+    const downloadViaAnchor = (url: string, shouldRevokeUrl: boolean) => {
       const link = document.createElement('a')
       link.href = url
       link.style.display = 'none'
@@ -1469,7 +1470,7 @@ export const ZZPInvoicesPage = () => {
       document.body.removeChild(link)
       
       // For blob URLs, schedule revocation
-      if (isBlob) {
+      if (shouldRevokeUrl) {
         const revokeDelay = isMobile() ? PDF_URL_REVOCATION_DELAY_MS * 2 : PDF_URL_REVOCATION_DELAY_MS
         setTimeout(() => window.URL.revokeObjectURL(url), revokeDelay)
       }
@@ -1488,14 +1489,13 @@ export const ZZPInvoicesPage = () => {
         
         // Check if blob is valid
         if (pdfBlob.size === 0) {
-          throw new Error('Empty PDF blob received')
+          throw new Error(`Empty PDF blob received for invoice ${invoice.id}`)
         }
         
         // Create object URL for the PDF blob
         const blobUrl = window.URL.createObjectURL(pdfBlob)
         
         downloadViaAnchor(blobUrl, true)
-        toast.success(t('zzpInvoices.pdfDownloaded'))
       } catch (blobErr) {
         console.warn('Blob download failed, trying window.open fallback:', blobErr)
         
@@ -1505,18 +1505,18 @@ export const ZZPInvoicesPage = () => {
           const directUrl = zzpApi.invoices.getPdfUrl(invoice.id)
           const newWindow = window.open(directUrl, '_blank', 'noopener,noreferrer')
           
-          if (newWindow) {
-            toast.success(t('zzpInvoices.pdfDownloaded'))
-          } else {
+          if (!newWindow) {
             // If popup was blocked, try anchor approach with direct URL
             downloadViaAnchor(directUrl, false)
-            toast.success(t('zzpInvoices.pdfDownloaded'))
           }
         } else {
           // Re-throw for desktop - blob approach should work
           throw blobErr
         }
       }
+      
+      // Success toast shown after all download attempts
+      toast.success(t('zzpInvoices.pdfDownloaded'))
     } catch (err) {
       console.error('Failed to download PDF:', err)
       toast.error(parseApiError(err) || t('zzpInvoices.pdfError'))

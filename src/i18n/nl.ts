@@ -179,8 +179,13 @@ export const nl = {
     listTitle: "Uitgavenlijst",
     newExpense: "Nieuwe uitgave",
     editExpense: "Uitgave bewerken",
+    scanReceipt: "Scan bon",
+    scanning: "Scannen...",
+    reviewScannedExpense: "Gescande bon controleren",
     newExpenseDescription: "Voeg een nieuwe zakelijke uitgave toe.",
     editExpenseDescription: "Wijzig de gegevens van deze uitgave.",
+    reviewScannedDescription: "Controleer de gescande gegevens en pas aan indien nodig.",
+    scanSuccess: "Bon succesvol gescand!",
     // Table columns
     columnDate: "Datum",
     columnVendor: "Leverancier",
@@ -631,6 +636,7 @@ export const nl = {
     shareText: "Bekijk factuur {number}",
     shareSuccess: "Factuur gedeeld",
     shareError: "Kon factuur niet delen",
+    invoiceNotFound: "Factuur niet gevonden",
     // Error messages
     loadError: "Kon facturen niet laden",
     saveError: "Kon factuur niet opslaan",

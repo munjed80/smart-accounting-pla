@@ -32,6 +32,7 @@ import { t } from '@/i18n'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { nl as nlLocale } from 'date-fns/locale'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import {
   Plus,
   UserPlus,
@@ -429,6 +430,9 @@ export const AccountantClientsPage = () => {
   const [isInviteOpen, setIsInviteOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('active')
 
+  // Delayed loading to prevent flashing
+  const showLoading = useDelayedLoading(isLoading, 300, allLinks.length > 0)
+
   // Filter links by status
   const activeLinks = allLinks.filter(link => link.status === 'ACTIVE')
   const pendingLinks = allLinks.filter(link => link.status === 'PENDING')
@@ -515,7 +519,7 @@ export const AccountantClientsPage = () => {
 
         {/* Active clients tab */}
         <TabsContent value="active" className="mt-0">
-          {isLoading ? (
+          {showLoading ? (
             <LoadingSkeleton />
           ) : activeLinks.length === 0 ? (
             <EmptyState
@@ -525,7 +529,7 @@ export const AccountantClientsPage = () => {
               onAction={() => setIsInviteOpen(true)}
             />
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
               {activeLinks.map((link) => (
                 <ClientCard
                   key={link.assignment_id}
@@ -541,7 +545,7 @@ export const AccountantClientsPage = () => {
 
         {/* Pending clients tab */}
         <TabsContent value="pending" className="mt-0">
-          {isLoading ? (
+          {showLoading ? (
             <LoadingSkeleton />
           ) : pendingLinks.length === 0 ? (
             <EmptyState
@@ -549,7 +553,7 @@ export const AccountantClientsPage = () => {
               description={t('accountantClients.noPendingClientsDescription')}
             />
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
               {pendingLinks.map((link) => (
                 <ClientCard
                   key={link.assignment_id}

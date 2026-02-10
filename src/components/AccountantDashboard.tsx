@@ -70,6 +70,7 @@ import { format, formatDistanceToNow } from 'date-fns'
 import { nl as nlLocale } from 'date-fns/locale'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
 // Status indicator colors
 const statusColors: Record<ClientStatus, { bg: string; text: string; border: string }> = {
@@ -213,6 +214,9 @@ export const AccountantDashboard = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+  
+  // Delayed loading to prevent flashing
+  const showLoading = useDelayedLoading(isLoading, 300, !!dashboard)
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('')
@@ -480,7 +484,7 @@ export const AccountantDashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-10 w-16" />
               ) : (
                 <div className="text-3xl font-bold text-green-600 dark:text-green-400">
@@ -498,7 +502,7 @@ export const AccountantDashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-10 w-16" />
               ) : (
                 <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">
@@ -516,7 +520,7 @@ export const AccountantDashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-10 w-16" />
               ) : (
                 <div className="text-3xl font-bold text-red-600 dark:text-red-400">
@@ -539,14 +543,14 @@ export const AccountantDashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {showLoading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
                   <Skeleton key={i} className="h-12 w-full" />
                 ))}
               </div>
             ) : dashboard?.clients && dashboard.clients.length > 0 ? (
-              <Table>
+              <Table style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t('accountant.client')}</TableHead>

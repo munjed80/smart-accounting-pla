@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { zzpApi, PendingLinkRequest, ActiveAccountantLink, getErrorMessage } from '@/lib/api'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -195,6 +196,7 @@ export const ZZPAccountantLinksPage = () => {
   const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set())
   const [rejectingIds, setRejectingIds] = useState<Set<string>>(new Set())
   const [revokingIds, setRevokingIds] = useState<Set<string>>(new Set())
+  const showSkeleton = useDelayedLoading(isLoading, 300, pendingRequests.length > 0 || activeLinks.length > 0)
 
   // Load pending requests and active links
   const loadData = useCallback(async () => {
@@ -330,7 +332,7 @@ export const ZZPAccountantLinksPage = () => {
           )}
         </div>
 
-        {isLoading ? (
+        {showSkeleton ? (
           <LoadingSkeleton />
         ) : pendingRequests.length === 0 ? (
           <EmptyState
@@ -366,7 +368,7 @@ export const ZZPAccountantLinksPage = () => {
           )}
         </div>
         
-        {isLoading ? (
+        {showSkeleton ? (
           <LoadingSkeleton />
         ) : activeLinks.length === 0 ? (
           <Card className="bg-secondary/30 border-dashed">

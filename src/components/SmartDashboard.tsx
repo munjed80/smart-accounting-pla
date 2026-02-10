@@ -9,6 +9,7 @@ import { zzpApi, ZZPDashboardResponse, administrationApi, Administration, getErr
 import { navigateTo } from '@/lib/navigation'
 import { NoAdministrationsEmptyState } from '@/components/EmptyState'
 import { AIInsightsPanel } from '@/components/AIInsightsPanel'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   Receipt, 
   TrendUp, 
@@ -36,6 +37,9 @@ export const SmartDashboard = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+
+  // Use delayed loading to prevent skeleton flash
+  const showLoading = useDelayedLoading(isLoading, 300, !!dashboardData)
 
   const fetchData = async () => {
     setIsLoading(true)
@@ -88,11 +92,11 @@ export const SmartDashboard = () => {
   }
   
   // Show loading state
-  if (isLoading) {
+  if (showLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 opacity-0 animate-in fade-in duration-300">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
@@ -233,7 +237,7 @@ export const SmartDashboard = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
       
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 opacity-0 animate-in fade-in duration-500">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">

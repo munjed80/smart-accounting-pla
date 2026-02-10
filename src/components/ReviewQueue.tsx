@@ -44,6 +44,7 @@ import {
   DocumentSuggestedAction,
   getErrorMessage 
 } from '@/lib/api'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   ArrowsClockwise,
   WarningCircle,
@@ -142,6 +143,7 @@ export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }:
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<DocumentReviewStatus | undefined>('NEEDS_REVIEW')
+  const showSkeleton = useDelayedLoading(isLoading, 300, documents.length > 0)
   
   // Dialog states
   const [selectedDoc, setSelectedDoc] = useState<DocumentReviewItem | null>(null)
@@ -305,7 +307,7 @@ export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }:
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {showSkeleton ? (
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />

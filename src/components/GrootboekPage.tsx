@@ -26,6 +26,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { RequireActiveClient } from '@/components/RequireActiveClient'
 import { ApiErrorState, parseApiError, ApiErrorType } from '@/components/ApiErrorState'
 import { useActiveClient } from '@/lib/ActiveClientContext'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { ledgerApi, BalanceSheetResponse, AccountBalance } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
@@ -127,6 +128,7 @@ export const GrootboekPage = ({ onNavigate }: GrootboekPageProps) => {
   const [apiError, setApiError] = useState<{ type: ApiErrorType; message: string } | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const showLoading = useDelayedLoading(isLoading, 300, !!balanceSheet)
 
   // Load balance sheet data
   useEffect(() => {
@@ -315,7 +317,7 @@ export const GrootboekPage = ({ onNavigate }: GrootboekPageProps) => {
       </Card>
 
       {/* Loading state */}
-      {isLoading && (
+      {showLoading && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-1 space-y-2">
             {[1, 2, 3, 4, 5].map(i => (
@@ -332,8 +334,8 @@ export const GrootboekPage = ({ onNavigate }: GrootboekPageProps) => {
       )}
 
       {/* Main content */}
-      {!isLoading && !apiError && balanceSheet && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {!showLoading && !apiError && balanceSheet && (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 transition-opacity duration-200" style={{ opacity: isLoading ? 0.5 : 1 }}>
           {/* Left sidebar - Categories */}
           <div className="lg:col-span-1">
             <Card className="sticky top-24">

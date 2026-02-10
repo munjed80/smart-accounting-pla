@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { transactionApi, TransactionListItem, Transaction, getErrorMessage } from '@/lib/api'
 import { TransactionDetailDialog } from '@/components/TransactionDetailDialog'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   Receipt, 
   MagnifyingGlass,
@@ -25,6 +26,7 @@ export const TransactionList = () => {
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | 'DRAFT' | 'POSTED'>('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const showLoading = useDelayedLoading(isLoading, 300, !!transactions.length)
 
   const fetchTransactions = async () => {
     try {
@@ -174,7 +176,7 @@ export const TransactionList = () => {
             <CardDescription>Click on any transaction to view details and take action</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {showLoading ? (
               <div className="space-y-4">
                 {[...Array(8)].map((_, i) => (
                   <div key={i} className="flex items-center justify-between p-4">
@@ -187,7 +189,7 @@ export const TransactionList = () => {
                 ))}
               </div>
             ) : filteredTransactions.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-3 transition-opacity duration-200" style={{ opacity: isLoading ? 0.5 : 1 }}>
                 {filteredTransactions.map((transaction) => (
                   <div
                     key={transaction.id}

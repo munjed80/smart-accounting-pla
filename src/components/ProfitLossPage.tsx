@@ -24,6 +24,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { RequireActiveClient } from '@/components/RequireActiveClient'
 import { ApiErrorState, parseApiError, ApiErrorType } from '@/components/ApiErrorState'
 import { useActiveClient } from '@/lib/ActiveClientContext'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { ledgerApi, ProfitAndLossResponse } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
@@ -53,6 +54,7 @@ export const ProfitLossPage = ({ onNavigate }: ProfitLossPageProps) => {
   const [isLoading, setIsLoading] = useState(true)
   const [apiError, setApiError] = useState<{ type: ApiErrorType; message: string } | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodOption>('thisQuarter')
+  const showLoading = useDelayedLoading(isLoading, 300, !!pnlData)
 
   // Calculate period dates based on selection
   const getPeriodDates = (period: PeriodOption): { startDate: string; endDate: string } => {
@@ -260,7 +262,7 @@ export const ProfitLossPage = ({ onNavigate }: ProfitLossPageProps) => {
       </Card>
 
       {/* Loading state */}
-      {isLoading && (
+      {showLoading && (
         <div className="space-y-4">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-48 w-full" />
@@ -269,7 +271,7 @@ export const ProfitLossPage = ({ onNavigate }: ProfitLossPageProps) => {
       )}
 
       {/* Empty state */}
-      {!isLoading && !apiError && !hasData && (
+      {!showLoading && !apiError && !hasData && (
         <>
           <EmptyState
             title={t('profitLoss.noDataYet')}
@@ -300,8 +302,8 @@ export const ProfitLossPage = ({ onNavigate }: ProfitLossPageProps) => {
       )}
 
       {/* P&L Data */}
-      {!isLoading && !apiError && hasData && pnlData && (
-        <>
+      {!showLoading && !apiError && hasData && pnlData && (
+        <div className="transition-opacity duration-200" style={{ opacity: isLoading ? 0.5 : 1 }}>
           {/* Period indicator */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
             <Calendar size={16} />
@@ -528,7 +530,7 @@ export const ProfitLossPage = ({ onNavigate }: ProfitLossPageProps) => {
               </div>
             </CardContent>
           </Card>
-        </>
+        </div>
       )}
     </div>
   )

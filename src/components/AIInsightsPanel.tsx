@@ -44,6 +44,7 @@ import {
   CheckCircle,
 } from '@phosphor-icons/react'
 import { zzpApi, ZZPInsight, ZZPInsightsResponse, InsightSeverity } from '@/lib/api'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { navigateTo } from '@/lib/navigation'
 import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
@@ -240,6 +241,7 @@ export const AIInsightsPanel = ({
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
+  const showSkeleton = useDelayedLoading(isLoading, 300, !!insights)
 
   // Load insights
   const loadInsights = async () => {
@@ -311,7 +313,7 @@ export const AIInsightsPanel = ({
       )}
       
       <CardContent className={showHeader ? '' : 'pt-4'}>
-        {isLoading ? (
+        {showSkeleton ? (
           <InsightsSkeleton />
         ) : error ? (
           <div className="text-center py-6">

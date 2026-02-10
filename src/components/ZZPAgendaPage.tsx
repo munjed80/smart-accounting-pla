@@ -61,6 +61,7 @@ import { zzpApi, ZZPCalendarEvent, ZZPCalendarEventCreate, ZZPCalendarEventUpdat
 import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
 // Dutch day abbreviations (week starts on Monday)
 const WEEKDAY_NAMES = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
@@ -644,6 +645,8 @@ export const ZZPAgendaPage = () => {
   const [events, setEvents] = useState<ZZPCalendarEvent[]>([])
   const [isLoading, setIsLoading] = useState(true)
   
+  const showLoading = useDelayedLoading(isLoading, 300, events.length > 0)
+  
   // Current view state
   const today = useMemo(() => new Date(), [])
   const [viewYear, setViewYear] = useState(today.getFullYear())
@@ -852,10 +855,10 @@ export const ZZPAgendaPage = () => {
         </div>
 
         {/* Calendar View */}
-        {isLoading ? (
+        {showLoading ? (
           <CalendarLoadingSkeleton />
         ) : (
-          <Card className="bg-card/80 backdrop-blur-sm mb-6">
+          <Card className="bg-card/80 backdrop-blur-sm mb-6" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
             <CardContent className="p-4 sm:p-6">
               {/* Month navigation */}
               <div className="flex items-center justify-between mb-4">
@@ -935,12 +938,12 @@ export const ZZPAgendaPage = () => {
         )}
 
         {/* Events List */}
-        {isLoading ? (
+        {showLoading ? (
           <EventListLoadingSkeleton />
         ) : events.length === 0 ? (
           <EmptyState onAddEvent={() => openNewForm()} />
         ) : (
-          <Card className="bg-card/80 backdrop-blur-sm">
+          <Card className="bg-card/80 backdrop-blur-sm" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
             <CardHeader className="pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>

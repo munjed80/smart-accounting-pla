@@ -35,6 +35,7 @@ import {
 import { EmptyState } from '@/components/EmptyState'
 import { RequireActiveClient } from '@/components/RequireActiveClient'
 import { useActiveClient } from '@/lib/ActiveClientContext'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   bankReconciliationApi, 
   BankTransaction, 
@@ -652,6 +653,7 @@ export const BankReconciliationPage = () => {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 50
+  const showLoading = useDelayedLoading(isLoading, 300, !!transactions.length)
 
   const loadTransactions = useCallback(async (reset: boolean = true, pageOverride?: number) => {
     if (!activeClientId) return
@@ -800,7 +802,7 @@ export const BankReconciliationPage = () => {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {isLoading ? (
+          {showLoading ? (
             <div className="p-4 space-y-4">
               {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-20 w-full" />
@@ -808,7 +810,7 @@ export const BankReconciliationPage = () => {
             </div>
           ) : transactions.length > 0 ? (
             <>
-              <div className="divide-y">
+              <div className="divide-y transition-opacity duration-200" style={{ opacity: isLoading ? 0.5 : 1 }}>
                 {transactions.map((transaction) => (
                   <TransactionRow
                     key={transaction.id}

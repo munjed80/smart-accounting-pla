@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { transactionApi, TransactionStats, Transaction, getErrorMessage } from '@/lib/api'
 import { useAuth } from '@/lib/AuthContext'
 import { TransactionDetailDialog } from '@/components/TransactionDetailDialog'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   Receipt, 
   TrendUp, 
@@ -27,6 +28,9 @@ export const Dashboard = () => {
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+  // Use delayed loading to prevent skeleton flash
+  const showLoading = useDelayedLoading(isLoading, 300, !!stats)
 
   const fetchStats = async () => {
     try {
@@ -147,10 +151,10 @@ export const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-10 w-24" />
               ) : (
-                <div className="text-3xl font-bold text-primary">
+                <div className="text-3xl font-bold text-primary" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
                   {stats?.total_transactions || 0}
                 </div>
               )}
@@ -165,10 +169,10 @@ export const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-10 w-24" />
               ) : (
-                <div className="text-3xl font-bold text-accent">
+                <div className="text-3xl font-bold text-accent" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
                   {stats?.draft_count || 0}
                 </div>
               )}
@@ -183,10 +187,10 @@ export const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-10 w-24" />
               ) : (
-                <div className="text-3xl font-bold text-primary">
+                <div className="text-3xl font-bold text-primary" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
                   {stats?.posted_count || 0}
                 </div>
               )}
@@ -201,10 +205,10 @@ export const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-10 w-32" />
               ) : (
-                <div className="space-y-1">
+                <div className="space-y-1" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
                   <div className="text-sm text-muted-foreground">
                     {t('dashboard.debit')}: {formatCurrency(stats?.total_debit || 0)}
                   </div>
@@ -226,7 +230,7 @@ export const Dashboard = () => {
             <CardDescription>{t('dashboard.recentTransactionsDescription')}</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {showLoading ? (
               <div className="space-y-4">
                 {[...Array(5)].map((_, i) => (
                   <div key={i} className="flex items-center justify-between">
@@ -239,7 +243,7 @@ export const Dashboard = () => {
                 ))}
               </div>
             ) : stats?.recent_transactions && stats.recent_transactions.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-4" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
                 {stats.recent_transactions.map((transaction) => (
                   <div
                     key={transaction.id}

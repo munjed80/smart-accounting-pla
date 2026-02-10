@@ -58,6 +58,7 @@ import {
   Info,
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
 // Readiness score badge with tooltip
 const ReadinessScoreBadge = ({ score, breakdown }: { score: number; breakdown?: { deductions?: Array<{ reason: string; penalty: number }> } | null }) => {
@@ -331,6 +332,9 @@ export const AccountantWorkQueue = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
+  // Delayed loading to prevent flashing
+  const showLoading = useDelayedLoading(isLoading, 300, !!workQueue)
+  
   // Tab state
   const [activeTab, setActiveTab] = useState<'all' | 'red' | 'review' | 'vat_due' | 'stale'>('all')
   
@@ -471,14 +475,14 @@ export const AccountantWorkQueue = () => {
           </Tabs>
         </CardHeader>
         <CardContent className="pt-4">
-          {isLoading ? (
+          {showLoading ? (
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
           ) : workQueue && workQueue.items.length > 0 ? (
-            <Table>
+            <Table style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
               <TableHeader>
                 <TableRow>
                   <TableHead

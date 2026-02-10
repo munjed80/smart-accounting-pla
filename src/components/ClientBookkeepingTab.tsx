@@ -44,6 +44,7 @@ import {
   JournalEntryStatus,
   getErrorMessage 
 } from '@/lib/api'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   Book,
   Check,
@@ -123,6 +124,7 @@ export const ClientBookkeepingTab = ({ clientId }: ClientBookkeepingTabProps) =>
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [isSheetOpen, setIsSheetOpen] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
+  const showSkeleton = useDelayedLoading(isLoading, 300, entries.length > 0)
 
   const fetchEntries = async () => {
     try {
@@ -163,7 +165,7 @@ export const ClientBookkeepingTab = ({ clientId }: ClientBookkeepingTabProps) =>
     }
   }, [clientId, statusFilter])
 
-  if (isLoading) {
+  if (showSkeleton) {
     return (
       <Card className="bg-card/80 backdrop-blur-sm">
         <CardHeader>

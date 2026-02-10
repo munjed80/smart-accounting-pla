@@ -20,6 +20,7 @@ import { ReviewQueue } from '@/components/ReviewQueue'
 import { ClientAccessError, parseClientAccessError } from '@/components/ClientAccessError'
 import { useAuth } from '@/lib/AuthContext'
 import { useActiveClient } from '@/lib/ActiveClientContext'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { accountantClientApi, AccountantClientListItem, getErrorMessage } from '@/lib/api'
 import { 
   WarningCircle,
@@ -47,6 +48,7 @@ export const AccountantReviewQueuePage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [clientAccessError, setClientAccessError] = useState<'pending_approval' | 'access_revoked' | 'not_assigned' | 'no_client' | null>(null)
+  const showLoading = useDelayedLoading(isLoading, 300, !!selectedClient)
   
   // Fetch client details when activeClient changes
   useEffect(() => {
@@ -270,8 +272,8 @@ export const AccountantReviewQueuePage = () => {
               </TabsList>
             </Tabs>
           </CardHeader>
-          <CardContent className="pt-6">
-            {isLoading ? (
+          <CardContent className="pt-6 transition-opacity duration-200">
+            {showLoading ? (
               <div className="text-center py-12">
                 <ArrowsClockwise size={32} className="mx-auto mb-4 animate-spin text-primary" />
                 <p className="text-muted-foreground">{t('common.loading')}</p>

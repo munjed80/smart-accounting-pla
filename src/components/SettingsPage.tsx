@@ -29,6 +29,7 @@ import {
   ZZPBusinessProfile,
   ZZPBusinessProfileCreate 
 } from '@/lib/api'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   User,
   Buildings,
@@ -63,6 +64,10 @@ export const SettingsPage = () => {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [backendVersion, setBackendVersion] = useState<VersionInfo | null>(null)
   const [backendVersionError, setBackendVersionError] = useState<string | null>(null)
+  
+  // Use delayed loading to prevent skeleton flash
+  const showLoading = useDelayedLoading(isLoading, 300, administrations.length > 0)
+  const showProfileLoading = useDelayedLoading(isLoadingProfile, 300, !!businessProfile)
   
   // Business profile state (for ZZP users)
   const [businessProfile, setBusinessProfile] = useState<ZZPBusinessProfile | null>(null)
@@ -196,7 +201,7 @@ export const SettingsPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
       
-      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 opacity-0 animate-in fade-in duration-500">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
@@ -221,7 +226,7 @@ export const SettingsPage = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {isLoading ? (
+              {showLoading ? (
                 <div className="space-y-4">
                   <Skeleton className="h-10 w-full" />
                   <Skeleton className="h-10 w-full" />
@@ -284,7 +289,7 @@ export const SettingsPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {isLoadingProfile ? (
+                {showProfileLoading ? (
                   <div className="space-y-6">
                     <div className="space-y-4">
                       <Skeleton className="h-4 w-32" />

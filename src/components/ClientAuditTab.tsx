@@ -27,6 +27,7 @@ import {
   AuditLogAction,
   getErrorMessage 
 } from '@/lib/api'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   ClockCounterClockwise,
   Plus,
@@ -151,6 +152,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
   const [actionFilter, setActionFilter] = useState<string>('ALL')
   const [entityFilter, setEntityFilter] = useState<string>('ALL')
   const [totalCount, setTotalCount] = useState(0)
+  const showSkeleton = useDelayedLoading(isLoading, 300, entries.length > 0)
 
   const fetchEntries = async () => {
     try {
@@ -181,7 +183,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
     }
   }, [clientId, actionFilter, entityFilter])
 
-  if (isLoading) {
+  if (showSkeleton) {
     return (
       <Card className="bg-card/80 backdrop-blur-sm">
         <CardHeader>

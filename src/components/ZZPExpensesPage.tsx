@@ -77,6 +77,7 @@ import { zzpApi, ZZPExpense, ZZPExpenseCreate, ZZPExpenseUpdate } from '@/lib/ap
 import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
 // Default expense categories
 const DEFAULT_CATEGORIES = [
@@ -668,6 +669,8 @@ export const ZZPExpensesPage = () => {
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES)
   const [isLoading, setIsLoading] = useState(true)
   
+  const showLoading = useDelayedLoading(isLoading, 300, expenses.length > 0)
+  
   // Filter state
   const currentDate = new Date()
   const [filterYear, setFilterYear] = useState<string>(currentDate.getFullYear().toString())
@@ -822,10 +825,10 @@ export const ZZPExpensesPage = () => {
         </div>
 
         {/* Stats Cards */}
-        {isLoading ? (
+        {showLoading ? (
           <StatsLoadingSkeleton />
         ) : (
-          <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
             <StatsCard 
               title={t('zzpExpenses.statsTotal')} 
               value={totalCount.toString()} 
@@ -848,12 +851,12 @@ export const ZZPExpensesPage = () => {
         )}
 
         {/* Show loading, empty state or content */}
-        {isLoading ? (
+        {showLoading ? (
           <TableLoadingSkeleton />
         ) : expenses.length === 0 && filterCategory === 'all' && filterYear === currentDate.getFullYear().toString() && filterMonth === (currentDate.getMonth() + 1).toString() ? (
           <EmptyState onAddExpense={openNewForm} />
         ) : (
-          <Card className="bg-card/80 backdrop-blur-sm">
+          <Card className="bg-card/80 backdrop-blur-sm" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
             <CardHeader className="pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>

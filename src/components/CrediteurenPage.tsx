@@ -25,6 +25,7 @@ import { RequireActiveClient } from '@/components/RequireActiveClient'
 import { ApiErrorState, parseApiError, ApiErrorType } from '@/components/ApiErrorState'
 import { useActiveClient } from '@/lib/ActiveClientContext'
 import { ledgerApi, OpenItemReport } from '@/lib/api'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
 import {
@@ -69,6 +70,7 @@ export const CrediteurenPage = ({ onNavigate }: CrediteurenPageProps) => {
   const [sortField, setSortField] = useState<SortField>('amount')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [totals, setTotals] = useState({ totalOpen: 0, totalOriginal: 0, overdueAmount: 0 })
+  const showSkeleton = useDelayedLoading(isLoading, 300, apItems.length > 0)
 
   // Load AP data
   useEffect(() => {
@@ -293,7 +295,7 @@ export const CrediteurenPage = ({ onNavigate }: CrediteurenPageProps) => {
       </Card>
 
       {/* Loading state */}
-      {isLoading && (
+      {showSkeleton && (
         <div className="space-y-4">
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-24 w-full" />

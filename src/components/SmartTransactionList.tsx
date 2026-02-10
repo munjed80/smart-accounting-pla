@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { transactionApi, TransactionListItem } from '@/lib/api'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   Receipt, 
   MagnifyingGlass,
@@ -26,6 +27,7 @@ export const SmartTransactionList = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const fetchIdRef = useRef(0) // Prevent race conditions from multiple fetches
+  const showLoading = useDelayedLoading(isLoading, 300, !!transactions.length)
 
   const fetchTransactions = async () => {
     const fetchId = ++fetchIdRef.current
@@ -197,7 +199,7 @@ export const SmartTransactionList = () => {
         </CardHeader>
 
         <CardContent>
-          {isLoading ? (
+          {showLoading ? (
             <div className="text-center py-12">
               <ArrowsClockwise size={48} className="mx-auto mb-4 text-primary animate-spin" />
               <p className="text-muted-foreground">{t('smartTransactions.loadingTransactions')}</p>
@@ -222,7 +224,7 @@ export const SmartTransactionList = () => {
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 transition-opacity duration-200" style={{ opacity: isLoading ? 0.5 : 1 }}>
               {filteredTransactions.map((transaction) => (
                 <div 
                   key={transaction.id} 

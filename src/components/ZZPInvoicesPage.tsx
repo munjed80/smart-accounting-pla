@@ -110,6 +110,7 @@ import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 import { useDebounce } from '@/hooks/useDebounce'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
 // Format amount in cents to EUR currency string
 function formatAmountEUR(amountCents: number): string {
@@ -1255,6 +1256,8 @@ export const ZZPInvoicesPage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
+  const showLoading = useDelayedLoading(isLoading, 300, invoices.length > 0)
+  
   // Pre-selected customer ID from URL (for CTA from customers page)
   const [preSelectedCustomerId, setPreSelectedCustomerId] = useState<string | null>(null)
   // Customer ID to pass to dialog (keeps value until dialog closes)
@@ -1648,10 +1651,10 @@ export const ZZPInvoicesPage = () => {
         )}
 
         {/* Stats Cards */}
-        {isLoading ? (
+        {showLoading ? (
           <StatsLoadingSkeleton />
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
             <StatsCard 
               title={t('zzpInvoices.statsTotal')} 
               value={stats.total}
@@ -1684,12 +1687,12 @@ export const ZZPInvoicesPage = () => {
         )}
 
         {/* Show loading, empty state or content */}
-        {isLoading ? (
+        {showLoading ? (
           <TableLoadingSkeleton />
         ) : invoices.length === 0 ? (
           <EmptyState onAddInvoice={openNewForm} hasCustomers={hasActiveCustomers} />
         ) : (
-          <Card className="bg-card/80 backdrop-blur-sm">
+          <Card className="bg-card/80 backdrop-blur-sm" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
             <CardHeader className="pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>

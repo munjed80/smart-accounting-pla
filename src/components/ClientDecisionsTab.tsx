@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import {
   Dialog,
   DialogContent,
@@ -232,6 +233,7 @@ export const ClientDecisionsTab = ({ clientId }: ClientDecisionsTabProps) => {
   const [isReversingId, setIsReversingId] = useState<string | null>(null)
   const [reverseError, setReverseError] = useState<string | null>(null)
   const [reverseSuccess, setReverseSuccess] = useState<string | null>(null)
+  const showLoading = useDelayedLoading(isLoading, 300, !!history)
   
   // Reverse confirmation dialog
   const [showReverseDialog, setShowReverseDialog] = useState(false)
@@ -355,7 +357,7 @@ export const ClientDecisionsTab = ({ clientId }: ClientDecisionsTabProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {showLoading ? (
             <Skeleton className="h-8 w-12" />
           ) : (
             <div className="text-2xl font-bold">
@@ -366,8 +368,8 @@ export const ClientDecisionsTab = ({ clientId }: ClientDecisionsTabProps) => {
       </Card>
 
       {/* Decisions Table */}
-      {isLoading ? (
-        <div className="space-y-4">
+      {showLoading ? (
+        <div className="space-y-4 transition-opacity duration-200">
           {[...Array(5)].map((_, i) => (
             <Skeleton key={i} className="h-16 w-full" />
           ))}

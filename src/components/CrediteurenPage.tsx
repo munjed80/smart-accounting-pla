@@ -64,6 +64,7 @@ export const CrediteurenPage = ({ onNavigate }: CrediteurenPageProps) => {
   const { activeClientId, activeClientName } = useActiveClient()
   const [apItems, setApItems] = useState<OpenItemReport[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [showSkeleton, setShowSkeleton] = useState(true)
   const [apiError, setApiError] = useState<{ type: ApiErrorType; message: string } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [sortField, setSortField] = useState<SortField>('amount')
@@ -99,6 +100,11 @@ export const CrediteurenPage = ({ onNavigate }: CrediteurenPageProps) => {
 
     loadApData()
   }, [activeClientId])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSkeleton(false), 300)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Group AP items by supplier (party)
   const suppliers = useMemo((): SupplierSummary[] => {
@@ -293,7 +299,7 @@ export const CrediteurenPage = ({ onNavigate }: CrediteurenPageProps) => {
       </Card>
 
       {/* Loading state */}
-      {isLoading && (
+      {isLoading && showSkeleton && (
         <div className="space-y-4">
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-24 w-full" />

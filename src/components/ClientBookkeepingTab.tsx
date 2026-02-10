@@ -118,6 +118,7 @@ export const ClientBookkeepingTab = ({ clientId }: ClientBookkeepingTabProps) =>
   const [entries, setEntries] = useState<JournalEntryListItem[]>([])
   const [selectedEntry, setSelectedEntry] = useState<JournalEntryResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [showSkeleton, setShowSkeleton] = useState(true)
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
@@ -163,7 +164,12 @@ export const ClientBookkeepingTab = ({ clientId }: ClientBookkeepingTabProps) =>
     }
   }, [clientId, statusFilter])
 
-  if (isLoading) {
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSkeleton(false), 300)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (isLoading && showSkeleton) {
     return (
       <Card className="bg-card/80 backdrop-blur-sm">
         <CardHeader>

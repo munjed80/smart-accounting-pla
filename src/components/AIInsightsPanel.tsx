@@ -238,6 +238,7 @@ export const AIInsightsPanel = ({
 }: AIInsightsPanelProps) => {
   const [insights, setInsights] = useState<ZZPInsightsResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [showSkeleton, setShowSkeleton] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
 
@@ -258,6 +259,11 @@ export const AIInsightsPanel = ({
 
   useEffect(() => {
     loadInsights()
+  }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSkeleton(false), 300)
+    return () => clearTimeout(timer)
   }, [])
 
   // Handle dismiss
@@ -311,7 +317,7 @@ export const AIInsightsPanel = ({
       )}
       
       <CardContent className={showHeader ? '' : 'pt-4'}>
-        {isLoading ? (
+        {isLoading && showSkeleton ? (
           <InsightsSkeleton />
         ) : error ? (
           <div className="text-center py-6">

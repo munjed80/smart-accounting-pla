@@ -140,6 +140,7 @@ interface ReviewQueueProps {
 export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }: ReviewQueueProps) => {
   const [documents, setDocuments] = useState<DocumentReviewItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [showSkeleton, setShowSkeleton] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<DocumentReviewStatus | undefined>('NEEDS_REVIEW')
   
@@ -168,6 +169,11 @@ export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }:
   useEffect(() => {
     fetchDocuments()
   }, [clientId, filter])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSkeleton(false), 300)
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleViewDocument = (doc: DocumentReviewItem) => {
     setSelectedDoc(doc)
@@ -305,7 +311,7 @@ export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }:
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoading && showSkeleton ? (
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />

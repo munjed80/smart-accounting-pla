@@ -147,6 +147,7 @@ const ALL_ACTIONS: AuditLogAction[] = [
 export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
   const [entries, setEntries] = useState<AuditLogEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [showSkeleton, setShowSkeleton] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionFilter, setActionFilter] = useState<string>('ALL')
   const [entityFilter, setEntityFilter] = useState<string>('ALL')
@@ -181,7 +182,12 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
     }
   }, [clientId, actionFilter, entityFilter])
 
-  if (isLoading) {
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSkeleton(false), 300)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (isLoading && showSkeleton) {
     return (
       <Card className="bg-card/80 backdrop-blur-sm">
         <CardHeader>

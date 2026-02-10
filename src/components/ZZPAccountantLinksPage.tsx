@@ -191,6 +191,7 @@ export const ZZPAccountantLinksPage = () => {
   const [pendingRequests, setPendingRequests] = useState<PendingLinkRequest[]>([])
   const [activeLinks, setActiveLinks] = useState<ActiveAccountantLink[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [showSkeleton, setShowSkeleton] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set())
   const [rejectingIds, setRejectingIds] = useState<Set<string>>(new Set())
@@ -220,6 +221,11 @@ export const ZZPAccountantLinksPage = () => {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSkeleton(false), 300)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Handle approve
   const handleApprove = async (assignmentId: string, request: PendingLinkRequest) => {
@@ -330,7 +336,7 @@ export const ZZPAccountantLinksPage = () => {
           )}
         </div>
 
-        {isLoading ? (
+        {isLoading && showSkeleton ? (
           <LoadingSkeleton />
         ) : pendingRequests.length === 0 ? (
           <EmptyState
@@ -366,7 +372,7 @@ export const ZZPAccountantLinksPage = () => {
           )}
         </div>
         
-        {isLoading ? (
+        {isLoading && showSkeleton ? (
           <LoadingSkeleton />
         ) : activeLinks.length === 0 ? (
           <Card className="bg-secondary/30 border-dashed">

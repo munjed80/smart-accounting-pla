@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from '@/lib/AuthContext'
 import { ActiveClientProvider } from '@/lib/ActiveClientContext'
 import { LoginPage } from '@/components/LoginPage'
@@ -556,13 +557,26 @@ const AppContent = () => {
   )
 }
 
+// Create a QueryClient instance
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false, // Prevent automatic refetches on window focus
+      retry: 1,
+      staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    },
+  },
+})
+
 function App() {
   return (
-    <AuthProvider>
-      <ActiveClientProvider>
-        <AppContent />
-      </ActiveClientProvider>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ActiveClientProvider>
+          <AppContent />
+        </ActiveClientProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   )
 }
 

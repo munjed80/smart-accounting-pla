@@ -216,4 +216,27 @@ Look for these attributes on the selected element:
 - `data-[state=closed]:fade-out-0` - Fades out to 0 opacity
 
 ## Status
-🔍 **IN PROGRESS** - Root cause not yet identified. Need to investigate state management and timing.
+🟢 **PROTECTION IMPLEMENTED** - Root cause requires frontend testing to identify.
+
+### What We Fixed
+✅ **Three-layer protection system** to prevent stuck overlays:
+1. Route change detection → auto-close overlays
+2. Body scroll lock cleanup → release stuck locks
+3. Escape key handler → manual close option
+
+✅ **Code quality**:
+- Code review completed and feedback addressed
+- Build successful (no errors)
+- Security scan passed (no vulnerabilities)
+- Comprehensive documentation created
+
+### What's Next
+🔍 **User Action Required**:
+1. Run frontend with backend
+2. Navigate to Overzicht page
+3. If overlay appears, follow "Investigation Guide" below
+4. Report findings for targeted fix
+
+---
+
+## Status

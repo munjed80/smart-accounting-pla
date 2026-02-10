@@ -305,8 +305,8 @@ async def list_expense_categories(
 @router.post("/expenses/scan")
 async def scan_receipt(
     file: UploadFile = File(...),
-    current_user: CurrentUser = None,
-    db: Annotated[AsyncSession, Depends(get_db)] = None,
+    current_user: CurrentUser = Depends(),
+    db: Annotated[AsyncSession, Depends(get_db)] = Depends(),
 ):
     """
     Scan a receipt and extract expense data using OCR.

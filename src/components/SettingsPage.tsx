@@ -796,7 +796,7 @@ export const SettingsPage = () => {
               <Alert>
                 <Info size={16} />
                 <AlertDescription>
-                  Je wachtwoord moet minimaal 8 tekens bevatten en een combinatie van letters en cijfers
+                  Je wachtwoord moet minimaal 8 tekens bevatten
                 </AlertDescription>
               </Alert>
             </CardContent>

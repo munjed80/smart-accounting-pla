@@ -855,7 +855,7 @@ export const ZZPExpensesPage = () => {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = 'image/*'
-    // Enable camera capture on mobile devices
+    // Enable camera capture on mobile devices (ignored by desktop browsers)
     input.setAttribute('capture', 'environment')
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]

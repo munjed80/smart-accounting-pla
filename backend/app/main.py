@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.core.database import engine
-from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta, zzp_customers, zzp_profile, zzp_invoices, zzp_expenses, zzp_time, zzp_calendar, zzp_work_sessions, zzp_bank, zzp_insights, zzp_quotes, zzp_dashboard, bookkeeping
+from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta, zzp_customers, zzp_profile, zzp_invoices, zzp_expenses, zzp_time, zzp_calendar, zzp_work_sessions, zzp_bank, zzp_insights, zzp_quotes, zzp_dashboard, bookkeeping, client_data, zzp_payments
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ def verify_orm_mappings() -> None:
         ZZPInvoice, ZZPInvoiceLine, ZZPInvoiceCounter,
         ZZPExpense, ZZPTimeEntry, ZZPCalendarEvent,
         WorkSession, ZZPBankTransactionMatch,
+        ZZPPayment, ZZPPaymentAllocation,
     )
     
     # This will raise InvalidRequestError if any relationships are misconfigured
@@ -216,6 +217,7 @@ api_v1_router.include_router(accountant_dashboard.router, prefix="/accountant", 
 api_v1_router.include_router(work_queue.router, prefix="/accountant", tags=["work-queue-reminders-evidence"])
 api_v1_router.include_router(bank.router, prefix="/accountant", tags=["bank-reconciliation"])
 api_v1_router.include_router(bookkeeping.router, prefix="/accountant", tags=["bookkeeping-ledger"])
+api_v1_router.include_router(client_data.router, prefix="/accountant", tags=["client-data-access"])
 api_v1_router.include_router(zzp.router, prefix="/zzp", tags=["zzp-client-consent"])
 api_v1_router.include_router(zzp_customers.router, prefix="/zzp", tags=["zzp-customers"])
 api_v1_router.include_router(zzp_profile.router, prefix="/zzp", tags=["zzp-business-profile"])
@@ -228,6 +230,7 @@ api_v1_router.include_router(zzp_bank.router, prefix="/zzp", tags=["zzp-bank-pay
 api_v1_router.include_router(zzp_insights.router, prefix="/zzp", tags=["zzp-ai-insights"])
 api_v1_router.include_router(zzp_quotes.router, prefix="/zzp", tags=["zzp-quotes"])
 api_v1_router.include_router(zzp_dashboard.router, prefix="/zzp", tags=["zzp-dashboard"])
+api_v1_router.include_router(zzp_payments.router, prefix="/zzp", tags=["zzp-payments"])
 api_v1_router.include_router(observability.router, prefix="/ops", tags=["observability"])
 api_v1_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_v1_router.include_router(meta.router, tags=["metadata"])

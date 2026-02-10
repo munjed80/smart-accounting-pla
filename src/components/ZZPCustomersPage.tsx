@@ -100,6 +100,7 @@ import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 import { useDebounce } from '@/hooks/useDebounce'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
 // Status badge component
 const StatusBadge = ({ status, size = 'default' }: { status: 'active' | 'inactive'; size?: 'default' | 'sm' }) => {
@@ -1059,6 +1060,8 @@ export const ZZPCustomersPage = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [isLoading, setIsLoading] = useState(true)
   
+  const showLoading = useDelayedLoading(isLoading, 300, customers.length > 0)
+  
   // Debounced search for better performance
   const debouncedSearch = useDebounce(searchQuery, 300)
   
@@ -1220,10 +1223,10 @@ export const ZZPCustomersPage = () => {
         </div>
 
         {/* Stats Cards */}
-        {isLoading ? (
+        {showLoading ? (
           <StatsLoadingSkeleton />
         ) : (
-          <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
             <StatsCard 
               title={t('zzpCustomers.statsTotal')} 
               value={stats.total} 
@@ -1246,12 +1249,12 @@ export const ZZPCustomersPage = () => {
         )}
 
         {/* Show loading, empty state or content */}
-        {isLoading ? (
+        {showLoading ? (
           <TableLoadingSkeleton />
         ) : customers.length === 0 ? (
           <EmptyState onAddCustomer={openNewForm} />
         ) : (
-          <Card className="bg-card/80 backdrop-blur-sm">
+          <Card className="bg-card/80 backdrop-blur-sm" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
             <CardHeader className="pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>

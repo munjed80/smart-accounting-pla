@@ -91,6 +91,7 @@ import {
 import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
 // Sentinel value for "no customer" selection (empty string is not allowed in Radix Select v2+)
 const NO_CUSTOMER_VALUE = "__none__"
@@ -1250,6 +1251,8 @@ export const ZZPTimeTrackingPage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [isWeeklyLoading, setIsWeeklyLoading] = useState(true)
   
+  const showLoading = useDelayedLoading(isLoading, 300, entries.length > 0)
+  
   // Clock-in/out state
   const [activeSession, setActiveSession] = useState<WorkSession | null>(null)
   const [isSessionLoading, setIsSessionLoading] = useState(true)
@@ -1639,12 +1642,12 @@ export const ZZPTimeTrackingPage = () => {
         )}
 
         {/* Show loading, empty state or content */}
-        {isLoading ? (
+        {showLoading ? (
           <TableLoadingSkeleton />
         ) : entries.length === 0 ? (
           <EmptyState onAddEntry={openNewForm} />
         ) : (
-          <Card className="bg-card/80 backdrop-blur-sm">
+          <Card className="bg-card/80 backdrop-blur-sm" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
             <CardHeader className="pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>

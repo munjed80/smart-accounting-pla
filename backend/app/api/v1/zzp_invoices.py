@@ -612,6 +612,11 @@ async def get_invoice_pdf(
     Returns the invoice as a downloadable PDF file with proper headers:
     - Content-Type: application/pdf
     - Content-Disposition: attachment; filename="INV-YYYY-XXXX.pdf"
+    - Content-Length: <size> (for mobile browser compatibility)
+    - Cache-Control: no-cache (prevent stale PDFs)
+    
+    Uses ReportLab as the primary PDF generator (pure Python, Docker-safe).
+    Falls back to WeasyPrint if ReportLab fails.
     """
     require_zzp(current_user)
     
@@ -634,33 +639,51 @@ async def get_invoice_pdf(
         )
     
     try:
-        # Generate PDF
-        pdf_bytes = generate_invoice_pdf(invoice)
+        # Try ReportLab first (pure Python, Docker-safe, no system dependencies)
+        from app.services.invoice_pdf_reportlab import generate_invoice_pdf_reportlab, get_invoice_pdf_filename
+        pdf_bytes = generate_invoice_pdf_reportlab(invoice)
         filename = get_invoice_pdf_filename(invoice)
         
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f'attachment; filename="{filename}"'
-            }
-        )
-    except RuntimeError as e:
-        # Check if this is a WeasyPrint unavailability error
-        error_msg = str(e)
-        if "not available" in error_msg or "not installed" in error_msg:
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "code": "PDF_NOT_AVAILABLE",
-                    "message": "PDF-generatie is tijdelijk niet beschikbaar. Probeer het later opnieuw."
-                }
-            )
-        else:
-            raise HTTPException(
-                status_code=500,
-                detail={
-                    "code": "PDF_GENERATION_FAILED",
-                    "message": "Kon de PDF niet genereren. Probeer het later opnieuw."
-                }
-            )
+    except Exception as reportlab_error:
+        # Fallback to WeasyPrint if ReportLab fails
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"ReportLab PDF generation failed, trying WeasyPrint fallback: {reportlab_error}")
+        
+        try:
+            pdf_bytes = generate_invoice_pdf(invoice)
+            filename = get_invoice_pdf_filename(invoice)
+        except RuntimeError as e:
+            # Both methods failed
+            error_msg = str(e)
+            if "not available" in error_msg or "not installed" in error_msg:
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "PDF_NOT_AVAILABLE",
+                        "message": "PDF-generatie is tijdelijk niet beschikbaar. Probeer het later opnieuw."
+                    }
+                )
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail={
+                        "code": "PDF_GENERATION_FAILED",
+                        "message": "Kon de PDF niet genereren. Probeer het later opnieuw."
+                    }
+                )
+    
+    # Return PDF with mobile-safe headers
+    # Content-Length is critical for iOS Safari to show download progress
+    # Cache-Control prevents browsers from showing stale versions
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(pdf_bytes)),
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+    )

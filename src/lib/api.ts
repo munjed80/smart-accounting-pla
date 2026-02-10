@@ -3878,13 +3878,19 @@ export const zzpApi = {
      * Scan a receipt and extract expense data.
      * Returns extracted data that can be used to prefill the expense form.
      */
-    scanReceipt: async (): Promise<{
+    scanReceipt: async (file: File): Promise<{
       extracted_data: ZZPExpenseCreate
       confidence: number
       status: string
       message: string
     }> => {
-      const response = await api.post('/zzp/expenses/scan')
+      const formData = new FormData()
+      formData.append('file', file)
+      const response = await api.post('/zzp/expenses/scan', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
       return response.data
     },
   },

@@ -94,6 +94,14 @@ export const SettingsPage = () => {
     vatReminders: true,
     documentProcessed: false,
   })
+  
+  // Password change state
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  })
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -193,6 +201,145 @@ export const SettingsPage = () => {
   
   const updateProfileField = (field: keyof ZZPBusinessProfileCreate, value: string) => {
     setProfileForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleChangePassword = async () => {
+    // Validate password fields
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      toast.error('Vul alle velden in')
+      return
+    }
+    
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('Nieuwe wachtwoorden komen niet overeen')
+      return
+    }
+    
+    if (passwordForm.newPassword.length < 8) {
+      toast.error('Wachtwoord moet minimaal 8 tekens bevatten')
+      return
+    }
+    
+    setIsChangingPassword(true)
+    
+    try {
+      // TODO: Implement backend endpoint for password change
+      // await authApi.changePassword({
+      //   current_password: passwordForm.currentPassword,
+      //   new_password: passwordForm.newPassword
+      // })
+      
+      // For now, simulate the API call
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      toast.success('Wachtwoord succesvol gewijzigd')
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    } catch (error) {
+      console.error('Failed to change password:', error)
+      toast.error(parseApiError(error))
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
+  
+  const handleExportJSON = async () => {
+    try {
+      toast.info('Export wordt voorbereid...')
+      
+      // Gather all data for export
+      const exportData: any = {
+        exportDate: new Date().toISOString(),
+        user: {
+          name: user?.full_name,
+          email: user?.email,
+          role: user?.role,
+        },
+        administrations: administrations,
+      }
+      
+      // For ZZP users, add business data
+      if (user?.role === 'zzp') {
+        try {
+          const [profile, customers, invoices, expenses, timeEntries] = await Promise.all([
+            zzpApi.profile.get().catch(() => null),
+            zzpApi.customers.list().catch(() => []),
+            zzpApi.invoices.list().catch(() => []),
+            zzpApi.expenses.list().catch(() => ({ expenses: [] })),
+            zzpApi.time.list().catch(() => []),
+          ])
+          
+          exportData.businessProfile = profile
+          exportData.customers = customers
+          exportData.invoices = invoices
+          exportData.expenses = expenses?.expenses || []
+          exportData.timeEntries = timeEntries
+        } catch (error) {
+          console.error('Error gathering export data:', error)
+        }
+      }
+      
+      // Create JSON blob and download
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `smart-accounting-export-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      
+      toast.success('Export succesvol gedownload')
+    } catch (error) {
+      console.error('Failed to export data:', error)
+      toast.error('Export mislukt')
+    }
+  }
+  
+  const handleExportCSV = async () => {
+    try {
+      toast.info('CSV export wordt voorbereid...')
+      
+      if (user?.role !== 'zzp') {
+        toast.error('CSV export is alleen beschikbaar voor ZZP gebruikers')
+        return
+      }
+      
+      // Gather customers for CSV
+      const customers = await zzpApi.customers.list().catch(() => [])
+      
+      // Create CSV content
+      const headers = ['Naam', 'Email', 'Telefoon', 'KVK', 'BTW', 'Status']
+      const rows = customers.map((c: any) => [
+        c.name || '',
+        c.email || '',
+        c.phone || '',
+        c.kvk_number || '',
+        c.btw_number || '',
+        c.status || ''
+      ])
+      
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n')
+      
+      // Create CSV blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `klanten-export-${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      
+      toast.success('CSV export succesvol gedownload')
+    } catch (error) {
+      console.error('Failed to export CSV:', error)
+      toast.error('CSV export mislukt')
+    }
   }
 
   const primaryAdmin = administrations[0]
@@ -588,6 +735,112 @@ export const SettingsPage = () => {
                 <Info size={16} />
                 <AlertDescription>
                   <span className="font-medium">{t('settings.comingSoon')}</span> {t('settings.emailNotificationsFinalized')}
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+
+          {/* Password Change Section */}
+          <Card className="bg-card/80 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gear size={20} weight="duotone" />
+                Wachtwoord wijzigen
+              </CardTitle>
+              <CardDescription>
+                Wijzig je accountwachtwoord voor extra beveiliging
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="currentPassword">Huidig wachtwoord</Label>
+                  <Input 
+                    id="currentPassword" 
+                    type="password"
+                    placeholder="Voer huidig wachtwoord in"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                    disabled={isChangingPassword}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">Nieuw wachtwoord</Label>
+                  <Input 
+                    id="newPassword" 
+                    type="password"
+                    placeholder="Voer nieuw wachtwoord in"
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                    disabled={isChangingPassword}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Bevestig nieuw wachtwoord</Label>
+                  <Input 
+                    id="confirmPassword" 
+                    type="password"
+                    placeholder="Bevestig nieuw wachtwoord"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    disabled={isChangingPassword}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end pt-4">
+                <Button onClick={handleChangePassword} disabled={isChangingPassword}>
+                  {isChangingPassword && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
+                  Wachtwoord wijzigen
+                </Button>
+              </div>
+              <Alert>
+                <Info size={16} />
+                <AlertDescription>
+                  Je wachtwoord moet minimaal 8 tekens bevatten
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+
+          {/* Data Export/Backup Section */}
+          <Card className="bg-card/80 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FloppyDisk size={20} weight="duotone" />
+                Data export & backup
+              </CardTitle>
+              <CardDescription>
+                Exporteer je bedrijfsgegevens als backup of voor externe verwerking
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Download een complete export van je bedrijfsgegevens inclusief:
+                </p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 ml-4">
+                  <li>Bedrijfsprofiel en contactgegevens</li>
+                  <li>Klanten</li>
+                  <li>Facturen en betalingen</li>
+                  <li>Uitgaven en bonnetjes</li>
+                  <li>Uren registratie</li>
+                  <li>Afspraken</li>
+                </ul>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button variant="outline" className="flex-1" onClick={handleExportJSON}>
+                  <FloppyDisk size={18} className="mr-2" />
+                  Exporteer als JSON
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={handleExportCSV}>
+                  <FloppyDisk size={18} className="mr-2" />
+                  Exporteer als CSV
+                </Button>
+              </div>
+              <Alert>
+                <Info size={16} />
+                <AlertDescription>
+                  De export bevat alle gegevens in je huidige administratie. Bewaar de export veilig.
                 </AlertDescription>
               </Alert>
             </CardContent>

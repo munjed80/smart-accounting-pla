@@ -332,7 +332,7 @@ export const ZZPAccountantLinksPage = () => {
           )}
         </div>
 
-        {isLoading && showSkeleton ? (
+        {showSkeleton ? (
           <LoadingSkeleton />
         ) : pendingRequests.length === 0 ? (
           <EmptyState
@@ -368,7 +368,7 @@ export const ZZPAccountantLinksPage = () => {
           )}
         </div>
         
-        {isLoading && showSkeleton ? (
+        {showSkeleton ? (
           <LoadingSkeleton />
         ) : activeLinks.length === 0 ? (
           <Card className="bg-secondary/30 border-dashed">

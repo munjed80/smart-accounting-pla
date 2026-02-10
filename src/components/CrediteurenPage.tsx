@@ -295,7 +295,7 @@ export const CrediteurenPage = ({ onNavigate }: CrediteurenPageProps) => {
       </Card>
 
       {/* Loading state */}
-      {isLoading && showSkeleton && (
+      {showSkeleton && (
         <div className="space-y-4">
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-24 w-full" />

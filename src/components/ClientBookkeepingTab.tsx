@@ -165,7 +165,7 @@ export const ClientBookkeepingTab = ({ clientId }: ClientBookkeepingTabProps) =>
     }
   }, [clientId, statusFilter])
 
-  if (isLoading && showSkeleton) {
+  if (showSkeleton) {
     return (
       <Card className="bg-card/80 backdrop-blur-sm">
         <CardHeader>

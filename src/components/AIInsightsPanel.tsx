@@ -313,7 +313,7 @@ export const AIInsightsPanel = ({
       )}
       
       <CardContent className={showHeader ? '' : 'pt-4'}>
-        {isLoading && showSkeleton ? (
+        {showSkeleton ? (
           <InsightsSkeleton />
         ) : error ? (
           <div className="text-center py-6">

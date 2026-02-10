@@ -183,7 +183,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
     }
   }, [clientId, actionFilter, entityFilter])
 
-  if (isLoading && showSkeleton) {
+  if (showSkeleton) {
     return (
       <Card className="bg-card/80 backdrop-blur-sm">
         <CardHeader>

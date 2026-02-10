@@ -234,10 +234,24 @@ See `ZZP_INVOICES_TEST_STEPS.md` for comprehensive manual testing guide.
 
 ## Known Limitations
 
-1. **PDF URL Authentication**: The PDF endpoint requires authentication. For customer sharing, consider implementing:
-   - Signed/temporary URLs
-   - Public invoice view endpoint
-   - Token-based access
+### ⚠️ Important: PDF URL Authentication
+**The PDF endpoint currently requires authentication.** This means:
+- Shared links only work for logged-in users
+- External customers without system access cannot view shared invoices
+- Links are best for internal sharing or customers with login credentials
+
+**Impact on Requirements:**
+- Share/Copy now uses PDF URL (better than page route)
+- BUT: Not fully customer-usable without authentication
+- Partially addresses requirement; full solution needs backend changes
+
+**Recommended Backend Enhancement:**
+For truly customer-usable invoice links, implement:
+1. **Signed URLs**: Time-limited access tokens in URL
+2. **Public endpoint**: `/public/invoices/{signed_id}/pdf`
+3. **Per-invoice tokens**: Stored in database, validated on access
+
+### Other Limitations
 
 2. **iOS Download Behavior**: iOS Safari doesn't support forced downloads via download attribute. PDFs open in viewer, which is actually better UX for mobile.
 

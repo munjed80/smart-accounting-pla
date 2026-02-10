@@ -1205,8 +1205,8 @@ const InvoiceCard = ({
                 {t('zzpInvoices.share')}
               </DropdownMenuItem>
               
-              {/* Status actions separator */}
-              {(invoice.status === 'draft' || (invoice.status !== 'cancelled' && invoice.status !== 'draft')) && (
+              {/* Status actions separator - show for all except cancelled */}
+              {invoice.status !== 'cancelled' && (
                 <DropdownMenuSeparator />
               )}
               
@@ -1968,8 +1968,8 @@ export const ZZPInvoicesPage = () => {
                                       {t('zzpInvoices.share')}
                                     </DropdownMenuItem>
                                     
-                                    {/* Status actions separator */}
-                                    {(invoice.status === 'draft' || (invoice.status !== 'cancelled' && invoice.status !== 'draft')) && (
+                                    {/* Status actions separator - show for all except cancelled */}
+                                    {invoice.status !== 'cancelled' && (
                                       <DropdownMenuSeparator />
                                     )}
                                     

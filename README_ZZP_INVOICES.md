@@ -130,13 +130,24 @@ popupBlocked: "Pop-up geblokkeerd. Sta pop-ups toe om de factuur te openen."
 
 ## ⚠️ Known Limitations
 
-1. **PDF URL Authentication**: The PDF endpoint requires authentication. For customer sharing:
-   - Consider implementing signed/temporary URLs
-   - Or create a public invoice view endpoint
+### 1. PDF URL Authentication (Important)
+**The PDF endpoint currently requires authentication**, which means:
+- Shared links only work for logged-in users
+- External customers without login cannot access shared PDFs
+- Links are useful for internal sharing and logged-in users only
 
-2. **iOS Download Behavior**: iOS Safari doesn't support forced downloads. PDFs open in viewer, which is actually better UX for mobile users.
+**This partially addresses the requirement but is NOT fully customer-usable yet.**
 
-3. **Popup Blockers**: Some browsers block `window.open()`. Users need to allow popups, but we show a clear error message.
+**Recommended Solution:** Implement backend support for:
+- Signed/temporary URLs with time-limited tokens
+- Public invoice view endpoint
+- Per-invoice access tokens
+
+### 2. iOS Download Behavior
+iOS Safari doesn't support forced downloads. PDFs open in viewer, which is actually better UX for mobile users.
+
+### 3. Popup Blockers
+Some browsers block `window.open()`. Users need to allow popups, but we show a clear error message.
 
 ## 🔮 Future Enhancements
 

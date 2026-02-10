@@ -275,7 +275,25 @@ This document outlines the manual test steps for verifying the ZZP invoices UX i
 
 ## Known Issues/Limitations
 
-1. **PDF link authentication**: The PDF URL endpoint requires authentication. Customers need to be logged in or URL needs to be signed/public (future enhancement).
+### ⚠️ IMPORTANT: PDF Link Authentication
+**The PDF URL endpoint currently requires authentication**. This means:
+- Shared links only work for logged-in users
+- Customers WITHOUT login cannot access shared invoice PDFs
+- This partially addresses the requirement but is NOT fully customer-usable yet
+
+**Recommended Future Enhancement:**
+To make invoice links truly customer-usable, the backend should implement one of:
+1. Signed/temporary URLs with time-limited access tokens
+2. Public invoice view endpoint (e.g., `/public/invoices/{signed_id}/pdf`)
+3. Per-invoice access tokens stored in database
+
+**Current Workaround:**
+For now, the PDF URL works well for:
+- Internal sharing (between authenticated users)
+- Customers who have login access to the system
+- Quick access from different devices (when logged in)
+
+### Other Limitations
 
 2. **iOS Safari download attribute**: iOS Safari ignores the download attribute, so we use window.open to view PDF instead. Users can save from the PDF viewer.
 

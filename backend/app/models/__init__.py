@@ -43,6 +43,12 @@ from app.models.zzp import (
     ZZPQuoteLine,
     ZZPQuoteCounter,
 )
+from app.models.payment import (
+    ZZPPayment,
+    ZZPPaymentAllocation,
+    PaymentStatus,
+    PaymentMethod,
+)
 
 __all__ = [
     "User",
@@ -103,4 +109,8 @@ __all__ = [
     "ZZPQuote",
     "ZZPQuoteLine",
     "ZZPQuoteCounter",
+    "ZZPPayment",
+    "ZZPPaymentAllocation",
+    "PaymentStatus",
+    "PaymentMethod",
 ]

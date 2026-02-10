@@ -151,6 +151,9 @@ function isMobile(): boolean {
 // Delay in ms before revoking PDF blob URL to ensure download/open completes
 const PDF_URL_REVOCATION_DELAY_MS = 30000
 
+// iOS requires longer delay due to slower PDF rendering and potential network latency
+const IOS_PDF_URL_REVOCATION_DELAY_MS = PDF_URL_REVOCATION_DELAY_MS * 2
+
 // Helper function to extract date part from ISO string
 const extractDatePart = (isoString: string | undefined): string => {
   if (!isoString) return ''
@@ -1538,12 +1541,12 @@ export const ZZPInvoicesPage = () => {
           // iOS Safari ignores download attribute, so open in new tab instead
           const newWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer')
           
-          // Schedule cleanup
-          setTimeout(() => window.URL.revokeObjectURL(blobUrl), PDF_URL_REVOCATION_DELAY_MS * 2)
+          // Schedule cleanup with extended delay for iOS
+          setTimeout(() => window.URL.revokeObjectURL(blobUrl), IOS_PDF_URL_REVOCATION_DELAY_MS)
           
           // Check if popup was blocked
           if (!newWindow) {
-            toast.warning('Popup geblokkeerd. Sta pop-ups toe om de PDF te openen.')
+            toast.warning(t('zzpInvoices.popupBlocked'))
           }
         } else {
           // For other browsers, use download attribute

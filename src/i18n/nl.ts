@@ -638,6 +638,7 @@ export const nl = {
     shareText: "Bekijk factuur {number}",
     shareSuccess: "Factuur gedeeld",
     shareError: "Kon factuur niet delen",
+    popupBlocked: "Popup geblokkeerd. Sta pop-ups toe om de PDF te openen.",
     invoiceNotFound: "Factuur niet gevonden",
     // Error messages
     loadError: "Kon facturen niet laden",

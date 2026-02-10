@@ -295,9 +295,9 @@ For now, the PDF URL works well for:
 
 ### Other Limitations
 
-2. **iOS Safari download attribute**: iOS Safari ignores the download attribute, so we use window.open to view PDF instead. Users can save from the PDF viewer.
+- **iOS Safari download attribute**: iOS Safari ignores the download attribute, so we use window.open to view PDF instead. Users can save from the PDF viewer.
 
-3. **Popup blockers**: Some browsers block window.open calls. Users need to allow popups for the site.
+- **Popup blockers**: Some browsers block window.open calls. Users need to allow popups for the site.
 
 ## Success Criteria
 

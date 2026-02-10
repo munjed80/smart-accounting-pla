@@ -1988,7 +1988,6 @@ export const ZZPInvoicesPage = () => {
                                       </DropdownMenuItem>
                                     )}
                                     
-                                    <DropdownMenuSeparator />
                                     {/* Mark as Paid / Unpaid - only for non-draft, non-cancelled invoices */}
                                     {invoice.status !== 'draft' && invoice.status !== 'cancelled' && (
                                       <>

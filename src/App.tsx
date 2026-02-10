@@ -32,6 +32,7 @@ import { SmartTransactionList } from '@/components/SmartTransactionList'
 import { SettingsPage } from '@/components/SettingsPage'
 import { SupportPage } from '@/components/SupportPage'
 import { AppShell } from '@/components/AppShell'
+import { DashboardErrorBoundary } from '@/components/DashboardErrorBoundary'
 import { administrationApi, accountantClientApi } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { Database } from '@phosphor-icons/react'
@@ -548,7 +549,9 @@ const AppContent = () => {
       activeTab={activeTab} 
       onTabChange={handleTabChange}
     >
-      {renderTabContent()}
+      <DashboardErrorBoundary>
+        {renderTabContent()}
+      </DashboardErrorBoundary>
     </AppShell>
   )
 }

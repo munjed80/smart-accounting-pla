@@ -366,7 +366,7 @@ export const SmartDashboard = () => {
                 {t('dashboard.btwEstimate')}
               </CardTitle>
               <CardDescription>
-                {dashboardData?.btw.quarter} - deadline {dashboardData?.btw.deadline ? format(new Date(dashboardData.btw.deadline), 'd MMMM yyyy', { locale: nlLocale }) : ''}
+                {dashboardData?.btw?.quarter || 'Q1 2024'} - deadline {dashboardData?.btw?.deadline ? format(new Date(dashboardData.btw.deadline), 'd MMMM yyyy', { locale: nlLocale }) : 'TBD'}
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -68,12 +68,16 @@ interface ActiveClientProviderProps {
 
 /**
  * Load active client from localStorage
+ * Also syncs selectedClientId for API header compatibility
  */
 const loadActiveClient = (): ActiveClient | null => {
   try {
     const stored = localStorage.getItem(ACTIVE_CLIENT_KEY)
     if (stored) {
-      return JSON.parse(stored) as ActiveClient
+      const client = JSON.parse(stored) as ActiveClient
+      // Sync selectedClientId in case it got out of sync
+      localStorage.setItem('selectedClientId', client.administrationId)
+      return client
     }
   } catch (error) {
     console.warn('Failed to load active client from localStorage:', error)
@@ -83,13 +87,17 @@ const loadActiveClient = (): ActiveClient | null => {
 
 /**
  * Save active client to localStorage
+ * Also sets selectedClientId for API header compatibility
  */
 const saveActiveClient = (client: ActiveClient | null) => {
   try {
     if (client) {
       localStorage.setItem(ACTIVE_CLIENT_KEY, JSON.stringify(client))
+      // Also set selectedClientId for API header (X-Selected-Client-Id)
+      localStorage.setItem('selectedClientId', client.administrationId)
     } else {
       localStorage.removeItem(ACTIVE_CLIENT_KEY)
+      localStorage.removeItem('selectedClientId')
     }
   } catch (error) {
     console.warn('Failed to save active client to localStorage:', error)

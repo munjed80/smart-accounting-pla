@@ -68,7 +68,8 @@ export const SmartDashboard = () => {
   })
 
   // Determine loading states
-  const isInitialLoading = isLoadingAdmins || (isLoadingDashboard && !dashboardData)
+  // Only show full skeleton on initial load when we have no data yet
+  const isInitialLoading = isLoadingAdmins || (isLoadingDashboard && !dashboardData && administrations.length > 0)
   const fetchError = adminError || dashboardError
 
   const handleRefresh = () => {
@@ -248,11 +249,6 @@ export const SmartDashboard = () => {
               <ArrowsClockwise size={18} className={`mr-2 ${isFetching ? 'animate-spin' : ''}`} />
               {t('common.refresh')}
             </Button>
-            {isFetching && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Refreshing...
-              </p>
-            )}
           </div>
         </div>
 

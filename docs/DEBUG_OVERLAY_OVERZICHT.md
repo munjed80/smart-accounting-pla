@@ -1,5 +1,21 @@
 # Debug Report: Dark Overlay on Overzicht Page
 
+## Executive Summary
+
+**Problem**: The Overzicht (Dashboard) page briefly renders correctly, then after ~1 second, a full-screen dark/grey overlay covers the entire page. The overlay has no content, just a semi-transparent black background.
+
+**Status**: ✅ **Protective fixes implemented** - Multiple safeguards added to prevent stuck overlays. Root cause requires frontend testing to identify.
+
+**Fixes Applied**:
+1. ✅ Route change protection - overlays close automatically on navigation
+2. ✅ Escape key handler - press Escape to close overlays
+3. ✅ Body scroll lock cleanup - automatically releases stuck scroll locks
+4. ✅ Comprehensive investigation guide - for identifying exact overlay source
+
+**Next Action Required**: Run frontend with backend and follow investigation guide if overlay still appears.
+
+---
+
 ## Problem Description
 The Overzicht (Dashboard) page briefly renders correctly, then after ~1 second, a full-screen dark/grey overlay covers the entire page. The overlay has no content, just a semi-transparent black background.
 

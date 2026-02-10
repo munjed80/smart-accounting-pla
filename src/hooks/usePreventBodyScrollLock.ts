@@ -18,9 +18,14 @@ export function usePreventBodyScrollLock() {
       const bodyOverflow = window.getComputedStyle(document.body).overflow
       
       // Check if there are any open Radix UI overlays
-      const openOverlays = document.querySelectorAll(
-        '[data-state="open"][data-slot*="overlay"]'
-      )
+      // Radix UI uses data-radix-* attributes and role="dialog"
+      const openOverlays = document.querySelectorAll([
+        '[data-radix-dialog-overlay][data-state="open"]',
+        '[data-radix-alert-dialog-overlay][data-state="open"]',
+        '[data-radix-drawer-overlay][data-state="open"]',
+        '[data-state="open"][role="dialog"]',
+        '[data-slot*="overlay"][data-state="open"]', // Fallback for shadcn/ui components
+      ].join(', '))
       
       // If body is locked but no overlays are open, release it
       if (bodyOverflow === 'hidden' && openOverlays.length === 0) {

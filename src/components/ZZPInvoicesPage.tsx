@@ -1096,6 +1096,7 @@ const InvoiceCard = ({
   onEdit, 
   onDelete,
   onStatusChange,
+  onSendInvoice,
   onDownloadPdf,
   onCopyLink,
   onShare,
@@ -1110,6 +1111,7 @@ const InvoiceCard = ({
   onEdit: () => void
   onDelete: () => void
   onStatusChange: (newStatus: 'sent' | 'paid' | 'cancelled') => void
+  onSendInvoice: () => void
   onDownloadPdf: () => void
   onCopyLink: () => void
   onShare: () => void
@@ -1196,13 +1198,30 @@ const InvoiceCard = ({
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onCopyLink}>
                 <CopySimple size={16} className="mr-2" />
-                {t('zzpInvoices.copyLink')}
+                {t('zzpInvoices.copyInvoiceLink')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onShare}>
                 <ShareNetwork size={16} className="mr-2" />
                 {t('zzpInvoices.share')}
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              
+              {/* Status actions separator */}
+              {(invoice.status === 'draft' || (invoice.status !== 'cancelled' && invoice.status !== 'draft')) && (
+                <DropdownMenuSeparator />
+              )}
+              
+              {/* Send invoice - only for draft invoices */}
+              {invoice.status === 'draft' && (
+                <DropdownMenuItem onClick={onSendInvoice} disabled={isUpdatingStatus}>
+                  {isUpdatingStatus ? (
+                    <SpinnerGap size={16} className="mr-2 animate-spin" />
+                  ) : (
+                    <PaperPlaneTilt size={16} className="mr-2" />
+                  )}
+                  {t('zzpInvoices.sendInvoice')}
+                </DropdownMenuItem>
+              )}
+              
               {/* Mark as Paid / Unpaid - only for non-draft, non-cancelled invoices */}
               {invoice.status !== 'draft' && invoice.status !== 'cancelled' && (
                 <>
@@ -1225,18 +1244,21 @@ const InvoiceCard = ({
                       {t('zzpInvoices.markPaid')}
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuSeparator />
                 </>
               )}
+              
               {/* Delete - only for draft invoices */}
               {invoice.status === 'draft' && (
-                <DropdownMenuItem 
-                  onClick={onDelete}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <TrashSimple size={16} className="mr-2" />
-                  {t('common.delete')}
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={onDelete}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <TrashSimple size={16} className="mr-2" />
+                    {t('common.delete')}
+                  </DropdownMenuItem>
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1457,6 +1479,21 @@ export const ZZPInvoicesPage = () => {
     }
   }, [loadData])
 
+  // Handle send invoice (draft → sent)
+  const handleSendInvoice = useCallback(async (invoice: ZZPInvoice) => {
+    setUpdatingStatusInvoiceId(invoice.id)
+    try {
+      await zzpApi.invoices.updateStatus(invoice.id, 'sent')
+      toast.success(t('zzpInvoices.invoiceSent'))
+      await loadData()
+    } catch (err) {
+      console.error('Failed to send invoice:', err)
+      toast.error(parseApiError(err))
+    } finally {
+      setUpdatingStatusInvoiceId(null)
+    }
+  }, [loadData])
+
   // Handle delete invoice
   const handleDeleteInvoice = useCallback(async () => {
     if (!deletingInvoice) return
@@ -1474,38 +1511,10 @@ export const ZZPInvoicesPage = () => {
   }, [deletingInvoice, loadData])
 
   // Handle PDF download - download actual PDF from server (mobile-safe)
-  // Uses fetch -> blob -> createObjectURL -> anchor click pattern for best mobile compatibility
+  // Uses fetch -> blob -> createObjectURL -> window.open for iOS, anchor click for others
   // Falls back to window.open() with direct PDF URL if blob approach fails on mobile
   const handleDownloadPdf = useCallback(async (invoice: ZZPInvoice) => {
     const filename = `${invoice.invoice_number || `INV-${invoice.id}`}.pdf`
-    
-    // Helper to attempt download via anchor element
-    // shouldRevokeUrl: true for blob URLs that need cleanup, false for direct URLs
-    const downloadViaAnchor = (url: string, shouldRevokeUrl: boolean) => {
-      const link = document.createElement('a')
-      link.href = url
-      link.style.display = 'none'
-      
-      if (isIOS()) {
-        // iOS Safari: Open in new tab with target _blank
-        // iOS often ignores download attribute, so we open in PDF viewer instead
-        link.target = '_blank'
-        link.rel = 'noopener noreferrer'
-      }
-      
-      // Set download attribute for browsers that support it
-      link.download = filename
-      
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      
-      // For blob URLs, schedule revocation
-      if (shouldRevokeUrl) {
-        const revokeDelay = isMobile() ? PDF_URL_REVOCATION_DELAY_MS * 2 : PDF_URL_REVOCATION_DELAY_MS
-        setTimeout(() => window.URL.revokeObjectURL(url), revokeDelay)
-      }
-    }
     
     try {
       setDownloadingInvoiceId(invoice.id)
@@ -1526,7 +1535,35 @@ export const ZZPInvoicesPage = () => {
         // Create object URL for the PDF blob
         const blobUrl = window.URL.createObjectURL(pdfBlob)
         
-        downloadViaAnchor(blobUrl, true)
+        // iOS Safari: Use window.open to open PDF in new tab
+        // iOS ignores download attribute, so opening in viewer is the best approach
+        if (isIOS()) {
+          const newWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer')
+          
+          if (!newWindow) {
+            // If popup was blocked, notify user
+            toast.error(t('zzpInvoices.popupBlocked'))
+            window.URL.revokeObjectURL(blobUrl)
+            return
+          }
+          
+          // Clean up blob URL after a delay
+          setTimeout(() => window.URL.revokeObjectURL(blobUrl), PDF_URL_REVOCATION_DELAY_MS * 2)
+        } else {
+          // Desktop and Android: Use anchor element with download attribute
+          const link = document.createElement('a')
+          link.href = blobUrl
+          link.download = filename
+          link.style.display = 'none'
+          
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          
+          // Clean up blob URL after a delay
+          const revokeDelay = isMobile() ? PDF_URL_REVOCATION_DELAY_MS * 2 : PDF_URL_REVOCATION_DELAY_MS
+          setTimeout(() => window.URL.revokeObjectURL(blobUrl), revokeDelay)
+        }
       } catch (blobErr) {
         console.warn('Blob download failed, trying window.open fallback:', blobErr)
         
@@ -1537,8 +1574,9 @@ export const ZZPInvoicesPage = () => {
           const newWindow = window.open(directUrl, '_blank', 'noopener,noreferrer')
           
           if (!newWindow) {
-            // If popup was blocked, try anchor approach with direct URL
-            downloadViaAnchor(directUrl, false)
+            // If popup was blocked, notify user
+            toast.error(t('zzpInvoices.popupBlocked'))
+            return
           }
         } else {
           // Re-throw for desktop - blob approach should work
@@ -1556,13 +1594,13 @@ export const ZZPInvoicesPage = () => {
     }
   }, [])
 
-  // Handle copy invoice link to clipboard
+  // Handle copy invoice link to clipboard (PDF URL for customer)
   const handleCopyLink = useCallback(async (invoice: ZZPInvoice) => {
     try {
-      // Create a proper invoice link using route parameter
-      const invoiceLink = `${window.location.origin}/zzp/invoices/${invoice.id}`
-      await navigator.clipboard.writeText(invoiceLink)
-      toast.success(t('zzpInvoices.linkCopied'))
+      // Copy the PDF download URL that customers can use
+      const pdfUrl = `${window.location.origin}${zzpApi.invoices.getPdfUrl(invoice.id)}`
+      await navigator.clipboard.writeText(pdfUrl)
+      toast.success(t('zzpInvoices.invoiceLinkCopied'))
     } catch (err) {
       console.error('Failed to copy link:', err)
       toast.error(t('common.error'))
@@ -1571,8 +1609,8 @@ export const ZZPInvoicesPage = () => {
 
   // Handle share invoice (Web Share API with clipboard fallback)
   const handleShare = useCallback(async (invoice: ZZPInvoice) => {
-    // Create a proper invoice link using route parameter
-    const invoicePublicUrl = `${window.location.origin}/zzp/invoices/${invoice.id}`
+    // Share the PDF download URL that customers can use
+    const pdfUrl = `${window.location.origin}${zzpApi.invoices.getPdfUrl(invoice.id)}`
     const invoiceNumber = invoice.invoice_number || `INV-${invoice.id}`
     
     try {
@@ -1581,13 +1619,13 @@ export const ZZPInvoicesPage = () => {
         await navigator.share({
           title: t('zzpInvoices.shareTitle').replace('{number}', invoiceNumber),
           text: t('zzpInvoices.shareText').replace('{number}', invoiceNumber),
-          url: invoicePublicUrl,
+          url: pdfUrl,
         })
         toast.success(t('zzpInvoices.shareSuccess'))
       } else {
         // Fallback: copy link to clipboard
-        await navigator.clipboard.writeText(invoicePublicUrl)
-        toast.success(t('zzpInvoices.linkCopied'))
+        await navigator.clipboard.writeText(pdfUrl)
+        toast.success(t('zzpInvoices.invoiceLinkCopied'))
       }
     } catch (err) {
       // AbortError is thrown when user cancels the share dialog - not an error
@@ -1796,6 +1834,7 @@ export const ZZPInvoicesPage = () => {
                         onEdit={() => openEditForm(invoice)}
                         onDelete={() => setDeletingInvoice(invoice)}
                         onStatusChange={(status) => handleStatusChange(invoice, status)}
+                        onSendInvoice={() => handleSendInvoice(invoice)}
                         onDownloadPdf={() => handleDownloadPdf(invoice)}
                         onCopyLink={() => handleCopyLink(invoice)}
                         onShare={() => handleShare(invoice)}
@@ -1922,12 +1961,33 @@ export const ZZPInvoicesPage = () => {
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handleCopyLink(invoice)}>
                                       <CopySimple size={16} className="mr-2" />
-                                      {t('zzpInvoices.copyLink')}
+                                      {t('zzpInvoices.copyInvoiceLink')}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handleShare(invoice)}>
                                       <ShareNetwork size={16} className="mr-2" />
                                       {t('zzpInvoices.share')}
                                     </DropdownMenuItem>
+                                    
+                                    {/* Status actions separator */}
+                                    {(invoice.status === 'draft' || (invoice.status !== 'cancelled' && invoice.status !== 'draft')) && (
+                                      <DropdownMenuSeparator />
+                                    )}
+                                    
+                                    {/* Send invoice - only for draft invoices */}
+                                    {invoice.status === 'draft' && (
+                                      <DropdownMenuItem 
+                                        onClick={() => handleSendInvoice(invoice)}
+                                        disabled={updatingStatusInvoiceId === invoice.id}
+                                      >
+                                        {updatingStatusInvoiceId === invoice.id ? (
+                                          <SpinnerGap size={16} className="mr-2 animate-spin" />
+                                        ) : (
+                                          <PaperPlaneTilt size={16} className="mr-2" />
+                                        )}
+                                        {t('zzpInvoices.sendInvoice')}
+                                      </DropdownMenuItem>
+                                    )}
+                                    
                                     <DropdownMenuSeparator />
                                     {/* Mark as Paid / Unpaid - only for non-draft, non-cancelled invoices */}
                                     {invoice.status !== 'draft' && invoice.status !== 'cancelled' && (
@@ -1957,18 +2017,21 @@ export const ZZPInvoicesPage = () => {
                                             {t('zzpInvoices.markPaid')}
                                           </DropdownMenuItem>
                                         )}
-                                        <DropdownMenuSeparator />
                                       </>
                                     )}
+                                    
                                     {/* Delete - only for draft invoices */}
                                     {invoice.status === 'draft' && (
-                                      <DropdownMenuItem 
-                                        onClick={() => setDeletingInvoice(invoice)}
-                                        className="text-destructive focus:text-destructive"
-                                      >
-                                        <TrashSimple size={16} className="mr-2" />
-                                        {t('common.delete')}
-                                      </DropdownMenuItem>
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem 
+                                          onClick={() => setDeletingInvoice(invoice)}
+                                          className="text-destructive focus:text-destructive"
+                                        >
+                                          <TrashSimple size={16} className="mr-2" />
+                                          {t('common.delete')}
+                                        </DropdownMenuItem>
+                                      </>
                                     )}
                                   </DropdownMenuContent>
                                 </DropdownMenu>

@@ -388,6 +388,18 @@ const AppContent = () => {
     // For unauthenticated users during login, let the LoginPage show with its own loading state
   }
 
+  // Show loading while determining if onboarding is needed (prevents flash of dashboard before redirect)
+  if (isAuthenticated && needsOnboarding === null && needsAccountantOnboarding === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center">
+        <div className="text-center">
+          <Database size={64} className="mx-auto mb-4 text-primary animate-pulse" weight="duotone" />
+          <p className="text-muted-foreground">Laden...</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!isAuthenticated) {
     return (
       <LoginPage 

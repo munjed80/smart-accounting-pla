@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,7 +9,6 @@ import { zzpApi, ZZPDashboardResponse, administrationApi, Administration, getErr
 import { navigateTo } from '@/lib/navigation'
 import { NoAdministrationsEmptyState } from '@/components/EmptyState'
 import { AIInsightsPanel } from '@/components/AIInsightsPanel'
-import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   Receipt, 
   TrendUp, 
@@ -32,52 +31,49 @@ import { t } from '@/i18n'
 
 export const SmartDashboard = () => {
   const { user } = useAuth()
-  const [dashboardData, setDashboardData] = useState<ZZPDashboardResponse | null>(null)
-  const [administrations, setAdministrations] = useState<Administration[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [fetchError, setFetchError] = useState<string | null>(null)
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
 
-  // Use delayed loading to prevent skeleton flash
-  const showLoading = useDelayedLoading(isLoading, 300, !!dashboardData)
+  // Fetch administrations using react-query
+  const { 
+    data: administrations = [], 
+    isLoading: isLoadingAdmins,
+    error: adminError 
+  } = useQuery<Administration[], Error>({
+    queryKey: ['administrations'],
+    queryFn: () => administrationApi.list(),
+    refetchOnWindowFocus: false,
+  })
 
-  const fetchData = async () => {
-    setIsLoading(true)
-    setFetchError(null)
-    try {
-      // First fetch administrations
-      const admins = await administrationApi.list()
-      setAdministrations(admins)
-      
-      // Only fetch dashboard data if administrations exist
-      if (admins.length > 0) {
-        try {
-          const data = await zzpApi.dashboard.get()
-          setDashboardData(data)
-        } catch {
-          // Dashboard data may be unavailable for fresh accounts - this is expected
-          setDashboardData(null)
-        }
-      } else {
-        setDashboardData(null)
+  // Fetch dashboard data using react-query
+  const { 
+    data: dashboardData,
+    isLoading: isLoadingDashboard,
+    isFetching,
+    error: dashboardError,
+    refetch
+  } = useQuery<ZZPDashboardResponse | null, Error>({
+    queryKey: ['zzp-dashboard'],
+    queryFn: async () => {
+      if (administrations.length === 0) {
+        return null
       }
-      setLastRefresh(new Date())
-    } catch (error) {
-      console.error('Failed to fetch dashboard data:', error)
-      setFetchError(getErrorMessage(error))
-      setAdministrations([])
-      setDashboardData(null)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+      try {
+        return await zzpApi.dashboard.get()
+      } catch {
+        // Dashboard data may be unavailable for fresh accounts - this is expected
+        return null
+      }
+    },
+    enabled: !isLoadingAdmins && administrations.length > 0,
+    refetchOnWindowFocus: false,
+  })
 
-  useEffect(() => {
-    fetchData()
-  }, [])
+  // Determine loading states
+  // Only show full skeleton on initial load when we have no data yet
+  const isInitialLoading = isLoadingAdmins || (isLoadingDashboard && !dashboardData && administrations.length > 0)
+  const fetchError = adminError || dashboardError
 
   const handleRefresh = () => {
-    fetchData()
+    refetch()
   }
 
   const formatCurrency = (cents: number) => {
@@ -91,12 +87,12 @@ export const SmartDashboard = () => {
     return format(new Date(), 'MMMM', { locale: nlLocale })
   }
   
-  // Show loading state
-  if (showLoading) {
+  // Show loading state only on initial load (not on background refetches)
+  if (isInitialLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 opacity-0 animate-in fade-in duration-300">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 opacity-100">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
@@ -168,7 +164,7 @@ export const SmartDashboard = () => {
           <Alert variant="destructive">
             <WarningCircle size={18} />
             <AlertDescription className="ml-2 flex items-center justify-between">
-              <span>{fetchError}</span>
+              <span>{getErrorMessage(fetchError)}</span>
               <Button variant="outline" size="sm" onClick={handleRefresh} className="ml-4">
                 <ArrowsClockwise size={16} className="mr-2" />
                 {t('common.retry')}
@@ -237,7 +233,7 @@ export const SmartDashboard = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
       
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 opacity-0 animate-in fade-in duration-500">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 opacity-100">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
@@ -249,13 +245,10 @@ export const SmartDashboard = () => {
             </p>
           </div>
           <div className="text-right">
-            <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isLoading}>
-              <ArrowsClockwise size={18} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isFetching}>
+              <ArrowsClockwise size={18} className={`mr-2 ${isFetching ? 'animate-spin' : ''}`} />
               {t('common.refresh')}
             </Button>
-            <p className="text-xs text-muted-foreground mt-2">
-              {t('dashboard.lastUpdated')}: {format(lastRefresh, 'HH:mm:ss', { locale: nlLocale })}
-            </p>
           </div>
         </div>
 

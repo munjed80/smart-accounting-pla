@@ -1,5 +1,6 @@
 #!/bin/bash
 # Minimal smoke checks to ensure critical UI issues are caught
+# Usage: chmod +x smoke-checks.sh && ./smoke-checks.sh
 
 set -e
 

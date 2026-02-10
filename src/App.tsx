@@ -549,7 +549,7 @@ const AppContent = () => {
   const getPageName = (): string => {
     switch (activeTab) {
       case 'workqueue': return 'Werklijst'
-      case 'clients': return 'Klanten'
+      case 'clients': return 'Klanten (Accountant)'
       case 'reviewqueue': return 'Beoordelingslijst'
       case 'reminders': return 'Herinneringen'
       case 'acties': return 'Acties'
@@ -558,7 +558,7 @@ const AppContent = () => {
       case 'profitloss': return 'Winst & Verlies'
       case 'grootboek': return 'Grootboek'
       case 'boekhouder': return 'Boekhouder'
-      case 'customers': return 'Klanten'
+      case 'customers': return 'Klanten (ZZP)'
       case 'invoices': return 'Facturen'
       case 'expenses': return 'Uitgaven'
       case 'time': return 'Uren'

@@ -824,19 +824,16 @@ export const ZZPExpensesPage = () => {
   }, [])
   
   // Handle scan receipt
-  // NOTE: This is a placeholder implementation that calls the backend scan endpoint
-  // which currently returns mock data. For production, this should be enhanced to:
-  // 1. Show a file picker or camera capture dialog
-  // 2. Upload the image to the backend
-  // 3. Process with OCR service (pytesseract, Google Vision, Azure CV, or AWS Textract)
-  // 4. Return extracted data to prefill the form
-  const handleScanReceipt = useCallback(async () => {
+  // Updated to support file upload with camera capture on mobile
+  const handleScanReceipt = useCallback(async (file: File) => {
     if (!user?.id) return
     
     setIsScanning(true)
     try {
-      console.log('[Expense Scan] Starting receipt scan...')
-      const result = await zzpApi.expenses.scanReceipt()
+      console.log('[Expense Scan] Starting receipt scan with file:', file.name)
+      
+      // Call API with file upload
+      const result = await zzpApi.expenses.scanReceipt(file)
       console.log('[Expense Scan] Scan completed:', result)
       
       // Set the scanned data to prefill the form
@@ -852,6 +849,22 @@ export const ZZPExpensesPage = () => {
       setIsScanning(false)
     }
   }, [user?.id])
+  
+  // Trigger file picker for receipt scan
+  const handleScanButtonClick = useCallback(() => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    // Enable camera capture on mobile devices
+    input.setAttribute('capture', 'environment')
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (file) {
+        handleScanReceipt(file)
+      }
+    }
+    input.click()
+  }, [handleScanReceipt])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
@@ -871,7 +884,7 @@ export const ZZPExpensesPage = () => {
           </div>
           <div className="flex gap-2">
             <Button 
-              onClick={handleScanReceipt} 
+              onClick={handleScanButtonClick} 
               variant="outline"
               disabled={isScanning}
               className="gap-2 h-10 sm:h-11 flex-1 sm:flex-initial"

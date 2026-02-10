@@ -31,6 +31,7 @@ import {
   AlertSeverity_Ops,
   getErrorMessage 
 } from '@/lib/api'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   ArrowsClockwise,
   WarningCircle,
@@ -291,6 +292,9 @@ export const AlertsPage = () => {
   // Active tab
   const [activeTab, setActiveTab] = useState<'all' | 'critical' | 'warning' | 'info'>('all')
 
+  // Use delayed loading to prevent skeleton flash
+  const showLoading = useDelayedLoading(isLoading, 300, !!alertsData)
+
   const fetchAlerts = async () => {
     try {
       setIsLoading(true)
@@ -403,7 +407,7 @@ export const AlertsPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.1),rgba(255,255,255,0))]" />
       
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 opacity-0 animate-in fade-in duration-500">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -436,7 +440,7 @@ export const AlertsPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-10 w-16" />
               ) : (
                 <div className="text-3xl font-bold text-red-600 dark:text-red-400">
@@ -454,7 +458,7 @@ export const AlertsPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-10 w-16" />
               ) : (
                 <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">
@@ -472,7 +476,7 @@ export const AlertsPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-10 w-16" />
               ) : (
                 <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
@@ -490,7 +494,7 @@ export const AlertsPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-10 w-16" />
               ) : alertsData?.counts.total === 0 ? (
                 <div className="text-xl font-bold text-green-600 dark:text-green-400">
@@ -534,7 +538,7 @@ export const AlertsPage = () => {
               </TabsList>
               
               <TabsContent value={activeTab}>
-                {isLoading ? (
+                {showLoading ? (
                   <div className="space-y-3">
                     {[...Array(3)].map((_, i) => (
                       <Skeleton key={i} className="h-32 w-full" />

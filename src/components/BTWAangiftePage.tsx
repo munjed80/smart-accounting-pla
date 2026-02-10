@@ -29,6 +29,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import {
   FileText,
   ArrowsClockwise,
@@ -249,9 +250,12 @@ export const BTWAangiftePage = ({
 }) => {
   const [activeTab, setActiveTab] = useState('boxes')
   
-  if (isLoading) {
+  // Use delayed loading to prevent skeleton flash
+  const showLoading = useDelayedLoading(isLoading, 300, !!report)
+  
+  if (showLoading) {
     return (
-      <Card>
+      <Card className="opacity-0 animate-in fade-in duration-300">
         <CardHeader>
           <Skeleton className="h-6 w-64" />
           <Skeleton className="h-4 w-48 mt-2" />
@@ -289,7 +293,7 @@ export const BTWAangiftePage = ({
   const isRefund = netVat < 0
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 opacity-0 animate-in fade-in duration-500">
       {/* Header */}
       <Card>
         <CardHeader className="flex flex-row items-start justify-between">

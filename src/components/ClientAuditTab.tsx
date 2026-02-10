@@ -27,6 +27,7 @@ import {
   AuditLogAction,
   getErrorMessage 
 } from '@/lib/api'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   ClockCounterClockwise,
   Plus,
@@ -147,11 +148,11 @@ const ALL_ACTIONS: AuditLogAction[] = [
 export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
   const [entries, setEntries] = useState<AuditLogEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [showSkeleton, setShowSkeleton] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionFilter, setActionFilter] = useState<string>('ALL')
   const [entityFilter, setEntityFilter] = useState<string>('ALL')
   const [totalCount, setTotalCount] = useState(0)
+  const showSkeleton = useDelayedLoading(isLoading, 300, entries.length > 0)
 
   const fetchEntries = async () => {
     try {
@@ -181,11 +182,6 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
       fetchEntries()
     }
   }, [clientId, actionFilter, entityFilter])
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowSkeleton(false), 300)
-    return () => clearTimeout(timer)
-  }, [])
 
   if (isLoading && showSkeleton) {
     return (

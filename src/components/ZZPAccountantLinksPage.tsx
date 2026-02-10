@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { zzpApi, PendingLinkRequest, ActiveAccountantLink, getErrorMessage } from '@/lib/api'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -191,11 +192,11 @@ export const ZZPAccountantLinksPage = () => {
   const [pendingRequests, setPendingRequests] = useState<PendingLinkRequest[]>([])
   const [activeLinks, setActiveLinks] = useState<ActiveAccountantLink[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [showSkeleton, setShowSkeleton] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set())
   const [rejectingIds, setRejectingIds] = useState<Set<string>>(new Set())
   const [revokingIds, setRevokingIds] = useState<Set<string>>(new Set())
+  const showSkeleton = useDelayedLoading(isLoading, 300, pendingRequests.length > 0 || activeLinks.length > 0)
 
   // Load pending requests and active links
   const loadData = useCallback(async () => {
@@ -221,11 +222,6 @@ export const ZZPAccountantLinksPage = () => {
   useEffect(() => {
     loadData()
   }, [loadData])
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowSkeleton(false), 300)
-    return () => clearTimeout(timer)
-  }, [])
 
   // Handle approve
   const handleApprove = async (assignmentId: string, request: PendingLinkRequest) => {

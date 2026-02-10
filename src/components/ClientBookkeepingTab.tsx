@@ -44,6 +44,7 @@ import {
   JournalEntryStatus,
   getErrorMessage 
 } from '@/lib/api'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   Book,
   Check,
@@ -118,12 +119,12 @@ export const ClientBookkeepingTab = ({ clientId }: ClientBookkeepingTabProps) =>
   const [entries, setEntries] = useState<JournalEntryListItem[]>([])
   const [selectedEntry, setSelectedEntry] = useState<JournalEntryResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [showSkeleton, setShowSkeleton] = useState(true)
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [isSheetOpen, setIsSheetOpen] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
+  const showSkeleton = useDelayedLoading(isLoading, 300, entries.length > 0)
 
   const fetchEntries = async () => {
     try {
@@ -163,11 +164,6 @@ export const ClientBookkeepingTab = ({ clientId }: ClientBookkeepingTabProps) =>
       fetchEntries()
     }
   }, [clientId, statusFilter])
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowSkeleton(false), 300)
-    return () => clearTimeout(timer)
-  }, [])
 
   if (isLoading && showSkeleton) {
     return (

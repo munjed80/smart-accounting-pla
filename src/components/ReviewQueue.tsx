@@ -44,6 +44,7 @@ import {
   DocumentSuggestedAction,
   getErrorMessage 
 } from '@/lib/api'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   ArrowsClockwise,
   WarningCircle,
@@ -140,9 +141,9 @@ interface ReviewQueueProps {
 export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }: ReviewQueueProps) => {
   const [documents, setDocuments] = useState<DocumentReviewItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [showSkeleton, setShowSkeleton] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<DocumentReviewStatus | undefined>('NEEDS_REVIEW')
+  const showSkeleton = useDelayedLoading(isLoading, 300, documents.length > 0)
   
   // Dialog states
   const [selectedDoc, setSelectedDoc] = useState<DocumentReviewItem | null>(null)
@@ -169,11 +170,6 @@ export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }:
   useEffect(() => {
     fetchDocuments()
   }, [clientId, filter])
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowSkeleton(false), 300)
-    return () => clearTimeout(timer)
-  }, [])
 
   const handleViewDocument = (doc: DocumentReviewItem) => {
     setSelectedDoc(doc)

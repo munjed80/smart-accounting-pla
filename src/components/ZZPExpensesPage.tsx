@@ -708,7 +708,6 @@ export const ZZPExpensesPage = () => {
 
   const monthOptions = useMemo(() => generateMonthOptions(), [])
   const yearOptions = useMemo(() => generateYearOptions(), [])
-  const yearOptions = useMemo(() => generateYearOptions(), [])
 
   // Load categories from API
   const loadCategories = useCallback(async () => {
@@ -825,6 +824,12 @@ export const ZZPExpensesPage = () => {
   }, [])
   
   // Handle scan receipt
+  // NOTE: This is a placeholder implementation that calls the backend scan endpoint
+  // which currently returns mock data. For production, this should be enhanced to:
+  // 1. Show a file picker or camera capture dialog
+  // 2. Upload the image to the backend
+  // 3. Process with OCR service (pytesseract, Google Vision, Azure CV, or AWS Textract)
+  // 4. Return extracted data to prefill the form
   const handleScanReceipt = useCallback(async () => {
     if (!user?.id) return
     

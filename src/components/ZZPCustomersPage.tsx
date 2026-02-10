@@ -1131,24 +1131,41 @@ export const ZZPCustomersPage = () => {
     if (!user?.id) return
 
     try {
+      console.log('[Customer Save] Starting save operation:', { 
+        user_id: user.id, 
+        is_edit: !!editingCustomer,
+        customer_data: data 
+      })
+      
       if (editingCustomer) {
         // Update existing
+        console.log('[Customer Save] Updating customer:', editingCustomer.id)
         await zzpApi.customers.update(editingCustomer.id, data as ZZPCustomerUpdate)
         toast.success(t('zzpCustomers.customerSaved'))
       } else {
         // Add new - show CTA to create invoice
+        console.log('[Customer Save] Creating new customer')
         const newCustomer = await zzpApi.customers.create(data)
+        console.log('[Customer Save] Customer created successfully:', newCustomer.id)
         setNewlyCreatedCustomer(newCustomer)
         setShowCreateInvoiceCta(true)
       }
 
       // Reload customers list
+      console.log('[Customer Save] Reloading customers list')
       await loadCustomers()
 
       setIsFormOpen(false)
       setEditingCustomer(undefined)
+      console.log('[Customer Save] Save operation completed successfully')
     } catch (error) {
-      console.error('Failed to save customer:', error)
+      console.error('[Customer Save] Failed to save customer:', error)
+      // Log detailed error information
+      if (error instanceof Error) {
+        console.error('[Customer Save] Error name:', error.name)
+        console.error('[Customer Save] Error message:', error.message)
+        console.error('[Customer Save] Error stack:', error.stack)
+      }
       toast.error(parseApiError(error))
     }
   }, [user?.id, editingCustomer, loadCustomers])

@@ -71,6 +71,7 @@ import {
   Tag,
   CalendarBlank,
   DotsThreeVertical,
+  Camera,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { zzpApi, ZZPExpense, ZZPExpenseCreate, ZZPExpenseUpdate } from '@/lib/api'
@@ -192,16 +193,19 @@ const ExpenseFormDialog = ({
   open,
   onOpenChange,
   expense,
+  scannedData,
   categories,
   onSave,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   expense?: ZZPExpense
+  scannedData?: ZZPExpenseCreate | null
   categories: string[]
   onSave: (data: ZZPExpenseCreate) => Promise<void>
 }) => {
   const isEdit = !!expense
+  const isScanned = !!scannedData && !expense
   
   // Form fields
   const [vendor, setVendor] = useState('')
@@ -219,10 +223,11 @@ const ExpenseFormDialog = ({
   const [categoryError, setCategoryError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Reset form when dialog opens/closes or expense changes
+  // Reset form when dialog opens/closes or expense/scannedData changes
   useEffect(() => {
     if (open) {
       if (expense) {
+        // Editing existing expense
         setVendor(expense.vendor)
         setDescription(expense.description || '')
         setExpenseDate(expense.expense_date)
@@ -230,7 +235,17 @@ const ExpenseFormDialog = ({
         setVatRate(expense.vat_rate)
         setCategory(expense.category)
         setNotes(expense.notes || '')
+      } else if (scannedData) {
+        // Prefill with scanned data
+        setVendor(scannedData.vendor || '')
+        setDescription(scannedData.description || '')
+        setExpenseDate(scannedData.expense_date || new Date().toISOString().split('T')[0])
+        setAmountEuros(scannedData.amount_cents ? (scannedData.amount_cents / 100).toFixed(2).replace('.', ',') : '')
+        setVatRate(scannedData.vat_rate || 21)
+        setCategory(scannedData.category || categories[0] || 'algemeen')
+        setNotes(scannedData.notes || '')
       } else {
+        // New expense
         setVendor('')
         setDescription('')
         setExpenseDate(new Date().toISOString().split('T')[0])
@@ -246,7 +261,7 @@ const ExpenseFormDialog = ({
       setCategoryError('')
       setIsSubmitting(false)
     }
-  }, [open, expense, categories])
+  }, [open, expense, scannedData, categories])
 
   const handleSave = async () => {
     let hasError = false
@@ -306,13 +321,15 @@ const ExpenseFormDialog = ({
         <DialogHeader className="pb-4 border-b border-border/50">
           <DialogTitle className="flex items-center gap-3 text-xl">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Receipt size={24} className="text-primary" weight="duotone" />
+              {isScanned ? <Camera size={24} className="text-primary" weight="duotone" /> : <Receipt size={24} className="text-primary" weight="duotone" />}
             </div>
-            {isEdit ? t('zzpExpenses.editExpense') : t('zzpExpenses.newExpense')}
+            {isEdit ? t('zzpExpenses.editExpense') : isScanned ? t('zzpExpenses.reviewScannedExpense') : t('zzpExpenses.newExpense')}
           </DialogTitle>
           <DialogDescription className="text-sm">
             {isEdit 
               ? t('zzpExpenses.editExpenseDescription')
+              : isScanned
+              ? t('zzpExpenses.reviewScannedDescription')
               : t('zzpExpenses.newExpenseDescription')}
           </DialogDescription>
         </DialogHeader>
@@ -686,6 +703,8 @@ export const ZZPExpensesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingExpense, setEditingExpense] = useState<ZZPExpense | undefined>()
   const [deletingExpense, setDeletingExpense] = useState<ZZPExpense | undefined>()
+  const [isScanning, setIsScanning] = useState(false)
+  const [scannedData, setScannedData] = useState<ZZPExpenseCreate | null>(null)
 
   const monthOptions = useMemo(() => generateMonthOptions(), [])
   const yearOptions = useMemo(() => generateYearOptions(), [])
@@ -793,14 +812,46 @@ export const ZZPExpensesPage = () => {
   // Open form for new expense
   const openNewForm = useCallback(() => {
     setEditingExpense(undefined)
+    setScannedData(null)
     setIsFormOpen(true)
   }, [])
 
   // Open form for editing
   const openEditForm = useCallback((expense: ZZPExpense) => {
     setEditingExpense(expense)
+    setScannedData(null)
     setIsFormOpen(true)
   }, [])
+  
+  // Handle scan receipt
+  // NOTE: This is a placeholder implementation that calls the backend scan endpoint
+  // which currently returns mock data. For production, this should be enhanced to:
+  // 1. Show a file picker or camera capture dialog
+  // 2. Upload the image to the backend
+  // 3. Process with OCR service (pytesseract, Google Vision, Azure CV, or AWS Textract)
+  // 4. Return extracted data to prefill the form
+  const handleScanReceipt = useCallback(async () => {
+    if (!user?.id) return
+    
+    setIsScanning(true)
+    try {
+      console.log('[Expense Scan] Starting receipt scan...')
+      const result = await zzpApi.expenses.scanReceipt()
+      console.log('[Expense Scan] Scan completed:', result)
+      
+      // Set the scanned data to prefill the form
+      setScannedData(result.extracted_data)
+      setEditingExpense(undefined)
+      setIsFormOpen(true)
+      
+      toast.success(result.message || t('zzpExpenses.scanSuccess'))
+    } catch (error) {
+      console.error('[Expense Scan] Failed to scan receipt:', error)
+      toast.error(parseApiError(error))
+    } finally {
+      setIsScanning(false)
+    }
+  }, [user?.id])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
@@ -818,10 +869,30 @@ export const ZZPExpensesPage = () => {
               {t('zzpExpenses.pageDescription')}
             </p>
           </div>
-          <Button onClick={openNewForm} className="gap-2 h-10 sm:h-11 w-full sm:w-auto">
-            <Plus size={18} weight="bold" />
-            {t('zzpExpenses.newExpense')}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleScanReceipt} 
+              variant="outline"
+              disabled={isScanning}
+              className="gap-2 h-10 sm:h-11 flex-1 sm:flex-initial"
+            >
+              {isScanning ? (
+                <>
+                  <SpinnerGap size={18} className="animate-spin" />
+                  {t('zzpExpenses.scanning')}
+                </>
+              ) : (
+                <>
+                  <Camera size={18} weight="bold" />
+                  {t('zzpExpenses.scanReceipt')}
+                </>
+              )}
+            </Button>
+            <Button onClick={openNewForm} className="gap-2 h-10 sm:h-11 flex-1 sm:flex-initial">
+              <Plus size={18} weight="bold" />
+              {t('zzpExpenses.newExpense')}
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -1035,9 +1106,13 @@ export const ZZPExpensesPage = () => {
         open={isFormOpen}
         onOpenChange={(open) => {
           setIsFormOpen(open)
-          if (!open) setEditingExpense(undefined)
+          if (!open) {
+            setEditingExpense(undefined)
+            setScannedData(null)
+          }
         }}
         expense={editingExpense}
+        scannedData={scannedData}
         categories={categories}
         onSave={handleSaveExpense}
       />

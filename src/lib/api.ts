@@ -3807,6 +3807,28 @@ export const zzpApi = {
     getPdfUrl: (invoiceId: string): string => {
       return `${api.defaults.baseURL}/zzp/invoices/${invoiceId}/pdf`
     },
+    
+    /**
+     * Mark an invoice as paid by creating a payment record.
+     */
+    markPaid: async (
+      invoiceId: string, 
+      data?: { 
+        payment_date?: string
+        payment_method?: string
+        reference?: string
+        notes?: string 
+      }
+    ): Promise<void> => {
+      await api.post(`/zzp/payments/invoices/${invoiceId}/mark-paid`, data || {})
+    },
+    
+    /**
+     * Mark an invoice as unpaid by removing payment allocations.
+     */
+    markUnpaid: async (invoiceId: string): Promise<void> => {
+      await api.post(`/zzp/payments/invoices/${invoiceId}/mark-unpaid`)
+    },
   },
 
   // ------------ Expenses ------------
@@ -3849,6 +3871,20 @@ export const zzpApi = {
 
     getCategories: async (): Promise<{ categories: string[] }> => {
       const response = await api.get<{ categories: string[] }>('/zzp/expenses/categories/list')
+      return response.data
+    },
+    
+    /**
+     * Scan a receipt and extract expense data.
+     * Returns extracted data that can be used to prefill the expense form.
+     */
+    scanReceipt: async (): Promise<{
+      extracted_data: ZZPExpenseCreate
+      confidence: number
+      status: string
+      message: string
+    }> => {
+      const response = await api.post('/zzp/expenses/scan')
       return response.data
     },
   },

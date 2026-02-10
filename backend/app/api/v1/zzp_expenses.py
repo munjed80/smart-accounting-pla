@@ -300,3 +300,67 @@ async def list_expense_categories(
     
     from app.schemas.zzp import EXPENSE_CATEGORIES
     return {"categories": EXPENSE_CATEGORIES}
+
+
+@router.post("/expenses/scan")
+async def scan_receipt(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Scan a receipt and extract expense data using OCR.
+    
+    NOTE: This is a PLACEHOLDER endpoint that returns mock data for development.
+    
+    For production, this endpoint should be enhanced to:
+    1. Accept a file upload (image/pdf) via FastAPI's UploadFile
+    2. Process the image with an OCR service:
+       - Open-source: pytesseract (requires tesseract-ocr installation)
+       - Cloud: Google Cloud Vision API, Azure Computer Vision, or AWS Textract
+    3. Parse the OCR text to extract:
+       - Vendor/merchant name
+       - Date
+       - Total amount
+       - VAT amount/rate
+       - Category (via keyword matching or ML classification)
+    4. Return structured data with confidence scores
+    
+    Example production implementation:
+    ```python
+    from fastapi import UploadFile, File
+    
+    @router.post("/expenses/scan")
+    async def scan_receipt(
+        file: UploadFile = File(...),
+        current_user: CurrentUser,
+        db: Annotated[AsyncSession, Depends(get_db)],
+    ):
+        # Save uploaded file temporarily
+        # Process with OCR service
+        # Extract and structure data
+        # Return extracted_data
+    ```
+    """
+    require_zzp(current_user)
+    
+    # Verify user has administration
+    administration = await get_user_administration(current_user.id, db)
+    
+    # TODO: Implement actual OCR processing
+    # For now, return mock extracted data that can be used to prefill the form
+    from datetime import datetime
+    
+    return {
+        "extracted_data": {
+            "vendor": "Voorbeeld Leverancier",
+            "description": "Kantoorbenodigdheden",
+            "amount_cents": 12500,  # €125.00
+            "expense_date": datetime.now().date().isoformat(),
+            "category": "kantoorkosten",
+            "vat_rate": 21.0,
+            "notes": "Geëxtraheerd via bonnenscanner - controleer de gegevens"
+        },
+        "confidence": 0.85,
+        "status": "ready_for_review",
+        "message": "Bon succesvol gescand. Controleer de gegevens en pas aan indien nodig."
+    }

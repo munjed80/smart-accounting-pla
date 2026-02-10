@@ -81,6 +81,17 @@ def upgrade() -> None:
     op.create_index('ix_zzp_payment_allocations_payment_id', 'zzp_payment_allocations', ['payment_id'])
     op.create_index('ix_zzp_payment_allocations_invoice_id', 'zzp_payment_allocations', ['invoice_id'])
     
+    # Create the PostgreSQL function to update updated_at column
+    op.execute("""
+        CREATE OR REPLACE FUNCTION update_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+    """)
+    
     # Add trigger to update updated_at column for zzp_payments
     op.execute("""
         CREATE TRIGGER update_zzp_payments_updated_at
@@ -93,6 +104,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Drop trigger
     op.execute("DROP TRIGGER IF EXISTS update_zzp_payments_updated_at ON zzp_payments")
+    
+    # Drop the function
+    op.execute("DROP FUNCTION IF EXISTS update_updated_at_column()")
     
     # Drop tables
     op.drop_index('ix_zzp_payment_allocations_invoice_id', table_name='zzp_payment_allocations')

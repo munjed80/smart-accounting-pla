@@ -1167,6 +1167,8 @@ export const ZZPCustomersPage = () => {
         console.error('[Customer Save] Error stack:', error.stack)
       }
       toast.error(parseApiError(error))
+      // Re-throw error so the form knows the save failed and stays open
+      throw error
     }
   }, [user?.id, editingCustomer, loadCustomers])
 

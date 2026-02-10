@@ -1101,6 +1101,7 @@ const InvoiceCard = ({
   onShare,
   onMarkPaid,
   onMarkUnpaid,
+  onMarkAsSent,
   canEdit,
   isDownloading,
   isUpdatingStatus,
@@ -1115,6 +1116,7 @@ const InvoiceCard = ({
   onShare: () => void
   onMarkPaid: () => void
   onMarkUnpaid: () => void
+  onMarkAsSent: () => void
   canEdit: boolean
   isDownloading: boolean
   isUpdatingStatus: boolean
@@ -1203,6 +1205,20 @@ const InvoiceCard = ({
                 {t('zzpInvoices.share')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              {/* Mark as Sent - only for draft invoices */}
+              {invoice.status === 'draft' && (
+                <>
+                  <DropdownMenuItem onClick={onMarkAsSent} disabled={isUpdatingStatus}>
+                    {isUpdatingStatus ? (
+                      <SpinnerGap size={16} className="mr-2 animate-spin" />
+                    ) : (
+                      <PaperPlaneTilt size={16} className="mr-2" />
+                    )}
+                    {t('zzpInvoices.markAsSent')}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               {/* Mark as Paid / Unpaid - only for non-draft, non-cancelled invoices */}
               {invoice.status !== 'draft' && invoice.status !== 'cancelled' && (
                 <>
@@ -1485,15 +1501,6 @@ export const ZZPInvoicesPage = () => {
       const link = document.createElement('a')
       link.href = url
       link.style.display = 'none'
-      
-      if (isIOS()) {
-        // iOS Safari: Open in new tab with target _blank
-        // iOS often ignores download attribute, so we open in PDF viewer instead
-        link.target = '_blank'
-        link.rel = 'noopener noreferrer'
-      }
-      
-      // Set download attribute for browsers that support it
       link.download = filename
       
       document.body.appendChild(link)
@@ -1526,7 +1533,22 @@ export const ZZPInvoicesPage = () => {
         // Create object URL for the PDF blob
         const blobUrl = window.URL.createObjectURL(pdfBlob)
         
-        downloadViaAnchor(blobUrl, true)
+        // Special handling for iOS Safari
+        if (isIOS()) {
+          // iOS Safari ignores download attribute, so open in new tab instead
+          const newWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer')
+          
+          // Schedule cleanup
+          setTimeout(() => window.URL.revokeObjectURL(blobUrl), PDF_URL_REVOCATION_DELAY_MS * 2)
+          
+          // Check if popup was blocked
+          if (!newWindow) {
+            toast.warning('Popup geblokkeerd. Sta pop-ups toe om de PDF te openen.')
+          }
+        } else {
+          // For other browsers, use download attribute
+          downloadViaAnchor(blobUrl, true)
+        }
       } catch (blobErr) {
         console.warn('Blob download failed, trying window.open fallback:', blobErr)
         
@@ -1559,8 +1581,9 @@ export const ZZPInvoicesPage = () => {
   // Handle copy invoice link to clipboard
   const handleCopyLink = useCallback(async (invoice: ZZPInvoice) => {
     try {
-      // Create a proper invoice link using route parameter
-      const invoiceLink = `${window.location.origin}/zzp/invoices/${invoice.id}`
+      // Use PDF download URL as the shareable link
+      // This is the actual invoice that customers can view/download
+      const invoiceLink = zzpApi.invoices.getPdfUrl(invoice.id)
       await navigator.clipboard.writeText(invoiceLink)
       toast.success(t('zzpInvoices.linkCopied'))
     } catch (err) {
@@ -1571,8 +1594,8 @@ export const ZZPInvoicesPage = () => {
 
   // Handle share invoice (Web Share API with clipboard fallback)
   const handleShare = useCallback(async (invoice: ZZPInvoice) => {
-    // Create a proper invoice link using route parameter
-    const invoicePublicUrl = `${window.location.origin}/zzp/invoices/${invoice.id}`
+    // Use PDF download URL as the shareable link
+    const invoicePublicUrl = zzpApi.invoices.getPdfUrl(invoice.id)
     const invoiceNumber = invoice.invoice_number || `INV-${invoice.id}`
     
     try {
@@ -1629,6 +1652,21 @@ export const ZZPInvoicesPage = () => {
       await loadData()
     } catch (err) {
       console.error('Failed to mark as unpaid:', err)
+      toast.error(parseApiError(err))
+    } finally {
+      setUpdatingStatusInvoiceId(null)
+    }
+  }, [loadData])
+
+  // Handle mark as sent (for draft invoices)
+  const handleMarkAsSent = useCallback(async (invoice: ZZPInvoice) => {
+    setUpdatingStatusInvoiceId(invoice.id)
+    try {
+      await zzpApi.invoices.updateStatus(invoice.id, 'sent')
+      toast.success(t('zzpInvoices.markedAsSent'))
+      await loadData()
+    } catch (err) {
+      console.error('Failed to mark as sent:', err)
       toast.error(parseApiError(err))
     } finally {
       setUpdatingStatusInvoiceId(null)
@@ -1801,6 +1839,7 @@ export const ZZPInvoicesPage = () => {
                         onShare={() => handleShare(invoice)}
                         onMarkPaid={() => handleMarkPaid(invoice)}
                         onMarkUnpaid={() => handleMarkUnpaid(invoice)}
+                        onMarkAsSent={() => handleMarkAsSent(invoice)}
                         canEdit={canEdit}
                         isDownloading={downloadingInvoiceId === invoice.id}
                         isUpdatingStatus={updatingStatusInvoiceId === invoice.id}
@@ -1929,6 +1968,23 @@ export const ZZPInvoicesPage = () => {
                                       {t('zzpInvoices.share')}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
+                                    {/* Mark as Sent - only for draft invoices */}
+                                    {invoice.status === 'draft' && (
+                                      <>
+                                        <DropdownMenuItem 
+                                          onClick={() => handleMarkAsSent(invoice)}
+                                          disabled={updatingStatusInvoiceId === invoice.id}
+                                        >
+                                          {updatingStatusInvoiceId === invoice.id ? (
+                                            <SpinnerGap size={16} className="mr-2 animate-spin" />
+                                          ) : (
+                                            <PaperPlaneTilt size={16} className="mr-2" />
+                                          )}
+                                          {t('zzpInvoices.markAsSent')}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                      </>
+                                    )}
                                     {/* Mark as Paid / Unpaid - only for non-draft, non-cancelled invoices */}
                                     {invoice.status !== 'draft' && invoice.status !== 'cancelled' && (
                                       <>

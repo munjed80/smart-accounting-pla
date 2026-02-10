@@ -627,6 +627,8 @@ export const nl = {
     markUnpaid: "Markeer als onbetaald",
     markedPaid: "Factuur gemarkeerd als betaald",
     markedUnpaid: "Factuur gemarkeerd als onbetaald",
+    markAsSent: "Markeer als verzonden",
+    markedAsSent: "Factuur gemarkeerd als verzonden",
     pdfDownloading: "PDF wordt gedownload...",
     pdfDownloaded: "PDF gedownload",
     pdfError: "Kon PDF niet downloaden",

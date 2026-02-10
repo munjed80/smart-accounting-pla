@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   Table, 
   TableBody, 
@@ -323,6 +324,7 @@ export const BulkOperationsHistoryPage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const showLoading = useDelayedLoading(isLoading, 300, operations.length > 0)
   
   // Details drawer state
   const [selectedOperation, setSelectedOperation] = useState<BulkOperationResponse | null>(null)
@@ -452,8 +454,8 @@ export const BulkOperationsHistoryPage = () => {
 
         {/* Main content */}
         <Card className="bg-card/80 backdrop-blur-sm">
-          <CardContent className="pt-6">
-            {isLoading ? (
+          <CardContent className="pt-6 transition-opacity duration-200">
+            {showLoading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
                   <Skeleton key={i} className="h-16 w-full" />

@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/EmptyState'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   Table, 
   TableBody, 
@@ -175,11 +176,13 @@ export const AccountantRemindersPage = () => {
   const [totalReminders, setTotalReminders] = useState(0)
   const [isLoadingReminders, setIsLoadingReminders] = useState(true)
   const [remindersError, setRemindersError] = useState<string | null>(null)
+  const showLoadingReminders = useDelayedLoading(isLoadingReminders, 300, reminders.length > 0)
   
   // State for bulk operations
   const [bulkOperations, setBulkOperations] = useState<BulkOperationResponse[]>([])
   const [isLoadingBulkOps, setIsLoadingBulkOps] = useState(true)
   const [bulkOpsError, setBulkOpsError] = useState<string | null>(null)
+  const showLoadingBulkOps = useDelayedLoading(isLoadingBulkOps, 300, bulkOperations.length > 0)
   
   // State for clients (for filter dropdown)
   const [clients, setClients] = useState<AccountantClientListItem[]>([])
@@ -400,7 +403,7 @@ export const AccountantRemindersPage = () => {
               </Select>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="transition-opacity duration-200">
             {remindersError && (
               <Alert className="mb-4 bg-destructive/10 border-destructive/40">
                 <WarningCircle className="h-5 w-5 text-destructive" />
@@ -408,7 +411,7 @@ export const AccountantRemindersPage = () => {
               </Alert>
             )}
             
-            {isLoadingReminders ? (
+            {showLoadingReminders ? (
               <div className="space-y-2">
                 <Skeleton className="h-12 w-full" />
                 <Skeleton className="h-12 w-full" />
@@ -498,7 +501,7 @@ export const AccountantRemindersPage = () => {
             </CardTitle>
             <CardDescription>{t('reminders.bulkHistoryDescription')}</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="transition-opacity duration-200">
             {bulkOpsError && (
               <Alert className="mb-4 bg-destructive/10 border-destructive/40">
                 <WarningCircle className="h-5 w-5 text-destructive" />
@@ -506,7 +509,7 @@ export const AccountantRemindersPage = () => {
               </Alert>
             )}
             
-            {isLoadingBulkOps ? (
+            {showLoadingBulkOps ? (
               <div className="space-y-2">
                 <Skeleton className="h-12 w-full" />
                 <Skeleton className="h-12 w-full" />

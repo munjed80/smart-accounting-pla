@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   ledgerApi, 
   decisionApi,
@@ -428,6 +429,7 @@ export const ClientIssuesTab = ({ clientId, onIssueResolved }: ClientIssuesTabPr
   const [isRecalculating, setIsRecalculating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [recalculateResult, setRecalculateResult] = useState<RecalculateResponse | null>(null)
+  const showLoading = useDelayedLoading(isLoading, 300, !!issues)
 
   const fetchIssues = async () => {
     const logger = createDossierLogger(clientId)
@@ -541,7 +543,7 @@ export const ClientIssuesTab = ({ clientId, onIssueResolved }: ClientIssuesTabPr
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {showLoading ? (
               <Skeleton className="h-8 w-12" />
             ) : (
               <div className="text-2xl font-bold">
@@ -559,7 +561,7 @@ export const ClientIssuesTab = ({ clientId, onIssueResolved }: ClientIssuesTabPr
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {showLoading ? (
               <Skeleton className="h-8 w-12" />
             ) : (
               <div className="text-2xl font-bold text-red-600 dark:text-red-400">
@@ -577,7 +579,7 @@ export const ClientIssuesTab = ({ clientId, onIssueResolved }: ClientIssuesTabPr
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {showLoading ? (
               <Skeleton className="h-8 w-12" />
             ) : (
               <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
@@ -589,8 +591,8 @@ export const ClientIssuesTab = ({ clientId, onIssueResolved }: ClientIssuesTabPr
       </div>
 
       {/* Issues List */}
-      {isLoading ? (
-        <div className="space-y-4">
+      {showLoading ? (
+        <div className="space-y-4 transition-opacity duration-200">
           {[...Array(3)].map((_, i) => (
             <Skeleton key={i} className="h-32 w-full" />
           ))}

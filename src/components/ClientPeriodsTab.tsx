@@ -20,6 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import {
   Dialog,
   DialogContent,
@@ -696,6 +697,7 @@ export const ClientPeriodsTab = ({ clientId }: ClientPeriodsTabProps) => {
   const [periods, setPeriods] = useState<Period[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const showLoading = useDelayedLoading(isLoading, 300, periods.length > 0)
 
   const fetchPeriods = async () => {
     const logger = createDossierLogger(clientId)
@@ -758,8 +760,8 @@ export const ClientPeriodsTab = ({ clientId }: ClientPeriodsTabProps) => {
       </div>
 
       {/* Periods List */}
-      {isLoading ? (
-        <div className="space-y-4">
+      {showLoading ? (
+        <div className="space-y-4 transition-opacity duration-200">
           {[...Array(3)].map((_, i) => (
             <Skeleton key={i} className="h-32 w-full" />
           ))}

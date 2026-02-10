@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/lib/AuthContext'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { 
   ledgerApi, 
   decisionApi,
@@ -431,6 +432,7 @@ export const ClientIssuesPage = ({ clientId, onBack }: ClientIssuesPageProps) =>
   const [isRecalculating, setIsRecalculating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [recalculateResult, setRecalculateResult] = useState<RecalculateResponse | null>(null)
+  const showLoading = useDelayedLoading(isLoading, 300, !!issues)
 
   const fetchIssues = async () => {
     try {
@@ -522,7 +524,7 @@ export const ClientIssuesPage = ({ clientId, onBack }: ClientIssuesPageProps) =>
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-foreground mb-1">
-                {isLoading ? <Skeleton className="h-8 w-48" /> : issues?.client_name}
+                {showLoading ? <Skeleton className="h-8 w-48" /> : issues?.client_name}
               </h1>
               <p className="text-muted-foreground">
                 Consistency Issues from Validation Engine
@@ -560,7 +562,7 @@ export const ClientIssuesPage = ({ clientId, onBack }: ClientIssuesPageProps) =>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-8 w-12" />
               ) : (
                 <div className="text-2xl font-bold">
@@ -578,7 +580,7 @@ export const ClientIssuesPage = ({ clientId, onBack }: ClientIssuesPageProps) =>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-8 w-12" />
               ) : (
                 <div className="text-2xl font-bold text-red-600 dark:text-red-400">
@@ -596,7 +598,7 @@ export const ClientIssuesPage = ({ clientId, onBack }: ClientIssuesPageProps) =>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-8 w-12" />
               ) : (
                 <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
@@ -615,8 +617,8 @@ export const ClientIssuesPage = ({ clientId, onBack }: ClientIssuesPageProps) =>
               Issues are sorted by severity: errors first, then warnings
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            {isLoading ? (
+          <CardContent className="transition-opacity duration-200">
+            {showLoading ? (
               <div className="space-y-4">
                 {[...Array(3)].map((_, i) => (
                   <Skeleton key={i} className="h-32 w-full" />

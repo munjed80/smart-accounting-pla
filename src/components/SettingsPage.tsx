@@ -65,11 +65,7 @@ export const SettingsPage = () => {
   const [backendVersion, setBackendVersion] = useState<VersionInfo | null>(null)
   const [backendVersionError, setBackendVersionError] = useState<string | null>(null)
   
-  // Use delayed loading to prevent skeleton flash
-  const showLoading = useDelayedLoading(isLoading, 300, administrations.length > 0)
-  const showProfileLoading = useDelayedLoading(isLoadingProfile, 300, !!businessProfile)
-  
-  // Business profile state (for ZZP users)
+  // Business profile state (for ZZP users) - MUST be declared before useDelayedLoading
   const [businessProfile, setBusinessProfile] = useState<ZZPBusinessProfile | null>(null)
   const [profileForm, setProfileForm] = useState<ZZPBusinessProfileCreate>({
     company_name: '',
@@ -86,6 +82,10 @@ export const SettingsPage = () => {
     website: '',
     logo_url: '',
   })
+  
+  // Use delayed loading to prevent skeleton flash
+  const showLoading = useDelayedLoading(isLoading, 300, administrations.length > 0)
+  const showProfileLoading = useDelayedLoading(isLoadingProfile, 300, !!businessProfile)
   
   // Notification preferences (local state - would be stored in backend in full implementation)
   const [notifications, setNotifications] = useState({

@@ -1277,8 +1277,11 @@ export const ZZPInvoicesPage = () => {
   
   // Status change state - tracks which invoice is updating status
   const [updatingStatusInvoiceId, setUpdatingStatusInvoiceId] = useState<string | null>(null)
+  
+  // Pre-selected invoice ID from URL
+  const [preSelectedInvoiceId, setPreSelectedInvoiceId] = useState<string | null>(null)
 
-  // Check for customer_id in URL params
+  // Check for customer_id in URL params or invoice_id in URL path
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const customerId = params.get('customer_id')
@@ -1286,6 +1289,17 @@ export const ZZPInvoicesPage = () => {
       setPreSelectedCustomerId(customerId)
       // Clear the URL param after reading it
       window.history.replaceState({}, '', window.location.pathname)
+    }
+    
+    // Check for invoice ID in URL path: /zzp/invoices/:id
+    const pathParts = window.location.pathname.split('/')
+    const invoicesIndex = pathParts.indexOf('invoices')
+    if (invoicesIndex !== -1 && pathParts[invoicesIndex + 1]) {
+      const invoiceId = pathParts[invoicesIndex + 1]
+      // We'll handle this after invoices are loaded
+      setPreSelectedInvoiceId(invoiceId)
+      // Clean up the URL to /zzp/invoices
+      window.history.replaceState({}, '', '/zzp/invoices')
     }
   }, [])
 
@@ -1333,6 +1347,20 @@ export const ZZPInvoicesPage = () => {
       setPreSelectedCustomerId(null) // Clear URL param after opening
     }
   }, [preSelectedCustomerId, customers, isLoading])
+  
+  // Auto-open invoice view when pre-selected invoice ID is set and data is loaded
+  useEffect(() => {
+    if (preSelectedInvoiceId && invoices.length > 0 && !isLoading) {
+      // Find the invoice
+      const invoice = invoices.find(inv => inv.id === preSelectedInvoiceId)
+      if (invoice) {
+        setViewingInvoice(invoice)
+      } else {
+        toast.error(t('zzpInvoices.invoiceNotFound') || 'Invoice not found')
+      }
+      setPreSelectedInvoiceId(null) // Clear after opening
+    }
+  }, [preSelectedInvoiceId, invoices, isLoading])
 
   // Create customer lookup map
   const customerMap = useMemo(() => {
@@ -1531,8 +1559,8 @@ export const ZZPInvoicesPage = () => {
   // Handle copy invoice link to clipboard
   const handleCopyLink = useCallback(async (invoice: ZZPInvoice) => {
     try {
-      // Create a link to the invoice - for now, just a reference
-      const invoiceLink = `${window.location.origin}/zzp/invoices?view=${encodeURIComponent(invoice.id)}`
+      // Create a proper invoice link using route parameter
+      const invoiceLink = `${window.location.origin}/zzp/invoices/${invoice.id}`
       await navigator.clipboard.writeText(invoiceLink)
       toast.success(t('zzpInvoices.linkCopied'))
     } catch (err) {
@@ -1543,7 +1571,8 @@ export const ZZPInvoicesPage = () => {
 
   // Handle share invoice (Web Share API with clipboard fallback)
   const handleShare = useCallback(async (invoice: ZZPInvoice) => {
-    const invoicePublicUrl = `${window.location.origin}/zzp/invoices?view=${encodeURIComponent(invoice.id)}`
+    // Create a proper invoice link using route parameter
+    const invoicePublicUrl = `${window.location.origin}/zzp/invoices/${invoice.id}`
     const invoiceNumber = invoice.invoice_number || `INV-${invoice.id}`
     
     try {
@@ -1574,7 +1603,12 @@ export const ZZPInvoicesPage = () => {
   const handleMarkPaid = useCallback(async (invoice: ZZPInvoice) => {
     setUpdatingStatusInvoiceId(invoice.id)
     try {
-      await zzpApi.invoices.updateStatus(invoice.id, 'paid')
+      // Use proper payment system endpoint
+      await zzpApi.invoices.markPaid(invoice.id, {
+        payment_date: new Date().toISOString(),
+        payment_method: 'bank_transfer',
+        notes: 'Gemarkeerd als betaald via ZZP portal'
+      })
       toast.success(t('zzpInvoices.markedPaid'))
       await loadData()
     } catch (err) {
@@ -1585,11 +1619,12 @@ export const ZZPInvoicesPage = () => {
     }
   }, [loadData])
 
-  // Handle mark as unpaid (change back to sent)
+  // Handle mark as unpaid (remove payment allocations)
   const handleMarkUnpaid = useCallback(async (invoice: ZZPInvoice) => {
     setUpdatingStatusInvoiceId(invoice.id)
     try {
-      await zzpApi.invoices.updateStatus(invoice.id, 'sent')
+      // Use proper payment system endpoint
+      await zzpApi.invoices.markUnpaid(invoice.id)
       toast.success(t('zzpInvoices.markedUnpaid'))
       await loadData()
     } catch (err) {

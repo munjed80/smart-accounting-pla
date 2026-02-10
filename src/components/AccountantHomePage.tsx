@@ -77,6 +77,7 @@ import { BulkOperationModal } from './BulkOperationModal'
 import { RecentActionsPanel } from './RecentActionsPanel'
 import { useClientSelection } from '@/hooks/useClientSelection'
 import { WorkQueueSection } from './WorkQueueSection'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
 // Local storage keys for user preferences
 const PREF_SEARCH = 'accountant_search'
@@ -251,6 +252,9 @@ export const AccountantHomePage = () => {
   const [allClients, setAllClients] = useState<ClientStatusCard[]>([]) // All fetched clients
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Delayed loading to prevent flashing
+  const showLoading = useDelayedLoading(isLoading, 300, allClients.length > 0)
   
   // Search state with debounce
   const [searchText, setSearchText] = useState(() => 
@@ -706,14 +710,14 @@ export const AccountantHomePage = () => {
         <DagstartPanel 
           summary={summary} 
           clients={allClients} 
-          isLoading={isLoading}
+          isLoading={showLoading}
           onFilterChange={setActiveFilter as (filter: string) => void}
         />
 
         {/* Priority Clients Panel - "Top prioriteit klanten" */}
         <PriorityClientsPanel 
           clients={allClients} 
-          isLoading={isLoading} 
+          isLoading={showLoading} 
         />
 
         {/* Error Alert */}
@@ -730,42 +734,42 @@ export const AccountantHomePage = () => {
             icon={Users} 
             label={t('accountantDashboard.kpiTotalClients')} 
             value={summary?.total_clients || 0}
-            isLoading={isLoading}
+            isLoading={showLoading}
           />
           <KPICard 
             icon={WarningCircle} 
             label={t('accountantDashboard.kpiRedIssues')} 
             value={summary?.clients_with_red_issues || 0}
             color="red"
-            isLoading={isLoading}
+            isLoading={showLoading}
           />
           <KPICard 
             icon={MagnifyingGlass} 
             label={t('accountantDashboard.kpiToReview')} 
             value={summary?.clients_in_review || 0}
             color="yellow"
-            isLoading={isLoading}
+            isLoading={showLoading}
           />
           <KPICard 
             icon={Calendar} 
             label={t('accountantDashboard.kpiVatDue')} 
             value={summary?.upcoming_vat_deadlines_7d || 0}
             color={summary?.upcoming_vat_deadlines_7d ? 'red' : 'green'}
-            isLoading={isLoading}
+            isLoading={showLoading}
           />
           <KPICard 
             icon={Stack} 
             label={t('accountantDashboard.kpiDocBacklog')} 
             value={summary?.document_backlog_total || 0}
             color={summary?.document_backlog_total ? 'yellow' : 'green'}
-            isLoading={isLoading}
+            isLoading={showLoading}
           />
           <KPICard 
             icon={Bell} 
             label={t('accountantDashboard.kpiAlerts')} 
             value={(summary?.alerts_by_severity.critical || 0) + (summary?.alerts_by_severity.warning || 0)}
             color={summary?.alerts_by_severity.critical ? 'red' : 'yellow'}
-            isLoading={isLoading}
+            isLoading={showLoading}
           />
         </div>
 
@@ -913,7 +917,7 @@ export const AccountantHomePage = () => {
           </CardHeader>
           
           <CardContent className="pt-0">
-            {isLoading ? (
+            {showLoading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
                   <Skeleton key={i} className="h-12 w-full" />
@@ -921,7 +925,7 @@ export const AccountantHomePage = () => {
               </div>
             ) : paginatedClients.length > 0 ? (
               <>
-                <Table>
+                <Table style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10">

@@ -98,9 +98,17 @@ The overlay timing "after 1 second" suggests:
 - Listens for custom `navigate` events (programmatic navigation)
 - Calls cleanup function to close overlays on route changes
 
-### 2. AppShell Protection
+### 2. Body Scroll Lock Protection Hook
+**File**: `/src/hooks/usePreventBodyScrollLock.ts`
+- Checks for stuck body scroll lock (`overflow: hidden`)
+- Automatically releases scroll lock if no overlays are open
+- Runs on mount and route changes
+- Prevents scroll lock from persisting after overlay closes
+
+### 3. AppShell Protection
 **File**: `/src/components/AppShell.tsx`
 - **Route change protection**: Added `useCloseOverlayOnRouteChange(() => setSidebarOpen(false))`
+- **Scroll lock protection**: Added `usePreventBodyScrollLock()` to release stuck scroll locks
 - **Escape key handler**: Added `useEffect` to close sidebar when Escape key is pressed
 - These protections ensure the mobile Sheet overlay cannot get stuck open
 
@@ -108,7 +116,9 @@ The overlay timing "after 1 second" suggests:
 - ✅ Sheet closes automatically on navigation
 - ✅ Escape key closes overlay (better UX)
 - ✅ Prevents stuck overlay state during routing
-- ✅ Radix UI handles body scroll lock cleanup automatically
+- ✅ Automatically releases stuck body scroll lock
+- ✅ Radix UI handles normal scroll lock cleanup, we handle edge cases
+- ✅ Console warnings for debugging when locks are released
 
 ## Next Steps
 
@@ -117,8 +127,56 @@ The overlay timing "after 1 second" suggests:
 3. ✅ Check for useEffect hooks with timing logic in AppShell
 4. ✅ Verify no dialogs are being rendered with `open={true}` unintentionally
 5. ✅ Add safeguards (route change handler, escape key)
-6. ⬜ Identify exact root cause of 1-second overlay appearance
-7. ⬜ Test on initial load, refresh, and mobile viewport
+6. ⬜ **USER ACTION**: Use DevTools to identify exact overlay (see Investigation Guide below)
+7. ⬜ Implement specific fix based on findings
+8. ⬜ Test on initial load, refresh, and mobile viewport
+
+## Investigation Guide for Identifying the Overlay
+
+If the overlay still appears after the protective fixes, use these steps to identify it:
+
+### Step 1: Reproduce and Inspect
+1. Navigate to the Overzicht page (`/dashboard` or `/`)
+2. Wait for the overlay to appear (~1 second)
+3. Open DevTools (F12) → Elements tab
+4. Click the element picker icon (top-left of DevTools)
+5. Click on the dark overlay
+
+### Step 2: Identify the Element
+Look for these attributes on the selected element:
+- **Classes**: Should include `fixed inset-0 z-50 bg-black/50`
+- **Data attributes**:
+  - `data-slot="sheet-overlay"` → Sheet (mobile sidebar)
+  - `data-slot="dialog-overlay"` → Dialog
+  - `data-slot="alert-dialog-overlay"` → AlertDialog  
+  - `data-state="open"` → Currently open
+  - `data-state="closed"` → Should be closed (bug if visible)
+
+### Step 3: Find Parent Component
+1. In DevTools, navigate up the DOM tree from the overlay
+2. Look for parent elements with `data-slot` or `data-radix-*` attributes
+3. Note the component type (Sheet, Dialog, AlertDialog, Drawer)
+
+### Step 4: Check React State
+1. Install React DevTools browser extension
+2. Select the overlay element
+3. Navigate up to the Sheet/Dialog component
+4. Check the `open` or `isOpen` prop value
+5. Find which component is setting this state
+
+### Expected Results
+
+**If it's the AppShell Sheet:**
+- `data-slot="sheet-overlay"`
+- Parent: `<Sheet>` component in `AppShell.tsx`
+- State: `sidebarOpen` should be `false`
+- **Already fixed**: Route change and Escape handlers added
+
+**If it's a different component:**
+- Document the `data-slot` value
+- Document the parent component name
+- Document the state variable name
+- Report these findings for targeted fix
 
 ## Technical Details
 

@@ -2,6 +2,7 @@ import { ReactNode, useState, useEffect } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { useActiveClient } from '@/lib/ActiveClientContext'
 import { useCloseOverlayOnRouteChange } from '@/hooks/useCloseOverlayOnRouteChange'
+import { usePreventBodyScrollLock } from '@/hooks/usePreventBodyScrollLock'
 import { navigateTo } from '@/lib/navigation'
 import { getApiBaseUrl } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -266,6 +267,9 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   
   // Protection: Close sidebar on route changes
   useCloseOverlayOnRouteChange(() => setSidebarOpen(false))
+  
+  // Protection: Prevent body scroll lock from getting stuck
+  usePreventBodyScrollLock()
   
   // Protection: Close sidebar on Escape key
   useEffect(() => {

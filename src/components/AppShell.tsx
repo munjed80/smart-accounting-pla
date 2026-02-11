@@ -334,27 +334,33 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
 
   // Handle menu item click
   const handleMenuClick = (item: MenuItem) => {
+    // Close mobile menu BEFORE navigation
+    setSidebarOpen(false)
+    
+    // Trigger navigation
     if (item.tabValue && onTabChange) {
       onTabChange(item.tabValue)
     }
-    // Close mobile menu after navigation
-    setSidebarOpen(false)
   }
 
   // Navigate back to home (Work Queue for accountants, Dashboard for ZZP)
   const handleBackToHome = () => {
+    // Close mobile menu BEFORE navigation
+    setSidebarOpen(false)
+    
     if (onTabChange) {
       onTabChange(homeTab)
     }
-    setSidebarOpen(false)
   }
   
   // Handle changing client (go to clients page)
   const handleChangeClient = () => {
+    // Close mobile menu BEFORE navigation
+    setSidebarOpen(false)
+    
     if (onTabChange) {
       onTabChange('clients')
     }
-    setSidebarOpen(false)
   }
 
   // Render sidebar/drawer content

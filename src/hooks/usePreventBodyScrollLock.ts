@@ -29,7 +29,9 @@ export function usePreventBodyScrollLock() {
       
       // If body is locked but no overlays are open, release it
       if (bodyOverflow === 'hidden' && openOverlays.length === 0) {
-        console.warn('[usePreventBodyScrollLock] Releasing stuck body scroll lock')
+        if (import.meta.env.DEV) {
+          console.warn('[usePreventBodyScrollLock] Releasing stuck body scroll lock')
+        }
         document.body.style.overflow = ''
         document.body.style.paddingRight = ''
       }
@@ -44,11 +46,13 @@ export function usePreventBodyScrollLock() {
     // Check on mount
     releaseScrollLock()
 
-    // Listen for route changes
+    // Listen for route changes (both browser navigation and programmatic)
     window.addEventListener('popstate', handleRouteChange)
+    window.addEventListener('app:route-change', handleRouteChange)
     
     return () => {
       window.removeEventListener('popstate', handleRouteChange)
+      window.removeEventListener('app:route-change', handleRouteChange)
     }
   }, [])
 }

@@ -74,6 +74,11 @@ import {
   CaretUp,
   Export,
   FileText,
+  Funnel,
+  MagnifyingGlass,
+  ArrowsDownUp,
+  TrendUp,
+  Copy,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { navigateTo } from '@/lib/navigation'
@@ -102,6 +107,12 @@ const DEFAULT_VAT_RATE_NL = 21
 // Helper function to format time entry as invoice line description
 const formatTimeEntryLineDescription = (entry: ZZPTimeEntry): string => {
   return `${entry.description}${entry.project_name ? ` (${entry.project_name})` : ''} - ${entry.hours}h`
+}
+
+const escapeCsv = (value: string | number | undefined): string => {
+  const raw = value === undefined ? '' : String(value)
+  const escaped = raw.replace(/"/g, '""')
+  return `"${escaped}"`
 }
 
 // Hook for live timer display
@@ -230,7 +241,7 @@ const StatsCard = ({
 
 // Loading skeleton for stats
 const StatsLoadingSkeleton = () => (
-  <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
     {[1, 2].map((i) => (
       <Card key={i} className="bg-card/80 backdrop-blur-sm">
         <CardContent className="p-4 sm:p-5">
@@ -1173,12 +1184,14 @@ const ClockInCard = ({
 const EntryCard = ({ 
   entry,
   customerName,
-  onEdit, 
+  onEdit,
+  onDuplicate,
   onDelete 
 }: { 
   entry: ZZPTimeEntry
   customerName?: string
   onEdit: () => void
+  onDuplicate: () => void
   onDelete: () => void 
 }) => (
   <Card className="bg-card/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-colors">
@@ -1230,6 +1243,15 @@ const EntryCard = ({
         <Button
           variant="ghost"
           size="sm"
+          onClick={onDuplicate}
+          className="h-9 px-3 gap-2"
+        >
+          <Copy size={16} />
+          {t('zzpTimeTracking.duplicate')}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onDelete}
           className="h-9 px-3 gap-2 text-destructive hover:text-destructive"
         >
@@ -1265,6 +1287,11 @@ export const ZZPTimeTrackingPage = () => {
   const [editingEntry, setEditingEntry] = useState<ZZPTimeEntry | undefined>()
   const [deletingEntry, setDeletingEntry] = useState<ZZPTimeEntry | undefined>()
   const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false)
+
+  // Productivity filters and sorting
+  const [searchTerm, setSearchTerm] = useState('')
+  const [billableFilter, setBillableFilter] = useState<'all' | 'billable' | 'non-billable'>('all')
+  const [sortOption, setSortOption] = useState<'date-desc' | 'date-asc' | 'hours-desc' | 'hours-asc'>('date-desc')
 
   // Computed values
   const currentWeekEnd = useMemo(() => getSunday(currentWeekStart), [currentWeekStart])
@@ -1453,7 +1480,7 @@ export const ZZPTimeTrackingPage = () => {
     if (!user?.id) return
 
     try {
-      if (editingEntry) {
+      if (editingEntry?.id) {
         await zzpApi.timeEntries.update(editingEntry.id, data as ZZPTimeEntryUpdate)
         toast.success(t('zzpTimeTracking.entrySaved'))
       } else {
@@ -1502,10 +1529,106 @@ export const ZZPTimeTrackingPage = () => {
     setIsFormOpen(true)
   }, [])
 
-  // Sort entries by date (most recent first)
-  const sortedEntries = useMemo(() => {
-    return [...entries].sort((a, b) => b.entry_date.localeCompare(a.entry_date))
-  }, [entries])
+  // Filter and sort entries
+  const filteredEntries = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase()
+
+    const filtered = entries.filter((entry) => {
+      const customerName = entry.customer_id ? customerMap[entry.customer_id] : ''
+      const matchesSearch = !query || [
+        entry.description,
+        entry.project_name,
+        customerName,
+      ].some((value) => (value || '').toLowerCase().includes(query))
+
+      const matchesBillableFilter =
+        billableFilter === 'all' ||
+        (billableFilter === 'billable' && entry.billable) ||
+        (billableFilter === 'non-billable' && !entry.billable)
+
+      return matchesSearch && matchesBillableFilter
+    })
+
+    return filtered.sort((a, b) => {
+      switch (sortOption) {
+        case 'date-asc':
+          return a.entry_date.localeCompare(b.entry_date)
+        case 'hours-desc':
+          return b.hours - a.hours
+        case 'hours-asc':
+          return a.hours - b.hours
+        case 'date-desc':
+        default:
+          return b.entry_date.localeCompare(a.entry_date)
+      }
+    })
+  }, [entries, searchTerm, billableFilter, sortOption, customerMap])
+
+  const productivityMetrics = useMemo(() => {
+    const totalHours = filteredEntries.reduce((sum, entry) => sum + entry.hours, 0)
+    const billableHours = filteredEntries.filter((entry) => entry.billable).reduce((sum, entry) => sum + entry.hours, 0)
+    const utilization = totalHours > 0 ? (billableHours / totalHours) * 100 : 0
+
+    return {
+      totalHours,
+      billableHours,
+      utilization,
+      averageHoursPerEntry: filteredEntries.length > 0 ? totalHours / filteredEntries.length : 0,
+    }
+  }, [filteredEntries])
+
+  const exportEntriesToCsv = useCallback(() => {
+    if (filteredEntries.length === 0) {
+      toast.error(t('zzpTimeTracking.noEntriesToExport'))
+      return
+    }
+
+    const headers = [
+      t('zzpTimeTracking.columnDate'),
+      t('zzpTimeTracking.columnDescription'),
+      t('zzpTimeTracking.columnProject'),
+      t('zzpTimeTracking.customer'),
+      t('zzpTimeTracking.columnHours'),
+      t('zzpTimeTracking.columnBillable'),
+      t('zzpTimeTracking.hourlyRate'),
+    ]
+
+    const rows = filteredEntries.map((entry) => [
+      entry.entry_date,
+      entry.description,
+      entry.project_name || '-',
+      entry.customer_id ? customerMap[entry.customer_id] || '-' : '-',
+      entry.hours.toString(),
+      entry.billable ? t('zzpTimeTracking.billable') : t('zzpTimeTracking.nonBillable'),
+      entry.hourly_rate_cents ? (entry.hourly_rate_cents / 100).toFixed(2) : '-',
+    ])
+
+    const csv = [
+      headers.map(escapeCsv).join(','),
+      ...rows.map((row) => row.map(escapeCsv).join(',')),
+    ].join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `uren-${formatDateISO(currentWeekStart)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    toast.success(t('zzpTimeTracking.exportSuccess'))
+  }, [filteredEntries, customerMap, currentWeekStart])
+
+  const duplicateEntry = useCallback((entry: ZZPTimeEntry) => {
+    setEditingEntry({
+      ...entry,
+      id: '',
+      entry_date: formatDateISO(new Date()),
+    })
+    setIsFormOpen(true)
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
@@ -1541,16 +1664,14 @@ export const ZZPTimeTrackingPage = () => {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span tabIndex={0} className="inline-flex flex-1 sm:flex-none">
-                  <Button 
-                    variant="outline" 
-                    aria-disabled="true" 
-                    className="gap-2 h-10 sm:h-11 w-full opacity-50 cursor-not-allowed"
-                  >
-                    <Export size={18} />
-                    <span className="hidden sm:inline">{t('zzpTimeTracking.export')}</span>
-                  </Button>
-                </span>
+                <Button 
+                  variant="outline"
+                  onClick={exportEntriesToCsv}
+                  className="gap-2 h-10 sm:h-11 flex-1 sm:flex-none"
+                >
+                  <Export size={18} />
+                  <span className="hidden sm:inline">{t('zzpTimeTracking.export')}</span>
+                </Button>
               </TooltipTrigger>
               <TooltipContent>
                 <p>{t('zzpTimeTracking.exportTooltip')}</p>
@@ -1630,6 +1751,13 @@ export const ZZPTimeTrackingPage = () => {
               icon={Receipt}
               className="border-green-500/20"
             />
+            <StatsCard
+              title={t('zzpTimeTracking.utilization')}
+              value={productivityMetrics.utilization.toFixed(0)}
+              unit="%"
+              icon={TrendUp}
+              className="col-span-2 lg:col-span-1 border-blue-500/20"
+            />
           </div>
         )}
 
@@ -1641,10 +1769,55 @@ export const ZZPTimeTrackingPage = () => {
           />
         )}
 
+        {!showLoading && (
+          <Card className="bg-card/80 backdrop-blur-sm border border-border/50 mb-6">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="md:col-span-2 relative">
+                  <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder={t('zzpTimeTracking.searchPlaceholder')}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={billableFilter} onValueChange={(v: 'all' | 'billable' | 'non-billable') => setBillableFilter(v)}>
+                  <SelectTrigger className="gap-2">
+                    <div className="flex items-center gap-2">
+                      <Funnel size={14} />
+                      <SelectValue />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('zzpTimeTracking.filterAll')}</SelectItem>
+                    <SelectItem value="billable">{t('zzpTimeTracking.filterBillable')}</SelectItem>
+                    <SelectItem value="non-billable">{t('zzpTimeTracking.filterNonBillable')}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={sortOption} onValueChange={(v: 'date-desc' | 'date-asc' | 'hours-desc' | 'hours-asc') => setSortOption(v)}>
+                  <SelectTrigger className="gap-2">
+                    <div className="flex items-center gap-2">
+                      <ArrowsDownUp size={14} />
+                      <SelectValue />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date-desc">{t('zzpTimeTracking.sortDateDesc')}</SelectItem>
+                    <SelectItem value="date-asc">{t('zzpTimeTracking.sortDateAsc')}</SelectItem>
+                    <SelectItem value="hours-desc">{t('zzpTimeTracking.sortHoursDesc')}</SelectItem>
+                    <SelectItem value="hours-asc">{t('zzpTimeTracking.sortHoursAsc')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Show loading, empty state or content */}
         {showLoading ? (
           <TableLoadingSkeleton />
-        ) : entries.length === 0 ? (
+        ) : filteredEntries.length === 0 ? (
           <EmptyState onAddEntry={openNewForm} />
         ) : (
           <Card className="bg-card/80 backdrop-blur-sm" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
@@ -1653,7 +1826,7 @@ export const ZZPTimeTrackingPage = () => {
                 <div>
                   <CardTitle className="text-lg">{t('zzpTimeTracking.entriesTitle')}</CardTitle>
                   <CardDescription>
-                    {entries.length} {entries.length === 1 ? t('zzpTimeTracking.entry') : t('zzpTimeTracking.entries')} {t('zzpTimeTracking.thisWeek')}
+                    {filteredEntries.length} {filteredEntries.length === 1 ? t('zzpTimeTracking.entry') : t('zzpTimeTracking.entries')} {t('zzpTimeTracking.thisWeek')}
                   </CardDescription>
                 </div>
               </div>
@@ -1661,12 +1834,13 @@ export const ZZPTimeTrackingPage = () => {
             <CardContent>
               {/* Mobile: Card list */}
               <div className="sm:hidden space-y-3">
-                {sortedEntries.map((entry) => (
+                {filteredEntries.map((entry) => (
                   <EntryCard
                     key={entry.id}
                     entry={entry}
                     customerName={entry.customer_id ? customerMap[entry.customer_id] : undefined}
                     onEdit={() => openEditForm(entry)}
+                    onDuplicate={() => duplicateEntry(entry)}
                     onDelete={() => setDeletingEntry(entry)}
                   />
                 ))}
@@ -1686,7 +1860,7 @@ export const ZZPTimeTrackingPage = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedEntries.map((entry) => (
+                    {filteredEntries.map((entry) => (
                       <TableRow key={entry.id} className="hover:bg-secondary/30">
                         <TableCell>
                           <div className="flex items-center gap-3">
@@ -1726,6 +1900,15 @@ export const ZZPTimeTrackingPage = () => {
                             >
                               <PencilSimple size={16} />
                               <span className="sr-only">{t('common.edit')}</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => duplicateEntry(entry)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Copy size={16} />
+                              <span className="sr-only">{t('zzpTimeTracking.duplicate')}</span>
                             </Button>
                             <Button
                               variant="ghost"

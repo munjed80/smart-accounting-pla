@@ -254,6 +254,29 @@ const AppContent = () => {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [user, isAccountant])
   
+  // Global overlay cleanup on route changes
+  useEffect(() => {
+    const handleRouteChange = () => {
+      // Clean up any lingering overlay portals after navigation
+      setTimeout(() => {
+        if (typeof document !== 'undefined') {
+          // Import and call cleanup function
+          import('@/hooks/useCloseOverlayOnRouteChange').then(({ cleanupOverlayPortals }) => {
+            cleanupOverlayPortals()
+          })
+        }
+      }, 100)
+    }
+    
+    window.addEventListener('popstate', handleRouteChange)
+    window.addEventListener('app:route-change', handleRouteChange)
+    
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange)
+      window.removeEventListener('app:route-change', handleRouteChange)
+    }
+  }, [])
+  
   // Update active tab when user role becomes available (after login) or route changes
   useEffect(() => {
     if (user && isAuthenticated) {

@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { useActiveClient } from '@/lib/ActiveClientContext'
-import { useCloseOverlayOnRouteChange } from '@/hooks/useCloseOverlayOnRouteChange'
+import { useCloseOverlayOnRouteChange, cleanupOverlayPortals } from '@/hooks/useCloseOverlayOnRouteChange'
 import { usePreventBodyScrollLock } from '@/hooks/usePreventBodyScrollLock'
 import { navigateTo } from '@/lib/navigation'
 import { getApiBaseUrl } from '@/lib/api'
@@ -334,27 +334,33 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
 
   // Handle menu item click
   const handleMenuClick = (item: MenuItem) => {
+    // Close mobile menu BEFORE navigation
+    setSidebarOpen(false)
+    
+    // Trigger navigation
     if (item.tabValue && onTabChange) {
       onTabChange(item.tabValue)
     }
-    // Close mobile menu after navigation
-    setSidebarOpen(false)
   }
 
   // Navigate back to home (Work Queue for accountants, Dashboard for ZZP)
   const handleBackToHome = () => {
+    // Close mobile menu BEFORE navigation
+    setSidebarOpen(false)
+    
     if (onTabChange) {
       onTabChange(homeTab)
     }
-    setSidebarOpen(false)
   }
   
   // Handle changing client (go to clients page)
   const handleChangeClient = () => {
+    // Close mobile menu BEFORE navigation
+    setSidebarOpen(false)
+    
     if (onTabChange) {
       onTabChange('clients')
     }
-    setSidebarOpen(false)
   }
 
   // Render sidebar/drawer content

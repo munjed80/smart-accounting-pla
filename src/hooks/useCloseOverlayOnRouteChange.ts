@@ -106,12 +106,12 @@ export function cleanupOverlayPortals() {
   })
   
   // Strategy 2: Remove fixed position overlay elements that are STUCK OPEN
-  // Only target overlays with explicit "open" state - don't remove properly closed ones
+  // This catches overlays that might not be in portals (edge case)
+  // Only target actual overlay elements (not dialog content), and only if open
   const overlaySelectors = [
     '[data-radix-dialog-overlay][data-state="open"]',
     '[data-radix-alert-dialog-overlay][data-state="open"]',
     '[data-radix-drawer-overlay][data-state="open"]',
-    '[data-state="open"][role="dialog"]',
   ].join(', ')
   
   const possibleOverlays = document.querySelectorAll(overlaySelectors)
@@ -132,8 +132,10 @@ export function cleanupOverlayPortals() {
     const isFullCoverage = hasInsetZero || hasAllSidesZero
     
     if (isFixed && isFullCoverage) {
-      // Force close state
-      htmlEl.setAttribute('data-state', 'closed')
+      // Force close state (safe check before setting attribute)
+      if (htmlEl.hasAttribute('data-state')) {
+        htmlEl.setAttribute('data-state', 'closed')
+      }
       
       // Remove immediately for stuck overlays
       htmlEl.remove()

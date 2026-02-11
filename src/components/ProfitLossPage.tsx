@@ -63,16 +63,18 @@ export const ProfitLossPage = ({ onNavigate }: ProfitLossPageProps) => {
     
     let startDate: string
     switch (period) {
-      case 'last30':
+      case 'last30': {
         const thirtyDaysAgo = new Date(today)
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
         startDate = thirtyDaysAgo.toISOString().split('T')[0]
         break
-      case 'thisQuarter':
+      }
+      case 'thisQuarter': {
         const quarter = Math.floor(today.getMonth() / 3)
         const quarterStart = new Date(today.getFullYear(), quarter * 3, 1)
         startDate = quarterStart.toISOString().split('T')[0]
         break
+      }
       case 'thisYear':
       default:
         startDate = `${today.getFullYear()}-01-01`

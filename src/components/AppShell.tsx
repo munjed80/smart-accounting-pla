@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { useActiveClient } from '@/lib/ActiveClientContext'
-import { useCloseOverlayOnRouteChange, cleanupOverlayPortals } from '@/hooks/useCloseOverlayOnRouteChange'
+import { useCloseOverlayOnRouteChange } from '@/hooks/useCloseOverlayOnRouteChange'
 import { usePreventBodyScrollLock } from '@/hooks/usePreventBodyScrollLock'
 import { navigateTo } from '@/lib/navigation'
 import { getApiBaseUrl } from '@/lib/api'

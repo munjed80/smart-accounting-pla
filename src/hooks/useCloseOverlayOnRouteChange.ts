@@ -86,11 +86,15 @@ export function cleanupOverlayPortals() {
     
     // Double-check it's actually an overlay (fixed positioning with full coverage)
     const isFixed = styles.position === 'fixed'
-    const isFullCoverage = 
-      (styles.top === '0px' || styles.inset === '0px') &&
-      (styles.left === '0px') &&
-      (styles.right === '0px') &&
-      (styles.bottom === '0px')
+    
+    // Check for full coverage - either via inset or individual properties
+    const hasInsetZero = styles.inset === '0px'
+    const hasAllSidesZero = 
+      styles.top === '0px' &&
+      styles.left === '0px' &&
+      styles.right === '0px' &&
+      styles.bottom === '0px'
+    const isFullCoverage = hasInsetZero || hasAllSidesZero
     
     if (isFixed && isFullCoverage) {
       // Extra safety: don't remove if it has important content (many children)

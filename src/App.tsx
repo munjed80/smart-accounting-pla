@@ -36,6 +36,7 @@ import { AppShell } from '@/components/AppShell'
 import { DashboardErrorBoundary } from '@/components/DashboardErrorBoundary'
 import { administrationApi, accountantClientApi } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
+import { cleanupOverlayPortals } from '@/hooks/useCloseOverlayOnRouteChange'
 import { Database } from '@phosphor-icons/react'
 
 // URL-based routing with path support
@@ -259,12 +260,7 @@ const AppContent = () => {
     const handleRouteChange = () => {
       // Clean up any lingering overlay portals after navigation
       setTimeout(() => {
-        if (typeof document !== 'undefined') {
-          // Import and call cleanup function
-          import('@/hooks/useCloseOverlayOnRouteChange').then(({ cleanupOverlayPortals }) => {
-            cleanupOverlayPortals()
-          })
-        }
+        cleanupOverlayPortals()
       }, 100)
     }
     

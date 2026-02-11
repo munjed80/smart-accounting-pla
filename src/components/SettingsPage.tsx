@@ -922,7 +922,7 @@ export const SettingsPage = () => {
                     <div className="flex flex-wrap items-center gap-4 font-mono text-xs">
                       <span>
                         <strong>Git SHA:</strong>{' '}
-                        <code className="bg-secondary px-1 rounded">{backendVersion.git_sha.substring(0, 8)}</code>
+                        <code className="bg-secondary px-1 rounded">{backendVersion.git_sha?.substring(0, 8) || 'unknown'}</code>
                       </span>
                       <span>
                         <strong>Build:</strong>{' '}
@@ -932,7 +932,7 @@ export const SettingsPage = () => {
                       </span>
                       <span>
                         <strong>Env:</strong>{' '}
-                        <code className="bg-secondary px-1 rounded">{backendVersion.env_name}</code>
+                        <code className="bg-secondary px-1 rounded">{backendVersion.env_name || 'unknown'}</code>
                       </span>
                     </div>
                   ) : (

@@ -200,19 +200,19 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // 8. Uren (Time Tracking) - coming soon
-  {
-    label: t('sidebar.uren'),
-    tabValue: 'time',
-    icon: <Clock size={20} weight="duotone" />,
-    rolesAllowed: ['zzp'],
-    section: 'main',
-  },
-  // 9. Agenda
+  // 8. Agenda
   {
     label: t('sidebar.agenda'),
     tabValue: 'agenda',
     icon: <CalendarBlank size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  // 9. Uren (Time Tracking)
+  {
+    label: t('sidebar.uren'),
+    tabValue: 'time',
+    icon: <Clock size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',
   },

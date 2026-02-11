@@ -22,9 +22,10 @@ export function usePreventBodyScrollLock() {
       const openOverlays = document.querySelectorAll([
         '[data-radix-dialog-overlay][data-state="open"]',
         '[data-radix-alert-dialog-overlay][data-state="open"]',
-        '[data-radix-drawer-overlay][data-state="open"]',
+        '[data-radix-drawer-overlay][data-state="open"]', // Added drawer support
         '[data-state="open"][role="dialog"]',
         '[data-slot*="overlay"][data-state="open"]', // Fallback for shadcn/ui components
+        '.sheet-overlay', // Additional Sheet/Drawer overlay class
       ].join(', '))
       
       // If body is locked but no overlays are open, release it
@@ -39,8 +40,8 @@ export function usePreventBodyScrollLock() {
 
     // Release on mount and route changes
     const handleRouteChange = () => {
-      // Small delay to let Radix UI cleanup first
-      setTimeout(releaseScrollLock, 100)
+      // Increased delay to let Radix UI cleanup first (especially for slower devices)
+      setTimeout(releaseScrollLock, 150)
     }
 
     // Check on mount

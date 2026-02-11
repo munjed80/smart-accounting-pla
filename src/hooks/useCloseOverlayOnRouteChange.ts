@@ -18,7 +18,11 @@ import { useEffect, useRef } from 'react'
 export const ROUTE_CHANGE_EVENT = 'app:route-change'
 
 // Delay to allow Radix UI portals to complete their cleanup cycle before DOM inspection
-const OVERLAY_CLEANUP_DELAY_MS = 50
+// Increased to 150ms to handle slower devices and ensure animations complete
+const OVERLAY_CLEANUP_DELAY_MS = 150
+
+// Small delay to allow forced close animation to start before removing elements
+const FORCE_CLOSE_ANIMATION_DELAY_MS = 50
 
 export function useCloseOverlayOnRouteChange(onClose: () => void) {
   // Use ref to avoid recreating effect when onClose changes
@@ -58,6 +62,7 @@ export function cleanupOverlayPortals() {
   if (typeof document === 'undefined') return
   
   let removedCount = 0
+  let pendingRemovals = 0
   
   // Strategy 1: Remove Radix portal containers that contain overlays
   const radixPortals = document.querySelectorAll('[data-radix-portal]')
@@ -67,8 +72,25 @@ export function cleanupOverlayPortals() {
     const hasDialog = portal.querySelector('[role="dialog"]')
     
     if (hasDialogOverlay || hasDialog) {
-      portal.remove()
-      removedCount++
+      // Force close state before removing to trigger any cleanup animations
+      const overlayElements = portal.querySelectorAll('[data-state]')
+      overlayElements.forEach(el => {
+        el.setAttribute('data-state', 'closed')
+      })
+      
+      // Small delay to allow forced animation to start, then remove
+      pendingRemovals++
+      setTimeout(() => {
+        if (portal.parentNode) {
+          portal.remove()
+          removedCount++
+          
+          // Log after all pending removals complete
+          if (--pendingRemovals === 0 && import.meta.env.DEV && removedCount > 0) {
+            console.log(`Overlay cleanup removed: ${removedCount} element(s)`)
+          }
+        }
+      }, FORCE_CLOSE_ANIMATION_DELAY_MS)
     }
   })
   
@@ -77,6 +99,7 @@ export function cleanupOverlayPortals() {
   const overlaySelectors = [
     '[data-radix-dialog-overlay]',
     '[data-radix-alert-dialog-overlay]',
+    '[data-radix-drawer-overlay]', // Added drawer support
     '[data-state="open"][role="dialog"]',
     '.fixed.inset-0', // Common Tailwind overlay pattern
     '[data-slot="overlay"]', // Some UI libraries use this
@@ -100,13 +123,19 @@ export function cleanupOverlayPortals() {
     const isFullCoverage = hasInsetZero || hasAllSidesZero
     
     if (isFixed && isFullCoverage) {
+      // Force close state
+      if (htmlEl.hasAttribute('data-state')) {
+        htmlEl.setAttribute('data-state', 'closed')
+      }
+      
+      // Remove immediately for stuck overlays
       htmlEl.remove()
       removedCount++
     }
   })
   
-  // Dev-only logging
-  if (import.meta.env.DEV && removedCount > 0) {
+  // Log immediate removals (Strategy 2) if no pending removals from Strategy 1
+  if (pendingRemovals === 0 && import.meta.env.DEV && removedCount > 0) {
     console.log(`Overlay cleanup removed: ${removedCount} element(s)`)
   }
 }

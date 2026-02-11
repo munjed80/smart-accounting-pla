@@ -741,10 +741,10 @@ const CreateInvoiceDialog = ({
     return billableEntries.filter(e => e.customer_id === selectedCustomerId)
   }, [billableEntries, selectedCustomerId])
 
-  // Active customers that have billable entries
+  // Customers that have billable entries
   const customersWithEntries = useMemo(() => {
     const customerIds = new Set(billableEntries.filter(e => e.customer_id).map(e => e.customer_id))
-    return customers.filter(c => c.status === 'active' && customerIds.has(c.id))
+    return customers.filter(c => customerIds.has(c.id))
   }, [customers, billableEntries])
 
   // Reset selections when dialog opens

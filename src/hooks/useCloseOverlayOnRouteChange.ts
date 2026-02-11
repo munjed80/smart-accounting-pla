@@ -61,10 +61,12 @@ export function useCloseOverlayOnRouteChange(onClose: () => void) {
 export function cleanupOverlayPortals() {
   if (typeof document === 'undefined') return
   
-  let removedCount = 0
+  let strategy1RemovedCount = 0
+  let strategy2RemovedCount = 0
   let pendingRemovals = 0
   
-  // Strategy 1: Remove Radix portal containers that contain overlays
+  // Strategy 1: Remove Radix portal containers that contain OPEN overlays
+  // DO NOT remove closed overlays as Radix needs them for proper state management
   const radixPortals = document.querySelectorAll('[data-radix-portal]')
   radixPortals.forEach(portal => {
     // Check if this portal contains an overlay (has overlay-like attributes or role)
@@ -72,37 +74,47 @@ export function cleanupOverlayPortals() {
     const hasDialog = portal.querySelector('[role="dialog"]')
     
     if (hasDialogOverlay || hasDialog) {
-      // Force close state before removing to trigger any cleanup animations
+      // Check if overlay is actually OPEN (don't remove properly closed ones)
       const overlayElements = portal.querySelectorAll('[data-state]')
+      let hasOpenOverlay = false
+      
       overlayElements.forEach(el => {
-        el.setAttribute('data-state', 'closed')
+        const state = el.getAttribute('data-state')
+        if (state === 'open') {
+          hasOpenOverlay = true
+          // Force close state to trigger cleanup animations
+          el.setAttribute('data-state', 'closed')
+        }
       })
       
-      // Small delay to allow forced animation to start, then remove
-      pendingRemovals++
-      setTimeout(() => {
-        if (portal.parentNode) {
-          portal.remove()
-          removedCount++
-          
-          // Log after all pending removals complete
-          if (--pendingRemovals === 0 && import.meta.env.DEV && removedCount > 0) {
-            console.log(`Overlay cleanup removed: ${removedCount} element(s)`)
+      // Only remove portal if it had open overlays
+      if (hasOpenOverlay) {
+        // Small delay to allow forced animation to start, then remove
+        pendingRemovals++
+        setTimeout(() => {
+          if (portal.parentNode) {
+            portal.remove()
+            strategy1RemovedCount++
+            
+            // Log after all pending removals complete
+            if (--pendingRemovals === 0 && import.meta.env.DEV) {
+              if (strategy1RemovedCount > 0 || strategy2RemovedCount > 0) {
+                console.log(`[Cleanup] Removed ${strategy1RemovedCount} stuck portal(s) and ${strategy2RemovedCount} stuck overlay(s)`)
+              }
+            }
           }
-        }
-      }, FORCE_CLOSE_ANIMATION_DELAY_MS)
+        }, FORCE_CLOSE_ANIMATION_DELAY_MS)
+      }
     }
   })
   
-  // Strategy 2: Remove fixed position overlay elements (more targeted than all elements)
-  // Target typical overlay selectors used by Radix/shadcn
+  // Strategy 2: Remove fixed position overlay elements that are STUCK OPEN
+  // This catches overlays that might not be in portals (edge case)
+  // Only target actual overlay elements (not dialog content), and only if open
   const overlaySelectors = [
-    '[data-radix-dialog-overlay]',
-    '[data-radix-alert-dialog-overlay]',
-    '[data-radix-drawer-overlay]', // Added drawer support
-    '[data-state="open"][role="dialog"]',
-    '.fixed.inset-0', // Common Tailwind overlay pattern
-    '[data-slot="overlay"]', // Some UI libraries use this
+    '[data-radix-dialog-overlay][data-state="open"]',
+    '[data-radix-alert-dialog-overlay][data-state="open"]',
+    '[data-radix-drawer-overlay][data-state="open"]',
   ].join(', ')
   
   const possibleOverlays = document.querySelectorAll(overlaySelectors)
@@ -123,19 +135,25 @@ export function cleanupOverlayPortals() {
     const isFullCoverage = hasInsetZero || hasAllSidesZero
     
     if (isFixed && isFullCoverage) {
-      // Force close state
+      // Force close state (safe check before setting attribute)
       if (htmlEl.hasAttribute('data-state')) {
         htmlEl.setAttribute('data-state', 'closed')
       }
       
       // Remove immediately for stuck overlays
       htmlEl.remove()
-      removedCount++
+      strategy2RemovedCount++
+      
+      if (import.meta.env.DEV) {
+        console.log(`[Cleanup] Removed stuck overlay element:`, htmlEl.getAttribute('data-slot') || htmlEl.className)
+      }
     }
   })
   
-  // Log immediate removals (Strategy 2) if no pending removals from Strategy 1
-  if (pendingRemovals === 0 && import.meta.env.DEV && removedCount > 0) {
-    console.log(`Overlay cleanup removed: ${removedCount} element(s)`)
+  // Log immediate removals from Strategy 2 if no pending removals from Strategy 1
+  if (pendingRemovals === 0 && import.meta.env.DEV) {
+    if (strategy1RemovedCount > 0 || strategy2RemovedCount > 0) {
+      console.log(`[Cleanup] Removed ${strategy1RemovedCount} stuck portal(s) and ${strategy2RemovedCount} stuck overlay(s)`)
+    }
   }
 }

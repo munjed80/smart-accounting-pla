@@ -387,7 +387,7 @@ export const SettingsPage = () => {
                 <Alert>
                   <Info size={16} />
                   <AlertDescription>
-                    Geen administraties gevonden. Mogelijk ben je een nieuwe gebruiker. Ga naar het overzicht om een administratie aan te maken, of neem contact op met support.
+                    {t('settings.noAdministrations')}
                   </AlertDescription>
                 </Alert>
               ) : (

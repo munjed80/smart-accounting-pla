@@ -40,7 +40,8 @@ import { cleanupOverlayPortals } from '@/hooks/useCloseOverlayOnRouteChange'
 import { Database } from '@phosphor-icons/react'
 
 // Delay for Radix UI to complete cleanup before our global cleanup runs
-const GLOBAL_CLEANUP_DELAY_MS = 100
+// Increased to 200ms to handle slower devices and ensure animations complete
+const GLOBAL_CLEANUP_DELAY_MS = 200
 
 // URL-based routing with path support
 type Route = 

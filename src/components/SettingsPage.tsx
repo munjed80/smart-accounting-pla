@@ -104,17 +104,25 @@ export const SettingsPage = () => {
   const [isChangingPassword, setIsChangingPassword] = useState(false)
 
   useEffect(() => {
+    let isMounted = true
+    
     const fetchData = async () => {
       setIsLoading(true)
       setLoadError(null)
       try {
         const admins = await administrationApi.list()
-        setAdministrations(admins)
+        if (isMounted) {
+          setAdministrations(admins)
+        }
       } catch (error) {
         console.error('Failed to fetch administrations:', error)
-        setLoadError('Failed to load company information')
+        if (isMounted) {
+          setLoadError('Failed to load company information')
+        }
       } finally {
-        setIsLoading(false)
+        if (isMounted) {
+          setIsLoading(false)
+        }
       }
     }
     fetchData()
@@ -123,25 +131,29 @@ export const SettingsPage = () => {
     const fetchBusinessProfile = async () => {
       if (!user?.id || user?.role !== 'zzp') return
       
-      setIsLoadingProfile(true)
+      if (isMounted) {
+        setIsLoadingProfile(true)
+      }
       try {
         const profile = await zzpApi.profile.get()
-        setBusinessProfile(profile)
-        setProfileForm({
-          company_name: profile.company_name || '',
-          trading_name: profile.trading_name || '',
-          address_street: profile.address_street || '',
-          address_postal_code: profile.address_postal_code || '',
-          address_city: profile.address_city || '',
-          address_country: profile.address_country || 'Nederland',
-          kvk_number: profile.kvk_number || '',
-          btw_number: profile.btw_number || '',
-          iban: profile.iban || '',
-          email: profile.email || '',
-          phone: profile.phone || '',
-          website: profile.website || '',
-          logo_url: profile.logo_url || '',
-        })
+        if (isMounted) {
+          setBusinessProfile(profile)
+          setProfileForm({
+            company_name: profile.company_name || '',
+            trading_name: profile.trading_name || '',
+            address_street: profile.address_street || '',
+            address_postal_code: profile.address_postal_code || '',
+            address_city: profile.address_city || '',
+            address_country: profile.address_country || 'Nederland',
+            kvk_number: profile.kvk_number || '',
+            btw_number: profile.btw_number || '',
+            iban: profile.iban || '',
+            email: profile.email || '',
+            phone: profile.phone || '',
+            website: profile.website || '',
+            logo_url: profile.logo_url || '',
+          })
+        }
       } catch (error: unknown) {
         // 404 is expected if profile doesn't exist yet - that's OK
         const err = error as { response?: { status?: number } }
@@ -149,7 +161,9 @@ export const SettingsPage = () => {
           console.error('Failed to fetch business profile:', error)
         }
       } finally {
-        setIsLoadingProfile(false)
+        if (isMounted) {
+          setIsLoadingProfile(false)
+        }
       }
     }
     fetchBusinessProfile()
@@ -158,14 +172,22 @@ export const SettingsPage = () => {
     const fetchVersion = async () => {
       try {
         const version = await metaApi.getVersion()
-        setBackendVersion(version)
-        setBackendVersionError(null)
+        if (isMounted) {
+          setBackendVersion(version)
+          setBackendVersionError(null)
+        }
       } catch (error) {
         console.error('Failed to fetch backend version:', error)
-        setBackendVersionError('Could not fetch backend version')
+        if (isMounted) {
+          setBackendVersionError('Could not fetch backend version')
+        }
       }
     }
     fetchVersion()
+    
+    return () => {
+      isMounted = false
+    }
   }, [user?.id, user?.role])
 
   const handleSaveNotifications = async () => {

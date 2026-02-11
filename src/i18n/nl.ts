@@ -360,7 +360,7 @@ export const nl = {
     
     // Export
     export: "Exporteren",
-    exportTooltip: "Exporteren naar CSV/PDF komt binnenkort beschikbaar",
+    exportTooltip: "Exporteer de gefilterde uren direct naar CSV",
     
     // Convert to invoice
     createInvoice: "Factureren",
@@ -378,6 +378,20 @@ export const nl = {
     invoiceCreated: "Factuur aangemaakt",
     invoiceCreatedGoTo: "Ga naar facturen",
     errorCreatingInvoice: "Fout bij maken van factuur",
+
+    // Productivity upgrades
+    utilization: "Declarabiliteit",
+    searchPlaceholder: "Zoek op omschrijving, project of klant...",
+    filterAll: "Alle registraties",
+    filterBillable: "Alleen factureerbaar",
+    filterNonBillable: "Alleen niet-factureerbaar",
+    sortDateDesc: "Sorteer: Nieuwste eerst",
+    sortDateAsc: "Sorteer: Oudste eerst",
+    sortHoursDesc: "Sorteer: Meeste uren",
+    sortHoursAsc: "Sorteer: Minste uren",
+    duplicate: "Dupliceren",
+    noEntriesToExport: "Geen uren om te exporteren",
+    exportSuccess: "CSV-export gedownload",
     entriesWithoutRate: "uren zonder uurtarief",
     noRate: "Geen tarief",
   },

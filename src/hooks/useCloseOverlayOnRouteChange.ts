@@ -61,7 +61,8 @@ export function useCloseOverlayOnRouteChange(onClose: () => void) {
 export function cleanupOverlayPortals() {
   if (typeof document === 'undefined') return
   
-  let removedCount = 0
+  let strategy1RemovedCount = 0
+  let strategy2RemovedCount = 0
   let pendingRemovals = 0
   
   // Strategy 1: Remove Radix portal containers that contain OPEN overlays
@@ -93,11 +94,13 @@ export function cleanupOverlayPortals() {
         setTimeout(() => {
           if (portal.parentNode) {
             portal.remove()
-            removedCount++
+            strategy1RemovedCount++
             
             // Log after all pending removals complete
-            if (--pendingRemovals === 0 && import.meta.env.DEV && removedCount > 0) {
-              console.log(`[Cleanup] Removed ${removedCount} stuck overlay portal(s)`)
+            if (--pendingRemovals === 0 && import.meta.env.DEV) {
+              if (strategy1RemovedCount > 0 || strategy2RemovedCount > 0) {
+                console.log(`[Cleanup] Removed ${strategy1RemovedCount} stuck portal(s) and ${strategy2RemovedCount} stuck overlay(s)`)
+              }
             }
           }
         }, FORCE_CLOSE_ANIMATION_DELAY_MS)
@@ -139,7 +142,7 @@ export function cleanupOverlayPortals() {
       
       // Remove immediately for stuck overlays
       htmlEl.remove()
-      removedCount++
+      strategy2RemovedCount++
       
       if (import.meta.env.DEV) {
         console.log(`[Cleanup] Removed stuck overlay element:`, htmlEl.getAttribute('data-slot') || htmlEl.className)
@@ -147,8 +150,10 @@ export function cleanupOverlayPortals() {
     }
   })
   
-  // Log final summary
-  if (import.meta.env.DEV && removedCount > 0) {
-    console.log(`[Cleanup] Total: ${removedCount} stuck overlay(s) removed`)
+  // Log immediate removals from Strategy 2 if no pending removals from Strategy 1
+  if (pendingRemovals === 0 && import.meta.env.DEV) {
+    if (strategy1RemovedCount > 0 || strategy2RemovedCount > 0) {
+      console.log(`[Cleanup] Removed ${strategy1RemovedCount} stuck portal(s) and ${strategy2RemovedCount} stuck overlay(s)`)
+    }
   }
 }

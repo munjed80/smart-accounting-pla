@@ -366,7 +366,7 @@ export const SettingsPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))] pointer-events-none" />
       
       <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 opacity-0 animate-in fade-in duration-500">
         {/* Header */}

@@ -70,7 +70,8 @@ export function cleanupOverlayPortals() {
   const radixPortals = document.querySelectorAll('[data-radix-portal]')
   radixPortals.forEach(portal => {
     // Check if this portal contains an overlay (has overlay-like attributes or role)
-    const hasDialogOverlay = portal.querySelector('[data-radix-dialog-overlay], [data-radix-alert-dialog-overlay]')
+    // Include sheet overlays (data-slot="sheet-overlay") which are Dialog-based components
+    const hasDialogOverlay = portal.querySelector('[data-radix-dialog-overlay], [data-radix-alert-dialog-overlay], [data-slot="sheet-overlay"]')
     const hasDialog = portal.querySelector('[role="dialog"]')
     
     if (hasDialogOverlay || hasDialog) {
@@ -111,10 +112,12 @@ export function cleanupOverlayPortals() {
   // Strategy 2: Remove fixed position overlay elements that are STUCK OPEN
   // This catches overlays that might not be in portals (edge case)
   // Only target actual overlay elements (not dialog content), and only if open
+  // Include sheet overlays which use data-slot attribute
   const overlaySelectors = [
     '[data-radix-dialog-overlay][data-state="open"]',
     '[data-radix-alert-dialog-overlay][data-state="open"]',
     '[data-radix-drawer-overlay][data-state="open"]',
+    '[data-slot="sheet-overlay"][data-state="open"]',
   ].join(', ')
   
   const possibleOverlays = document.querySelectorAll(overlaySelectors)

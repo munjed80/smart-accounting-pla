@@ -40,24 +40,37 @@ export const IntelligentUploadPortal = () => {
   const [docFetchError, setDocFetchError] = useState<string | null>(null)
   const [reprocessingIds, setReprocessingIds] = useState<Set<string>>(new Set())
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const isMountedRef = useRef(true)
 
   const fetchDocuments = async () => {
+    if (!isMountedRef.current) return
     setIsLoadingDocs(true)
     setDocFetchError(null)
     try {
       const docs = await documentApi.list()
-      setDocuments(docs)
+      if (isMountedRef.current) {
+        setDocuments(docs)
+      }
     } catch (error) {
       console.error('Failed to fetch documents:', error)
-      setDocFetchError(getErrorMessage(error))
-      setDocuments([])
+      if (isMountedRef.current) {
+        setDocFetchError(getErrorMessage(error))
+        setDocuments([])
+      }
     } finally {
-      setIsLoadingDocs(false)
+      if (isMountedRef.current) {
+        setIsLoadingDocs(false)
+      }
     }
   }
 
   useEffect(() => {
+    isMountedRef.current = true
     fetchDocuments()
+    
+    return () => {
+      isMountedRef.current = false
+    }
   }, [])
 
   const handleReprocess = async (docId: string) => {
@@ -116,6 +129,8 @@ export const IntelligentUploadPortal = () => {
   }
 
   const uploadFile = async (fileItem: UploadedFile) => {
+    if (!isMountedRef.current) return
+    
     setFiles((prev) =>
       prev.map((f) =>
         f.id === fileItem.id ? { ...f, status: 'uploading', progress: 10 } : f
@@ -126,63 +141,75 @@ export const IntelligentUploadPortal = () => {
       const reader = new FileReader()
       
       reader.onload = async (e) => {
+        if (!isMountedRef.current) return
+        
         const imageUrl = e.target?.result as string
         
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.id === fileItem.id ? { ...f, progress: 30, imageUrl } : f
-          )
-        )
-
-        try {
+        if (isMountedRef.current) {
           setFiles((prev) =>
             prev.map((f) =>
-              f.id === fileItem.id ? { ...f, progress: 50 } : f
+              f.id === fileItem.id ? { ...f, progress: 30, imageUrl } : f
             )
           )
+        }
+
+        try {
+          if (isMountedRef.current) {
+            setFiles((prev) =>
+              prev.map((f) =>
+                f.id === fileItem.id ? { ...f, progress: 50 } : f
+              )
+            )
+          }
 
           const response = await documentApi.upload(fileItem.file)
           
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === fileItem.id ? { ...f, progress: 90 } : f
+          if (isMountedRef.current) {
+            setFiles((prev) =>
+              prev.map((f) =>
+                f.id === fileItem.id ? { ...f, progress: 90 } : f
+              )
             )
-          )
 
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === fileItem.id 
-                ? { ...f, status: 'uploaded', progress: 100, documentId: response.document_id } 
-                : f
+            setFiles((prev) =>
+              prev.map((f) =>
+                f.id === fileItem.id 
+                  ? { ...f, status: 'uploaded', progress: 100, documentId: response.document_id } 
+                  : f
+              )
             )
-          )
 
-          toast.success(t('upload.uploadSuccess'), {
-            description: `${fileItem.file.name} - Document ID: ${response.document_id.substring(0, 8)}...`
-          })
+            toast.success(t('upload.uploadSuccess'), {
+              description: `${fileItem.file.name} - Document ID: ${response.document_id.substring(0, 8)}...`
+            })
+          }
 
         } catch (error) {
           const errorMessage = getErrorMessage(error)
           console.error('Upload failed:', error)
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === fileItem.id 
-                ? { 
-                    ...f, 
-                    status: 'error', 
-                    progress: 100, 
-                    errorMessage 
-                  } 
-                : f
+          if (isMountedRef.current) {
+            setFiles((prev) =>
+              prev.map((f) =>
+                f.id === fileItem.id 
+                  ? { 
+                      ...f, 
+                      status: 'error', 
+                      progress: 100, 
+                      errorMessage 
+                    } 
+                  : f
+              )
             )
-          )
-          toast.error(t('upload.uploadFailed'), {
-            description: errorMessage
-          })
+            toast.error(t('upload.uploadFailed'), {
+              description: errorMessage
+            })
+          }
         }
       }
 
       reader.onerror = () => {
+        if (!isMountedRef.current) return
+        
         setFiles((prev) =>
           prev.map((f) =>
             f.id === fileItem.id 

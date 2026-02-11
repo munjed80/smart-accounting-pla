@@ -293,10 +293,40 @@ export const ClientDecisionsTab = ({ clientId }: ClientDecisionsTabProps) => {
   }
 
   useEffect(() => {
-    fetchHistory()
-    // fetchHistory is defined inline and would cause infinite loop if added to deps.
-    // We only want to re-fetch when clientId changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let isMounted = true
+    
+    const fetchData = async () => {
+      const logger = createDossierLogger(clientId)
+      const endpoint = `/accountant/clients/${clientId}/decision-history`
+      
+      try {
+        setIsLoading(true)
+        setError(null)
+        logger.request(endpoint)
+        const data = await decisionApi.getDecisionHistory(clientId)
+        logger.success(endpoint, { totalDecisions: data.total_decisions })
+        
+        if (isMounted) {
+          setHistory(data)
+        }
+      } catch (err) {
+        logger.error(endpoint, err)
+        const message = getErrorMessage(err)
+        if (isMounted) {
+          setError(message)
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+    
+    fetchData()
+    
+    return () => {
+      isMounted = false
+    }
   }, [clientId])
 
   if (error && !history) {

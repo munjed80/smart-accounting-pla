@@ -1299,6 +1299,7 @@ export const ZZPInvoicesPage = () => {
   
   // Status change state - tracks which invoice is updating status
   const [updatingStatusInvoiceId, setUpdatingStatusInvoiceId] = useState<string | null>(null)
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false)
   
   // Pre-selected invoice ID from URL
   const [preSelectedInvoiceId, setPreSelectedInvoiceId] = useState<string | null>(null)
@@ -1428,10 +1429,15 @@ export const ZZPInvoicesPage = () => {
     })
   }, [invoices, debouncedSearch, statusFilter])
 
+  // Active customers for quick actions
+  const activeCustomers = useMemo(() => {
+    return customers.filter(c => c.status === 'active')
+  }, [customers])
+
   // Check if we have active customers
   const hasActiveCustomers = useMemo(() => {
-    return customers.some(c => c.status === 'active')
-  }, [customers])
+    return activeCustomers.length > 0
+  }, [activeCustomers])
 
   // Handle adding/editing invoice
   const handleSaveInvoice = useCallback(async (data: ZZPInvoiceCreate, isEdit: boolean) => {
@@ -1680,6 +1686,48 @@ export const ZZPInvoicesPage = () => {
     setIsFormOpen(true)
   }, [])
 
+  // Generate invoice draft with sensible defaults and open it directly
+  const handleGenerateInvoice = useCallback(async () => {
+    if (activeCustomers.length === 0) {
+      toast.error(t('zzpInvoices.noActiveCustomers'))
+      return
+    }
+
+    setIsGeneratingInvoice(true)
+    try {
+      const selectedCustomer = [...activeCustomers].sort((a, b) => a.name.localeCompare(b.name))[0]
+      const issueDate = new Date()
+      const dueDate = new Date(issueDate)
+      dueDate.setDate(dueDate.getDate() + 14)
+
+      const generatedInvoice = await zzpApi.invoices.create({
+        customer_id: selectedCustomer.id,
+        issue_date: extractDatePart(issueDate.toISOString()),
+        due_date: extractDatePart(dueDate.toISOString()),
+        notes: t('zzpInvoices.generatedInvoiceNote'),
+        lines: [
+          {
+            description: t('zzpInvoices.generatedLineDescription'),
+            quantity: 1,
+            unit_price_cents: 10000,
+            vat_rate: 21,
+          },
+        ],
+      })
+
+      setViewingInvoice(undefined)
+      setEditingInvoice(generatedInvoice)
+      setIsFormOpen(true)
+      toast.success(t('zzpInvoices.invoiceGenerated'))
+      await loadData()
+    } catch (err) {
+      console.error('Failed to generate invoice:', err)
+      toast.error(parseApiError(err))
+    } finally {
+      setIsGeneratingInvoice(false)
+    }
+  }, [activeCustomers, loadData])
+
   // Open form for editing (only for draft invoices)
   const openEditForm = useCallback((invoice: ZZPInvoice) => {
     setViewingInvoice(undefined)
@@ -1710,10 +1758,25 @@ export const ZZPInvoicesPage = () => {
               {t('zzpInvoices.pageDescription')}
             </p>
           </div>
-          <Button onClick={openNewForm} className="gap-2 h-10 sm:h-11 w-full sm:w-auto" disabled={!hasActiveCustomers}>
-            <Plus size={18} weight="bold" />
-            {t('zzpInvoices.newInvoice')}
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              onClick={handleGenerateInvoice}
+              variant="secondary"
+              className="gap-2 h-10 sm:h-11 w-full sm:w-auto"
+              disabled={!hasActiveCustomers || isGeneratingInvoice}
+            >
+              {isGeneratingInvoice ? (
+                <SpinnerGap size={18} className="animate-spin" />
+              ) : (
+                <Receipt size={18} weight="bold" />
+              )}
+              {t('zzpInvoices.generateInvoice')}
+            </Button>
+            <Button onClick={openNewForm} className="gap-2 h-10 sm:h-11 w-full sm:w-auto" disabled={!hasActiveCustomers}>
+              <Plus size={18} weight="bold" />
+              {t('zzpInvoices.newInvoice')}
+            </Button>
+          </div>
         </div>
 
         {/* No customers warning */}

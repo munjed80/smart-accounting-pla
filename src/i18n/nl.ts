@@ -1317,6 +1317,7 @@ export const nl = {
     businessProfileDescription: "Je bedrijfsgegevens voor facturen en correspondentie",
     businessProfileSaved: "Bedrijfsprofiel opgeslagen",
     businessProfileError: "Kon bedrijfsprofiel niet opslaan",
+    noAdministrations: "Geen administraties gevonden. Mogelijk ben je een nieuwe gebruiker. Ga naar het overzicht om een administratie aan te maken, of neem contact op met support.",
     tradingName: "Handelsnaam",
     tradingNamePlaceholder: "Optioneel - als anders dan bedrijfsnaam",
     addressStreet: "Straat en huisnummer",

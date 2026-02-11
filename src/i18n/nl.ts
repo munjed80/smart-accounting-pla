@@ -549,6 +549,7 @@ export const nl = {
     pageDescription: "Beheer je facturen en betalingsoverzicht",
     listTitle: "Facturenlijst",
     newInvoice: "Nieuwe factuur",
+    generateInvoice: "Genereer factuur",
     editInvoice: "Factuur bewerken",
     viewInvoice: "Factuur bekijken",
     newInvoiceDescription: "Maak een nieuwe factuur aan voor een klant.",
@@ -613,6 +614,7 @@ export const nl = {
     deleteInvoiceConfirm: "Weet je zeker dat je deze factuur wilt verwijderen?",
     deleteInvoiceWarning: "Dit kan niet ongedaan worden gemaakt.",
     invoiceSaved: "Factuur opgeslagen",
+    invoiceGenerated: "Factuur automatisch gegenereerd",
     invoiceDeleted: "Factuur verwijderd",
     statusChanged: "Status gewijzigd",
     changeStatus: "Status wijzigen",
@@ -673,6 +675,8 @@ export const nl = {
     customerAddress: "Aan:",
     backToInvoices: "Terug naar facturen",
     print: "Afdrukken",
+    generatedInvoiceNote: "Automatisch gegenereerd concept - controleer en pas aan indien nodig.",
+    generatedLineDescription: "Dienstverlening",
   },
 
   // Dashboard

@@ -56,41 +56,43 @@ export function cleanupOverlayPortals() {
   
   let removedCount = 0
   
-  // Find and remove Radix portal overlays
+  // Strategy 1: Remove Radix portal containers that contain overlays
   const radixPortals = document.querySelectorAll('[data-radix-portal]')
   radixPortals.forEach(portal => {
-    // Check if this is an overlay (has overlay-like attributes or styles)
-    const isOverlay = portal.querySelector('[data-radix-dialog-overlay], [data-radix-alert-dialog-overlay], [role="dialog"]')
-    const hasOverlayClass = portal.className && typeof portal.className === 'string' && portal.className.toLowerCase().includes('radix')
+    // Check if this portal contains an overlay (has overlay-like attributes or role)
+    const hasDialogOverlay = portal.querySelector('[data-radix-dialog-overlay], [data-radix-alert-dialog-overlay]')
+    const hasDialog = portal.querySelector('[role="dialog"]')
     
-    if (isOverlay || hasOverlayClass) {
+    if (hasDialogOverlay || hasDialog) {
       portal.remove()
       removedCount++
     }
   })
   
-  // Find and remove elements with overlay-like styles (fixed positioning with full coverage)
-  const allElements = document.querySelectorAll('*')
-  allElements.forEach(el => {
-    const styles = window.getComputedStyle(el)
+  // Strategy 2: Remove fixed position overlay elements (more targeted than all elements)
+  // Target typical overlay selectors used by Radix/shadcn
+  const overlaySelectors = [
+    '[data-radix-dialog-overlay]',
+    '[data-radix-alert-dialog-overlay]',
+    '[data-state="open"][role="dialog"]',
+    '.fixed.inset-0', // Common Tailwind overlay pattern
+    '[data-slot="overlay"]', // Some UI libraries use this
+  ].join(', ')
+  
+  const possibleOverlays = document.querySelectorAll(overlaySelectors)
+  possibleOverlays.forEach(el => {
     const htmlEl = el as HTMLElement
+    const styles = window.getComputedStyle(htmlEl)
     
-    // Check for overlay characteristics:
-    // - Fixed positioning
-    // - Full coverage (inset-0 pattern)
-    // - Dark background (bg-black/overlay pattern)
+    // Double-check it's actually an overlay (fixed positioning with full coverage)
     const isFixed = styles.position === 'fixed'
     const isFullCoverage = 
       (styles.top === '0px' || styles.inset === '0px') &&
       (styles.left === '0px') &&
       (styles.right === '0px') &&
       (styles.bottom === '0px')
-    const hasOverlayBackground = 
-      styles.backgroundColor.includes('rgba') && 
-      (styles.backgroundColor.includes('0, 0, 0') || styles.opacity !== '1')
     
-    // Only remove if it looks like an overlay, not a layout container
-    if (isFixed && isFullCoverage && hasOverlayBackground) {
+    if (isFixed && isFullCoverage) {
       // Extra safety: don't remove if it has important content (many children)
       if (htmlEl.children.length <= 1) {
         htmlEl.remove()

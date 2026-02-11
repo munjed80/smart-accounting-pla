@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
+import { NotFoundError, NetworkError, UnauthorizedError, ValidationError, ServerError } from './errors'
 
 /**
  * ==== DATA MAP: Accountant Screens → Endpoints ====
@@ -291,6 +292,42 @@ api.interceptors.response.use(
     
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
+    // Convert axios errors to typed errors for better handling
+    let typedError: Error = error
+
+    if (!error.response) {
+      // Network error (no response from server)
+      typedError = new NetworkError(error.message || 'Network connection failed')
+    } else {
+      const status = error.response.status
+      const errorMessage = (error.response.data as any)?.detail || error.message
+
+      switch (status) {
+        case 400:
+          typedError = new ValidationError(errorMessage)
+          break
+        case 401:
+          typedError = new UnauthorizedError(errorMessage)
+          break
+        case 403:
+          typedError = new UnauthorizedError(errorMessage || 'Access forbidden')
+          break
+        case 404:
+          typedError = new NotFoundError(errorMessage || 'Resource not found')
+          break
+        case 500:
+        case 502:
+        case 503:
+        case 504:
+          typedError = new ServerError(errorMessage || 'Server error')
+          break
+        default:
+          // Keep as generic error for other status codes
+          typedError = error
+      }
+    }
+
+    // Handle 401 - redirect to login
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
 
@@ -299,10 +336,10 @@ api.interceptors.response.use(
       
       window.location.href = '/login'
       
-      return Promise.reject(error)
+      return Promise.reject(typedError)
     }
 
-    return Promise.reject(error)
+    return Promise.reject(typedError)
   }
 )
 

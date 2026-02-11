@@ -342,8 +342,6 @@ export const SettingsPage = () => {
     }
   }
 
-  const primaryAdmin = administrations[0]
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
@@ -359,6 +357,13 @@ export const SettingsPage = () => {
             {t('settings.subtitle')}
           </p>
         </div>
+
+        {/* Display load error if present */}
+        {loadError && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertDescription>{loadError}</AlertDescription>
+          </Alert>
+        )}
 
         <div className="space-y-6">
           {/* Profile Section */}
@@ -378,6 +383,13 @@ export const SettingsPage = () => {
                   <Skeleton className="h-10 w-full" />
                   <Skeleton className="h-10 w-full" />
                 </div>
+              ) : administrations.length === 0 ? (
+                <Alert>
+                  <Info size={16} />
+                  <AlertDescription>
+                    Geen administraties gevonden. Mogelijk ben je een nieuwe gebruiker. Ga naar het overzicht om een administratie aan te maken, of neem contact op met support.
+                  </AlertDescription>
+                </Alert>
               ) : (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

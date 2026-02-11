@@ -554,7 +554,7 @@ const AppContent = () => {
         // ZZP-only page for time tracking (coming soon)
         return !isAccountant ? <ZZPTimeTrackingPage /> : <SmartDashboard />
       case 'agenda':
-        // ZZP-only page for agenda (coming soon)
+        // ZZP-only page for agenda
         return !isAccountant ? <ZZPAgendaPage /> : <SmartDashboard />
       case 'dashboard':
         return <SmartDashboard />

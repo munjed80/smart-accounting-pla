@@ -153,3 +153,15 @@ The Dockerfile is configured to require `VITE_API_URL` at build time and will fa
    - No CORS errors
    - No Network errors
    - API calls going to correct URL
+
+## Pre-Deploy Smoke Validation
+
+Run these checks in CI or locally before deployment:
+
+```bash
+npm run lint
+npm test
+bash scripts/backend-smoke.sh
+```
+
+The backend smoke check validates that the FastAPI app starts and that key health/documentation routes are present.

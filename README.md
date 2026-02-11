@@ -1252,3 +1252,21 @@ The ZZP MVP provides a streamlined Dutch-first experience for ZZP (freelance) us
 | Pending accountant links | `/api/v1/zzp/links` | GET |
 | Approve link | `/api/v1/zzp/links/{id}/approve` | POST |
 | Reject link | `/api/v1/zzp/links/{id}/reject` | POST |
+
+## Developer Quality Checks
+
+Run these commands before opening a PR:
+
+```bash
+npm run lint
+npm test
+npm run test:backend:smoke
+```
+
+To run all three in one go:
+
+```bash
+npm run check:all
+```
+
+The backend smoke test imports the FastAPI app and verifies critical routes (`/health`, `/docs`, `/openapi.json`) are registered.

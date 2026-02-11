@@ -545,12 +545,39 @@ const AppContent = () => {
     }
   }
 
+  // Get readable page name for error boundary logging
+  const getPageName = (): string => {
+    switch (activeTab) {
+      case 'workqueue': return 'Werklijst'
+      case 'clients': return 'Klanten (Accountant)'
+      case 'reviewqueue': return 'Beoordelingslijst'
+      case 'reminders': return 'Herinneringen'
+      case 'acties': return 'Acties'
+      case 'bank': return 'Bank'
+      case 'crediteuren': return 'Crediteuren'
+      case 'profitloss': return 'Winst & Verlies'
+      case 'grootboek': return 'Grootboek'
+      case 'boekhouder': return 'Boekhouder'
+      case 'customers': return 'Klanten (ZZP)'
+      case 'invoices': return 'Facturen'
+      case 'expenses': return 'Uitgaven'
+      case 'time': return 'Uren'
+      case 'agenda': return 'Agenda'
+      case 'dashboard': return 'Overzicht'
+      case 'transactions': return 'Transacties'
+      case 'upload': return 'Upload'
+      case 'settings': return 'Instellingen'
+      case 'support': return 'Ondersteuning'
+      default: return 'Overzicht'
+    }
+  }
+
   return (
     <AppShell 
       activeTab={activeTab} 
       onTabChange={handleTabChange}
     >
-      <DashboardErrorBoundary>
+      <DashboardErrorBoundary pageName={getPageName()}>
         {renderTabContent()}
       </DashboardErrorBoundary>
     </AppShell>

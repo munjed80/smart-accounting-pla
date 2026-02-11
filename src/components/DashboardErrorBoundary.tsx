@@ -6,6 +6,7 @@ import { WarningCircle, ArrowsClockwise } from '@phosphor-icons/react'
 
 interface Props {
   children: ReactNode
+  pageName?: string
 }
 
 interface State {
@@ -29,8 +30,15 @@ export class DashboardErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Log error for debugging
-    console.error('Dashboard Error Boundary caught an error:', error, errorInfo)
+    // Log error with page/component context for debugging
+    const pageName = this.props.pageName || 'Unknown Page'
+    console.error(`[UI Error Boundary] Error in ${pageName}:`, error)
+    console.error('Component stack:', errorInfo.componentStack)
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      page: pageName,
+    })
   }
 
   handleReload = () => {

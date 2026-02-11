@@ -208,7 +208,7 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // 9. Agenda - coming soon
+  // 9. Agenda
   {
     label: t('sidebar.agenda'),
     tabValue: 'agenda',

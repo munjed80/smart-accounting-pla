@@ -3,7 +3,6 @@
  * 
  * Profile settings, company info, and notification preferences.
  * Includes editable Business Profile for ZZP users.
- * Includes version footer for debugging.
  */
 
 import { useState, useEffect } from 'react'
@@ -20,11 +19,6 @@ import { useAuth } from '@/lib/AuthContext'
 import { 
   administrationApi, 
   Administration, 
-  getApiBaseUrl, 
-  getRawViteApiUrl, 
-  getWindowOrigin, 
-  metaApi, 
-  VersionInfo,
   zzpApi,
   ZZPBusinessProfile,
   ZZPBusinessProfileCreate 
@@ -50,10 +44,6 @@ import { toast } from 'sonner'
 import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
 
-// Build timestamp - injected at build time or fallback
-const BUILD_VERSION = import.meta.env.VITE_BUILD_VERSION || 'dev'
-const BUILD_TIMESTAMP = import.meta.env.VITE_BUILD_TIMESTAMP || 'development'
-
 export const SettingsPage = () => {
   const { user } = useAuth()
   const [administrations, setAdministrations] = useState<Administration[]>([])
@@ -62,8 +52,6 @@ export const SettingsPage = () => {
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [backendVersion, setBackendVersion] = useState<VersionInfo | null>(null)
-  const [backendVersionError, setBackendVersionError] = useState<string | null>(null)
   
   // Business profile state (for ZZP users) - MUST be declared before useDelayedLoading
   const [businessProfile, setBusinessProfile] = useState<ZZPBusinessProfile | null>(null)
@@ -167,23 +155,6 @@ export const SettingsPage = () => {
       }
     }
     fetchBusinessProfile()
-    
-    // Fetch backend version info (non-blocking)
-    const fetchVersion = async () => {
-      try {
-        const version = await metaApi.getVersion()
-        if (isMounted) {
-          setBackendVersion(version)
-          setBackendVersionError(null)
-        }
-      } catch (error) {
-        console.error('Failed to fetch backend version:', error)
-        if (isMounted) {
-          setBackendVersionError('Could not fetch backend version')
-        }
-      }
-    }
-    fetchVersion()
     
     return () => {
       isMounted = false
@@ -880,92 +851,6 @@ export const SettingsPage = () => {
             </CardContent>
           </Card>
 
-          {/* Version Footer with Diagnostics */}
-          <Card className="bg-secondary/30 border-dashed">
-            <CardHeader className="py-3 pb-0">
-              <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                <Info size={16} />
-                Build Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="py-4">
-              <div className="flex flex-col gap-3 text-sm text-muted-foreground">
-                {/* Frontend Version Info */}
-                <div>
-                  <h4 className="font-semibold text-foreground mb-2">Frontend</h4>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-4 font-mono text-xs">
-                      <span>
-                        <strong>{t('settings.version')}:</strong>{' '}
-                        <code className="bg-secondary px-1 rounded">{BUILD_VERSION}</code>
-                      </span>
-                      <span>
-                        <strong>{t('settings.build')}:</strong>{' '}
-                        <code className="bg-secondary px-1 rounded">
-                          {BUILD_TIMESTAMP === 'development' ? t('settings.development') : new Date(BUILD_TIMESTAMP).toLocaleString('nl-NL')}
-                        </code>
-                      </span>
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {import.meta.env.DEV ? t('settings.development') : t('settings.production')}
-                    </Badge>
-                  </div>
-                </div>
-                
-                {/* Backend Version Info */}
-                <Separator className="my-1" />
-                <div>
-                  <h4 className="font-semibold text-foreground mb-2">Backend</h4>
-                  {backendVersionError ? (
-                    <p className="text-xs text-destructive">{backendVersionError}</p>
-                  ) : backendVersion ? (
-                    <div className="flex flex-wrap items-center gap-4 font-mono text-xs">
-                      <span>
-                        <strong>Git SHA:</strong>{' '}
-                        <code className="bg-secondary px-1 rounded">{backendVersion.git_sha?.substring(0, 8) || 'unknown'}</code>
-                      </span>
-                      <span>
-                        <strong>Build:</strong>{' '}
-                        <code className="bg-secondary px-1 rounded">
-                          {backendVersion.build_time === 'unknown' ? 'unknown' : new Date(backendVersion.build_time).toLocaleString('nl-NL')}
-                        </code>
-                      </span>
-                      <span>
-                        <strong>Env:</strong>{' '}
-                        <code className="bg-secondary px-1 rounded">{backendVersion.env_name || 'unknown'}</code>
-                      </span>
-                    </div>
-                  ) : (
-                    <Skeleton className="h-4 w-64" />
-                  )}
-                </div>
-                
-                {/* API Diagnostics - non-intrusive but visible for debugging */}
-                <Separator className="my-1" />
-                <div className="space-y-1 font-mono text-xs">
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    <span>
-                      <strong>{t('settings.apiBase')}:</strong>{' '}
-                      <code className="bg-secondary px-1 rounded">{getApiBaseUrl()}</code>
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground/70">
-                    <span>
-                      <strong>{t('settings.viteApiUrl')}:</strong>{' '}
-                      <code className="bg-secondary/50 px-1 rounded">{getRawViteApiUrl()}</code>
-                    </span>
-                    <span>
-                      <strong>{t('settings.browserOrigin')}:</strong>{' '}
-                      <code className="bg-secondary/50 px-1 rounded">{getWindowOrigin()}</code>
-                    </span>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground/60 italic">
-                  {t('settings.apiDiagnosticsHint')}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

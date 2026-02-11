@@ -39,6 +39,9 @@ import { navigateTo } from '@/lib/navigation'
 import { cleanupOverlayPortals } from '@/hooks/useCloseOverlayOnRouteChange'
 import { Database } from '@phosphor-icons/react'
 
+// Delay for Radix UI to complete cleanup before our global cleanup runs
+const GLOBAL_CLEANUP_DELAY_MS = 100
+
 // URL-based routing with path support
 type Route = 
   | { type: 'login' }
@@ -256,12 +259,15 @@ const AppContent = () => {
   }, [user, isAccountant])
   
   // Global overlay cleanup on route changes
+  // This provides a backstop cleanup in case individual components don't properly
+  // clean up their overlays. Runs with a longer delay than component-level cleanup
+  // to allow Radix UI and component cleanup to run first.
   useEffect(() => {
     const handleRouteChange = () => {
       // Clean up any lingering overlay portals after navigation
       setTimeout(() => {
         cleanupOverlayPortals()
-      }, 100)
+      }, GLOBAL_CLEANUP_DELAY_MS)
     }
     
     window.addEventListener('popstate', handleRouteChange)

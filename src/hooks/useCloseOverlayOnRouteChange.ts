@@ -17,6 +17,9 @@ import { useEffect, useRef } from 'react'
 // Custom event for programmatic navigation
 export const ROUTE_CHANGE_EVENT = 'app:route-change'
 
+// Delay to allow Radix UI portals to complete their cleanup cycle before DOM inspection
+const OVERLAY_CLEANUP_DELAY_MS = 50
+
 export function useCloseOverlayOnRouteChange(onClose: () => void) {
   // Use ref to avoid recreating effect when onClose changes
   const onCloseRef = useRef(onClose)
@@ -34,7 +37,7 @@ export function useCloseOverlayOnRouteChange(onClose: () => void) {
       // Add delayed cleanup to remove any lingering portal overlays
       setTimeout(() => {
         cleanupOverlayPortals()
-      }, 50)
+      }, OVERLAY_CLEANUP_DELAY_MS)
     }
 
     window.addEventListener('popstate', handleRouteChange)
@@ -97,11 +100,8 @@ export function cleanupOverlayPortals() {
     const isFullCoverage = hasInsetZero || hasAllSidesZero
     
     if (isFixed && isFullCoverage) {
-      // Extra safety: don't remove if it has important content (many children)
-      if (htmlEl.children.length <= 1) {
-        htmlEl.remove()
-        removedCount++
-      }
+      htmlEl.remove()
+      removedCount++
     }
   })
   

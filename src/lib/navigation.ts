@@ -15,7 +15,12 @@ const ROUTE_CHANGE_EVENT = 'app:route-change'
 export const navigateTo = (path: string) => {
   window.history.pushState({}, '', path)
   
-  // Dispatch both popstate (for compatibility) and custom event (for overlay cleanup)
-  window.dispatchEvent(new PopStateEvent('popstate'))
+  // Dispatch custom event for overlay cleanup and other navigation handlers
+  // Note: We don't dispatch a synthetic 'popstate' here because that's reserved
+  // for actual browser navigation (back/forward). Components can listen to our
+  // custom event for programmatic navigation.
   window.dispatchEvent(new CustomEvent(ROUTE_CHANGE_EVENT))
+  
+  // Also dispatch popstate for backwards compatibility with existing code
+  window.dispatchEvent(new PopStateEvent('popstate'))
 }

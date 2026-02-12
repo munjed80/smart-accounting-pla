@@ -1487,17 +1487,14 @@ export const ZZPInvoicesPage = () => {
 
   // Handle send invoice (draft → sent)
   const handleSendInvoice = useCallback(async (invoice: ZZPInvoice) => {
-    console.log('[DEBUG] handleSendInvoice called for invoice:', invoice.id, invoice.invoice_number)
     setUpdatingStatusInvoiceId(invoice.id)
     try {
-      console.log('[DEBUG] Calling sendEmail API for invoice:', invoice.id)
       toast.info(t('zzpInvoices.sending'))
       await zzpApi.invoices.sendEmail(invoice.id)
-      console.log('[DEBUG] sendEmail API call successful')
       toast.success(t('zzpInvoices.invoiceSent'))
       await loadData()
     } catch (err) {
-      console.error('[DEBUG] Failed to send invoice:', err)
+      console.error('Failed to send invoice:', err)
       toast.error(parseApiError(err))
     } finally {
       setUpdatingStatusInvoiceId(null)
@@ -1901,10 +1898,7 @@ export const ZZPInvoicesPage = () => {
                         onEdit={() => openEditForm(invoice)}
                         onDelete={() => setDeletingInvoice(invoice)}
                         onStatusChange={(status) => handleStatusChange(invoice, status)}
-                        onSendInvoice={() => {
-                          console.log('[DEBUG] Mobile card onSendInvoice clicked for invoice:', invoice.id)
-                          handleSendInvoice(invoice)
-                        }}
+                        onSendInvoice={() => handleSendInvoice(invoice)}
                         onDownloadPdf={() => handleDownloadPdf(invoice)}
                         onCopyLink={() => handleCopyLink(invoice)}
                         onShare={() => handleShare(invoice)}
@@ -2046,10 +2040,7 @@ export const ZZPInvoicesPage = () => {
                                     {/* Send invoice - only for draft invoices */}
                                     {invoice.status === 'draft' && (
                                       <DropdownMenuItem 
-                                        onSelect={() => {
-                                          console.log('[DEBUG] Desktop table onSelect clicked for invoice:', invoice.id)
-                                          handleSendInvoice(invoice)
-                                        }}
+                                        onSelect={() => handleSendInvoice(invoice)}
                                         disabled={updatingStatusInvoiceId === invoice.id}
                                       >
                                         {updatingStatusInvoiceId === invoice.id ? (

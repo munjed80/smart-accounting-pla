@@ -4,6 +4,8 @@ ZZP Invoices API Endpoints
 CRUD operations for ZZP invoices with lines, status transitions,
 race-safe invoice number generation, and PDF generation.
 """
+import base64
+import logging
 from datetime import datetime, date, timezone
 from decimal import Decimal
 from typing import Annotated, List, Optional
@@ -15,6 +17,7 @@ from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.services.invoice_pdf import generate_invoice_pdf, get_invoice_pdf_filename
 from app.services.email import email_service
@@ -38,6 +41,7 @@ from app.schemas.zzp import (
 from app.api.v1.deps import CurrentUser, require_zzp
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
@@ -751,8 +755,6 @@ async def send_invoice(
         pdf_bytes = generate_invoice_pdf_reportlab(invoice)
         filename = get_invoice_pdf_filename(invoice)
     except Exception as pdf_error:
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Failed to generate PDF for invoice {invoice_id}: {pdf_error}")
         raise HTTPException(
             status_code=500,
@@ -764,8 +766,6 @@ async def send_invoice(
     
     # Send email
     try:
-        import base64
-        
         # Prepare email content
         invoice_number = invoice.invoice_number
         total_amount = f"€{invoice.total_cents / 100:.2f}"
@@ -819,9 +819,6 @@ Dit is een geautomatiseerd bericht van Smart Accounting Platform.
                 }
             )
         
-        # Import settings for from email
-        from app.core.config import settings
-        
         # Encode PDF as base64 for attachment
         pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
         
@@ -840,8 +837,6 @@ Dit is een geautomatiseerd bericht van Smart Accounting Platform.
         })
         
     except Exception as email_error:
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Failed to send email for invoice {invoice_id}: {email_error}")
         raise HTTPException(
             status_code=500,

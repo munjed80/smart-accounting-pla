@@ -61,14 +61,15 @@ async def test_zzp_dashboard_with_invoices(
     auth_headers: dict,
     db_session: AsyncSession,
     test_administration,
+    test_customer,
 ):
     """Test dashboard shows invoice statistics correctly."""
     today = date.today()
     
     # Create a sent invoice (open)
     sent_invoice = ZZPInvoice(
-        id=uuid.uuid4(),
         administration_id=test_administration.id,
+        customer_id=test_customer.id,
         invoice_number="INV-2026-0001",
         status=InvoiceStatus.SENT.value,
         issue_date=today - timedelta(days=10),
@@ -81,8 +82,8 @@ async def test_zzp_dashboard_with_invoices(
     
     # Create a paid invoice (this month)
     paid_invoice = ZZPInvoice(
-        id=uuid.uuid4(),
         administration_id=test_administration.id,
+        customer_id=test_customer.id,
         invoice_number="INV-2026-0002",
         status=InvoiceStatus.PAID.value,
         issue_date=today - timedelta(days=30),
@@ -90,14 +91,13 @@ async def test_zzp_dashboard_with_invoices(
         subtotal_cents=20000,
         vat_total_cents=4200,
         total_cents=24200,
-        updated_at=datetime.now(timezone.utc),
     )
     db_session.add(paid_invoice)
     
     # Create a draft invoice
     draft_invoice = ZZPInvoice(
-        id=uuid.uuid4(),
         administration_id=test_administration.id,
+        customer_id=test_customer.id,
         invoice_number="INV-2026-0003",
         status=InvoiceStatus.DRAFT.value,
         issue_date=today,
@@ -140,7 +140,6 @@ async def test_zzp_dashboard_with_expenses(
     
     # Create an expense this month
     expense = ZZPExpense(
-        id=uuid.uuid4(),
         administration_id=test_administration.id,
         vendor="Test Vendor",
         expense_date=today - timedelta(days=5),
@@ -180,7 +179,6 @@ async def test_zzp_dashboard_with_time_entries(
     
     # Create a billable time entry
     time_entry = ZZPTimeEntry(
-        id=uuid.uuid4(),
         administration_id=test_administration.id,
         entry_date=monday,
         description="Test work",
@@ -192,7 +190,6 @@ async def test_zzp_dashboard_with_time_entries(
     
     # Create a non-billable time entry
     non_billable = ZZPTimeEntry(
-        id=uuid.uuid4(),
         administration_id=test_administration.id,
         entry_date=monday + timedelta(days=1),
         description="Admin work",
@@ -227,7 +224,6 @@ async def test_zzp_dashboard_profile_complete(
     """Test dashboard shows profile_complete correctly."""
     # Create a complete profile
     profile = BusinessProfile(
-        id=uuid.uuid4(),
         administration_id=test_administration.id,
         company_name="Test Company",
         kvk_number="12345678",

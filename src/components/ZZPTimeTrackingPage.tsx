@@ -1288,6 +1288,13 @@ export const ZZPTimeTrackingPage = () => {
   const [deletingEntry, setDeletingEntry] = useState<ZZPTimeEntry | undefined>()
   const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false)
 
+  // Invoice creation state
+  const [invoiceCustomerId, setInvoiceCustomerId] = useState<string>('')
+  const [invoicePeriodStart, setInvoicePeriodStart] = useState('')
+  const [invoicePeriodEnd, setInvoicePeriodEnd] = useState('')
+  const [invoiceHourlyRate, setInvoiceHourlyRate] = useState('')
+  const [isCreatingInvoice, setIsCreatingInvoice] = useState(false)
+
   // Productivity filters and sorting
   const [searchTerm, setSearchTerm] = useState('')
   const [billableFilter, setBillableFilter] = useState<'all' | 'billable' | 'non-billable'>('all')
@@ -1303,6 +1310,40 @@ export const ZZPTimeTrackingPage = () => {
     customers.forEach(c => { map[c.id] = c.name })
     return map
   }, [customers])
+
+  // Calculate unbilled hours for invoice preview
+  const unbilledHoursForInvoice = useMemo(() => {
+    if (!invoiceCustomerId || !invoicePeriodStart || !invoicePeriodEnd) return 0
+    
+    const periodStart = new Date(invoicePeriodStart)
+    const periodEnd = new Date(invoicePeriodEnd)
+    
+    return entries
+      .filter(e => 
+        e.customer_id === invoiceCustomerId &&
+        !e.is_invoiced &&
+        new Date(e.entry_date) >= periodStart &&
+        new Date(e.entry_date) <= periodEnd
+      )
+      .reduce((sum, e) => sum + e.hours, 0)
+  }, [entries, invoiceCustomerId, invoicePeriodStart, invoicePeriodEnd])
+
+  // Calculate invoice total preview
+  const invoiceTotalPreview = useMemo(() => {
+    const rate = parseFloat(invoiceHourlyRate) || 0
+    return unbilledHoursForInvoice * rate
+  }, [unbilledHoursForInvoice, invoiceHourlyRate])
+
+  // Split entries into open and invoiced
+  const openEntries = useMemo(() => 
+    entries.filter(e => !e.is_invoiced),
+    [entries]
+  )
+
+  const invoicedEntries = useMemo(() => 
+    entries.filter(e => e.is_invoiced),
+    [entries]
+  )
 
   // Load customers
   const loadCustomers = useCallback(async () => {
@@ -1454,6 +1495,12 @@ export const ZZPTimeTrackingPage = () => {
     loadWeeklySummary()
   }, [loadEntries, loadWeeklySummary])
 
+  // Initialize invoice period to current week
+  useEffect(() => {
+    setInvoicePeriodStart(formatDateISO(currentWeekStart))
+    setInvoicePeriodEnd(formatDateISO(currentWeekEnd))
+  }, [currentWeekStart, currentWeekEnd])
+
   // Week navigation
   const goToPreviousWeek = useCallback(() => {
     setCurrentWeekStart(prev => {
@@ -1517,6 +1564,60 @@ export const ZZPTimeTrackingPage = () => {
     setDeletingEntry(undefined)
   }, [user?.id, deletingEntry, loadEntries, loadWeeklySummary])
 
+  // Handle invoice creation from time entries
+  const handleCreateInvoiceFromTimeEntries = useCallback(async () => {
+    if (!invoiceCustomerId || !invoicePeriodStart || !invoicePeriodEnd || !invoiceHourlyRate) {
+      toast.error('Vul alle velden in om een factuur te maken')
+      return
+    }
+
+    if (unbilledHoursForInvoice === 0) {
+      toast.error('Geen ongefactureerde uren gevonden voor deze periode en klant')
+      return
+    }
+
+    setIsCreatingInvoice(true)
+    try {
+      const hourlyRateCents = Math.round(parseFloat(invoiceHourlyRate) * 100)
+      
+      const invoice = await zzpApi.timeEntries.createInvoice({
+        customer_id: invoiceCustomerId,
+        period_start: invoicePeriodStart,
+        period_end: invoicePeriodEnd,
+        hourly_rate_cents: hourlyRateCents,
+        issue_date: formatDateISO(new Date()),
+        due_date: formatDateISO(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)), // 14 days from now
+      })
+
+      toast.success('Factuur succesvol aangemaakt', {
+        action: {
+          label: 'Bekijk factuur',
+          onClick: () => navigateTo(`invoices/${invoice.id}`),
+        },
+      })
+
+      // Reset form
+      setInvoiceCustomerId('')
+      setInvoiceHourlyRate('')
+      
+      // Reload data
+      await Promise.all([loadEntries(), loadWeeklySummary()])
+    } catch (error) {
+      console.error('Failed to create invoice:', error)
+      toast.error(parseApiError(error))
+    } finally {
+      setIsCreatingInvoice(false)
+    }
+  }, [
+    invoiceCustomerId, 
+    invoicePeriodStart, 
+    invoicePeriodEnd, 
+    invoiceHourlyRate,
+    unbilledHoursForInvoice,
+    loadEntries,
+    loadWeeklySummary
+  ])
+
   // Open form for new entry
   const openNewForm = useCallback(() => {
     setEditingEntry(undefined)
@@ -1529,11 +1630,11 @@ export const ZZPTimeTrackingPage = () => {
     setIsFormOpen(true)
   }, [])
 
-  // Filter and sort entries
-  const filteredEntries = useMemo(() => {
+  // Filter and sort entries - separate for open and invoiced
+  const filteredOpenEntries = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
 
-    const filtered = entries.filter((entry) => {
+    const filtered = openEntries.filter((entry) => {
       const customerName = entry.customer_id ? customerMap[entry.customer_id] : ''
       const matchesSearch = !query || [
         entry.description,
@@ -1562,7 +1663,47 @@ export const ZZPTimeTrackingPage = () => {
           return b.entry_date.localeCompare(a.entry_date)
       }
     })
-  }, [entries, searchTerm, billableFilter, sortOption, customerMap])
+  }, [openEntries, searchTerm, billableFilter, sortOption, customerMap])
+
+  const filteredInvoicedEntries = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase()
+
+    const filtered = invoicedEntries.filter((entry) => {
+      const customerName = entry.customer_id ? customerMap[entry.customer_id] : ''
+      const matchesSearch = !query || [
+        entry.description,
+        entry.project_name,
+        customerName,
+      ].some((value) => (value || '').toLowerCase().includes(query))
+
+      const matchesBillableFilter =
+        billableFilter === 'all' ||
+        (billableFilter === 'billable' && entry.billable) ||
+        (billableFilter === 'non-billable' && !entry.billable)
+
+      return matchesSearch && matchesBillableFilter
+    })
+
+    return filtered.sort((a, b) => {
+      switch (sortOption) {
+        case 'date-asc':
+          return a.entry_date.localeCompare(b.entry_date)
+        case 'hours-desc':
+          return b.hours - a.hours
+        case 'hours-asc':
+          return a.hours - b.hours
+        case 'date-desc':
+        default:
+          return b.entry_date.localeCompare(a.entry_date)
+      }
+    })
+  }, [invoicedEntries, searchTerm, billableFilter, sortOption, customerMap])
+
+  // Combined for metrics
+  const filteredEntries = useMemo(() => 
+    [...filteredOpenEntries, ...filteredInvoicedEntries],
+    [filteredOpenEntries, filteredInvoicedEntries]
+  )
 
   const productivityMetrics = useMemo(() => {
     const totalHours = filteredEntries.reduce((sum, entry) => sum + entry.hours, 0)
@@ -1691,6 +1832,119 @@ export const ZZPTimeTrackingPage = () => {
           onClockOut={handleClockOut}
           isLoading={isSessionLoading}
         />
+
+        {/* Invoice Creation Block - Facturatie deze week */}
+        <Card className="bg-gradient-to-br from-primary/5 to-accent/5 backdrop-blur-sm border border-primary/20 mb-6">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-3 text-xl">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Receipt size={24} className="text-primary" weight="duotone" />
+              </div>
+              Facturatie deze week
+            </CardTitle>
+            <CardDescription>
+              Genereer direct een factuur van ongefactureerde uren
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Customer selector */}
+              <div className="space-y-2">
+                <Label htmlFor="invoice-customer">Klant *</Label>
+                <Select value={invoiceCustomerId} onValueChange={setInvoiceCustomerId}>
+                  <SelectTrigger id="invoice-customer">
+                    <SelectValue placeholder="Selecteer klant..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map(customer => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Hourly rate */}
+              <div className="space-y-2">
+                <Label htmlFor="invoice-rate">Uurtarief (€) *</Label>
+                <Input
+                  id="invoice-rate"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="bijv. 75.00"
+                  value={invoiceHourlyRate}
+                  onChange={(e) => setInvoiceHourlyRate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Period start */}
+              <div className="space-y-2">
+                <Label htmlFor="invoice-period-start">Periode van</Label>
+                <Input
+                  id="invoice-period-start"
+                  type="date"
+                  value={invoicePeriodStart}
+                  onChange={(e) => setInvoicePeriodStart(e.target.value)}
+                />
+              </div>
+
+              {/* Period end */}
+              <div className="space-y-2">
+                <Label htmlFor="invoice-period-end">Periode tot</Label>
+                <Input
+                  id="invoice-period-end"
+                  type="date"
+                  value={invoicePeriodEnd}
+                  onChange={(e) => setInvoicePeriodEnd(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Preview */}
+            {invoiceCustomerId && invoiceHourlyRate && (
+              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Totaal uren:</span>
+                  <span className="font-semibold">{unbilledHoursForInvoice.toFixed(2)}h</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Uurtarief:</span>
+                  <span className="font-semibold">€{parseFloat(invoiceHourlyRate).toFixed(2)}</span>
+                </div>
+                <div className="h-px bg-border my-2" />
+                <div className="flex justify-between">
+                  <span className="font-semibold">Totaal (excl. BTW):</span>
+                  <span className="text-lg font-bold text-primary">
+                    €{invoiceTotalPreview.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Create invoice button */}
+            <Button
+              onClick={handleCreateInvoiceFromTimeEntries}
+              disabled={!invoiceCustomerId || !invoiceHourlyRate || unbilledHoursForInvoice === 0 || isCreatingInvoice}
+              className="w-full gap-2"
+            >
+              {isCreatingInvoice ? (
+                <>
+                  <SpinnerGap size={20} className="animate-spin" />
+                  Factuur aanmaken...
+                </>
+              ) : (
+                <>
+                  <Receipt size={20} />
+                  Maak factuur
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Week Navigation */}
         <Card className="bg-card/80 backdrop-blur-sm border border-border/50 mb-6">

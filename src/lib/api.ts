@@ -3654,6 +3654,8 @@ export interface ZZPTimeEntry {
   customer_id?: string
   hourly_rate_cents?: number
   billable: boolean
+  invoice_id?: string
+  is_invoiced: boolean
   created_at: string
   updated_at: string
 }
@@ -3683,6 +3685,16 @@ export interface ZZPWeeklyTimeSummary {
   total_hours: number
   billable_hours: number
   entries_by_day: Record<string, number>
+}
+
+export interface CreateInvoiceFromTimeEntriesRequest {
+  customer_id: string
+  period_start: string
+  period_end: string
+  hourly_rate_cents: number
+  issue_date: string
+  due_date?: string
+  notes?: string
 }
 
 // Calendar Event Types
@@ -3995,6 +4007,14 @@ export const zzpApi = {
 
     delete: async (entryId: string): Promise<void> => {
       await api.delete(`/zzp/time-entries/${entryId}`)
+    },
+
+    /**
+     * Create an invoice from unbilled time entries for a specific customer and period.
+     */
+    createInvoice: async (data: CreateInvoiceFromTimeEntriesRequest): Promise<ZZPInvoice> => {
+      const response = await api.post<ZZPInvoice>('/zzp/time-entries/create-invoice', data)
+      return response.data
     },
   },
 

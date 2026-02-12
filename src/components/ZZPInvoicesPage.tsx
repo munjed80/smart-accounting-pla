@@ -1573,7 +1573,7 @@ export const ZZPInvoicesPage = () => {
         const link = document.createElement('a')
         link.href = blobUrl
         link.download = filename
-        link.rel = 'noopener'  // Security: prevent window.opener access
+        link.rel = 'noopener noreferrer'  // Security: prevent window.opener access and referrer leakage
         link.style.display = 'none'
         
         document.body.appendChild(link)
@@ -1651,7 +1651,7 @@ export const ZZPInvoicesPage = () => {
       
       // Check if Web Share API supports file sharing
       // Only create File object if we can actually use it
-      if (navigator.share && navigator.canShare) {
+      if (navigator.share && typeof navigator.canShare === 'function') {
         const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' })
         const shareData = {
           title: t('zzpInvoices.shareTitle').replace('{number}', invoiceNumber),
@@ -1666,6 +1666,8 @@ export const ZZPInvoicesPage = () => {
           console.log('[PDF Share] File shared successfully')
           toast.success(t('zzpInvoices.shareSuccess'))
           return
+        } else {
+          console.log('[PDF Share] File sharing not supported by canShare check')
         }
       }
       

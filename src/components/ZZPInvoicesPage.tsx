@@ -150,6 +150,8 @@ function isMobile(): boolean {
 
 // Delay in ms before revoking PDF blob URL to ensure download/open completes
 const PDF_URL_REVOCATION_DELAY_MS = 30000
+// iOS requires longer delay due to slower blob URL loading
+const IOS_REVOCATION_DELAY_MULTIPLIER = 2
 
 // Helper function to extract date part from ISO string
 const extractDatePart = (isoString: string | undefined): string => {
@@ -1564,7 +1566,7 @@ export const ZZPInvoicesPage = () => {
         setTimeout(() => {
           console.log('[PDF Download] Revoking blob URL after iOS delay')
           window.URL.revokeObjectURL(blobUrl)
-        }, PDF_URL_REVOCATION_DELAY_MS * 2)
+        }, PDF_URL_REVOCATION_DELAY_MS * IOS_REVOCATION_DELAY_MULTIPLIER)
       } else {
         // Desktop and Android: Use anchor element with download attribute
         console.log('[PDF Download] Creating anchor element for download...')
@@ -1584,7 +1586,9 @@ export const ZZPInvoicesPage = () => {
         }, 100)
         
         // Clean up blob URL after a delay
-        const revokeDelay = isMobile() ? PDF_URL_REVOCATION_DELAY_MS * 2 : PDF_URL_REVOCATION_DELAY_MS
+        const revokeDelay = isMobile() 
+          ? PDF_URL_REVOCATION_DELAY_MS * IOS_REVOCATION_DELAY_MULTIPLIER 
+          : PDF_URL_REVOCATION_DELAY_MS
         setTimeout(() => {
           console.log('[PDF Download] Revoking blob URL after delay')
           window.URL.revokeObjectURL(blobUrl)
@@ -1652,7 +1656,7 @@ export const ZZPInvoicesPage = () => {
         files: [pdfFile],
       }
       
-      if (navigator.canShare && navigator.canShare(shareData)) {
+      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
         // Share the actual PDF file
         console.log('[PDF Share] Sharing PDF file via Web Share API...')
         await navigator.share(shareData)

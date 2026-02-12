@@ -469,3 +469,185 @@ async def test_customer(test_administration, db_session):
     await db_session.commit()
     await db_session.refresh(customer)
     return customer
+
+
+class TestInvoicePdfContent:
+    """Tests for invoice PDF content correctness."""
+    
+    def test_reportlab_pdf_no_html_escaping(self):
+        """ReportLab PDF should not contain escaped HTML tags in totals."""
+        from app.services.invoice_pdf_reportlab import generate_invoice_pdf_reportlab
+        from decimal import Decimal
+        from datetime import date
+        
+        # Create minimal mock invoice
+        class MockInvoice:
+            id = "test-id"
+            invoice_number = "INV-TEST-001"
+            issue_date = date.today()
+            due_date = date.today()
+            seller_company_name = "Test Co"
+            seller_trading_name = None
+            seller_address_street = "Street 1"
+            seller_address_postal_code = "1234AB"
+            seller_address_city = "City"
+            seller_address_country = "Nederland"
+            seller_kvk_number = "12345678"
+            seller_btw_number = "NL123456789B01"
+            seller_iban = "NL00BANK0000000000"
+            seller_email = "test@test.nl"
+            seller_phone = None
+            customer_name = "Customer"
+            customer_address_street = None
+            customer_address_postal_code = None
+            customer_address_city = None
+            customer_address_country = None
+            customer_kvk_number = None
+            customer_btw_number = None
+            subtotal_cents = 100000
+            vat_total_cents = 21000
+            total_cents = 121000
+            notes = None
+            lines = []
+        
+        class MockLine:
+            description = "Test item"
+            quantity = Decimal("1")
+            unit_price_cents = 100000
+            vat_rate = Decimal("21")
+            line_total_cents = 100000
+            vat_amount_cents = 21000
+        
+        invoice = MockInvoice()
+        invoice.lines = [MockLine()]
+        
+        # Generate PDF
+        pdf_bytes = generate_invoice_pdf_reportlab(invoice)
+        
+        # Convert to string (with latin-1 encoding for binary data)
+        pdf_str = pdf_bytes.decode('latin-1', errors='ignore')
+        
+        # Verify no escaped HTML tags
+        assert "<b>Totaal</b>" not in pdf_str, "PDF contains escaped HTML tags in totals"
+        assert "&lt;b&gt;" not in pdf_str, "PDF contains HTML entity-encoded tags"
+        
+    def test_weasyprint_html_kvk_in_payment_section(self):
+        """WeasyPrint HTML should have KvK in payment details, not footer."""
+        from app.services.invoice_pdf import generate_invoice_html
+        from decimal import Decimal
+        from datetime import date
+        
+        # Create minimal mock invoice
+        class MockInvoice:
+            id = "test-id"
+            invoice_number = "INV-TEST-001"
+            issue_date = date.today()
+            due_date = date.today()
+            seller_company_name = "Test Co"
+            seller_trading_name = None
+            seller_address_street = "Street 1"
+            seller_address_postal_code = "1234AB"
+            seller_address_city = "City"
+            seller_address_country = "Nederland"
+            seller_kvk_number = "12345678"
+            seller_btw_number = "NL123456789B01"
+            seller_iban = "NL00BANK0000000000"
+            seller_email = "test@test.nl"
+            seller_phone = None
+            customer_name = "Customer"
+            customer_address_street = None
+            customer_address_postal_code = None
+            customer_address_city = None
+            customer_address_country = None
+            customer_kvk_number = None
+            customer_btw_number = None
+            subtotal_cents = 100000
+            vat_total_cents = 21000
+            total_cents = 121000
+            notes = None
+            lines = []
+        
+        class MockLine:
+            description = "Test item"
+            quantity = Decimal("1")
+            unit_price_cents = 100000
+            vat_rate = Decimal("21")
+            line_total_cents = 100000
+            vat_amount_cents = 21000
+        
+        invoice = MockInvoice()
+        invoice.lines = [MockLine()]
+        
+        # Generate HTML
+        html = generate_invoice_html(invoice)
+        
+        # Extract payment section
+        payment_start = html.find('<div class="payment-info">')
+        payment_end = html.find('</div>', payment_start + 200)  # Look ahead for closing tag
+        payment_section = html[payment_start:payment_end] if payment_start > 0 else ""
+        
+        # Verify KvK is in payment section
+        assert "12345678" in payment_section, "KvK number should be in payment details section"
+        assert "KvK" in payment_section, "KvK label should be in payment details section"
+        
+        # Verify there's no separate business-ids footer div
+        assert '<div class="business-ids">' not in html, "Should not have separate business-ids footer"
+        
+    def test_weasyprint_html_totals_use_css_not_inline_html(self):
+        """WeasyPrint HTML should use CSS classes for totals, not inline HTML tags."""
+        from app.services.invoice_pdf import generate_invoice_html
+        from decimal import Decimal
+        from datetime import date
+        
+        # Create minimal mock invoice
+        class MockInvoice:
+            id = "test-id"
+            invoice_number = "INV-TEST-001"
+            issue_date = date.today()
+            due_date = date.today()
+            seller_company_name = "Test Co"
+            seller_trading_name = None
+            seller_address_street = None
+            seller_address_postal_code = None
+            seller_address_city = None
+            seller_address_country = None
+            seller_kvk_number = None
+            seller_btw_number = None
+            seller_iban = None
+            seller_email = None
+            seller_phone = None
+            customer_name = "Customer"
+            customer_address_street = None
+            customer_address_postal_code = None
+            customer_address_city = None
+            customer_address_country = None
+            customer_kvk_number = None
+            customer_btw_number = None
+            subtotal_cents = 100000
+            vat_total_cents = 21000
+            total_cents = 121000
+            notes = None
+            lines = []
+        
+        class MockLine:
+            description = "Test item"
+            quantity = Decimal("1")
+            unit_price_cents = 100000
+            vat_rate = Decimal("21")
+            line_total_cents = 100000
+            vat_amount_cents = 21000
+        
+        invoice = MockInvoice()
+        invoice.lines = [MockLine()]
+        
+        # Generate HTML
+        html = generate_invoice_html(invoice)
+        
+        # Verify totals use proper HTML structure with CSS classes
+        assert '<div class="totals-row total">' in html, "Totals should use CSS class"
+        assert '<span>Totaal</span>' in html, "Total label should be plain text in span"
+        
+        # Verify no escaped or inline HTML in values
+        assert "<b>Totaal</b>" not in html, "Should not have inline <b> tags in total label"
+        assert "&lt;b&gt;" not in html, "Should not have HTML-encoded tags"
+

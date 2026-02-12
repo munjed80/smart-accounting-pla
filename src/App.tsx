@@ -8,6 +8,7 @@ import { ForgotPasswordPage } from '@/components/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/components/ResetPasswordPage'
 import { OnboardingPage } from '@/components/OnboardingPage'
 import { AccountantOnboardingPage } from '@/components/AccountantOnboardingPage'
+import { LandingPage } from '@/pages/LandingPage'
 import { SmartDashboard } from '@/components/SmartDashboard'
 import { AccountantDashboard } from '@/components/AccountantDashboard'
 import { AccountantHomePage } from '@/components/AccountantHomePage'
@@ -431,6 +432,11 @@ const AppContent = () => {
   }
 
   if (!isAuthenticated) {
+    // Show LandingPage for root path, LoginPage for explicit /login routes
+    if (route.type === 'app' && route.path === '/') {
+      return <LandingPage />
+    }
+    
     return (
       <LoginPage 
         onSuccess={(loggedInUser) => {

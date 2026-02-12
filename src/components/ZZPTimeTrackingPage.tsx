@@ -79,6 +79,7 @@ import {
   ArrowsDownUp,
   TrendUp,
   Copy,
+  Lock,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { navigateTo } from '@/lib/navigation'
@@ -92,6 +93,8 @@ import {
   ZZPCustomer,
   WorkSession,
   ZZPInvoiceLineCreate,
+  ZZPTimeEntryInvoiceCreate,
+  ZZPInvoice,
 } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
@@ -1207,9 +1210,12 @@ const EntryCard = ({
                 {formatDateDisplay(entry.entry_date)}
               </span>
               <span className="text-lg font-bold text-primary">{entry.hours}h</span>
+              {entry.is_invoiced && (
+                <Lock size={16} className="text-amber-600" weight="fill" />
+              )}
             </div>
             <h4 className="font-medium line-clamp-2">{entry.description}</h4>
-            {(entry.project_name || customerName) && (
+            {(entry.project_name || customerName || entry.invoice_id) && (
               <p className="text-sm text-muted-foreground truncate flex items-center gap-1.5 mt-1">
                 {entry.project_name && (
                   <>
@@ -1224,6 +1230,13 @@ const EntryCard = ({
                     {customerName}
                   </>
                 )}
+                {entry.invoice_id && (
+                  <>
+                    {(entry.project_name || customerName) && <span>•</span>}
+                    <Receipt size={12} />
+                    Gefactureerd
+                  </>
+                )}
               </p>
             )}
           </div>
@@ -1236,6 +1249,7 @@ const EntryCard = ({
           size="sm"
           onClick={onEdit}
           className="h-9 px-3 gap-2"
+          disabled={entry.is_invoiced}
         >
           <PencilSimple size={16} />
           {t('common.edit')}
@@ -1254,6 +1268,7 @@ const EntryCard = ({
           size="sm"
           onClick={onDelete}
           className="h-9 px-3 gap-2 text-destructive hover:text-destructive"
+          disabled={entry.is_invoiced}
         >
           <TrashSimple size={16} />
           {t('common.delete')}
@@ -1292,6 +1307,14 @@ export const ZZPTimeTrackingPage = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [billableFilter, setBillableFilter] = useState<'all' | 'billable' | 'non-billable'>('all')
   const [sortOption, setSortOption] = useState<'date-desc' | 'date-asc' | 'hours-desc' | 'hours-asc'>('date-desc')
+  const [invoicedFilter, setInvoicedFilter] = useState<'open' | 'invoiced'>('open')
+
+  // Invoice generation state
+  const [invoiceCustomerId, setInvoiceCustomerId] = useState<string>('')
+  const [invoicePeriodStart, setInvoicePeriodStart] = useState(() => formatDateISO(currentWeekStart))
+  const [invoicePeriodEnd, setInvoicePeriodEnd] = useState(() => formatDateISO(currentWeekEnd))
+  const [invoiceHourlyRate, setInvoiceHourlyRate] = useState('')
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false)
 
   // Computed values
   const currentWeekEnd = useMemo(() => getSunday(currentWeekStart), [currentWeekStart])
@@ -1452,7 +1475,9 @@ export const ZZPTimeTrackingPage = () => {
   useEffect(() => {
     loadEntries()
     loadWeeklySummary()
-  }, [loadEntries, loadWeeklySummary])
+    setInvoicePeriodStart(formatDateISO(currentWeekStart))
+    setInvoicePeriodEnd(formatDateISO(currentWeekEnd))
+  }, [loadEntries, loadWeeklySummary, currentWeekStart, currentWeekEnd])
 
   // Week navigation
   const goToPreviousWeek = useCallback(() => {
@@ -1479,6 +1504,11 @@ export const ZZPTimeTrackingPage = () => {
   const handleSaveEntry = useCallback(async (data: ZZPTimeEntryCreate) => {
     if (!user?.id) return
 
+    if (editingEntry?.id && editingEntry.is_invoiced) {
+      toast.error(t('zzpTimeTracking.cannotEditInvoiced'))
+      return
+    }
+
     try {
       if (editingEntry?.id) {
         await zzpApi.timeEntries.update(editingEntry.id, data as ZZPTimeEntryUpdate)
@@ -1503,6 +1533,12 @@ export const ZZPTimeTrackingPage = () => {
   const handleDeleteEntry = useCallback(async () => {
     if (!user?.id || !deletingEntry) return
 
+    if (deletingEntry.is_invoiced) {
+      toast.error(t('zzpTimeTracking.cannotDeleteInvoiced'))
+      setDeletingEntry(undefined)
+      return
+    }
+
     try {
       await zzpApi.timeEntries.delete(deletingEntry.id)
       toast.success(t('zzpTimeTracking.entryDeleted'))
@@ -1525,6 +1561,10 @@ export const ZZPTimeTrackingPage = () => {
 
   // Open form for editing
   const openEditForm = useCallback((entry: ZZPTimeEntry) => {
+    if (entry.is_invoiced) {
+      toast.error(t('zzpTimeTracking.cannotEditInvoiced'))
+      return
+    }
     setEditingEntry(entry)
     setIsFormOpen(true)
   }, [])
@@ -1546,7 +1586,11 @@ export const ZZPTimeTrackingPage = () => {
         (billableFilter === 'billable' && entry.billable) ||
         (billableFilter === 'non-billable' && !entry.billable)
 
-      return matchesSearch && matchesBillableFilter
+      const matchesInvoicedFilter =
+        (invoicedFilter === 'open' && !entry.is_invoiced) ||
+        (invoicedFilter === 'invoiced' && entry.is_invoiced)
+
+      return matchesSearch && matchesBillableFilter && matchesInvoicedFilter
     })
 
     return filtered.sort((a, b) => {
@@ -1562,7 +1606,7 @@ export const ZZPTimeTrackingPage = () => {
           return b.entry_date.localeCompare(a.entry_date)
       }
     })
-  }, [entries, searchTerm, billableFilter, sortOption, customerMap])
+  }, [entries, searchTerm, billableFilter, sortOption, customerMap, invoicedFilter])
 
   const productivityMetrics = useMemo(() => {
     const totalHours = filteredEntries.reduce((sum, entry) => sum + entry.hours, 0)
@@ -1630,6 +1674,87 @@ export const ZZPTimeTrackingPage = () => {
     setIsFormOpen(true)
   }, [])
 
+  // Calculate total hours for selected customer and period
+  const invoiceHoursData = useMemo(() => {
+    if (!invoiceCustomerId) {
+      return { totalHours: 0, entries: [] }
+    }
+
+    const periodEntries = entries.filter(entry => 
+      entry.customer_id === invoiceCustomerId &&
+      !entry.is_invoiced &&
+      entry.billable &&
+      entry.entry_date >= invoicePeriodStart &&
+      entry.entry_date <= invoicePeriodEnd
+    )
+
+    const totalHours = periodEntries.reduce((sum, entry) => sum + entry.hours, 0)
+
+    return { totalHours, entries: periodEntries }
+  }, [entries, invoiceCustomerId, invoicePeriodStart, invoicePeriodEnd])
+
+  // Calculate total amount for invoice
+  const invoiceTotalAmount = useMemo(() => {
+    const rateCents = parseFloat(invoiceHourlyRate) * 100
+    if (isNaN(rateCents) || rateCents <= 0) return 0
+    return (invoiceHoursData.totalHours * rateCents) / 100
+  }, [invoiceHoursData.totalHours, invoiceHourlyRate])
+
+  // Handle invoice generation
+  const handleGenerateInvoice = useCallback(async () => {
+    if (!user?.id) return
+
+    if (!invoiceCustomerId) {
+      toast.error('Selecteer een klant')
+      return
+    }
+
+    const rateCents = parseFloat(invoiceHourlyRate) * 100
+    if (isNaN(rateCents) || rateCents <= 0) {
+      toast.error('Voer een geldig uurtarief in')
+      return
+    }
+
+    if (invoiceHoursData.totalHours === 0) {
+      toast.error('Geen open uren gevonden voor deze klant en periode')
+      return
+    }
+
+    setIsGeneratingInvoice(true)
+
+    try {
+      const invoiceData: ZZPTimeEntryInvoiceCreate = {
+        customer_id: invoiceCustomerId,
+        period_start: invoicePeriodStart,
+        period_end: invoicePeriodEnd,
+        hourly_rate_cents: Math.round(rateCents),
+      }
+
+      const invoice = await zzpApi.timeEntries.generateInvoice(invoiceData)
+      
+      toast.success('Factuur succesvol aangemaakt', {
+        description: `Factuur ${invoice.invoice_number} voor ${invoiceHoursData.totalHours.toFixed(1)}h`
+      })
+
+      // Reload entries to reflect is_invoiced changes
+      await Promise.all([loadEntries(), loadWeeklySummary()])
+
+      // Reset form
+      setInvoiceCustomerId('')
+      setInvoiceHourlyRate('')
+
+      // Navigate to invoice detail page
+      navigateTo(`/zzp/invoices/${invoice.id}`)
+    } catch (error) {
+      console.error('Failed to generate invoice:', error)
+      toast.error('Fout bij aanmaken factuur', {
+        description: parseApiError(error)
+      })
+    } finally {
+      setIsGeneratingInvoice(false)
+    }
+  }, [user?.id, invoiceCustomerId, invoicePeriodStart, invoicePeriodEnd, invoiceHourlyRate, invoiceHoursData, loadEntries, loadWeeklySummary])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
@@ -1683,6 +1808,126 @@ export const ZZPTimeTrackingPage = () => {
             </Button>
           </div>
         </div>
+
+        {/* Invoice Generation Block */}
+        <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/5 border-green-500/30 mb-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Receipt size={20} className="text-green-600" weight="duotone" />
+              Facturatie deze week
+            </CardTitle>
+            <CardDescription>
+              Maak een factuur voor gewerkte uren
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Customer selector */}
+              <div className="space-y-2">
+                <Label htmlFor="invoice-customer" className="text-sm font-medium">
+                  Klant
+                </Label>
+                <Select value={invoiceCustomerId} onValueChange={setInvoiceCustomerId}>
+                  <SelectTrigger id="invoice-customer" className="h-10">
+                    <SelectValue placeholder="Selecteer klant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={String(customer.id)}>
+                        {customer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Period start */}
+              <div className="space-y-2">
+                <Label htmlFor="invoice-period-start" className="text-sm font-medium">
+                  Periode start
+                </Label>
+                <Input
+                  id="invoice-period-start"
+                  type="date"
+                  value={invoicePeriodStart}
+                  onChange={(e) => setInvoicePeriodStart(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+
+              {/* Period end */}
+              <div className="space-y-2">
+                <Label htmlFor="invoice-period-end" className="text-sm font-medium">
+                  Periode eind
+                </Label>
+                <Input
+                  id="invoice-period-end"
+                  type="date"
+                  value={invoicePeriodEnd}
+                  onChange={(e) => setInvoicePeriodEnd(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+
+              {/* Hourly rate */}
+              <div className="space-y-2">
+                <Label htmlFor="invoice-rate" className="text-sm font-medium">
+                  Uurtarief (€)
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
+                  <Input
+                    id="invoice-rate"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={invoiceHourlyRate}
+                    onChange={(e) => setInvoiceHourlyRate(e.target.value)}
+                    className="h-10 pl-8"
+                  />
+                </div>
+              </div>
+
+              {/* Summary display */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Totaal uren
+                </Label>
+                <div className="h-10 px-3 bg-secondary/50 rounded-md flex items-center">
+                  <span className="font-semibold text-primary">
+                    {invoiceHoursData.totalHours.toFixed(1)}h
+                  </span>
+                </div>
+              </div>
+
+              {/* Total amount */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Totaal bedrag (excl. BTW)
+                </Label>
+                <div className="h-10 px-3 bg-secondary/50 rounded-md flex items-center">
+                  <span className="font-semibold text-green-600">
+                    € {invoiceTotalAmount.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Generate button */}
+            <div className="mt-4 flex justify-end">
+              <Button
+                onClick={handleGenerateInvoice}
+                disabled={!invoiceCustomerId || !invoiceHourlyRate || invoiceHoursData.totalHours === 0 || isGeneratingInvoice}
+                className="gap-2"
+              >
+                {isGeneratingInvoice && <SpinnerGap size={18} className="animate-spin" />}
+                <FileText size={18} />
+                Maak factuur
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Clock-in/out Card (Dagstart) */}
         <ClockInCard
@@ -1772,6 +2017,27 @@ export const ZZPTimeTrackingPage = () => {
         {!showLoading && (
           <Card className="bg-card/80 backdrop-blur-sm border border-border/50 mb-6">
             <CardContent className="p-4">
+              {/* Invoiced filter tabs */}
+              <div className="flex gap-2 mb-4 pb-4 border-b border-border/50">
+                <Button
+                  variant={invoicedFilter === 'open' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setInvoicedFilter('open')}
+                  className="flex-1 sm:flex-none"
+                >
+                  Open uren
+                </Button>
+                <Button
+                  variant={invoicedFilter === 'invoiced' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setInvoicedFilter('invoiced')}
+                  className="flex-1 sm:flex-none"
+                >
+                  <Lock size={14} className="mr-1" />
+                  Gefactureerde uren
+                </Button>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="md:col-span-2 relative">
                   <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -1824,7 +2090,9 @@ export const ZZPTimeTrackingPage = () => {
             <CardHeader className="pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <CardTitle className="text-lg">{t('zzpTimeTracking.entriesTitle')}</CardTitle>
+                  <CardTitle className="text-lg">
+                    {invoicedFilter === 'open' ? 'Open uren' : 'Gefactureerde uren'}
+                  </CardTitle>
                   <CardDescription>
                     {filteredEntries.length} {filteredEntries.length === 1 ? t('zzpTimeTracking.entry') : t('zzpTimeTracking.entries')} {t('zzpTimeTracking.thisWeek')}
                   </CardDescription>
@@ -1868,6 +2136,9 @@ export const ZZPTimeTrackingPage = () => {
                               <CalendarBlank size={16} className="text-primary" weight="duotone" />
                             </div>
                             <span className="font-medium">{formatDateDisplay(entry.entry_date)}</span>
+                            {entry.is_invoiced && (
+                              <Lock size={16} className="text-amber-600" weight="fill" />
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -1877,6 +2148,12 @@ export const ZZPTimeTrackingPage = () => {
                               <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
                                 <User size={12} />
                                 {customerMap[entry.customer_id]}
+                              </p>
+                            )}
+                            {entry.invoice_id && (
+                              <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                                <Receipt size={12} />
+                                Gefactureerd
                               </p>
                             )}
                           </div>
@@ -1897,6 +2174,7 @@ export const ZZPTimeTrackingPage = () => {
                               size="sm"
                               onClick={() => openEditForm(entry)}
                               className="h-8 w-8 p-0"
+                              disabled={entry.is_invoiced}
                             >
                               <PencilSimple size={16} />
                               <span className="sr-only">{t('common.edit')}</span>
@@ -1915,6 +2193,7 @@ export const ZZPTimeTrackingPage = () => {
                               size="sm"
                               onClick={() => setDeletingEntry(entry)}
                               className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                              disabled={entry.is_invoiced}
                             >
                               <TrashSimple size={16} />
                               <span className="sr-only">{t('common.delete')}</span>

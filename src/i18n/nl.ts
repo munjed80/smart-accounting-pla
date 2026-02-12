@@ -319,6 +319,8 @@ export const nl = {
     // Success/error messages
     entrySaved: "Urenregistratie opgeslagen",
     entryDeleted: "Urenregistratie verwijderd",
+    cannotEditInvoiced: "Gefactureerde uren kunnen niet worden bewerkt",
+    cannotDeleteInvoiced: "Gefactureerde uren kunnen niet worden verwijderd",
     errorLoadingEntries: "Fout bij laden van urenregistraties",
     errorSavingEntry: "Fout bij opslaan van urenregistratie",
     errorDeletingEntry: "Fout bij verwijderen van urenregistratie",

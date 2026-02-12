@@ -44,6 +44,7 @@ import {
   Users,
   Clock,
   CalendarBlank,
+  ListChecks,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 
@@ -144,39 +145,8 @@ const menuItems: MenuItem[] = [
     section: 'secondary',
   },
   // === ZZP MVP Navigation (Dutch-first, minimal) ===
-  // 1. Overzicht (Dashboard)
-  {
-    label: t('sidebar.overzicht'),
-    tabValue: 'dashboard',
-    icon: <House size={20} weight="duotone" />,
-    rolesAllowed: ['zzp'],
-    section: 'main',
-  },
-  // 2. Documenten (AI Upload + document status list)
-  {
-    label: t('sidebar.documenten'),
-    tabValue: 'upload',
-    icon: <FileText size={20} weight="duotone" />,
-    rolesAllowed: ['zzp'],
-    section: 'main',
-  },
-  // 3. Boekingen (Transactions list + stats)
-  {
-    label: t('sidebar.boekingen'),
-    tabValue: 'transactions',
-    icon: <Receipt size={20} weight="duotone" />,
-    rolesAllowed: ['zzp'],
-    section: 'main',
-  },
-  // 4. Boekhouder (Links/consent page)
-  {
-    label: t('sidebar.boekhouder'),
-    tabValue: 'boekhouder',
-    icon: <Handshake size={20} weight="duotone" />,
-    rolesAllowed: ['zzp'],
-    section: 'main',
-  },
-  // 5. Klanten (Customers)
+  // Reordered menu items for better UX
+  // 1. Klanten (Customers)
   {
     label: t('sidebar.klanten'),
     tabValue: 'customers',
@@ -184,7 +154,7 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // 6. Facturen (Invoices)
+  // 2. Facturen (Invoices)
   {
     label: t('sidebar.facturen'),
     tabValue: 'invoices',
@@ -192,7 +162,7 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // 7. Uitgaven (Expenses) - coming soon
+  // 3. Uitgaven (Expenses)
   {
     label: t('sidebar.uitgaven'),
     tabValue: 'expenses',
@@ -200,7 +170,15 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // 8. Agenda
+  // 4. Uren (Time Tracking)
+  {
+    label: t('sidebar.uren'),
+    tabValue: 'time',
+    icon: <Clock size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  // 5. Agenda
   {
     label: t('sidebar.agenda'),
     tabValue: 'agenda',
@@ -208,11 +186,27 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // 9. Uren (Time Tracking)
+  // 6. Boekhouder (Links/consent page)
   {
-    label: t('sidebar.uren'),
-    tabValue: 'time',
-    icon: <Clock size={20} weight="duotone" />,
+    label: t('sidebar.boekhouder'),
+    tabValue: 'boekhouder',
+    icon: <Handshake size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  // 7. Documenten (AI Upload + document status list)
+  {
+    label: t('sidebar.documenten'),
+    tabValue: 'upload',
+    icon: <FileText size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  // 8. Boekingen (Transactions list + stats)
+  {
+    label: t('sidebar.boekingen'),
+    tabValue: 'transactions',
+    icon: <ListChecks size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',
   },

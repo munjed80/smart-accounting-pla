@@ -38,6 +38,10 @@ from app.api.v1.deps import CurrentUser, require_zzp
 
 router = APIRouter()
 
+# Invoice line description format for time entries
+# Format: "Week {week_number} ({start_date} - {end_date}) – {total_hours}h × €{rate}"
+INVOICE_LINE_DESCRIPTION_FORMAT = "Week {week_number} ({period_start} - {period_end}) – {total_hours:.2f}h × €{hourly_rate:.2f}"
+
 
 async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
     """
@@ -583,9 +587,15 @@ async def generate_invoice_from_time_entries(
     # Calculate week number for description
     week_number = period_start.isocalendar()[1]
     
-    # Create invoice line description
+    # Create invoice line description using format constant
     hourly_rate_euros = invoice_data.hourly_rate_cents / 100
-    line_description = f"Week {week_number} ({period_start.strftime('%d-%m-%Y')} - {period_end.strftime('%d-%m-%Y')}) – {total_hours:.2f}h × €{hourly_rate_euros:.2f}"
+    line_description = INVOICE_LINE_DESCRIPTION_FORMAT.format(
+        week_number=week_number,
+        period_start=period_start.strftime('%d-%m-%Y'),
+        period_end=period_end.strftime('%d-%m-%Y'),
+        total_hours=total_hours,
+        hourly_rate=hourly_rate_euros
+    )
     
     # Calculate totals
     subtotal_cents = int(total_hours * invoice_data.hourly_rate_cents)

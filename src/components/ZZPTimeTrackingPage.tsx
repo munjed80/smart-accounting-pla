@@ -1263,6 +1263,201 @@ const EntryCard = ({
   </Card>
 )
 
+// Helper component to render entry table
+const EntriesTable = ({
+  entries,
+  customerMap,
+  onEdit,
+  onDuplicate,
+  onDelete,
+  title,
+  description,
+  emptyMessage,
+  showInvoiceRef = false
+}: {
+  entries: ZZPTimeEntry[]
+  customerMap: Record<string, string>
+  onEdit: (entry: ZZPTimeEntry) => void
+  onDuplicate: (entry: ZZPTimeEntry) => void
+  onDelete: (entry: ZZPTimeEntry) => void
+  title: string
+  description: string
+  emptyMessage: string
+  showInvoiceRef?: boolean
+}) => {
+  if (entries.length === 0) {
+    return (
+      <Card className="bg-card/80 backdrop-blur-sm border border-border/50">
+        <CardContent className="py-12">
+          <div className="text-center text-muted-foreground">
+            <p className="text-sm">{emptyMessage}</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="bg-card/80 backdrop-blur-sm">
+      <CardHeader className="pb-4">
+        <div>
+          <CardTitle className="text-lg">{title}</CardTitle>
+          <CardDescription>
+            {description}
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {/* Mobile: Card list */}
+        <div className="sm:hidden space-y-3">
+          {entries.map((entry) => (
+            <EntryCard
+              key={entry.id}
+              entry={entry}
+              customerName={entry.customer_id ? customerMap[entry.customer_id] : undefined}
+              onEdit={() => onEdit(entry)}
+              onDuplicate={() => onDuplicate(entry)}
+              onDelete={() => onDelete(entry)}
+            />
+          ))}
+        </div>
+
+        {/* Desktop: Table */}
+        <div className="hidden sm:block rounded-lg border border-border/50 overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-secondary/50 hover:bg-secondary/50">
+                <TableHead className="font-semibold">{t('zzpTimeTracking.columnDate')}</TableHead>
+                <TableHead className="font-semibold">{t('zzpTimeTracking.columnDescription')}</TableHead>
+                <TableHead className="font-semibold hidden lg:table-cell">{t('zzpTimeTracking.columnProject')}</TableHead>
+                <TableHead className="font-semibold text-right">{t('zzpTimeTracking.columnHours')}</TableHead>
+                <TableHead className="font-semibold">{t('zzpTimeTracking.columnBillable')}</TableHead>
+                {showInvoiceRef && <TableHead className="font-semibold">Factuur</TableHead>}
+                <TableHead className="text-right font-semibold">{t('zzpTimeTracking.columnActions')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {entries.map((entry) => (
+                <TableRow key={entry.id} className="hover:bg-secondary/30">
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <CalendarBlank size={16} className="text-primary" weight="duotone" />
+                      </div>
+                      <span className="font-medium">{formatDateDisplay(entry.entry_date)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="max-w-xs">
+                      <p className="font-medium truncate">{entry.description}</p>
+                      {entry.customer_id && customerMap[entry.customer_id] && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          <User size={12} className="inline mr-1" />
+                          {customerMap[entry.customer_id]}
+                        </p>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    {entry.project_name ? (
+                      <div className="flex items-center gap-2">
+                        <Briefcase size={14} className="text-muted-foreground" />
+                        <span className="text-sm truncate max-w-[200px]">{entry.project_name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className="font-semibold">{entry.hours.toFixed(2)}h</span>
+                  </TableCell>
+                  <TableCell>
+                    {entry.billable ? (
+                      <Badge variant="default" className="gap-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20">
+                        <CheckCircle size={14} weight="fill" />
+                        {t('zzpTimeTracking.billable')}
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="gap-1">
+                        <XCircle size={14} weight="fill" />
+                        {t('zzpTimeTracking.nonBillable')}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  {showInvoiceRef && (
+                    <TableCell>
+                      {entry.invoice_id ? (
+                        <button 
+                          onClick={() => navigateTo(`invoices/${entry.invoice_id}`)}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Receipt size={14} />
+                          Factuur
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                  )}
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onEdit(entry)}
+                            disabled={entry.is_invoiced}
+                            className="h-8 w-8 p-0"
+                          >
+                            <PencilSimple size={16} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {entry.is_invoiced ? 'Gefactureerde uren kunnen niet worden bewerkt' : t('common.edit')}
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onDuplicate(entry)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Copy size={16} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{t('zzpTimeTracking.duplicate')}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onDelete(entry)}
+                            disabled={entry.is_invoiced}
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          >
+                            <TrashSimple size={16} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {entry.is_invoiced ? 'Gefactureerde uren kunnen niet worden verwijderd' : t('common.delete')}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export const ZZPTimeTrackingPage = () => {
   const { user } = useAuth()
   
@@ -2074,114 +2269,35 @@ export const ZZPTimeTrackingPage = () => {
         ) : filteredEntries.length === 0 ? (
           <EmptyState onAddEntry={openNewForm} />
         ) : (
-          <Card className="bg-card/80 backdrop-blur-sm" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
-            <CardHeader className="pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <CardTitle className="text-lg">{t('zzpTimeTracking.entriesTitle')}</CardTitle>
-                  <CardDescription>
-                    {filteredEntries.length} {filteredEntries.length === 1 ? t('zzpTimeTracking.entry') : t('zzpTimeTracking.entries')} {t('zzpTimeTracking.thisWeek')}
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Mobile: Card list */}
-              <div className="sm:hidden space-y-3">
-                {filteredEntries.map((entry) => (
-                  <EntryCard
-                    key={entry.id}
-                    entry={entry}
-                    customerName={entry.customer_id ? customerMap[entry.customer_id] : undefined}
-                    onEdit={() => openEditForm(entry)}
-                    onDuplicate={() => duplicateEntry(entry)}
-                    onDelete={() => setDeletingEntry(entry)}
-                  />
-                ))}
-              </div>
+          <div className="space-y-6">
+            {/* Open uren (not invoiced) */}
+            <EntriesTable
+              entries={filteredOpenEntries}
+              customerMap={customerMap}
+              onEdit={openEditForm}
+              onDuplicate={duplicateEntry}
+              onDelete={setDeletingEntry}
+              title="Open uren"
+              description={`${filteredOpenEntries.length} ${filteredOpenEntries.length === 1 ? 'uur' : 'uren'} nog niet gefactureerd`}
+              emptyMessage="Geen open uren gevonden. Alle uren zijn gefactureerd."
+              showInvoiceRef={false}
+            />
 
-              {/* Desktop: Table */}
-              <div className="hidden sm:block rounded-lg border border-border/50 overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-secondary/50 hover:bg-secondary/50">
-                      <TableHead className="font-semibold">{t('zzpTimeTracking.columnDate')}</TableHead>
-                      <TableHead className="font-semibold">{t('zzpTimeTracking.columnDescription')}</TableHead>
-                      <TableHead className="font-semibold hidden lg:table-cell">{t('zzpTimeTracking.columnProject')}</TableHead>
-                      <TableHead className="font-semibold text-right">{t('zzpTimeTracking.columnHours')}</TableHead>
-                      <TableHead className="font-semibold">{t('zzpTimeTracking.columnBillable')}</TableHead>
-                      <TableHead className="text-right font-semibold">{t('zzpTimeTracking.columnActions')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredEntries.map((entry) => (
-                      <TableRow key={entry.id} className="hover:bg-secondary/30">
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                              <CalendarBlank size={16} className="text-primary" weight="duotone" />
-                            </div>
-                            <span className="font-medium">{formatDateDisplay(entry.entry_date)}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="max-w-xs">
-                            <p className="font-medium truncate">{entry.description}</p>
-                            {entry.customer_id && customerMap[entry.customer_id] && (
-                              <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-                                <User size={12} />
-                                {customerMap[entry.customer_id]}
-                              </p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground hidden lg:table-cell">
-                          {entry.project_name || '-'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className="font-semibold text-primary">{entry.hours}h</span>
-                        </TableCell>
-                        <TableCell>
-                          <BillableBadge billable={entry.billable} />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditForm(entry)}
-                              className="h-8 w-8 p-0"
-                            >
-                              <PencilSimple size={16} />
-                              <span className="sr-only">{t('common.edit')}</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => duplicateEntry(entry)}
-                              className="h-8 w-8 p-0"
-                            >
-                              <Copy size={16} />
-                              <span className="sr-only">{t('zzpTimeTracking.duplicate')}</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeletingEntry(entry)}
-                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                            >
-                              <TrashSimple size={16} />
-                              <span className="sr-only">{t('common.delete')}</span>
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Gefactureerde uren (invoiced) */}
+            {filteredInvoicedEntries.length > 0 && (
+              <EntriesTable
+                entries={filteredInvoicedEntries}
+                customerMap={customerMap}
+                onEdit={openEditForm}
+                onDuplicate={duplicateEntry}
+                onDelete={setDeletingEntry}
+                title="Gefactureerde uren"
+                description={`${filteredInvoicedEntries.length} ${filteredInvoicedEntries.length === 1 ? 'uur' : 'uren'} gefactureerd`}
+                emptyMessage="Geen gefactureerde uren gevonden."
+                showInvoiceRef={true}
+              />
+            )}
+          </div>
         )}
       </div>
 

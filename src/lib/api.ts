@@ -170,12 +170,12 @@ const checkMisconfiguration = (): { isMisconfigured: boolean; reason: string; wa
     return { isMisconfigured: false, reason: '', warning }
   }
   
-  // In PROD mode, VITE_API_URL must be set and must NOT point to localhost
+  // In PROD mode, prefer explicit VITE_API_URL, but fallback to current origin to avoid mixed-content issues
   if (!normalizedEnvApiUrl || normalizedEnvApiUrl === '') {
     return { 
-      isMisconfigured: true, 
-      reason: 'VITE_API_URL environment variable is not set. The frontend cannot call the API.',
-      warning 
+      isMisconfigured: false, 
+      reason: '',
+      warning: 'VITE_API_URL ontbreekt. Fallback naar window.location.origin wordt gebruikt.' 
     }
   }
   
@@ -198,9 +198,10 @@ const checkMisconfiguration = (): { isMisconfigured: boolean; reason: string; wa
 // NOTE: All API routes are mounted under /api/v1, so we include it in the base URL
 // We use normalizeApiOrigin() to strip any accidental /api/v1 or /api paths from VITE_API_URL
 const devApiOrigin = normalizeApiOrigin(envApiUrl || 'http://localhost:8000').origin
+const resolvedProdOrigin = normalizedEnvApiUrl || (typeof window !== 'undefined' ? window.location.origin : '')
 const API_BASE_URL = isDev 
   ? `${devApiOrigin}/api/v1`
-  : `${normalizedEnvApiUrl || 'http://api-not-configured.invalid'}/api/v1`
+  : `${resolvedProdOrigin}/api/v1`
 
 // Store misconfiguration result
 const misconfigurationCheck = checkMisconfiguration()
@@ -244,11 +245,6 @@ export const api = axios.create({
 // Add request interceptor to fail fast if API is misconfigured
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // In production, if API is misconfigured, reject requests immediately with clear error
-    if (misconfigurationCheck.isMisconfigured) {
-      return Promise.reject(new Error(`API Configuration Error: ${misconfigurationCheck.reason}`))
-    }
-    
     const token = localStorage.getItem('access_token')
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`

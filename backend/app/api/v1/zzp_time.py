@@ -272,58 +272,23 @@ async def invoice_week(
             select(ZZPTimeEntry)
             .where(
                 ZZPTimeEntry.administration_id == administration.id,
-                ZZPTimeEntry.customer_id == payload.customer_id,
-                ZZPTimeEntry.invoice_id.is_(None),
-                ZZPTimeEntry.entry_date >= payload.period_start,
-                ZZPTimeEntry.entry_date <= payload.period_end,
+                ZZPTimeEntry.customer_id == invoice_data.customer_id,
+                ZZPTimeEntry.billable == True,
+                ZZPTimeEntry.is_invoiced == False,
+                ZZPTimeEntry.entry_date >= period_start,
+                ZZPTimeEntry.entry_date <= period_end
             )
-            .with_for_update()
-        )
-        entries = entries_result.scalars().all()
-        if not entries:
-            raise HTTPException(status_code=400, detail={"code": "NO_TIME_ENTRIES", "message": "Geen open uren gevonden voor deze selectie."})
-
-        total_hours = sum((e.hours for e in entries), Decimal("0"))
-
-        rate = payload.hourly_rate
-        if rate is None:
-            profile = await db.scalar(select(BusinessProfile).where(BusinessProfile.administration_id == administration.id))
-            rate = profile.default_hourly_rate if profile else None
-            if rate is None:
-                first_rate = next((e.hourly_rate for e in entries if e.hourly_rate is not None), None)
-                rate = first_rate
-        if rate is None:
-            raise HTTPException(
-                status_code=400,
-                detail={"code": "MISSING_HOURLY_RATE", "message": "Geen uurtarief opgegeven en geen standaardtarief gevonden."},
-            )
-
-        invoice_number = await generate_invoice_number(administration.id, db)
-        issue_date = date.today()
-        due_date = issue_date + timedelta(days=30)
-        subtotal = (total_hours * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        vat_rate = Decimal("21.00")
-        vat_amount = (subtotal * vat_rate / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        total_amount = subtotal + vat_amount
-
-        invoice = ZZPInvoice(
-            administration_id=administration.id,
-            customer_id=customer.id,
-            invoice_number=invoice_number,
-            status=InvoiceStatus.DRAFT.value,
-            issue_date=issue_date,
-            due_date=due_date,
-            seller_company_name=None,
-            customer_name=customer.name,
-            customer_address_street=customer.address_street,
-            customer_address_postal_code=customer.address_postal_code,
-            customer_address_city=customer.address_city,
-            customer_address_country=customer.address_country,
-            customer_kvk_number=customer.kvk_number,
-            customer_btw_number=customer.btw_number,
-            subtotal_cents=_to_cents(subtotal),
-            vat_total_cents=_to_cents(vat_amount),
-            total_cents=_to_cents(total_amount),
+        ).order_by(ZZPTimeEntry.entry_date)
+    )
+    time_entries = result.scalars().all()
+    
+    if not time_entries:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "NO_TIME_ENTRIES",
+                "message": "Geen factureerbare uren gevonden voor deze periode en klant."
+            }
         )
         db.add(invoice)
         await db.flush()

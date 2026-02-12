@@ -141,9 +141,9 @@ export const IntelligentUploadPortal = () => {
   const uploadFile = async (fileItem: UploadedFile) => {
     if (!isMountedRef.current) return
     
-    console.log('='  .repeat(80))
+    console.log('='.repeat(80))
     console.log('🚀 STARTING UPLOAD')
-    console.log('='  .repeat(80))
+    console.log('='.repeat(80))
     console.log('File:', fileItem.file.name)
     console.log('Size:', (fileItem.file.size / 1024).toFixed(2), 'KB')
     console.log('Type:', fileItem.file.type)

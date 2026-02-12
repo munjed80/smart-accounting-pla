@@ -318,13 +318,6 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                 border-left: 4px solid #eab308;
                 font-size: 9pt;
             }}
-            
-            .business-ids {{
-                margin-top: 20px;
-                font-size: 8pt;
-                color: #666;
-                text-align: center;
-            }}
         </style>
     </head>
     <body>
@@ -422,7 +415,9 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                     <div class="payment-details">
                         {f'<strong>IBAN:</strong> {invoice.seller_iban}<br>' if invoice.seller_iban else ''}
                         <strong>T.n.v.:</strong> {invoice.seller_company_name or '-'}<br>
-                        <strong>Kenmerk:</strong> {invoice.invoice_number}
+                        <strong>Kenmerk:</strong> {invoice.invoice_number}<br>
+                        {f'<strong>KvK:</strong> {invoice.seller_kvk_number}<br>' if invoice.seller_kvk_number else ''}
+                        {f'<strong>BTW:</strong> {invoice.seller_btw_number}' if invoice.seller_btw_number else ''}
                     </div>
                 </div>
                 
@@ -430,12 +425,6 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                     <strong>Opmerkingen:</strong><br>
                     {invoice.notes}
                 </div>''' if invoice.notes else ''}
-                
-                <div class="business-ids">
-                    {f'KVK: {invoice.seller_kvk_number}' if invoice.seller_kvk_number else ''}
-                    {' | ' if invoice.seller_kvk_number and invoice.seller_btw_number else ''}
-                    {f'BTW: {invoice.seller_btw_number}' if invoice.seller_btw_number else ''}
-                </div>
             </div>
         </div>
     </body>

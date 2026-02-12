@@ -3654,6 +3654,8 @@ export interface ZZPTimeEntry {
   customer_id?: string
   hourly_rate_cents?: number
   billable: boolean
+  invoice_id?: string
+  is_invoiced: boolean
   created_at: string
   updated_at: string
 }
@@ -3683,6 +3685,17 @@ export interface ZZPWeeklyTimeSummary {
   total_hours: number
   billable_hours: number
   entries_by_day: Record<string, number>
+}
+
+export interface ZZPTimeEntryInvoiceCreate {
+  customer_id: string
+  period_start: string
+  period_end: string
+  hourly_rate_cents: number
+  issue_date?: string
+  due_date?: string
+  vat_rate?: number
+  notes?: string
 }
 
 // Calendar Event Types
@@ -3958,6 +3971,7 @@ export const zzpApi = {
       project_name?: string
       customer_id?: string
       billable?: boolean
+      is_invoiced?: boolean
       from_date?: string
       to_date?: string
     }): Promise<ZZPTimeEntryListResponse> => {
@@ -3965,6 +3979,7 @@ export const zzpApi = {
       if (options?.project_name) params.project_name = options.project_name
       if (options?.customer_id) params.customer_id = options.customer_id
       if (options?.billable !== undefined) params.billable = options.billable
+      if (options?.is_invoiced !== undefined) params.is_invoiced = options.is_invoiced
       if (options?.from_date) params.from_date = options.from_date
       if (options?.to_date) params.to_date = options.to_date
       const response = await api.get<ZZPTimeEntryListResponse>('/zzp/time-entries', { params })
@@ -3995,6 +4010,11 @@ export const zzpApi = {
 
     delete: async (entryId: string): Promise<void> => {
       await api.delete(`/zzp/time-entries/${entryId}`)
+    },
+
+    generateInvoice: async (data: ZZPTimeEntryInvoiceCreate): Promise<ZZPInvoice> => {
+      const response = await api.post<ZZPInvoice>('/zzp/time-entries/generate-invoice', data)
+      return response.data
     },
   },
 

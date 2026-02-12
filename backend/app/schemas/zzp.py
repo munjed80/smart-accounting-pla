@@ -914,6 +914,8 @@ class TimeEntryResponse(BaseModel):
     customer_id: Optional[UUID] = None
     hourly_rate_cents: Optional[int] = None
     billable: bool
+    invoice_id: Optional[UUID] = None
+    is_invoiced: bool
     created_at: datetime
     updated_at: datetime
 
@@ -936,6 +938,18 @@ class WeeklyTimeSummary(BaseModel):
     total_hours: float
     billable_hours: float
     entries_by_day: dict  # date -> hours
+
+
+class TimeEntryInvoiceCreate(BaseModel):
+    """Schema for creating invoice from time entries."""
+    customer_id: UUID = Field(..., description="Customer ID for the invoice")
+    period_start: str = Field(..., description="Period start date (YYYY-MM-DD)")
+    period_end: str = Field(..., description="Period end date (YYYY-MM-DD)")
+    hourly_rate_cents: int = Field(..., gt=0, description="Hourly rate in cents")
+    issue_date: Optional[str] = Field(None, description="Invoice issue date (defaults to today)")
+    due_date: Optional[str] = Field(None, description="Invoice due date (defaults to 30 days from issue)")
+    vat_rate: Decimal = Field(default=Decimal("21"), description="VAT rate percentage")
+    notes: Optional[str] = Field(None, max_length=2000, description="Invoice notes")
 
 
 # ============================================================================

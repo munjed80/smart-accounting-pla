@@ -721,12 +721,20 @@ export interface DocumentResponse {
 
 export const documentApi = {
   upload: async (file: File, administrationId?: string): Promise<{ message: string; document_id: string }> => {
+    console.log('📤 documentApi.upload called')
+    console.log('   File:', file.name, `(${(file.size / 1024).toFixed(2)} KB)`)
+    console.log('   Administration ID:', administrationId || '(auto-select)')
+    
     const formData = new FormData()
     formData.append('file', file)
     if (administrationId) {
       formData.append('administration_id', administrationId)
     }
 
+    console.log('   FormData created, making POST request to /documents/upload')
+    console.log('   Headers will include: Authorization: Bearer [token]')
+    console.log('   Content-Type: multipart/form-data (set by axios)')
+    
     const response = await api.post<{ message: string; document_id: string }>(
       '/documents/upload',
       formData,
@@ -736,6 +744,8 @@ export const documentApi = {
         },
       }
     )
+    
+    console.log('✅ documentApi.upload response:', response.data)
     return response.data
   },
 

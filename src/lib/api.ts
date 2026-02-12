@@ -671,6 +671,52 @@ export const transactionApi = {
   },
 }
 
+
+export interface ZZPLedgerLine {
+  id: string
+  account_id: string
+  account_code: string | null
+  account_name: string | null
+  debit: string
+  credit: string
+}
+
+export interface ZZPLedgerEntry {
+  id: string
+  date: string
+  description: string
+  reference: string | null
+  posted: boolean
+  lines: ZZPLedgerLine[]
+}
+
+export interface ZZPAccountBalance {
+  account_id: string
+  account_code: string
+  account_name: string
+  total_debit: string
+  total_credit: string
+  balance: string
+}
+
+export interface ZZPLedgerAccountOption {
+  id: string
+  code: string
+  name: string
+}
+
+export interface ZZPLedgerResponse {
+  entries: ZZPLedgerEntry[]
+  account_balances: ZZPAccountBalance[]
+  accounts: ZZPLedgerAccountOption[]
+}
+
+export const zzpLedgerApi = {
+  getEntries: async (params?: { from_date?: string; to_date?: string; account_id?: string }): Promise<ZZPLedgerResponse> => {
+    const response = await api.get<ZZPLedgerResponse>('/zzp/ledger', { params })
+    return response.data
+  },
+}
 export interface Administration {
   id: string
   name: string

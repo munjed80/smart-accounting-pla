@@ -410,8 +410,11 @@ class ZZPTimeEntry(Base):
     - description (required): What was worked on
     - hours (required): Number of hours
     - project_name: Optional project/client name
+    - customer_id: Optional customer reference
     - hourly_rate_cents: Optional hourly rate for billing
     - billable: Whether this time is billable
+    - invoice_id: Optional link to invoice (set when invoiced)
+    - is_invoiced: Boolean flag indicating if entry has been invoiced
     """
     __tablename__ = "zzp_time_entries"
 
@@ -443,6 +446,15 @@ class ZZPTimeEntry(Base):
     hourly_rate_cents: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     billable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
     
+    # Invoice tracking
+    invoice_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("zzp_invoices.id", ondelete="SET NULL"), 
+        nullable=True,
+        index=True
+    )
+    is_invoiced: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -454,6 +466,7 @@ class ZZPTimeEntry(Base):
     # Relationships
     administration = relationship("Administration")
     customer = relationship("ZZPCustomer")
+    invoice = relationship("ZZPInvoice")
 
 
 class ZZPCalendarEvent(Base):

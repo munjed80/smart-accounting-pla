@@ -1,19 +1,26 @@
 """
 ZZP Time Tracking API Endpoints
 
-CRUD operations for ZZP time entries with weekly view support.
+CRUD operations for ZZP time entries with weekly view support and invoice generation.
 """
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from decimal import Decimal
 from typing import Annotated, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, extract
+from sqlalchemy import select, func, extract, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.models.zzp import ZZPTimeEntry, ZZPCustomer
+from app.models.zzp import (
+    ZZPTimeEntry, 
+    ZZPCustomer, 
+    ZZPInvoice, 
+    ZZPInvoiceLine,
+    ZZPInvoiceCounter,
+    BusinessProfile,
+)
 from app.models.administration import Administration, AdministrationMember
 from app.schemas.zzp import (
     TimeEntryCreate,
@@ -21,6 +28,8 @@ from app.schemas.zzp import (
     TimeEntryResponse,
     TimeEntryListResponse,
     WeeklyTimeSummary,
+    CreateInvoiceFromTimeEntriesRequest,
+    InvoiceResponse,
 )
 from app.api.v1.deps import CurrentUser, require_zzp
 
@@ -65,6 +74,8 @@ def entry_to_response(entry: ZZPTimeEntry) -> TimeEntryResponse:
         customer_id=entry.customer_id,
         hourly_rate_cents=entry.hourly_rate_cents,
         billable=entry.billable,
+        invoice_id=entry.invoice_id,
+        is_invoiced=entry.is_invoiced,
         created_at=entry.created_at,
         updated_at=entry.updated_at,
     )
@@ -361,3 +372,227 @@ async def delete_time_entry(
     await db.commit()
     
     return None
+
+
+async def generate_invoice_number(admin_id: UUID, db: AsyncSession) -> str:
+    """
+    Generate a sequential invoice number for an administration.
+    
+    Uses SELECT FOR UPDATE to prevent race conditions.
+    Format: INV-YYYY-0001
+    """
+    current_year = datetime.now().year
+    
+    # Try to get or create counter with lock
+    result = await db.execute(
+        select(ZZPInvoiceCounter)
+        .where(ZZPInvoiceCounter.administration_id == admin_id)
+        .with_for_update()
+    )
+    counter = result.scalar_one_or_none()
+    
+    if counter:
+        # Reset counter if year changed
+        if counter.year != current_year:
+            counter.year = current_year
+            counter.counter = 1
+        else:
+            counter.counter += 1
+    else:
+        # Create new counter
+        counter = ZZPInvoiceCounter(
+            administration_id=admin_id,
+            year=current_year,
+            counter=1
+        )
+        db.add(counter)
+    
+    await db.flush()
+    
+    # Format: INV-2024-0001
+    return f"INV-{current_year}-{counter.counter:04d}"
+
+
+@router.post("/time-entries/create-invoice", response_model=InvoiceResponse)
+async def create_invoice_from_time_entries(
+    request: CreateInvoiceFromTimeEntriesRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Create an invoice from unbilled time entries.
+    
+    This endpoint:
+    1. Fetches all unbilled time entries for the specified customer and period
+    2. Creates an invoice with a single line item summarizing the time
+    3. Links the time entries to the invoice
+    4. Marks the time entries as invoiced
+    """
+    require_zzp(current_user)
+    
+    administration = await get_user_administration(current_user.id, db)
+    
+    # Parse dates
+    period_start_date = date.fromisoformat(request.period_start)
+    period_end_date = date.fromisoformat(request.period_end)
+    issue_date = date.fromisoformat(request.issue_date)
+    due_date = date.fromisoformat(request.due_date) if request.due_date else None
+    
+    # Validate customer exists
+    customer_result = await db.execute(
+        select(ZZPCustomer).where(
+            ZZPCustomer.id == request.customer_id,
+            ZZPCustomer.administration_id == administration.id
+        )
+    )
+    customer = customer_result.scalar_one_or_none()
+    
+    if not customer:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "CUSTOMER_NOT_FOUND", "message": "Klant niet gevonden."}
+        )
+    
+    # Fetch unbilled time entries for this customer and period
+    entries_result = await db.execute(
+        select(ZZPTimeEntry).where(
+            and_(
+                ZZPTimeEntry.administration_id == administration.id,
+                ZZPTimeEntry.customer_id == request.customer_id,
+                ZZPTimeEntry.invoice_id.is_(None),
+                ZZPTimeEntry.entry_date >= period_start_date,
+                ZZPTimeEntry.entry_date <= period_end_date
+            )
+        )
+    )
+    time_entries = entries_result.scalars().all()
+    
+    if not time_entries:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "NO_UNBILLED_TIME_ENTRIES",
+                "message": "Geen ongefactureerde uren gevonden voor deze periode en klant."
+            }
+        )
+    
+    # Calculate total hours
+    total_hours = sum(float(entry.hours) for entry in time_entries)
+    
+    # Get business profile for seller info
+    profile_result = await db.execute(
+        select(BusinessProfile).where(
+            BusinessProfile.administration_id == administration.id
+        )
+    )
+    profile = profile_result.scalar_one_or_none()
+    
+    # Generate invoice number
+    invoice_number = await generate_invoice_number(administration.id, db)
+    
+    # Calculate week number from period start
+    week_number = period_start_date.isocalendar()[1]
+    
+    # Create invoice line description
+    line_description = f"Week {week_number} ({period_start_date.strftime('%d-%m-%Y')} - {period_end_date.strftime('%d-%m-%Y')}) – {total_hours:.2f}h × €{request.hourly_rate_cents / 100:.2f}"
+    
+    # Calculate amounts (assuming 21% VAT)
+    vat_rate = Decimal("21")
+    line_total_cents = int(Decimal(total_hours) * Decimal(request.hourly_rate_cents))
+    vat_amount_cents = int(line_total_cents * vat_rate / 100)
+    
+    # Create invoice
+    invoice = ZZPInvoice(
+        administration_id=administration.id,
+        customer_id=customer.id,
+        invoice_number=invoice_number,
+        status="draft",
+        issue_date=issue_date,
+        due_date=due_date,
+        # Seller snapshot
+        seller_company_name=profile.company_name if profile else None,
+        seller_trading_name=profile.trading_name if profile else None,
+        seller_address_street=profile.address_street if profile else None,
+        seller_address_postal_code=profile.address_postal_code if profile else None,
+        seller_address_city=profile.address_city if profile else None,
+        seller_address_country=profile.address_country if profile else None,
+        seller_kvk_number=profile.kvk_number if profile else None,
+        seller_btw_number=profile.btw_number if profile else None,
+        seller_iban=profile.iban if profile else None,
+        seller_email=profile.email if profile else None,
+        seller_phone=profile.phone if profile else None,
+        # Customer snapshot
+        customer_name=customer.name,
+        customer_address_street=customer.address_street,
+        customer_address_postal_code=customer.address_postal_code,
+        customer_address_city=customer.address_city,
+        customer_address_country=customer.address_country,
+        customer_kvk_number=customer.kvk_number,
+        customer_btw_number=customer.btw_number,
+        # Totals
+        subtotal_cents=line_total_cents,
+        vat_total_cents=vat_amount_cents,
+        total_cents=line_total_cents + vat_amount_cents,
+        notes=request.notes,
+    )
+    
+    db.add(invoice)
+    await db.flush()
+    
+    # Create invoice line
+    invoice_line = ZZPInvoiceLine(
+        invoice_id=invoice.id,
+        line_number=1,
+        description=line_description,
+        quantity=Decimal(total_hours),
+        unit_price_cents=request.hourly_rate_cents,
+        vat_rate=vat_rate,
+        line_total_cents=line_total_cents,
+        vat_amount_cents=vat_amount_cents,
+    )
+    
+    db.add(invoice_line)
+    
+    # Update time entries
+    for entry in time_entries:
+        entry.invoice_id = invoice.id
+        entry.is_invoiced = True
+    
+    await db.commit()
+    await db.refresh(invoice)
+    
+    # Build response
+    return InvoiceResponse(
+        id=invoice.id,
+        administration_id=invoice.administration_id,
+        customer_id=invoice.customer_id,
+        invoice_number=invoice.invoice_number,
+        status=invoice.status,
+        issue_date=invoice.issue_date.isoformat(),
+        due_date=invoice.due_date.isoformat() if invoice.due_date else None,
+        seller_company_name=invoice.seller_company_name,
+        seller_trading_name=invoice.seller_trading_name,
+        seller_address_street=invoice.seller_address_street,
+        seller_address_postal_code=invoice.seller_address_postal_code,
+        seller_address_city=invoice.seller_address_city,
+        seller_address_country=invoice.seller_address_country,
+        seller_kvk_number=invoice.seller_kvk_number,
+        seller_btw_number=invoice.seller_btw_number,
+        seller_iban=invoice.seller_iban,
+        seller_email=invoice.seller_email,
+        seller_phone=invoice.seller_phone,
+        customer_name=invoice.customer_name,
+        customer_address_street=invoice.customer_address_street,
+        customer_address_postal_code=invoice.customer_address_postal_code,
+        customer_address_city=invoice.customer_address_city,
+        customer_address_country=invoice.customer_address_country,
+        customer_kvk_number=invoice.customer_kvk_number,
+        customer_btw_number=invoice.customer_btw_number,
+        subtotal_cents=invoice.subtotal_cents,
+        vat_total_cents=invoice.vat_total_cents,
+        total_cents=invoice.total_cents,
+        notes=invoice.notes,
+        created_at=invoice.created_at,
+        updated_at=invoice.updated_at,
+        paid_at=invoice.paid_at,
+    )

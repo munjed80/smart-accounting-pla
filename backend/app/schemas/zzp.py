@@ -914,6 +914,8 @@ class TimeEntryResponse(BaseModel):
     customer_id: Optional[UUID] = None
     hourly_rate_cents: Optional[int] = None
     billable: bool
+    invoice_id: Optional[UUID] = None
+    is_invoiced: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -936,6 +938,28 @@ class WeeklyTimeSummary(BaseModel):
     total_hours: float
     billable_hours: float
     entries_by_day: dict  # date -> hours
+
+
+class CreateInvoiceFromTimeEntriesRequest(BaseModel):
+    """Schema for creating an invoice from time entries."""
+    customer_id: UUID = Field(..., description="Customer to invoice")
+    period_start: str = Field(..., description="Start date of billing period (YYYY-MM-DD)")
+    period_end: str = Field(..., description="End date of billing period (YYYY-MM-DD)")
+    hourly_rate_cents: int = Field(..., gt=0, description="Hourly rate in cents")
+    issue_date: str = Field(..., description="Invoice issue date (YYYY-MM-DD)")
+    due_date: Optional[str] = Field(None, description="Payment due date (YYYY-MM-DD)")
+    notes: Optional[str] = Field(None, max_length=2000, description="Invoice notes")
+
+    @field_validator('period_start', 'period_end', 'issue_date', 'due_date')
+    @classmethod
+    def validate_date(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            try:
+                from datetime import datetime as dt
+                dt.strptime(v, '%Y-%m-%d')
+            except ValueError:
+                raise ValueError("Date must be in YYYY-MM-DD format")
+        return v
 
 
 # ============================================================================

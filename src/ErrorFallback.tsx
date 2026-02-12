@@ -30,7 +30,7 @@ export const ErrorFallback = ({ error, resetErrorBoundary }) => {
     }
     return isDev 
       ? 'An error occurred during development. See details below and check the console for more information.'
-      : 'Something unexpected happened while running the application. The error details are shown below. Contact the spark author and let them know about this issue.';
+      : 'Er is een onverwachte fout opgetreden. De foutdetails staan hieronder. Neem contact op met ondersteuning als dit probleem blijft bestaan.';
   };
 
   return (
@@ -39,7 +39,7 @@ export const ErrorFallback = ({ error, resetErrorBoundary }) => {
         <Alert variant={isRecoverable ? "default" : "destructive"} className="mb-6">
           <AlertTriangleIcon />
           <AlertTitle>
-            {isRecoverable ? 'Er ging iets mis' : (isDev ? 'Development Error' : 'This spark has encountered a runtime error')}
+            {isRecoverable ? 'Er ging iets mis' : (isDev ? 'Development Error' : 'Er is een fout opgetreden')}
           </AlertTitle>
           <AlertDescription>
             {getUserMessage()}

@@ -141,6 +141,7 @@ class BusinessProfile(Base):
     
     # Bank details
     iban: Mapped[Optional[str]] = mapped_column(String(34), nullable=True)
+    default_hourly_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)
     
     # Contact details
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -421,6 +422,12 @@ class ZZPTimeEntry(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     administration_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), 
         ForeignKey("administrations.id", ondelete="CASCADE"), 
@@ -435,6 +442,12 @@ class ZZPTimeEntry(Base):
     
     # Optional project/client reference
     project_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    project_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("zzp_projects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     customer_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), 
         ForeignKey("zzp_customers.id", ondelete="SET NULL"), 
@@ -443,6 +456,7 @@ class ZZPTimeEntry(Base):
     )
     
     # Billing
+    hourly_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)
     hourly_rate_cents: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     billable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
     
@@ -467,6 +481,23 @@ class ZZPTimeEntry(Base):
     administration = relationship("Administration")
     customer = relationship("ZZPCustomer")
     invoice = relationship("ZZPInvoice")
+
+
+class ZZPProject(Base):
+    __tablename__ = "zzp_projects"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    administration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("administrations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
 
 class ZZPCalendarEvent(Base):

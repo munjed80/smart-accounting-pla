@@ -3214,6 +3214,7 @@ export interface ZZPBusinessProfile {
   id: string
   administration_id: string
   company_name: string
+  default_hourly_rate?: string
   trading_name?: string
   address_street?: string
   address_postal_code?: string
@@ -3689,11 +3690,14 @@ export interface ZZPExpenseListResponse {
 export interface ZZPTimeEntry {
   id: string
   administration_id: string
+  user_id?: string
   entry_date: string
   description: string
-  hours: number
+  hours: number | string
   project_name?: string
   customer_id?: string
+  project_id?: string
+  hourly_rate?: number | string
   hourly_rate_cents?: number
   billable: boolean
   invoice_id?: string
@@ -3705,10 +3709,11 @@ export interface ZZPTimeEntry {
 export interface ZZPTimeEntryCreate {
   entry_date: string
   description: string
-  hours: number
+  hours: number | string
   project_name?: string
   customer_id?: string
-  hourly_rate_cents?: number
+  project_id?: string
+  hourly_rate?: number | string
   billable: boolean
 }
 
@@ -3733,11 +3738,15 @@ export interface ZZPTimeEntryInvoiceCreate {
   customer_id: string
   period_start: string
   period_end: string
-  hourly_rate_cents: number
-  issue_date?: string
-  due_date?: string
-  vat_rate?: number
-  notes?: string
+  hourly_rate?: number | string
+}
+
+export interface ZZPWeeklyInvoiceCreateResponse {
+  invoice_id: string
+  invoice_number: string
+  total_hours: number | string
+  rate: number | string
+  total_amount: number | string
 }
 
 // Calendar Event Types
@@ -4010,33 +4019,41 @@ export const zzpApi = {
   // ------------ Time Entries ------------
   timeEntries: {
     list: async (options?: {
-      project_name?: string
       customer_id?: string
-      billable?: boolean
-      is_invoiced?: boolean
-      from_date?: string
-      to_date?: string
+      period_start?: string
+      period_end?: string
     }): Promise<ZZPTimeEntryListResponse> => {
-      const params: Record<string, string | boolean> = {}
-      if (options?.project_name) params.project_name = options.project_name
+      const params: Record<string, string> = {}
       if (options?.customer_id) params.customer_id = options.customer_id
-      if (options?.billable !== undefined) params.billable = options.billable
-      if (options?.is_invoiced !== undefined) params.is_invoiced = options.is_invoiced
-      if (options?.from_date) params.from_date = options.from_date
-      if (options?.to_date) params.to_date = options.to_date
+      if (options?.period_start) params.period_start = options.period_start
+      if (options?.period_end) params.period_end = options.period_end
       const response = await api.get<ZZPTimeEntryListResponse>('/zzp/time-entries', { params })
       return response.data
     },
 
-    getWeekly: async (weekOf?: string): Promise<ZZPWeeklyTimeSummary> => {
+    listOpen: async (options?: {
+      customer_id?: string
+      period_start?: string
+      period_end?: string
+    }): Promise<ZZPTimeEntry[]> => {
       const params: Record<string, string> = {}
-      if (weekOf) params.week_of = weekOf
-      const response = await api.get<ZZPWeeklyTimeSummary>('/zzp/time-entries/weekly', { params })
+      if (options?.customer_id) params.customer_id = options.customer_id
+      if (options?.period_start) params.period_start = options.period_start
+      if (options?.period_end) params.period_end = options.period_end
+      const response = await api.get<ZZPTimeEntry[]>('/zzp/time-entries/open', { params })
       return response.data
     },
 
-    get: async (entryId: string): Promise<ZZPTimeEntry> => {
-      const response = await api.get<ZZPTimeEntry>(`/zzp/time-entries/${entryId}`)
+    listInvoiced: async (options?: {
+      customer_id?: string
+      period_start?: string
+      period_end?: string
+    }): Promise<ZZPTimeEntry[]> => {
+      const params: Record<string, string> = {}
+      if (options?.customer_id) params.customer_id = options.customer_id
+      if (options?.period_start) params.period_start = options.period_start
+      if (options?.period_end) params.period_end = options.period_end
+      const response = await api.get<ZZPTimeEntry[]>('/zzp/time-entries/invoiced', { params })
       return response.data
     },
 
@@ -4046,7 +4063,7 @@ export const zzpApi = {
     },
 
     update: async (entryId: string, data: ZZPTimeEntryUpdate): Promise<ZZPTimeEntry> => {
-      const response = await api.put<ZZPTimeEntry>(`/zzp/time-entries/${entryId}`, data)
+      const response = await api.patch<ZZPTimeEntry>(`/zzp/time-entries/${entryId}`, data)
       return response.data
     },
 
@@ -4054,8 +4071,13 @@ export const zzpApi = {
       await api.delete(`/zzp/time-entries/${entryId}`)
     },
 
-    generateInvoice: async (data: ZZPTimeEntryInvoiceCreate): Promise<ZZPInvoice> => {
-      const response = await api.post<ZZPInvoice>('/zzp/time-entries/generate-invoice', data)
+    invoiceWeek: async (data: ZZPTimeEntryInvoiceCreate): Promise<ZZPWeeklyInvoiceCreateResponse> => {
+      const response = await api.post<ZZPWeeklyInvoiceCreateResponse>('/zzp/time-entries/invoice-week', data)
+      return response.data
+    },
+
+    generateInvoice: async (data: ZZPTimeEntryInvoiceCreate): Promise<ZZPWeeklyInvoiceCreateResponse> => {
+      const response = await api.post<ZZPWeeklyInvoiceCreateResponse>('/zzp/time-entries/invoice-week', data)
       return response.data
     },
   },

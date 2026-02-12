@@ -5,7 +5,7 @@ Pydantic schemas for ZZP-specific API operations including validation.
 """
 import re
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, date
 from enum import Enum
 from typing import Optional, List
 from uuid import UUID
@@ -628,7 +628,7 @@ class InvoiceBase(BaseModel):
         if v:
             try:
                 # Validate date format
-                from datetime import datetime as dt
+                from datetime import datetime, date as dt
                 dt.strptime(v, '%Y-%m-%d')
             except ValueError:
                 raise ValueError("Date must be in YYYY-MM-DD format")
@@ -653,7 +653,7 @@ class InvoiceUpdate(BaseModel):
     def validate_date(cls, v: Optional[str]) -> Optional[str]:
         if v:
             try:
-                from datetime import datetime as dt
+                from datetime import datetime, date as dt
                 dt.strptime(v, '%Y-%m-%d')
             except ValueError:
                 raise ValueError("Date must be in YYYY-MM-DD format")
@@ -770,7 +770,7 @@ class ExpenseBase(BaseModel):
     def validate_date(cls, v: str) -> str:
         if v:
             try:
-                from datetime import datetime as dt
+                from datetime import datetime, date as dt
                 dt.strptime(v, '%Y-%m-%d')
             except ValueError:
                 raise ValueError("Date must be in YYYY-MM-DD format")
@@ -798,7 +798,7 @@ class ExpenseUpdate(BaseModel):
     def validate_date(cls, v: Optional[str]) -> Optional[str]:
         if v:
             try:
-                from datetime import datetime as dt
+                from datetime import datetime, date as dt
                 dt.strptime(v, '%Y-%m-%d')
             except ValueError:
                 raise ValueError("Date must be in YYYY-MM-DD format")
@@ -848,24 +848,14 @@ class ExpenseSummary(BaseModel):
 
 class TimeEntryBase(BaseModel):
     """Base schema for time entry data."""
-    entry_date: str = Field(..., description="Date of work (YYYY-MM-DD)")
+    entry_date: date = Field(..., description="Date of work")
     description: str = Field(..., min_length=1, max_length=500, description="Description of work")
-    hours: float = Field(..., gt=0, le=24, description="Number of hours")
-    project_name: Optional[str] = Field(None, max_length=255, description="Project or client name")
-    customer_id: Optional[UUID] = Field(None, description="Optional customer reference")
-    hourly_rate_cents: Optional[int] = Field(None, ge=0, description="Hourly rate in cents")
+    hours: Decimal = Field(..., gt=Decimal("0"), le=Decimal("24"), description="Number of hours")
+    project_name: Optional[str] = Field(None, max_length=255, description="Project name")
+    customer_id: Optional[UUID] = Field(None, description="Customer reference")
+    project_id: Optional[UUID] = Field(None, description="Project reference")
+    hourly_rate: Optional[Decimal] = Field(None, ge=Decimal("0"), description="Hourly rate in euros")
     billable: bool = Field(True, description="Whether this time is billable")
-
-    @field_validator('entry_date')
-    @classmethod
-    def validate_date(cls, v: str) -> str:
-        if v:
-            try:
-                from datetime import datetime as dt
-                dt.strptime(v, '%Y-%m-%d')
-            except ValueError:
-                raise ValueError("Date must be in YYYY-MM-DD format")
-        return v
 
     @field_validator('description')
     @classmethod
@@ -879,44 +869,36 @@ class TimeEntryBase(BaseModel):
 
 class TimeEntryCreate(TimeEntryBase):
     """Schema for creating a time entry."""
-    pass
 
 
 class TimeEntryUpdate(BaseModel):
     """Schema for updating a time entry."""
-    entry_date: Optional[str] = None
+    entry_date: Optional[date] = None
     description: Optional[str] = Field(None, min_length=1, max_length=500)
-    hours: Optional[float] = Field(None, gt=0, le=24)
+    hours: Optional[Decimal] = Field(None, gt=Decimal("0"), le=Decimal("24"))
     project_name: Optional[str] = Field(None, max_length=255)
     customer_id: Optional[UUID] = None
-    hourly_rate_cents: Optional[int] = Field(None, ge=0)
+    project_id: Optional[UUID] = None
+    hourly_rate: Optional[Decimal] = Field(None, ge=Decimal("0"))
     billable: Optional[bool] = None
 
-    @field_validator('entry_date')
-    @classmethod
-    def validate_date(cls, v: Optional[str]) -> Optional[str]:
-        if v:
-            try:
-                from datetime import datetime as dt
-                dt.strptime(v, '%Y-%m-%d')
-            except ValueError:
-                raise ValueError("Date must be in YYYY-MM-DD format")
-        return v
 
-
-class TimeEntryResponse(BaseModel):
+class TimeEntryOut(BaseModel):
     """Schema for time entry response."""
     id: UUID
+    user_id: Optional[UUID] = None
     administration_id: UUID
-    entry_date: str
+    entry_date: date
     description: str
-    hours: float
+    hours: Decimal
     project_name: Optional[str] = None
     customer_id: Optional[UUID] = None
+    project_id: Optional[UUID] = None
+    hourly_rate: Optional[Decimal] = None
     hourly_rate_cents: Optional[int] = None
-    billable: bool
     invoice_id: Optional[UUID] = None
     is_invoiced: bool
+    billable: bool
     created_at: datetime
     updated_at: datetime
 
@@ -924,12 +906,18 @@ class TimeEntryResponse(BaseModel):
         from_attributes = True
 
 
+class TimeEntryResponse(TimeEntryOut):
+    """Backward-compatible alias for time entry response."""
+
+
 class TimeEntryListResponse(BaseModel):
-    """Schema for time entry list response."""
-    entries: List[TimeEntryResponse]
-    total: int
-    total_hours: float
-    total_billable_hours: float
+    """Schema for time entry lists with optional grouped representation."""
+    entries: List[TimeEntryOut] = Field(default_factory=list)
+    total: int = 0
+    total_hours: Decimal = Decimal("0")
+    total_billable_hours: Decimal = Decimal("0")
+    open_entries: List[TimeEntryOut] = Field(default_factory=list)
+    invoiced_entries: List[TimeEntryOut] = Field(default_factory=list)
 
 
 class WeeklyTimeSummary(BaseModel):
@@ -938,19 +926,26 @@ class WeeklyTimeSummary(BaseModel):
     week_end: str
     total_hours: float
     billable_hours: float
-    entries_by_day: dict  # date -> hours
+    entries_by_day: dict
 
 
-class TimeEntryInvoiceCreate(BaseModel):
-    """Schema for creating invoice from time entries."""
+class WeeklyInvoiceCreateRequest(BaseModel):
     customer_id: UUID = Field(..., description="Customer ID for the invoice")
-    period_start: str = Field(..., description="Period start date (YYYY-MM-DD)")
-    period_end: str = Field(..., description="Period end date (YYYY-MM-DD)")
-    hourly_rate_cents: int = Field(..., gt=0, description="Hourly rate in cents")
-    issue_date: Optional[str] = Field(None, description="Invoice issue date (defaults to today)")
-    due_date: Optional[str] = Field(None, description="Invoice due date (defaults to 30 days from issue)")
-    vat_rate: Decimal = Field(default=Decimal("21"), description="VAT rate percentage")
-    notes: Optional[str] = Field(None, max_length=2000, description="Invoice notes")
+    period_start: date = Field(..., description="Period start date")
+    period_end: date = Field(..., description="Period end date")
+    hourly_rate: Optional[Decimal] = Field(None, gt=Decimal("0"), description="Optional rate override")
+
+
+class WeeklyInvoiceCreateResponse(BaseModel):
+    invoice_id: UUID
+    invoice_number: str
+    total_hours: Decimal
+    rate: Decimal
+    total_amount: Decimal
+
+
+class TimeEntryInvoiceCreate(WeeklyInvoiceCreateRequest):
+    """Backward-compatible invoice-week request alias."""
 
 
 # ============================================================================
@@ -1005,7 +1000,7 @@ class CalendarEventUpdate(BaseModel):
     def validate_datetime(cls, v: Optional[str]) -> Optional[str]:
         if v:
             try:
-                from datetime import datetime as dt
+                from datetime import datetime, date as dt
                 dt.fromisoformat(v.replace('Z', '+00:00'))
             except ValueError:
                 raise ValueError("Datetime must be in ISO 8601 format")

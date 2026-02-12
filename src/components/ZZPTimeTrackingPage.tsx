@@ -1709,8 +1709,8 @@ export const ZZPTimeTrackingPage = () => {
       return
     }
 
-    const rateCents = parseFloat(invoiceHourlyRate) * 100
-    if (isNaN(rateCents) || rateCents <= 0) {
+    const rate = parseFloat(invoiceHourlyRate)
+    if (isNaN(rate) || rate <= 0) {
       toast.error('Voer een geldig uurtarief in')
       return
     }
@@ -1727,7 +1727,7 @@ export const ZZPTimeTrackingPage = () => {
         customer_id: invoiceCustomerId,
         period_start: invoicePeriodStart,
         period_end: invoicePeriodEnd,
-        hourly_rate_cents: Math.round(rateCents),
+        hourly_rate_cents: Math.round(rate * 100),
       }
 
       const invoice = await zzpApi.timeEntries.generateInvoice(invoiceData)

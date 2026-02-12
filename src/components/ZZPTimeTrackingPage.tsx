@@ -1695,9 +1695,9 @@ export const ZZPTimeTrackingPage = () => {
 
   // Calculate total amount for invoice
   const invoiceTotalAmount = useMemo(() => {
-    const rateCents = parseFloat(invoiceHourlyRate) * 100
-    if (isNaN(rateCents) || rateCents <= 0) return 0
-    return (invoiceHoursData.totalHours * rateCents) / 100
+    const rate = parseFloat(invoiceHourlyRate)
+    if (isNaN(rate) || rate <= 0) return 0
+    return invoiceHoursData.totalHours * rate
   }, [invoiceHoursData.totalHours, invoiceHourlyRate])
 
   // Handle invoice generation

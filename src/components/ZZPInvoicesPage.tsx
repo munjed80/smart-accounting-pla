@@ -150,6 +150,8 @@ function isMobile(): boolean {
 
 // Delay in ms before revoking PDF blob URL to ensure download/open completes
 const PDF_URL_REVOCATION_DELAY_MS = 30000
+// iOS requires longer delay due to slower blob URL loading
+const IOS_REVOCATION_DELAY_MULTIPLIER = 2
 
 // Helper function to extract date part from ISO string
 const extractDatePart = (isoString: string | undefined): string => {
@@ -1518,128 +1520,182 @@ export const ZZPInvoicesPage = () => {
   }, [deletingInvoice, loadData])
 
   // Handle PDF download - download actual PDF from server (mobile-safe)
-  // Uses fetch -> blob -> createObjectURL -> window.open for iOS, anchor click for others
-  // Falls back to window.open() with direct PDF URL if blob approach fails on mobile
+  // Uses fetch -> blob -> createObjectURL -> anchor/window.open for mobile compatibility
+  // Implements iOS Safari workaround and Web Share API for file sharing
   const handleDownloadPdf = useCallback(async (invoice: ZZPInvoice) => {
     const filename = `${invoice.invoice_number || `INV-${invoice.id}`}.pdf`
+    
+    console.log('[PDF Download] Starting download for invoice:', invoice.id, 'filename:', filename)
     
     try {
       setDownloadingInvoiceId(invoice.id)
       toast.info(t('zzpInvoices.pdfDownloading'))
       
-      // Try blob-based download first (works best on desktop)
-      try {
-        const blob = await zzpApi.invoices.downloadPdf(invoice.id)
+      // Download PDF as blob from backend
+      console.log('[PDF Download] Fetching PDF blob from API...')
+      const blob = await zzpApi.invoices.downloadPdf(invoice.id)
+      
+      // Ensure blob has correct MIME type for PDF
+      const pdfBlob = new Blob([blob], { type: 'application/pdf' })
+      console.log('[PDF Download] Blob received, size:', pdfBlob.size, 'bytes')
+      
+      // Check if blob is valid
+      if (pdfBlob.size === 0) {
+        throw new Error(`Empty PDF blob received for invoice ${invoice.id}`)
+      }
+      
+      // Create object URL for the PDF blob
+      const blobUrl = window.URL.createObjectURL(pdfBlob)
+      console.log('[PDF Download] Created blob URL:', blobUrl)
+      
+      // iOS Safari: Use window.open to open PDF in new tab
+      // iOS ignores download attribute, so opening in viewer is the best approach
+      if (isIOS()) {
+        console.log('[PDF Download] iOS detected, opening PDF in new tab...')
+        const newWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer')
         
-        // Ensure blob has correct MIME type for PDF
-        const pdfBlob = new Blob([blob], { type: 'application/pdf' })
-        
-        // Check if blob is valid
-        if (pdfBlob.size === 0) {
-          throw new Error(`Empty PDF blob received for invoice ${invoice.id}`)
+        if (!newWindow) {
+          // If popup was blocked, notify user
+          console.error('[PDF Download] Popup blocked by browser')
+          toast.error(t('zzpInvoices.popupBlocked'))
+          window.URL.revokeObjectURL(blobUrl)
+          return
         }
         
-        // Create object URL for the PDF blob
-        const blobUrl = window.URL.createObjectURL(pdfBlob)
+        // Clean up blob URL after a long delay for iOS (slow to load)
+        setTimeout(() => {
+          console.log('[PDF Download] Revoking blob URL after iOS delay')
+          window.URL.revokeObjectURL(blobUrl)
+        }, PDF_URL_REVOCATION_DELAY_MS * IOS_REVOCATION_DELAY_MULTIPLIER)
+      } else {
+        // Desktop and Android: Use anchor element with download attribute
+        console.log('[PDF Download] Creating anchor element for download...')
+        const link = document.createElement('a')
+        link.href = blobUrl
+        link.download = filename
+        link.rel = 'noopener noreferrer'  // Security: prevent window.opener access and referrer leakage
+        link.style.display = 'none'
         
-        // iOS Safari: Use window.open to open PDF in new tab
-        // iOS ignores download attribute, so opening in viewer is the best approach
-        if (isIOS()) {
-          const newWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer')
-          
-          if (!newWindow) {
-            // If popup was blocked, notify user
-            toast.error(t('zzpInvoices.popupBlocked'))
-            window.URL.revokeObjectURL(blobUrl)
-            return
-          }
-          
-          // Clean up blob URL after a delay
-          setTimeout(() => window.URL.revokeObjectURL(blobUrl), PDF_URL_REVOCATION_DELAY_MS * 2)
-        } else {
-          // Desktop and Android: Use anchor element with download attribute
-          const link = document.createElement('a')
-          link.href = blobUrl
-          link.download = filename
-          link.style.display = 'none'
-          
-          document.body.appendChild(link)
-          link.click()
+        document.body.appendChild(link)
+        link.click()
+        
+        // Small delay before removing to ensure click is processed
+        setTimeout(() => {
           document.body.removeChild(link)
-          
-          // Clean up blob URL after a delay
-          const revokeDelay = isMobile() ? PDF_URL_REVOCATION_DELAY_MS * 2 : PDF_URL_REVOCATION_DELAY_MS
-          setTimeout(() => window.URL.revokeObjectURL(blobUrl), revokeDelay)
-        }
-      } catch (blobErr) {
-        console.warn('Blob download failed, trying window.open fallback:', blobErr)
+          console.log('[PDF Download] Anchor removed from DOM')
+        }, 100)
         
-        // Fallback for mobile: Use window.open with direct PDF URL
-        // This is more reliable on iOS Safari and some Android browsers
-        if (isMobile()) {
-          const directUrl = zzpApi.invoices.getPdfUrl(invoice.id)
-          const newWindow = window.open(directUrl, '_blank', 'noopener,noreferrer')
-          
-          if (!newWindow) {
-            // If popup was blocked, notify user
-            toast.error(t('zzpInvoices.popupBlocked'))
-            return
-          }
-        } else {
-          // Re-throw for desktop - blob approach should work
-          throw blobErr
-        }
+        // Clean up blob URL after a delay
+        // iOS needs longer delay due to slower blob loading, Android works fine with standard delay
+        const revokeDelay = isIOS() 
+          ? PDF_URL_REVOCATION_DELAY_MS * IOS_REVOCATION_DELAY_MULTIPLIER 
+          : PDF_URL_REVOCATION_DELAY_MS
+        setTimeout(() => {
+          console.log('[PDF Download] Revoking blob URL after delay')
+          window.URL.revokeObjectURL(blobUrl)
+        }, revokeDelay)
       }
       
       // Success toast shown after all download attempts
+      console.log('[PDF Download] Download initiated successfully')
       toast.success(t('zzpInvoices.pdfDownloaded'))
     } catch (err) {
-      console.error('Failed to download PDF:', err)
-      toast.error(parseApiError(err) || t('zzpInvoices.pdfError'))
+      console.error('[PDF Download] Failed to download PDF:', err)
+      
+      // Parse and show detailed error message
+      const errorMessage = parseApiError(err)
+      if (errorMessage) {
+        toast.error(`${t('zzpInvoices.pdfError')}: ${errorMessage}`)
+      } else {
+        toast.error(t('zzpInvoices.pdfError'))
+      }
     } finally {
       setDownloadingInvoiceId(null)
     }
   }, [])
 
-  // Handle copy invoice link to clipboard (PDF URL for customer)
+  // Handle copy invoice link to clipboard (PDF download URL)
+  // Note: This URL requires authentication, so it's for internal use only
   const handleCopyLink = useCallback(async (invoice: ZZPInvoice) => {
+    console.log('[PDF Copy Link] Copying link for invoice:', invoice.id)
     try {
-      // Copy the PDF download URL that customers can use
+      // Copy the PDF download URL (requires authentication)
       const pdfUrl = zzpApi.invoices.getPdfUrl(invoice.id)
+      console.log('[PDF Copy Link] URL to copy:', pdfUrl)
+      
       await navigator.clipboard.writeText(pdfUrl)
+      console.log('[PDF Copy Link] Link copied successfully')
       toast.success(t('zzpInvoices.invoiceLinkCopied'))
     } catch (err) {
-      console.error('Failed to copy link:', err)
+      console.error('[PDF Copy Link] Failed to copy link:', err)
       toast.error(t('common.error'))
     }
   }, [])
 
-  // Handle share invoice (Web Share API with clipboard fallback)
+  // Handle share invoice (Web Share API with PDF file sharing)
+  // Shares the actual PDF file if supported, otherwise falls back to URL sharing
   const handleShare = useCallback(async (invoice: ZZPInvoice) => {
-    // Share the PDF download URL that customers can use
-    const pdfUrl = zzpApi.invoices.getPdfUrl(invoice.id)
     const invoiceNumber = invoice.invoice_number || `INV-${invoice.id}`
+    const filename = `${invoiceNumber}.pdf`
+    
+    console.log('[PDF Share] Starting share for invoice:', invoice.id, 'filename:', filename)
     
     try {
-      // Use Web Share API if available (native share sheet on mobile)
+      // Download PDF as blob first
+      console.log('[PDF Share] Fetching PDF blob from API...')
+      const blob = await zzpApi.invoices.downloadPdf(invoice.id)
+      
+      // Ensure blob has correct MIME type for PDF
+      const pdfBlob = new Blob([blob], { type: 'application/pdf' })
+      console.log('[PDF Share] Blob received, size:', pdfBlob.size, 'bytes')
+      
+      // Check if Web Share API supports file sharing
+      // Only create File object if we can actually use it
+      if (navigator.share && typeof navigator.canShare === 'function') {
+        const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' })
+        const shareData = {
+          title: t('zzpInvoices.shareTitle').replace('{number}', invoiceNumber),
+          text: t('zzpInvoices.shareText').replace('{number}', invoiceNumber),
+          files: [pdfFile],
+        }
+        
+        if (navigator.canShare(shareData)) {
+          // Share the actual PDF file
+          console.log('[PDF Share] Sharing PDF file via Web Share API...')
+          await navigator.share(shareData)
+          console.log('[PDF Share] File shared successfully')
+          toast.success(t('zzpInvoices.shareSuccess'))
+          return
+        } else {
+          console.log('[PDF Share] File sharing not supported by canShare check')
+        }
+      }
+      
       if (navigator.share) {
+        // Fallback: Share PDF URL instead of file (for browsers that don't support file sharing)
+        console.log('[PDF Share] File sharing not supported, sharing URL instead...')
+        const pdfUrl = zzpApi.invoices.getPdfUrl(invoice.id)
         await navigator.share({
           title: t('zzpInvoices.shareTitle').replace('{number}', invoiceNumber),
           text: t('zzpInvoices.shareText').replace('{number}', invoiceNumber),
           url: pdfUrl,
         })
+        console.log('[PDF Share] URL shared successfully')
         toast.success(t('zzpInvoices.shareSuccess'))
       } else {
-        // Fallback: copy link to clipboard
+        // No Web Share API available: copy link to clipboard as fallback
+        console.log('[PDF Share] Web Share API not available, copying link to clipboard...')
+        const pdfUrl = zzpApi.invoices.getPdfUrl(invoice.id)
         await navigator.clipboard.writeText(pdfUrl)
         toast.success(t('zzpInvoices.invoiceLinkCopied'))
       }
     } catch (err) {
       // AbortError is thrown when user cancels the share dialog - not an error
       if (err instanceof Error && err.name === 'AbortError') {
+        console.log('[PDF Share] User cancelled share dialog')
         return
       }
-      console.error('Failed to share invoice:', err)
+      console.error('[PDF Share] Failed to share invoice:', err)
       toast.error(t('zzpInvoices.shareError'))
     }
   }, [])

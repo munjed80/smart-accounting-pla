@@ -1388,7 +1388,7 @@ const EntriesTable = ({
                     <TableCell>
                       {entry.invoice_id ? (
                         <button 
-                          onClick={() => navigateTo(`invoices/${entry.invoice_id}`)}
+                          onClick={() => navigateTo(`/invoices/${entry.invoice_id}`)}
                           className="text-xs text-primary hover:underline flex items-center gap-1"
                         >
                           <Receipt size={14} />
@@ -1787,7 +1787,7 @@ export const ZZPTimeTrackingPage = () => {
       toast.success('Factuur succesvol aangemaakt', {
         action: {
           label: 'Bekijk factuur',
-          onClick: () => navigateTo(`invoices/${invoice.id}`),
+          onClick: () => navigateTo(`/invoices/${invoice.id}`),
         },
       })
 

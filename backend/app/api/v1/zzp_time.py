@@ -33,6 +33,10 @@ from app.schemas.zzp import (
 )
 from app.api.v1.deps import CurrentUser, require_zzp
 
+# Constants
+DEFAULT_VAT_RATE_NL = Decimal("21")  # Standard Dutch VAT rate
+INVOICE_LINE_DESCRIPTION_FORMAT = "Week {week} ({start} - {end}) – {hours:.2f}h × €{rate:.2f}"
+
 router = APIRouter()
 
 
@@ -494,10 +498,16 @@ async def create_invoice_from_time_entries(
     week_number = period_start_date.isocalendar()[1]
     
     # Create invoice line description
-    line_description = f"Week {week_number} ({period_start_date.strftime('%d-%m-%Y')} - {period_end_date.strftime('%d-%m-%Y')}) – {total_hours:.2f}h × €{request.hourly_rate_cents / 100:.2f}"
+    line_description = INVOICE_LINE_DESCRIPTION_FORMAT.format(
+        week=week_number,
+        start=period_start_date.strftime('%d-%m-%Y'),
+        end=period_end_date.strftime('%d-%m-%Y'),
+        hours=total_hours,
+        rate=request.hourly_rate_cents / 100
+    )
     
-    # Calculate amounts (assuming 21% VAT)
-    vat_rate = Decimal("21")
+    # Calculate amounts using default Dutch VAT rate
+    vat_rate = DEFAULT_VAT_RATE_NL
     line_total_cents = int(Decimal(total_hours) * Decimal(request.hourly_rate_cents))
     vat_amount_cents = int(line_total_cents * vat_rate / 100)
     

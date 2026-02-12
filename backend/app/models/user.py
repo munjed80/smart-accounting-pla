@@ -61,6 +61,9 @@ class User(Base):
             last_login_at: Timestamp of last login (optional)
             **kw: Additional arguments passed by SQLAlchemy during ORM operations
         """
+        # Call parent __init__ to ensure proper SQLAlchemy initialization
+        super().__init__(**kw)
+        
         # Set attributes
         if email is not None:
             self.email = email

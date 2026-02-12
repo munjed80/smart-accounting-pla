@@ -3866,6 +3866,16 @@ export const zzpApi = {
     markUnpaid: async (invoiceId: string): Promise<void> => {
       await api.post(`/zzp/payments/invoices/${invoiceId}/mark-unpaid`)
     },
+    
+    /**
+     * Send invoice via email to the customer.
+     * Generates PDF and emails it to the customer's email address.
+     * Updates invoice status to 'sent'.
+     */
+    sendEmail: async (invoiceId: string): Promise<ZZPInvoice> => {
+      const response = await api.post<ZZPInvoice>(`/zzp/invoices/${invoiceId}/send`)
+      return response.data
+    },
   },
 
   // ------------ Expenses ------------

@@ -4,6 +4,8 @@ ZZP Invoices API Endpoints
 CRUD operations for ZZP invoices with lines, status transitions,
 race-safe invoice number generation, and PDF generation.
 """
+import base64
+import logging
 from datetime import datetime, date, timezone
 from decimal import Decimal
 from typing import Annotated, List, Optional
@@ -15,8 +17,11 @@ from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.services.invoice_pdf import generate_invoice_pdf, get_invoice_pdf_filename
+from app.services.invoice_pdf_reportlab import generate_invoice_pdf_reportlab
+from app.services.email import email_service
 from app.models.zzp import (
     ZZPInvoice, 
     ZZPInvoiceLine, 
@@ -37,6 +42,7 @@ from app.schemas.zzp import (
 from app.api.v1.deps import CurrentUser, require_zzp
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
@@ -687,3 +693,162 @@ async def get_invoice_pdf(
             "Expires": "0",
         }
     )
+
+
+@router.post("/invoices/{invoice_id}/send", response_model=InvoiceResponse)
+async def send_invoice(
+    invoice_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> InvoiceResponse:
+    """
+    Send invoice via email to the customer and update status to 'sent'.
+    
+    This endpoint:
+    1. Validates the invoice exists and belongs to the user
+    2. Fetches the customer email address
+    3. Generates the invoice PDF
+    4. Sends the invoice via email using the email service
+    5. Updates the invoice status to 'sent'
+    
+    Returns the updated invoice.
+    """
+    require_zzp(current_user)
+    
+    administration = await get_user_administration(current_user.id, db)
+    
+    # Fetch invoice with lines and customer (need customer for email)
+    result = await db.execute(
+        select(ZZPInvoice)
+        .options(
+            selectinload(ZZPInvoice.lines),
+            selectinload(ZZPInvoice.customer)
+        )
+        .where(
+            ZZPInvoice.id == invoice_id,
+            ZZPInvoice.administration_id == administration.id
+        )
+    )
+    invoice = result.scalar_one_or_none()
+    
+    if not invoice:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
+        )
+    
+    # Get customer email
+    if not invoice.customer or not invoice.customer.email:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "NO_CUSTOMER_EMAIL",
+                "message": "Klant heeft geen e-mailadres. Voeg een e-mailadres toe aan de klant om de factuur te verzenden."
+            }
+        )
+    
+    customer_email = invoice.customer.email
+    customer_name = invoice.customer.name
+    
+    # Generate PDF
+    try:
+        pdf_bytes = generate_invoice_pdf_reportlab(invoice)
+        filename = get_invoice_pdf_filename(invoice)
+    except Exception as pdf_error:
+        logger.error(f"Failed to generate PDF for invoice {invoice_id}: {pdf_error}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "PDF_GENERATION_FAILED",
+                "message": "Kon de PDF niet genereren. Probeer het later opnieuw."
+            }
+        )
+    
+    # Send email
+    try:
+        # Prepare email content
+        invoice_number = invoice.invoice_number
+        total_amount = f"€{invoice.total_cents / 100:.2f}"
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">Factuur {invoice_number}</h1>
+            </div>
+            <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
+                <p style="margin-top: 0;">Beste {customer_name},</p>
+                <p>Hierbij ontvangt u factuur {invoice_number} voor een bedrag van {total_amount}.</p>
+                <p>De factuur is bijgevoegd als PDF.</p>
+                <p style="margin-top: 20px;">Met vriendelijke groet,<br>{invoice.seller_company_name or invoice.seller_trading_name or 'Uw leverancier'}</p>
+                <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+                <p style="color: #888; font-size: 12px; margin-bottom: 0;">
+                    Dit is een geautomatiseerd bericht van Smart Accounting Platform.
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        text_content = f"""
+Beste {customer_name},
+
+Hierbij ontvangt u factuur {invoice_number} voor een bedrag van {total_amount}.
+
+De factuur is bijgevoegd als PDF.
+
+Met vriendelijke groet,
+{invoice.seller_company_name or invoice.seller_trading_name or 'Uw leverancier'}
+
+---
+Dit is een geautomatiseerd bericht van Smart Accounting Platform.
+        """
+        
+        # Send via Resend
+        if not email_service.client:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "EMAIL_SERVICE_UNAVAILABLE",
+                    "message": "E-mailservice is momenteel niet beschikbaar. Controleer de configuratie."
+                }
+            )
+        
+        # Encode PDF as base64 for attachment
+        pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+        
+        email_service.client.Emails.send({
+            "from": settings.RESEND_FROM_EMAIL,
+            "to": [customer_email],
+            "subject": f"Factuur {invoice_number}",
+            "html": html_content,
+            "text": text_content,
+            "attachments": [
+                {
+                    "filename": filename,
+                    "content": pdf_base64,
+                }
+            ]
+        })
+        
+    except Exception as email_error:
+        logger.error(f"Failed to send email for invoice {invoice_id}: {email_error}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "EMAIL_SEND_FAILED",
+                "message": f"Kon de e-mail niet verzenden: {str(email_error)}"
+            }
+        )
+    
+    # Update invoice status to 'sent'
+    invoice.status = InvoiceStatus.SENT.value
+    await db.commit()
+    await db.refresh(invoice)
+    
+    return invoice_to_response(invoice)

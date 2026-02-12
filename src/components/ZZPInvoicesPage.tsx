@@ -1489,7 +1489,8 @@ export const ZZPInvoicesPage = () => {
   const handleSendInvoice = useCallback(async (invoice: ZZPInvoice) => {
     setUpdatingStatusInvoiceId(invoice.id)
     try {
-      await zzpApi.invoices.updateStatus(invoice.id, 'sent')
+      toast.info(t('zzpInvoices.sending'))
+      await zzpApi.invoices.sendEmail(invoice.id)
       toast.success(t('zzpInvoices.invoiceSent'))
       await loadData()
     } catch (err) {
@@ -1498,7 +1499,7 @@ export const ZZPInvoicesPage = () => {
     } finally {
       setUpdatingStatusInvoiceId(null)
     }
-  }, [loadData])
+  }, [loadData, t])
 
   // Handle delete invoice
   const handleDeleteInvoice = useCallback(async () => {

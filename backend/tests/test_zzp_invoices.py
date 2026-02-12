@@ -284,6 +284,85 @@ class TestInvoiceDelete:
         assert data["detail"]["code"] == "INVOICE_NOT_FOUND"
 
 
+class TestInvoiceSendEmail:
+    """Tests for POST /zzp/invoices/{id}/send - send invoice via email."""
+    
+    @pytest.mark.asyncio
+    async def test_send_invoice_success(
+        self,
+        async_client: AsyncClient,
+        test_invoice_draft: ZZPInvoice,
+        auth_headers: dict
+    ):
+        """Draft invoice can be sent via email."""
+        # Mock the email service and PDF generation
+        with patch('app.api.v1.zzp_invoices.email_service') as mock_email, \
+             patch('app.api.v1.zzp_invoices.generate_invoice_pdf_reportlab') as mock_pdf, \
+             patch('app.api.v1.zzp_invoices.get_invoice_pdf_filename') as mock_filename:
+            
+            # Setup mocks
+            mock_pdf.return_value = b'fake-pdf-content'
+            mock_filename.return_value = 'INV-2026-0001.pdf'
+            mock_email.client = MagicMock()
+            mock_email.client.Emails = MagicMock()
+            mock_email.client.Emails.send = MagicMock()
+            
+            # Call the endpoint
+            response = await async_client.post(
+                f"/api/v1/zzp/invoices/{test_invoice_draft.id}/send",
+                headers=auth_headers
+            )
+            
+            # Verify response
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "sent"
+            assert data["id"] == str(test_invoice_draft.id)
+            
+            # Verify email was sent
+            assert mock_email.client.Emails.send.called
+    
+    @pytest.mark.asyncio
+    async def test_send_invoice_no_customer_email(
+        self,
+        async_client: AsyncClient,
+        test_invoice_draft: ZZPInvoice,
+        test_customer,
+        db_session: AsyncSession,
+        auth_headers: dict
+    ):
+        """Sending invoice fails if customer has no email."""
+        # Remove customer email
+        test_customer.email = None
+        await db_session.commit()
+        
+        response = await async_client.post(
+            f"/api/v1/zzp/invoices/{test_invoice_draft.id}/send",
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 400
+        data = response.json()
+        assert data["detail"]["code"] == "NO_CUSTOMER_EMAIL"
+    
+    @pytest.mark.asyncio
+    async def test_send_invoice_not_found(
+        self,
+        async_client: AsyncClient,
+        auth_headers: dict
+    ):
+        """Send endpoint returns 404 for non-existent invoice."""
+        fake_id = uuid4()
+        response = await async_client.post(
+            f"/api/v1/zzp/invoices/{fake_id}/send",
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 404
+        data = response.json()
+        assert data["detail"]["code"] == "INVOICE_NOT_FOUND"
+
+
 # Pytest fixtures for test invoices
 # Note: These fixtures require the conftest.py to provide:
 # - test_user, test_administration, auth_headers

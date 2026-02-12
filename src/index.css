@@ -18,6 +18,34 @@
   button, a, [role="button"] {
     -webkit-tap-highlight-color: transparent;
   }
+  
+  /* Custom sidebar scrollbar styling - dark premium theme */
+  /* Targets the navigation area in AppShell sidebar */
+  nav[aria-label="Main navigation"] {
+    /* Firefox scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.35 0.02 265) oklch(0.18 0.02 265);
+  }
+  
+  /* WebKit browsers (Chrome, Safari, Edge) scrollbar styling */
+  nav[aria-label="Main navigation"]::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  nav[aria-label="Main navigation"]::-webkit-scrollbar-track {
+    background: oklch(0.18 0.02 265 / 0.3); /* Nearly transparent dark */
+    border-radius: 4px;
+  }
+  
+  nav[aria-label="Main navigation"]::-webkit-scrollbar-thumb {
+    background: oklch(0.35 0.02 265); /* Slightly lighter than track */
+    border-radius: 4px;
+    border: 1px solid oklch(0.18 0.02 265 / 0.5);
+  }
+  
+  nav[aria-label="Main navigation"]::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.42 0.02 265); /* Even lighter on hover for feedback */
+  }
 }
 
 :root {

@@ -20,8 +20,21 @@
 </head>
 
 <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #040b1f; color: #e5e7eb; font-family: system-ui, -apple-system, sans-serif; padding: 24px; text-align: center;">
+        <div>
+          <div style="width: 40px; height: 40px; border: 3px solid rgba(148,163,184,0.35); border-top-color: #60a5fa; border-radius: 9999px; margin: 0 auto 16px; animation: root-spin 0.9s linear infinite;"></div>
+          <p style="margin: 0; font-size: 14px; opacity: 0.9;">Smart Accounting wordt geladen…</p>
+          <p style="margin: 8px 0 0; font-size: 12px; opacity: 0.7;">Blijft dit scherm zichtbaar? Ververs dan de pagina.</p>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
+    <style>
+      @keyframes root-spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
 </body>
 
 </html>

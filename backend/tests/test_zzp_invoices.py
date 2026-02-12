@@ -474,8 +474,8 @@ async def test_customer(test_administration, db_session):
 class TestInvoicePdfContent:
     """Tests for invoice PDF content correctness."""
     
-    def test_reportlab_pdf_no_html_escaping(self):
-        """ReportLab PDF should not contain escaped HTML tags in totals."""
+    def test_reportlab_pdf_totals_no_html_tags(self):
+        """ReportLab PDF totals should not contain escaped HTML tags."""
         from app.services.invoice_pdf_reportlab import generate_invoice_pdf_reportlab
         from decimal import Decimal
         from datetime import date
@@ -581,10 +581,25 @@ class TestInvoicePdfContent:
         # Generate HTML
         html = generate_invoice_html(invoice)
         
-        # Extract payment section
+        # Extract payment section - find matching closing div
         payment_start = html.find('<div class="payment-info">')
-        payment_end = html.find('</div>', payment_start + 200)  # Look ahead for closing tag
-        payment_section = html[payment_start:payment_end] if payment_start > 0 else ""
+        if payment_start > 0:
+            # Find the closing div for payment-info section
+            # We need to track nested divs to find the correct closing tag
+            depth = 0
+            i = payment_start
+            while i < len(html):
+                if html[i:i+4] == '<div':
+                    depth += 1
+                elif html[i:i+6] == '</div>':
+                    depth -= 1
+                    if depth == 0:
+                        payment_end = i + 6
+                        break
+                i += 1
+            payment_section = html[payment_start:payment_end]
+        else:
+            payment_section = ""
         
         # Verify KvK is in payment section
         assert "12345678" in payment_section, "KvK number should be in payment details section"

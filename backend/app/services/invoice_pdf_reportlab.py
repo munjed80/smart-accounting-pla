@@ -265,6 +265,9 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         elements.append(Spacer(1, 0.5*cm))
         
         # Totals section (aligned to the right)
+        # NOTE: Bold styling for the total row is applied via TableStyle below,
+        # NOT with inline HTML tags like "<b>Totaal</b>". Using plain strings here
+        # prevents the HTML tags from appearing as literal text in the PDF.
         totals_data = [
             ["Subtotaal", format_amount(invoice.subtotal_cents)],
             ["BTW", format_amount(invoice.vat_total_cents)],

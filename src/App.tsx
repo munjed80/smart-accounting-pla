@@ -34,6 +34,8 @@ import { SettingsPage } from '@/components/SettingsPage'
 import { SupportPage } from '@/components/SupportPage'
 import { AppShell } from '@/components/AppShell'
 import { DashboardErrorBoundary } from '@/components/DashboardErrorBoundary'
+import { PWAInstallPrompt } from '@/components/PWAInstallPrompt'
+import { PWAUpdatePrompt } from '@/components/PWAUpdatePrompt'
 import { administrationApi, accountantClientApi } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { cleanupOverlayPortals } from '@/hooks/useCloseOverlayOnRouteChange'
@@ -627,6 +629,8 @@ function App() {
       <AuthProvider>
         <ActiveClientProvider>
           <AppContent />
+          <PWAInstallPrompt />
+          <PWAUpdatePrompt />
         </ActiveClientProvider>
       </AuthProvider>
     </QueryClientProvider>

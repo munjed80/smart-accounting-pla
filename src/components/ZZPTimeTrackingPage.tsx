@@ -1,160 +1,33 @@
-/**
- * ZZP Time Tracking Page (Uren)
- * 
- * Full CRUD functionality for time entry management.
- * Features weekly view with navigation, day-by-day breakdown, and entry list.
- */
-
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
-import { 
-  Clock, 
-  Plus, 
-  PencilSimple, 
-  TrashSimple,
-  CheckCircle,
-  XCircle,
-  CaretLeft,
-  CaretRight,
-  CalendarBlank,
-  Timer,
-  CurrencyEur,
-  Receipt,
-  SpinnerGap,
-  Briefcase,
-  User,
-  Play,
-  Stop,
-  CaretDown,
-  CaretUp,
-  Export,
-  FileText,
-  Funnel,
-  MagnifyingGlass,
-  ArrowsDownUp,
-  TrendUp,
-  Copy,
-  Lock,
-} from '@phosphor-icons/react'
-import { useAuth } from '@/lib/AuthContext'
-import { navigateTo } from '@/lib/navigation'
-import { 
-  zzpApi, 
-  ZZPTimeEntry, 
-  ZZPTimeEntryCreate, 
-  ZZPTimeEntryUpdate,
-  ZZPTimeEntryListResponse,
-  ZZPWeeklyTimeSummary,
-  ZZPCustomer,
-  WorkSession,
-  ZZPInvoiceLineCreate,
-  ZZPTimeEntryInvoiceCreate,
-  ZZPInvoice,
-} from '@/lib/api'
+import { Badge } from '@/components/ui/badge'
+import { CalendarBlank, Clock, CurrencyEur, PencilSimple, Plus, Receipt, TrashSimple, WarningCircle } from '@phosphor-icons/react'
+import { zzpApi, ZZPCustomer, ZZPTimeEntry, ZZPTimeEntryCreate } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
-import { t } from '@/i18n'
 import { toast } from 'sonner'
-import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { navigateTo } from '@/lib/navigation'
 
-// Sentinel value for "no customer" selection (empty string is not allowed in Radix Select v2+)
-const NO_CUSTOMER_VALUE = "__none__"
+const NO_CUSTOMER = '__none__'
 
-// Default Dutch VAT rate (%)
-const DEFAULT_VAT_RATE_NL = 21
-
-// Helper function to format time entry as invoice line description
-const formatTimeEntryLineDescription = (entry: ZZPTimeEntry): string => {
-  return `${entry.description}${entry.project_name ? ` (${entry.project_name})` : ''} - ${entry.hours}h`
+type EntryFormState = {
+  entry_date: string
+  hours: string
+  description: string
+  customer_id: string
+  project_name: string
+  hourly_rate: string
 }
 
-const escapeCsv = (value: string | number | undefined): string => {
-  const raw = value === undefined ? '' : String(value)
-  const escaped = raw.replace(/"/g, '""')
-  return `"${escaped}"`
-}
-
-// Hook for live timer display
-const useTimer = (startedAt: string | null) => {
-  const [elapsed, setElapsed] = useState(0)
-  
-  useEffect(() => {
-    if (!startedAt) {
-      setElapsed(0)
-      return
-    }
-    
-    const startTime = new Date(startedAt).getTime()
-    
-    // Calculate initial elapsed time
-    const updateElapsed = () => {
-      const now = Date.now()
-      setElapsed(Math.floor((now - startTime) / 1000))
-    }
-    
-    updateElapsed()
-    const interval = setInterval(updateElapsed, 1000)
-    
-    return () => clearInterval(interval)
-  }, [startedAt])
-  
-  // Format as HH:MM:SS
-  const hours = Math.floor(elapsed / 3600)
-  const minutes = Math.floor((elapsed % 3600) / 60)
-  const seconds = elapsed % 60
-  
-  const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-  
-  return { elapsed, formatted, hours, minutes, seconds }
-}
-
-// Helper functions for date manipulation
-const getMonday = (date: Date): Date => {
-  const d = new Date(date)
+const getMonday = (value: Date): Date => {
+  const d = new Date(value)
   const day = d.getDay()
   const diff = d.getDate() - day + (day === 0 ? -6 : 1)
   d.setDate(diff)
@@ -162,2084 +35,486 @@ const getMonday = (date: Date): Date => {
   return d
 }
 
-const getSunday = (monday: Date): Date => {
-  const d = new Date(monday)
-  d.setDate(d.getDate() + 6)
+const toISODate = (value: Date): string => value.toISOString().slice(0, 10)
+const addDays = (value: Date, days: number): Date => {
+  const d = new Date(value)
+  d.setDate(d.getDate() + days)
   return d
 }
 
-const formatDateISO = (date: Date): string => {
-  return date.toISOString().split('T')[0]
+const parseHours = (value: ZZPTimeEntry['hours']): number => Number(value || 0)
+const parseRate = (entry: ZZPTimeEntry): number => Number(entry.hourly_rate || 0)
+
+const groupByDay = (entries: ZZPTimeEntry[]) => {
+  return entries.reduce<Record<string, ZZPTimeEntry[]>>((acc, entry) => {
+    const key = entry.entry_date
+    if (!acc[key]) acc[key] = []
+    acc[key].push(entry)
+    return acc
+  }, {})
 }
 
-const formatDateDisplay = (dateStr: string): string => {
-  const date = new Date(dateStr + 'T00:00:00')
-  return date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-}
+const defaultFormState = (): EntryFormState => ({
+  entry_date: toISODate(new Date()),
+  hours: '1',
+  description: '',
+  customer_id: '',
+  project_name: '',
+  hourly_rate: '',
+})
 
-const formatWeekRange = (monday: Date, sunday: Date): string => {
-  const monStr = monday.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
-  const sunStr = sunday.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
-  return `${monStr} - ${sunStr}`
-}
+export const ZZPTimeTrackingPage = () => {
+  const monday = useMemo(() => getMonday(new Date()), [])
+  const sunday = useMemo(() => addDays(monday, 6), [monday])
 
-const getDayName = (dayIndex: number): string => {
-  const days = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
-  return days[dayIndex] || ''
-}
+  const [customers, setCustomers] = useState<ZZPCustomer[]>([])
+  const [openEntries, setOpenEntries] = useState<ZZPTimeEntry[]>([])
+  const [invoicedEntries, setInvoicedEntries] = useState<ZZPTimeEntry[]>([])
+  const [invoiceNumberMap, setInvoiceNumberMap] = useState<Record<string, string>>({})
 
-// Quick hour buttons
-const QUICK_HOURS = [0.5, 1, 2, 4, 8]
+  const [loading, setLoading] = useState(true)
+  const [invoicing, setInvoicing] = useState(false)
+  const [pageError, setPageError] = useState<string | null>(null)
 
-// Billable badge component
-const BillableBadge = ({ billable }: { billable: boolean }) => {
-  if (billable) {
-    return (
-      <Badge variant="outline" className="bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/40">
-        <CheckCircle size={14} className="mr-1" weight="fill" />
-        {t('zzpTimeTracking.billable')}
-      </Badge>
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('')
+  const [periodStart, setPeriodStart] = useState<string>(toISODate(monday))
+  const [periodEnd, setPeriodEnd] = useState<string>(toISODate(sunday))
+  const [hourlyRate, setHourlyRate] = useState<string>('')
+
+  const [invoicedFilterCustomerId, setInvoicedFilterCustomerId] = useState<string>('')
+  const [invoicedFilterStart, setInvoicedFilterStart] = useState<string>('')
+  const [invoicedFilterEnd, setInvoicedFilterEnd] = useState<string>('')
+
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingEntry, setEditingEntry] = useState<ZZPTimeEntry | null>(null)
+  const [formState, setFormState] = useState<EntryFormState>(defaultFormState)
+  const [isSavingEntry, setIsSavingEntry] = useState(false)
+
+  const customerMap = useMemo(() => Object.fromEntries(customers.map((c) => [c.id, c.name])), [customers])
+
+  const fetchInvoiceNumbers = useCallback(async (entries: ZZPTimeEntry[]) => {
+    const invoiceIds = Array.from(new Set(entries.map((entry) => entry.invoice_id).filter(Boolean))) as string[]
+    if (invoiceIds.length === 0) {
+      setInvoiceNumberMap({})
+      return
+    }
+
+    const results = await Promise.allSettled(
+      invoiceIds.map(async (invoiceId) => {
+        const invoice = await zzpApi.invoices.get(invoiceId)
+        return [invoiceId, invoice.invoice_number] as const
+      }),
     )
-  }
-  return (
-    <Badge variant="outline" className="bg-gray-500/20 text-gray-600 dark:text-gray-400 border-gray-500/40">
-      <XCircle size={14} className="mr-1" weight="fill" />
-      {t('zzpTimeTracking.nonBillable')}
-    </Badge>
-  )
-}
 
-// Stats card component
-const StatsCard = ({ 
-  title, 
-  value, 
-  unit,
-  icon: Icon, 
-  className = '' 
-}: { 
-  title: string
-  value: number | string
-  unit?: string
-  icon: React.ElementType
-  className?: string 
-}) => (
-  <Card className={`bg-card/80 backdrop-blur-sm border border-border/50 ${className}`}>
-    <CardContent className="p-4 sm:p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs sm:text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="text-2xl sm:text-3xl font-bold mt-1">
-            {value}
-            {unit && <span className="text-base sm:text-lg text-muted-foreground ml-1">{unit}</span>}
-          </p>
-        </div>
-        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Icon size={20} className="text-primary sm:hidden" weight="duotone" />
-          <Icon size={24} className="text-primary hidden sm:block" weight="duotone" />
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-)
-
-// Loading skeleton for stats
-const StatsLoadingSkeleton = () => (
-  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
-    {[1, 2].map((i) => (
-      <Card key={i} className="bg-card/80 backdrop-blur-sm">
-        <CardContent className="p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <Skeleton className="h-3 w-16 sm:w-20" />
-              <Skeleton className="h-7 w-14 sm:h-8 sm:w-16" />
-            </div>
-            <Skeleton className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl" />
-          </div>
-        </CardContent>
-      </Card>
-    ))}
-  </div>
-)
-
-// Weekly summary bar component
-interface DayData {
-  dayName: string
-  dateStr: string
-  hours: number
-  height: number
-  isWeekend: boolean
-}
-
-const WeeklySummaryBar = ({ 
-  entriesByDay,
-  weekStart 
-}: { 
-  entriesByDay: Record<string, number>
-  weekStart: Date
-}) => {
-  const maxHours = Math.max(8, ...Object.values(entriesByDay))
-  const days: DayData[] = []
-  
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(weekStart)
-    date.setDate(date.getDate() + i)
-    const dateStr = formatDateISO(date)
-    const hours = entriesByDay[dateStr] || 0
-    const height = maxHours > 0 ? (hours / maxHours) * 100 : 0
-    
-    days.push({
-      dayName: getDayName(i),
-      dateStr,
-      hours,
-      height,
-      isWeekend: i >= 5,
-    })
-  }
-
-  return (
-    <Card className="bg-card/80 backdrop-blur-sm border border-border/50 mb-6">
-      <CardContent className="p-4 sm:p-6">
-        <div className="flex items-end justify-between gap-2 h-32">
-          {days.map((day) => (
-            <div key={day.dateStr} className="flex-1 flex flex-col items-center gap-2">
-              <div className="w-full flex flex-col items-center justify-end h-20">
-                {day.hours > 0 && (
-                  <span className="text-xs font-medium text-muted-foreground mb-1">
-                    {day.hours.toFixed(1)}
-                  </span>
-                )}
-                <div 
-                  className={`w-full max-w-8 rounded-t transition-all ${
-                    day.isWeekend 
-                      ? 'bg-secondary/80' 
-                      : day.hours > 0 
-                        ? 'bg-primary/80' 
-                        : 'bg-secondary/50'
-                  }`}
-                  style={{ height: `${Math.max(day.height, 4)}%` }}
-                />
-              </div>
-              <span className={`text-xs font-medium ${day.isWeekend ? 'text-muted-foreground/60' : 'text-muted-foreground'}`}>
-                {day.dayName}
-              </span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// Loading skeleton for table
-const TableLoadingSkeleton = () => (
-  <Card className="bg-card/80 backdrop-blur-sm">
-    <CardContent className="p-4 sm:p-6">
-      <div className="space-y-4">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="flex items-center justify-between py-3 border-b border-border/50 last:border-0">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <Skeleton className="h-10 w-10 rounded-lg" />
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-24 sm:w-48" />
-                <Skeleton className="h-3 w-32 sm:w-32" />
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-6 w-12" />
-              <Skeleton className="h-8 w-8 rounded" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </CardContent>
-  </Card>
-)
-
-// Time entry form dialog
-const TimeEntryFormDialog = ({
-  open,
-  onOpenChange,
-  entry,
-  onSave,
-  customers,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  entry?: ZZPTimeEntry
-  onSave: (data: ZZPTimeEntryCreate) => Promise<void>
-  customers: ZZPCustomer[]
-}) => {
-  const isEdit = !!entry
-  
-  // Form fields
-  const [entryDate, setEntryDate] = useState('')
-  const [description, setDescription] = useState('')
-  const [hours, setHours] = useState('')
-  const [projectName, setProjectName] = useState('')
-  const [customerId, setCustomerId] = useState(NO_CUSTOMER_VALUE)
-  const [hourlyRateCents, setHourlyRateCents] = useState('')
-  const [billable, setBillable] = useState(true)
-  
-  // Validation
-  const [dateError, setDateError] = useState('')
-  const [descriptionError, setDescriptionError] = useState('')
-  const [hoursError, setHoursError] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  // Reset form when dialog opens/closes or entry changes
-  useEffect(() => {
-    if (open) {
-      if (entry) {
-        setEntryDate(entry.entry_date)
-        setDescription(entry.description)
-        setHours(entry.hours.toString())
-        setProjectName(entry.project_name || '')
-        setCustomerId(entry.customer_id || NO_CUSTOMER_VALUE)
-        setHourlyRateCents(entry.hourly_rate_cents ? (entry.hourly_rate_cents / 100).toString() : '')
-        setBillable(entry.billable)
-      } else {
-        // Default to today
-        setEntryDate(formatDateISO(new Date()))
-        setDescription('')
-        setHours('')
-        setProjectName('')
-        setCustomerId(NO_CUSTOMER_VALUE)
-        setHourlyRateCents('')
-        setBillable(true)
+    const map: Record<string, string> = {}
+    results.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        map[result.value[0]] = result.value[1]
       }
-      // Clear errors
-      setDateError('')
-      setDescriptionError('')
-      setHoursError('')
-      setIsSubmitting(false)
-    }
-  }, [open, entry])
+    })
+    setInvoiceNumberMap(map)
+  }, [])
 
-  const handleSave = async () => {
-    let hasError = false
-    
-    // Validate date
-    if (!entryDate) {
-      setDateError(t('zzpTimeTracking.dateRequired'))
-      hasError = true
-    }
-    
-    // Validate description
-    if (!description.trim()) {
-      setDescriptionError(t('zzpTimeTracking.descriptionRequired'))
-      hasError = true
-    }
-    
-    // Validate hours
-    const hoursNum = parseFloat(hours)
-    if (!hours || isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 24) {
-      setHoursError(t('zzpTimeTracking.hoursInvalid'))
-      hasError = true
-    }
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setPageError(null)
+    try {
+      const [customerRes, openRes, invoicedRes] = await Promise.all([
+        zzpApi.customers.list(),
+        zzpApi.timeEntries.listOpen(),
+        zzpApi.timeEntries.listInvoiced(),
+      ])
 
-    if (hasError) return
+      setCustomers(customerRes.customers)
+      setOpenEntries(openRes)
+      setInvoicedEntries(invoicedRes)
+      await fetchInvoiceNumbers(invoicedRes)
 
-    setIsSubmitting(true)
+      try {
+        const profile = await zzpApi.profile.get()
+        if (profile?.default_hourly_rate && !hourlyRate) {
+          setHourlyRate(String(profile.default_hourly_rate))
+        }
+      } catch {
+        // profile default is optional for this workflow
+      }
+    } catch (error) {
+      const message = parseApiError(error)
+      setPageError(message)
+      toast.error(message)
+    } finally {
+      setLoading(false)
+    }
+  }, [fetchInvoiceNumbers, hourlyRate])
+
+  useEffect(() => {
+    void fetchData()
+  }, [fetchData])
+
+  const filteredOpenEntries = useMemo(() => {
+    return openEntries.filter((entry) => {
+      if (selectedCustomerId && entry.customer_id !== selectedCustomerId) return false
+      if (periodStart && entry.entry_date < periodStart) return false
+      if (periodEnd && entry.entry_date > periodEnd) return false
+      return true
+    })
+  }, [openEntries, selectedCustomerId, periodStart, periodEnd])
+
+  const filteredInvoicedEntries = useMemo(() => {
+    return invoicedEntries.filter((entry) => {
+      if (invoicedFilterCustomerId && entry.customer_id !== invoicedFilterCustomerId) return false
+      if (invoicedFilterStart && entry.entry_date < invoicedFilterStart) return false
+      if (invoicedFilterEnd && entry.entry_date > invoicedFilterEnd) return false
+      return true
+    })
+  }, [invoicedEntries, invoicedFilterCustomerId, invoicedFilterStart, invoicedFilterEnd])
+
+  const groupedOpenEntries = useMemo(() => groupByDay(filteredOpenEntries), [filteredOpenEntries])
+
+  const totalOpenHours = useMemo(
+    () => filteredOpenEntries.reduce((sum, entry) => sum + parseHours(entry.hours), 0),
+    [filteredOpenEntries],
+  )
+
+  const totalOpenAmount = useMemo(() => totalOpenHours * Number(hourlyRate || 0), [totalOpenHours, hourlyRate])
+
+  const weeklyOpenHours = useMemo(
+    () => openEntries.reduce((sum, entry) => sum + parseHours(entry.hours), 0),
+    [openEntries],
+  )
+
+  const openForm = (entry?: ZZPTimeEntry) => {
+    if (entry) {
+      setEditingEntry(entry)
+      setFormState({
+        entry_date: entry.entry_date,
+        hours: String(entry.hours),
+        description: entry.description,
+        customer_id: entry.customer_id || '',
+        project_name: entry.project_name || '',
+        hourly_rate: entry.hourly_rate ? String(entry.hourly_rate) : '',
+      })
+    } else {
+      setEditingEntry(null)
+      setFormState(defaultFormState())
+    }
+    setIsFormOpen(true)
+  }
+
+  const saveEntry = async () => {
+    setIsSavingEntry(true)
+    try {
+      const payload: ZZPTimeEntryCreate = {
+        entry_date: formState.entry_date,
+        hours: Number(formState.hours),
+        description: formState.description,
+        customer_id: formState.customer_id || undefined,
+        project_name: formState.project_name || undefined,
+        hourly_rate: formState.hourly_rate ? Number(formState.hourly_rate) : undefined,
+        billable: true,
+      }
+
+      if (editingEntry) {
+        await zzpApi.timeEntries.update(editingEntry.id, payload)
+        toast.success('Uren bijgewerkt')
+      } else {
+        await zzpApi.timeEntries.create(payload)
+        toast.success('Uren toegevoegd')
+      }
+
+      setIsFormOpen(false)
+      await fetchData()
+    } catch (error) {
+      const message = parseApiError(error)
+      if (String(message).includes('TIME_ENTRY_INVOICED') || String(message).includes('Gefactureerde')) {
+        toast.error('Deze uren zijn al gefactureerd en kunnen niet worden aangepast.')
+      } else {
+        toast.error(message)
+      }
+    } finally {
+      setIsSavingEntry(false)
+    }
+  }
+
+
+  const handleDeleteEntry = async (entry: ZZPTimeEntry) => {
+    const confirmed = window.confirm('Weet je zeker dat je deze open uren wilt verwijderen?')
+    if (!confirmed) return
 
     try {
-      const rateNum = hourlyRateCents ? parseFloat(hourlyRateCents) : undefined
-      // Convert sentinel value back to undefined for API
-      const actualCustomerId = customerId === NO_CUSTOMER_VALUE ? undefined : customerId
-      
-      await onSave({
-        entry_date: entryDate,
-        description: description.trim(),
-        hours: hoursNum,
-        project_name: projectName.trim() || undefined,
-        customer_id: actualCustomerId,
-        hourly_rate_cents: rateNum ? Math.round(rateNum * 100) : undefined,
-        billable,
-      })
-    } finally {
-      setIsSubmitting(false)
+      await zzpApi.timeEntries.delete(entry.id)
+      toast.success('Uren verwijderd')
+      await fetchData()
+    } catch (error) {
+      toast.error(parseApiError(error))
     }
   }
 
-  const handleQuickHours = (value: number) => {
-    setHours(value.toString())
-    setHoursError('')
+  const handleInvoiceWeek = async () => {
+    if (!selectedCustomerId || totalOpenHours <= 0) return
+    setInvoicing(true)
+    try {
+      const response = await zzpApi.timeEntries.invoiceWeek({
+        customer_id: selectedCustomerId,
+        period_start: periodStart,
+        period_end: periodEnd,
+        hourly_rate: hourlyRate ? Number(hourlyRate) : undefined,
+      })
+      toast.success('Factuur aangemaakt')
+      await fetchData()
+      navigateTo(`/zzp/invoices/${response.invoice_id}`)
+    } catch (error) {
+      toast.error(parseApiError(error))
+    } finally {
+      setInvoicing(false)
+    }
   }
 
-  const isFormValid = entryDate && description.trim() && hours && !isNaN(parseFloat(hours)) && parseFloat(hours) > 0
+  if (pageError && !loading) {
+    return (
+      <div className="space-y-4 pb-24">
+        <Alert className="border-destructive/40 bg-destructive/5">
+          <WarningCircle size={18} weight="fill" />
+          <AlertDescription className="space-y-3">
+            <p>Er ging iets mis bij het laden van Uren: {pageError}</p>
+            <Button onClick={() => void fetchData()} variant="outline">Opnieuw proberen</Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="pb-4 border-b border-border/50">
-          <DialogTitle className="flex items-center gap-3 text-xl">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Clock size={24} className="text-primary" weight="duotone" />
-            </div>
-            {isEdit ? t('zzpTimeTracking.editEntry') : t('zzpTimeTracking.newEntry')}
-          </DialogTitle>
-          <DialogDescription className="text-sm">
-            {isEdit 
-              ? t('zzpTimeTracking.editEntryDescription')
-              : t('zzpTimeTracking.newEntryDescription')}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="py-4 space-y-4">
-          {/* Date field */}
-          <div className="space-y-2">
-            <Label htmlFor="entry-date" className="text-sm font-medium">
-              {t('zzpTimeTracking.date')} <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="entry-date"
-              type="date"
-              value={entryDate}
-              onChange={(e) => {
-                setEntryDate(e.target.value)
-                setDateError('')
-              }}
-              className={`h-11 ${dateError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-              disabled={isSubmitting}
-            />
-            {dateError && (
-              <p className="text-sm text-destructive flex items-center gap-1">
-                <XCircle size={14} />
-                {dateError}
-              </p>
-            )}
-          </div>
-
-          {/* Description field */}
-          <div className="space-y-2">
-            <Label htmlFor="entry-description" className="text-sm font-medium">
-              {t('zzpTimeTracking.description')} <span className="text-destructive">*</span>
-            </Label>
-            <Textarea
-              id="entry-description"
-              placeholder={t('zzpTimeTracking.descriptionPlaceholder')}
-              value={description}
-              onChange={(e) => {
-                setDescription(e.target.value)
-                setDescriptionError('')
-              }}
-              className={`min-h-20 ${descriptionError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-              disabled={isSubmitting}
-            />
-            {descriptionError && (
-              <p className="text-sm text-destructive flex items-center gap-1">
-                <XCircle size={14} />
-                {descriptionError}
-              </p>
-            )}
-          </div>
-
-          {/* Hours field with quick buttons */}
-          <div className="space-y-2">
-            <Label htmlFor="entry-hours" className="text-sm font-medium">
-              {t('zzpTimeTracking.hours')} <span className="text-destructive">*</span>
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                id="entry-hours"
-                type="number"
-                step="0.25"
-                min="0"
-                max="24"
-                placeholder="0.0"
-                value={hours}
-                onChange={(e) => {
-                  setHours(e.target.value)
-                  setHoursError('')
-                }}
-                className={`h-11 flex-1 ${hoursError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                disabled={isSubmitting}
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {QUICK_HOURS.map((value) => (
-                <Button
-                  key={value}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleQuickHours(value)}
-                  disabled={isSubmitting}
-                  className="h-8 px-3"
-                >
-                  {value}h
-                </Button>
-              ))}
-            </div>
-            {hoursError && (
-              <p className="text-sm text-destructive flex items-center gap-1">
-                <XCircle size={14} />
-                {hoursError}
-              </p>
-            )}
-          </div>
-
-          {/* Project name */}
-          <div className="space-y-2">
-            <Label htmlFor="entry-project" className="text-sm font-medium flex items-center gap-2">
-              <Briefcase size={14} className="text-muted-foreground" />
-              {t('zzpTimeTracking.project')}
-              <span className="text-xs text-muted-foreground font-normal">({t('common.optional')})</span>
-            </Label>
-            <Input
-              id="entry-project"
-              placeholder={t('zzpTimeTracking.projectPlaceholder')}
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              className="h-11"
-              disabled={isSubmitting}
-            />
-          </div>
-
-          {/* Customer selection */}
-          {customers.length > 0 && (
+    <div className="space-y-6 pb-24">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Receipt size={20} />
+            Facturatie deze week
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
-              <Label htmlFor="entry-customer" className="text-sm font-medium flex items-center gap-2">
-                <User size={14} className="text-muted-foreground" />
-                {t('zzpTimeTracking.customer')}
-                <span className="text-xs text-muted-foreground font-normal">({t('common.optional')})</span>
-              </Label>
-              <Select value={customerId} onValueChange={setCustomerId} disabled={isSubmitting}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder={t('zzpTimeTracking.selectCustomer')} />
+              <Label>Klant</Label>
+              <Select value={selectedCustomerId || NO_CUSTOMER} onValueChange={(value) => setSelectedCustomerId(value === NO_CUSTOMER ? '' : value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecteer klant" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NO_CUSTOMER_VALUE}>{t('zzpTimeTracking.noCustomer')}</SelectItem>
+                  <SelectItem value={NO_CUSTOMER}>Geen selectie</SelectItem>
                   {customers.map((customer) => (
-                    <SelectItem key={customer.id} value={String(customer.id)}>
-                      {customer.name}
-                    </SelectItem>
+                    <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
 
-          {/* Hourly rate */}
-          <div className="space-y-2">
-            <Label htmlFor="entry-rate" className="text-sm font-medium flex items-center gap-2">
-              <CurrencyEur size={14} className="text-muted-foreground" />
-              {t('zzpTimeTracking.hourlyRate')}
-              <span className="text-xs text-muted-foreground font-normal">({t('common.optional')})</span>
-            </Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
-              <Input
-                id="entry-rate"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                value={hourlyRateCents}
-                onChange={(e) => setHourlyRateCents(e.target.value)}
-                className="h-11 pl-8"
-                disabled={isSubmitting}
-              />
+            <div className="space-y-2">
+              <Label>Periode start</Label>
+              <Input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Periode eind</Label>
+              <Input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Uurtarief (€)</Label>
+              <Input type="number" min="0" step="0.01" value={hourlyRate} onChange={(event) => setHourlyRate(event.target.value)} placeholder="Bijv. 95" />
             </div>
           </div>
 
-          {/* Billable switch */}
-          <div className="flex items-center justify-between py-2 px-3 bg-secondary/30 rounded-lg">
-            <div className="flex items-center gap-2">
-              <Receipt size={18} className="text-muted-foreground" />
-              <Label htmlFor="entry-billable" className="text-sm font-medium cursor-pointer">
-                {t('zzpTimeTracking.markAsBillable')}
-              </Label>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-lg border p-3">
+              <p className="text-sm text-muted-foreground">Totaal uren (open)</p>
+              <p className="text-2xl font-semibold">{totalOpenHours.toFixed(2)}u</p>
             </div>
-            <Switch
-              id="entry-billable"
-              checked={billable}
-              onCheckedChange={setBillable}
-              disabled={isSubmitting}
-            />
+            <div className="rounded-lg border p-3">
+              <p className="text-sm text-muted-foreground">Uurtarief</p>
+              <p className="text-2xl font-semibold">€ {Number(hourlyRate || 0).toFixed(2)}</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-sm text-muted-foreground">Bedrag preview</p>
+              <p className="text-2xl font-semibold">€ {totalOpenAmount.toFixed(2)}</p>
+            </div>
           </div>
-        </div>
 
-        <DialogFooter className="pt-4 border-t border-border/50">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSubmitting}
-          >
-            {t('common.cancel')}
+          <Button disabled={!selectedCustomerId || totalOpenHours === 0 || invoicing} onClick={() => void handleInvoiceWeek()}>
+            {invoicing ? 'Factuur maken...' : 'Maak factuur'}
           </Button>
-          <Button 
-            onClick={handleSave} 
-            disabled={!isFormValid || isSubmitting}
-            className="gap-2"
-          >
-            {isSubmitting && <SpinnerGap size={18} className="animate-spin" />}
-            {isEdit ? t('common.save') : t('zzpTimeTracking.addEntry')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
+        </CardContent>
+      </Card>
 
-// Delete confirmation dialog
-const DeleteConfirmDialog = ({
-  open,
-  onOpenChange,
-  onConfirm,
-  entryDescription,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onConfirm: () => void
-  entryDescription: string
-}) => (
-  <AlertDialog open={open} onOpenChange={onOpenChange}>
-    <AlertDialogContent>
-      <AlertDialogHeader>
-        <AlertDialogTitle>{t('zzpTimeTracking.deleteEntry')}</AlertDialogTitle>
-        <AlertDialogDescription>
-          {t('zzpTimeTracking.deleteConfirmation')}
-        </AlertDialogDescription>
-      </AlertDialogHeader>
-      <AlertDialogFooter>
-        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-        <AlertDialogAction
-          onClick={onConfirm}
-          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-        >
-          {t('common.delete')}
-        </AlertDialogAction>
-      </AlertDialogFooter>
-    </AlertDialogContent>
-  </AlertDialog>
-)
-
-// Create Invoice from Time Entries Dialog
-const CreateInvoiceDialog = ({
-  open,
-  onOpenChange,
-  entries,
-  customers,
-  onSuccess,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  entries: ZZPTimeEntry[]
-  customers: ZZPCustomer[]
-  onSuccess: () => void
-}) => {
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(NO_CUSTOMER_VALUE)
-  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set())
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  // Filter to billable entries only
-  const billableEntries = useMemo(() => 
-    entries.filter(e => e.billable), 
-    [entries]
-  )
-
-  // Entries for the selected customer
-  const customerEntries = useMemo(() => {
-    if (selectedCustomerId === NO_CUSTOMER_VALUE) return []
-    return billableEntries.filter(e => e.customer_id === selectedCustomerId)
-  }, [billableEntries, selectedCustomerId])
-
-  // Customers that have billable entries
-  const customersWithEntries = useMemo(() => {
-    const customerIds = new Set(billableEntries.filter(e => e.customer_id).map(e => e.customer_id))
-    return customers.filter(c => customerIds.has(c.id))
-  }, [customers, billableEntries])
-
-  // Reset selections when dialog opens
-  useEffect(() => {
-    if (open) {
-      setSelectedCustomerId(NO_CUSTOMER_VALUE)
-      setSelectedEntryIds(new Set())
-      setIsSubmitting(false)
-    }
-  }, [open])
-
-  // Auto-select all entries when customer changes
-  useEffect(() => {
-    if (selectedCustomerId !== NO_CUSTOMER_VALUE) {
-      setSelectedEntryIds(new Set(customerEntries.map(e => e.id)))
-    } else {
-      setSelectedEntryIds(new Set())
-    }
-  }, [selectedCustomerId, customerEntries])
-
-  // Calculate totals
-  const totals = useMemo(() => {
-    const selected = customerEntries.filter(e => selectedEntryIds.has(e.id))
-    const hours = selected.reduce((sum, e) => sum + e.hours, 0)
-    const entriesWithRate = selected.filter(e => e.hourly_rate_cents)
-    const entriesWithoutRate = selected.filter(e => !e.hourly_rate_cents)
-    const amount = entriesWithRate.reduce((sum, e) => 
-      sum + Math.round(e.hours * (e.hourly_rate_cents || 0)), 0
-    )
-    return { 
-      hours, 
-      amount, 
-      count: selected.length,
-      withoutRateCount: entriesWithoutRate.length 
-    }
-  }, [customerEntries, selectedEntryIds])
-
-  // Toggle entry selection
-  const toggleEntry = (entryId: string) => {
-    setSelectedEntryIds(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(entryId)) {
-        newSet.delete(entryId)
-      } else {
-        newSet.add(entryId)
-      }
-      return newSet
-    })
-  }
-
-  // Create draft invoice
-  const handleCreateInvoice = async () => {
-    if (selectedCustomerId === NO_CUSTOMER_VALUE || selectedEntryIds.size === 0) return
-
-    setIsSubmitting(true)
-    try {
-      const selectedEntries = customerEntries.filter(e => selectedEntryIds.has(e.id))
-      
-      // Create invoice lines from time entries
-      const lines: ZZPInvoiceLineCreate[] = selectedEntries.map(entry => ({
-        description: formatTimeEntryLineDescription(entry),
-        quantity: entry.hours,
-        unit_price_cents: entry.hourly_rate_cents || 0,
-        vat_rate: DEFAULT_VAT_RATE_NL,
-      }))
-
-      // Create the invoice
-      await zzpApi.invoices.create({
-        customer_id: selectedCustomerId,
-        issue_date: formatDateISO(new Date()),
-        lines,
-      })
-
-      toast.success(t('zzpTimeTracking.invoiceCreated'), {
-        action: {
-          label: t('zzpTimeTracking.invoiceCreatedGoTo'),
-          onClick: () => navigateTo('invoices'),
-        },
-      })
-
-      onOpenChange(false)
-      onSuccess()
-    } catch (error) {
-      console.error('Failed to create invoice:', error)
-      toast.error(parseApiError(error))
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  // Format currency
-  const formatAmount = (cents: number) => 
-    new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(cents / 100)
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="pb-4 border-b border-border/50">
-          <DialogTitle className="flex items-center gap-3 text-xl">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <FileText size={24} className="text-primary" weight="duotone" />
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2"><Clock size={20} />Open uren</CardTitle>
+          <div className="flex items-center gap-3">
+            <Badge variant="secondary">Week totaal: {weeklyOpenHours.toFixed(2)}u</Badge>
+            <Button onClick={() => openForm()} size="sm"><Plus size={16} className="mr-2" />Uren toevoegen</Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
             </div>
-            {t('zzpTimeTracking.createInvoiceTitle')}
-          </DialogTitle>
-          <DialogDescription>
-            {t('zzpTimeTracking.createInvoiceDescription')}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="py-4 space-y-4">
-          {/* No billable entries message */}
-          {billableEntries.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Receipt size={40} className="text-muted-foreground mb-3" />
-              <p className="font-medium">{t('zzpTimeTracking.noBillableEntries')}</p>
-              <p className="text-sm text-muted-foreground">
-                {t('zzpTimeTracking.noBillableEntriesDescription')}
-              </p>
-            </div>
+          ) : Object.keys(groupedOpenEntries).length === 0 ? (
+            <p className="text-muted-foreground">Geen open uren in deze selectie.</p>
           ) : (
-            <>
-              {/* Customer selection */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  {t('zzpTimeTracking.selectCustomerForInvoice')}
-                </Label>
-                <Select 
-                  value={selectedCustomerId} 
-                  onValueChange={setSelectedCustomerId}
-                  disabled={isSubmitting}
-                >
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder={t('zzpTimeTracking.selectCustomerForInvoice')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_CUSTOMER_VALUE}>{t('zzpTimeTracking.noCustomerSelected')}</SelectItem>
-                    {customersWithEntries.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Entries list for selected customer */}
-              {selectedCustomerId !== NO_CUSTOMER_VALUE && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t('zzpTimeTracking.selectEntriesForInvoice')}
-                  </Label>
-                  <div className="border rounded-lg divide-y max-h-60 overflow-y-auto">
-                    {customerEntries.length === 0 ? (
-                      <div className="p-4 text-center text-muted-foreground text-sm">
-                        {t('zzpTimeTracking.noBillableEntries')}
+            <div className="space-y-4">
+              {Object.entries(groupedOpenEntries).sort(([a], [b]) => (a < b ? 1 : -1)).map(([day, dayEntries]) => {
+                const dayTotal = dayEntries.reduce((sum, entry) => sum + parseHours(entry.hours), 0)
+                return (
+                  <div key={day} className="rounded-xl border p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CalendarBlank size={16} />
+                        <p className="font-medium">{new Date(`${day}T00:00:00`).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
                       </div>
-                    ) : (
-                      customerEntries.map((entry) => (
-                        <label
-                          key={entry.id}
-                          className="flex items-center gap-3 p-3 hover:bg-secondary/30 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedEntryIds.has(entry.id)}
-                            onChange={() => toggleEntry(entry.id)}
-                            className="h-4 w-4 rounded border-input"
-                            disabled={isSubmitting}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{entry.description}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatDateDisplay(entry.entry_date)} • {entry.hours}h
-                              {entry.project_name && ` • ${entry.project_name}`}
+                      <Badge>{dayTotal.toFixed(2)}u</Badge>
+                    </div>
+                    <div className="space-y-2">
+                      {dayEntries.map((entry) => (
+                        <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">{entry.description}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {(entry.customer_id && customerMap[entry.customer_id]) || 'Geen klant'}
+                              {entry.project_name ? ` • ${entry.project_name}` : ''}
+                              {entry.hourly_rate ? ` • €${Number(entry.hourly_rate).toFixed(2)}/u` : ''}
                             </p>
                           </div>
-                          <div className="text-right">
-                            {entry.hourly_rate_cents ? (
-                              <span className="text-sm font-medium">
-                                {formatAmount(Math.round(entry.hours * entry.hourly_rate_cents))}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">{t('zzpTimeTracking.noRate')}</span>
-                            )}
+                          <div className="flex items-center gap-3">
+                            <p className="font-semibold">{parseHours(entry.hours).toFixed(2)}u</p>
+                            <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={() => openForm(entry)}>
+                              <PencilSimple size={14} className="mr-1" />Bewerken
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => void handleDeleteEntry(entry)}>
+                              <TrashSimple size={14} className="mr-1" />Verwijderen
+                            </Button>
+                            </div>
                           </div>
-                        </label>
-                      ))
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><CurrencyEur size={20} />Gefactureerde uren</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-3">
+            <Select value={invoicedFilterCustomerId || NO_CUSTOMER} onValueChange={(value) => setInvoicedFilterCustomerId(value === NO_CUSTOMER ? '' : value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filter op klant" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_CUSTOMER}>Alle klanten</SelectItem>
+                {customers.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input type="date" value={invoicedFilterStart} onChange={(event) => setInvoicedFilterStart(event.target.value)} />
+            <Input type="date" value={invoicedFilterEnd} onChange={(event) => setInvoicedFilterEnd(event.target.value)} />
+          </div>
+
+          {loading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+            </div>
+          ) : filteredInvoicedEntries.length === 0 ? (
+            <p className="text-muted-foreground">Geen gefactureerde uren gevonden.</p>
+          ) : (
+            <div className="space-y-2">
+              {filteredInvoicedEntries.map((entry) => (
+                <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 bg-muted/20">
+                  <div>
+                    <p className="font-medium">{entry.description}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(`${entry.entry_date}T00:00:00`).toLocaleDateString('nl-NL')} • {parseHours(entry.hours).toFixed(2)}u
+                    </p>
+                  </div>
+                  <div className="text-right text-sm">
+                    <p className="text-muted-foreground">Factuur</p>
+                    {entry.invoice_id ? (
+                      <button
+                        type="button"
+                        className="text-primary underline"
+                        onClick={() => navigateTo(`/zzp/invoices/${entry.invoice_id}`)}
+                      >
+                        {invoiceNumberMap[entry.invoice_id] || `#${entry.invoice_id.slice(0, 8)}`}
+                      </button>
+                    ) : (
+                      <span>-</span>
                     )}
                   </div>
                 </div>
-              )}
-
-              {/* Totals summary */}
-              {selectedEntryIds.size > 0 && (
-                <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>{t('zzpTimeTracking.selectedEntries')}</span>
-                    <span className="font-medium">{totals.count} ({totals.hours.toFixed(1)}h)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium">{t('zzpTimeTracking.totalToInvoice')}</span>
-                    <span className="text-lg font-bold text-primary">{formatAmount(totals.amount)}</span>
-                  </div>
-                  {totals.withoutRateCount > 0 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                      ⚠️ {totals.withoutRateCount} {t('zzpTimeTracking.entriesWithoutRate')}
-                    </p>
-                  )}
-                </div>
-              )}
-            </>
+              ))}
+            </div>
           )}
-        </div>
+        </CardContent>
+      </Card>
 
-        <DialogFooter className="pt-4 border-t border-border/50">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSubmitting}
-          >
-            {t('common.cancel')}
-          </Button>
-          <Button
-            onClick={handleCreateInvoice}
-            disabled={isSubmitting || selectedCustomerId === NO_CUSTOMER_VALUE || selectedEntryIds.size === 0}
-            className="gap-2"
-          >
-            {isSubmitting && <SpinnerGap size={18} className="animate-spin" />}
-            {t('zzpTimeTracking.createDraftInvoice')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// Empty state component
-const EmptyState = ({ onAddEntry }: { onAddEntry: () => void }) => (
-  <Card className="bg-card/80 backdrop-blur-sm border-2 border-dashed border-primary/20">
-    <CardContent className="flex flex-col items-center justify-center py-12 sm:py-16 text-center px-4">
-      <div className="h-20 w-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-        <Clock size={40} weight="duotone" className="text-primary" />
-      </div>
-      <h3 className="text-xl font-semibold mb-2">{t('zzpTimeTracking.noEntries')}</h3>
-      <p className="text-muted-foreground mb-8 max-w-md">
-        {t('zzpTimeTracking.noEntriesDescription')}
-      </p>
-      <Button onClick={onAddEntry} size="lg" className="gap-2 h-12 px-6">
-        <Plus size={20} weight="bold" />
-        {t('zzpTimeTracking.addFirstEntry')}
-      </Button>
-    </CardContent>
-  </Card>
-)
-
-// Clock-in/out card component (Dagstart)
-const ClockInCard = ({
-  activeSession,
-  onClockIn,
-  onClockOut,
-  isLoading,
-}: {
-  activeSession: WorkSession | null
-  onClockIn: (note?: string) => Promise<void>
-  onClockOut: (breakMinutes: number, note?: string) => Promise<void>
-  isLoading: boolean
-}) => {
-  const [showOptions, setShowOptions] = useState(false)
-  const [breakMinutes, setBreakMinutes] = useState('')
-  const [note, setNote] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  
-  const { formatted: timerDisplay } = useTimer(activeSession?.started_at || null)
-  const isActive = !!activeSession
-  
-  const handleClockIn = async () => {
-    setIsSubmitting(true)
-    try {
-      await onClockIn(note.trim() || undefined)
-      setNote('')
-      setShowOptions(false)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-  
-  const handleClockOut = async () => {
-    setIsSubmitting(true)
-    try {
-      const mins = parseInt(breakMinutes) || 0
-      await onClockOut(mins, note.trim() || undefined)
-      setNote('')
-      setBreakMinutes('')
-      setShowOptions(false)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-  
-  // Format start time for display
-  const startTimeDisplay = activeSession?.started_at
-    ? new Date(activeSession.started_at).toLocaleTimeString('nl-NL', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      })
-    : null
-  
-  return (
-    <Card className="bg-gradient-to-br from-card via-card to-primary/5 backdrop-blur-sm border-2 border-primary/20 mb-6">
-      <CardContent className="p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          {/* Left side: Status and timer */}
-          <div className="flex items-center gap-4">
-            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center ${
-              isActive 
-                ? 'bg-green-500/20 animate-pulse' 
-                : 'bg-secondary/50'
-            }`}>
-              <Timer 
-                size={32} 
-                className={isActive ? 'text-green-500' : 'text-muted-foreground'} 
-                weight="duotone" 
-              />
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingEntry ? 'Open uren bewerken' : 'Uren toevoegen'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>Datum</Label>
+              <Input type="date" value={formState.entry_date} onChange={(event) => setFormState((prev) => ({ ...prev, entry_date: event.target.value }))} />
             </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-lg font-semibold">{t('zzpTimeTracking.dagstartTitle')}</h3>
-                <Badge 
-                  variant={isActive ? 'default' : 'secondary'}
-                  className={isActive 
-                    ? 'bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/40' 
-                    : 'bg-secondary text-muted-foreground'
-                  }
-                >
-                  {isActive ? t('zzpTimeTracking.statusActive') : t('zzpTimeTracking.statusInactive')}
-                </Badge>
-              </div>
-              {isActive ? (
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-mono font-bold text-primary">{timerDisplay}</span>
-                  <span className="text-sm text-muted-foreground">
-                    ({t('zzpTimeTracking.startedAt')} {startTimeDisplay})
-                  </span>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {t('zzpTimeTracking.dagstartDescription')}
-                </p>
-              )}
+            <div className="space-y-2">
+              <Label>Uren</Label>
+              <Input type="number" min="0.25" step="0.25" value={formState.hours} onChange={(event) => setFormState((prev) => ({ ...prev, hours: event.target.value }))} />
             </div>
-          </div>
-          
-          {/* Right side: Button */}
-          <div className="flex flex-col gap-2 sm:items-end">
-            <Button
-              onClick={isActive ? handleClockOut : handleClockIn}
-              disabled={isLoading || isSubmitting}
-              size="lg"
-              className={`gap-2 h-12 px-6 min-w-[160px] ${
-                isActive 
-                  ? 'bg-orange-600 hover:bg-orange-700 text-white' 
-                  : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
-            >
-              {isSubmitting ? (
-                <>
-                  <SpinnerGap size={20} className="animate-spin" />
-                  {isActive ? t('zzpTimeTracking.clockingOut') : t('zzpTimeTracking.clockingIn')}
-                </>
-              ) : isActive ? (
-                <>
-                  <Stop size={20} weight="fill" />
-                  {t('zzpTimeTracking.clockOut')}
-                </>
-              ) : (
-                <>
-                  <Play size={20} weight="fill" />
-                  {t('zzpTimeTracking.clockIn')}
-                </>
-              )}
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowOptions(!showOptions)}
-              className="gap-1 text-xs text-muted-foreground"
-            >
-              {showOptions ? <CaretUp size={14} /> : <CaretDown size={14} />}
-              {showOptions ? t('zzpTimeTracking.hideOptions') : t('zzpTimeTracking.showOptions')}
-            </Button>
-          </div>
-        </div>
-        
-        {/* Expandable options */}
-        {showOptions && (
-          <div className="mt-4 pt-4 border-t border-border/50 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {isActive && (
-              <div className="space-y-2">
-                <Label htmlFor="break-minutes" className="text-sm font-medium">
-                  {t('zzpTimeTracking.breakMinutes')}
-                </Label>
-                <Input
-                  id="break-minutes"
-                  type="number"
-                  min="0"
-                  max="480"
-                  placeholder={t('zzpTimeTracking.breakMinutesPlaceholder')}
-                  value={breakMinutes}
-                  onChange={(e) => setBreakMinutes(e.target.value)}
-                  className="h-10"
-                  disabled={isSubmitting}
-                />
-              </div>
-            )}
-            <div className={`space-y-2 ${!isActive ? 'sm:col-span-2' : ''}`}>
-              <Label htmlFor="work-note" className="text-sm font-medium">
-                {t('zzpTimeTracking.workNote')}
-              </Label>
-              <Input
-                id="work-note"
-                placeholder={t('zzpTimeTracking.workNotePlaceholder')}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                className="h-10"
-                disabled={isSubmitting}
-              />
+            <div className="space-y-2">
+              <Label>Omschrijving</Label>
+              <Textarea value={formState.description} onChange={(event) => setFormState((prev) => ({ ...prev, description: event.target.value }))} />
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-// Mobile entry card component
-const EntryCard = ({ 
-  entry,
-  customerName,
-  onEdit,
-  onDuplicate,
-  onDelete 
-}: { 
-  entry: ZZPTimeEntry
-  customerName?: string
-  onEdit: () => void
-  onDuplicate: () => void
-  onDelete: () => void 
-}) => (
-  <Card className="bg-card/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-colors">
-    <CardContent className="p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 min-w-0 flex-1">
-          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <CalendarBlank size={20} className="text-primary" weight="duotone" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm font-medium text-muted-foreground">
-                {formatDateDisplay(entry.entry_date)}
-              </span>
-              <span className="text-lg font-bold text-primary">{entry.hours}h</span>
-              {entry.is_invoiced && (
-                <Lock size={16} className="text-amber-600" weight="fill" />
-              )}
+            <div className="space-y-2">
+              <Label>Klant</Label>
+              <Select value={formState.customer_id || NO_CUSTOMER} onValueChange={(value) => setFormState((prev) => ({ ...prev, customer_id: value === NO_CUSTOMER ? '' : value }))}>
+                <SelectTrigger><SelectValue placeholder="Kies klant" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CUSTOMER}>Geen klant</SelectItem>
+                  {customers.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <h4 className="font-medium line-clamp-2">{entry.description}</h4>
-            {(entry.project_name || customerName || entry.invoice_id) && (
-              <p className="text-sm text-muted-foreground truncate flex items-center gap-1.5 mt-1">
-                {entry.project_name && (
-                  <>
-                    <Briefcase size={12} />
-                    {entry.project_name}
-                  </>
-                )}
-                {entry.project_name && customerName && <span>•</span>}
-                {customerName && (
-                  <>
-                    <User size={12} />
-                    {customerName}
-                  </>
-                )}
-                {entry.invoice_id && (
-                  <>
-                    {(entry.project_name || customerName) && <span>•</span>}
-                    <Receipt size={12} />
-                    Gefactureerd
-                  </>
-                )}
-              </p>
-            )}
-          </div>
-        </div>
-        <BillableBadge billable={entry.billable} />
-      </div>
-      <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-border/50">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onEdit}
-          className="h-9 px-3 gap-2"
-          disabled={entry.is_invoiced}
-        >
-          <PencilSimple size={16} />
-          {t('common.edit')}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onDuplicate}
-          className="h-9 px-3 gap-2"
-        >
-          <Copy size={16} />
-          {t('zzpTimeTracking.duplicate')}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onDelete}
-          className="h-9 px-3 gap-2 text-destructive hover:text-destructive"
-          disabled={entry.is_invoiced}
-        >
-          <TrashSimple size={16} />
-          {t('common.delete')}
-        </Button>
-      </div>
-    </CardContent>
-  </Card>
-)
-
-export const ZZPTimeTrackingPage = () => {
-  const { user } = useAuth()
-  
-  // Data state
-  const [entries, setEntries] = useState<ZZPTimeEntry[]>([])
-  const [weeklySummary, setWeeklySummary] = useState<ZZPWeeklyTimeSummary | null>(null)
-  const [customers, setCustomers] = useState<ZZPCustomer[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isWeeklyLoading, setIsWeeklyLoading] = useState(true)
-  
-  const showLoading = useDelayedLoading(isLoading, 300, entries.length > 0)
-  
-  // Clock-in/out state
-  const [activeSession, setActiveSession] = useState<WorkSession | null>(null)
-  const [isSessionLoading, setIsSessionLoading] = useState(true)
-  
-  // Week navigation
-  const [currentWeekStart, setCurrentWeekStart] = useState(() => getMonday(new Date()))
-  
-  // Dialog state
-  const [isFormOpen, setIsFormOpen] = useState(false)
-  const [editingEntry, setEditingEntry] = useState<ZZPTimeEntry | undefined>()
-  const [deletingEntry, setDeletingEntry] = useState<ZZPTimeEntry | undefined>()
-  const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false)
-
-  // Productivity filters and sorting
-  const [searchTerm, setSearchTerm] = useState('')
-  const [billableFilter, setBillableFilter] = useState<'all' | 'billable' | 'non-billable'>('all')
-  const [sortOption, setSortOption] = useState<'date-desc' | 'date-asc' | 'hours-desc' | 'hours-asc'>('date-desc')
-  const [invoicedFilter, setInvoicedFilter] = useState<'open' | 'invoiced'>('open')
-
-  // Invoice generation state
-  const [invoiceCustomerId, setInvoiceCustomerId] = useState<string>('')
-  const [invoicePeriodStart, setInvoicePeriodStart] = useState(() => formatDateISO(currentWeekStart))
-  const [invoicePeriodEnd, setInvoicePeriodEnd] = useState(() => formatDateISO(currentWeekEnd))
-  const [invoiceHourlyRate, setInvoiceHourlyRate] = useState('')
-  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false)
-
-  // Computed values
-  const currentWeekEnd = useMemo(() => getSunday(currentWeekStart), [currentWeekStart])
-  const weekRangeDisplay = useMemo(() => formatWeekRange(currentWeekStart, currentWeekEnd), [currentWeekStart, currentWeekEnd])
-
-  // Customer map for quick lookup
-  const customerMap = useMemo(() => {
-    const map: Record<string, string> = {}
-    customers.forEach(c => { map[c.id] = c.name })
-    return map
-  }, [customers])
-
-  // Load customers
-  const loadCustomers = useCallback(async () => {
-    try {
-      const response = await zzpApi.customers.list()
-      setCustomers(response.customers)
-    } catch (error) {
-      console.error('Failed to load customers:', error)
-    }
-  }, [])
-
-  // Load active work session
-  const loadActiveSession = useCallback(async () => {
-    if (!user?.id) return
-    
-    setIsSessionLoading(true)
-    try {
-      const session = await zzpApi.workSessions.getActive()
-      setActiveSession(session)
-    } catch (error) {
-      console.error('Failed to load active session:', error)
-      setActiveSession(null)
-    } finally {
-      setIsSessionLoading(false)
-    }
-  }, [user?.id])
-
-  // Load weekly summary
-  const loadWeeklySummary = useCallback(async () => {
-    if (!user?.id) return
-    
-    setIsWeeklyLoading(true)
-    try {
-      const summary = await zzpApi.timeEntries.getWeekly(formatDateISO(currentWeekStart))
-      setWeeklySummary(summary)
-    } catch (error) {
-      console.error('Failed to load weekly summary:', error)
-      // Create empty summary on error
-      setWeeklySummary({
-        week_start: formatDateISO(currentWeekStart),
-        week_end: formatDateISO(currentWeekEnd),
-        total_hours: 0,
-        billable_hours: 0,
-        entries_by_day: {},
-      })
-    } finally {
-      setIsWeeklyLoading(false)
-    }
-  }, [user?.id, currentWeekStart, currentWeekEnd])
-
-  // Load entries for current week
-  const loadEntries = useCallback(async () => {
-    if (!user?.id) return
-    
-    setIsLoading(true)
-    try {
-      const response = await zzpApi.timeEntries.list({
-        from_date: formatDateISO(currentWeekStart),
-        to_date: formatDateISO(currentWeekEnd),
-      })
-      setEntries(response.entries)
-    } catch (error) {
-      console.error('Failed to load time entries:', error)
-      toast.error(parseApiError(error))
-    } finally {
-      setIsLoading(false)
-    }
-  }, [user?.id, currentWeekStart, currentWeekEnd])
-
-  // Clock-in handler
-  const handleClockIn = useCallback(async (note?: string) => {
-    if (!user?.id) {
-      toast.error(t('zzpTimeTracking.notLoggedIn'))
-      return
-    }
-    
-    // Show loading toast
-    const loadingToastId = toast.loading(t('zzpTimeTracking.clockingIn'))
-    
-    try {
-      const session = await zzpApi.workSessions.start({ note })
-      setActiveSession(session)
-      toast.dismiss(loadingToastId)
-      toast.success(t('zzpTimeTracking.workStarted'), {
-        description: note ? `📝 ${note}` : undefined
-      })
-    } catch (error) {
-      console.error('Failed to clock in:', error)
-      toast.dismiss(loadingToastId)
-      toast.error(t('zzpTimeTracking.clockInFailed'), {
-        description: parseApiError(error)
-      })
-    }
-  }, [user?.id])
-
-  // Clock-out handler
-  const handleClockOut = useCallback(async (breakMinutes: number, note?: string) => {
-    if (!user?.id) {
-      toast.error(t('zzpTimeTracking.notLoggedIn'))
-      return
-    }
-    
-    // Show loading toast
-    const loadingToastId = toast.loading(t('zzpTimeTracking.clockingOut'))
-    
-    try {
-      const response = await zzpApi.workSessions.stop({ 
-        break_minutes: breakMinutes,
-        note 
-      })
-      setActiveSession(null)
-      toast.dismiss(loadingToastId)
-      
-      // Show success toast with hours added
-      const hours = response.hours_added
-      toast.success(t('zzpTimeTracking.workStopped'), {
-        description: `✅ ${hours} ${t('zzpTimeTracking.hoursAdded')} ${t('zzpTimeTracking.addedToTimesheet')}`
-      })
-      
-      // Reload entries and weekly summary to reflect the new entry
-      await Promise.all([loadEntries(), loadWeeklySummary()])
-    } catch (error) {
-      console.error('Failed to clock out:', error)
-      toast.dismiss(loadingToastId)
-      toast.error(t('zzpTimeTracking.clockOutFailed'), {
-        description: parseApiError(error)
-      })
-    }
-  }, [user?.id, loadEntries, loadWeeklySummary])
-
-  // Initial load
-  useEffect(() => {
-    loadCustomers()
-    loadActiveSession()
-  }, [loadCustomers, loadActiveSession])
-
-  // Poll for active session every 15 seconds to keep state in sync
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadActiveSession()
-    }, 15000) // 15 seconds
-    
-    return () => clearInterval(interval)
-  }, [loadActiveSession])
-
-  // Load data when week changes
-  useEffect(() => {
-    loadEntries()
-    loadWeeklySummary()
-    setInvoicePeriodStart(formatDateISO(currentWeekStart))
-    setInvoicePeriodEnd(formatDateISO(currentWeekEnd))
-  }, [loadEntries, loadWeeklySummary, currentWeekStart, currentWeekEnd])
-
-  // Week navigation
-  const goToPreviousWeek = useCallback(() => {
-    setCurrentWeekStart(prev => {
-      const newDate = new Date(prev)
-      newDate.setDate(newDate.getDate() - 7)
-      return newDate
-    })
-  }, [])
-
-  const goToNextWeek = useCallback(() => {
-    setCurrentWeekStart(prev => {
-      const newDate = new Date(prev)
-      newDate.setDate(newDate.getDate() + 7)
-      return newDate
-    })
-  }, [])
-
-  const goToCurrentWeek = useCallback(() => {
-    setCurrentWeekStart(getMonday(new Date()))
-  }, [])
-
-  // Handle save entry
-  const handleSaveEntry = useCallback(async (data: ZZPTimeEntryCreate) => {
-    if (!user?.id) return
-
-    if (editingEntry?.id && editingEntry.is_invoiced) {
-      toast.error(t('zzpTimeTracking.cannotEditInvoiced'))
-      return
-    }
-
-    try {
-      if (editingEntry?.id) {
-        await zzpApi.timeEntries.update(editingEntry.id, data as ZZPTimeEntryUpdate)
-        toast.success(t('zzpTimeTracking.entrySaved'))
-      } else {
-        await zzpApi.timeEntries.create(data)
-        toast.success(t('zzpTimeTracking.entrySaved'))
-      }
-
-      // Reload data
-      await Promise.all([loadEntries(), loadWeeklySummary()])
-
-      setIsFormOpen(false)
-      setEditingEntry(undefined)
-    } catch (error) {
-      console.error('Failed to save time entry:', error)
-      toast.error(parseApiError(error))
-    }
-  }, [user?.id, editingEntry, loadEntries, loadWeeklySummary])
-
-  // Handle delete entry
-  const handleDeleteEntry = useCallback(async () => {
-    if (!user?.id || !deletingEntry) return
-
-    if (deletingEntry.is_invoiced) {
-      toast.error(t('zzpTimeTracking.cannotDeleteInvoiced'))
-      setDeletingEntry(undefined)
-      return
-    }
-
-    try {
-      await zzpApi.timeEntries.delete(deletingEntry.id)
-      toast.success(t('zzpTimeTracking.entryDeleted'))
-      
-      // Reload data
-      await Promise.all([loadEntries(), loadWeeklySummary()])
-    } catch (error) {
-      console.error('Failed to delete time entry:', error)
-      toast.error(parseApiError(error))
-    }
-
-    setDeletingEntry(undefined)
-  }, [user?.id, deletingEntry, loadEntries, loadWeeklySummary])
-
-  // Open form for new entry
-  const openNewForm = useCallback(() => {
-    setEditingEntry(undefined)
-    setIsFormOpen(true)
-  }, [])
-
-  // Open form for editing
-  const openEditForm = useCallback((entry: ZZPTimeEntry) => {
-    if (entry.is_invoiced) {
-      toast.error(t('zzpTimeTracking.cannotEditInvoiced'))
-      return
-    }
-    setEditingEntry(entry)
-    setIsFormOpen(true)
-  }, [])
-
-  // Filter and sort entries
-  const filteredEntries = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase()
-
-    const filtered = entries.filter((entry) => {
-      const customerName = entry.customer_id ? customerMap[entry.customer_id] : ''
-      const matchesSearch = !query || [
-        entry.description,
-        entry.project_name,
-        customerName,
-      ].some((value) => (value || '').toLowerCase().includes(query))
-
-      const matchesBillableFilter =
-        billableFilter === 'all' ||
-        (billableFilter === 'billable' && entry.billable) ||
-        (billableFilter === 'non-billable' && !entry.billable)
-
-      const matchesInvoicedFilter =
-        (invoicedFilter === 'open' && !entry.is_invoiced) ||
-        (invoicedFilter === 'invoiced' && entry.is_invoiced)
-
-      return matchesSearch && matchesBillableFilter && matchesInvoicedFilter
-    })
-
-    return filtered.sort((a, b) => {
-      switch (sortOption) {
-        case 'date-asc':
-          return a.entry_date.localeCompare(b.entry_date)
-        case 'hours-desc':
-          return b.hours - a.hours
-        case 'hours-asc':
-          return a.hours - b.hours
-        case 'date-desc':
-        default:
-          return b.entry_date.localeCompare(a.entry_date)
-      }
-    })
-  }, [entries, searchTerm, billableFilter, sortOption, customerMap, invoicedFilter])
-
-  const productivityMetrics = useMemo(() => {
-    const totalHours = filteredEntries.reduce((sum, entry) => sum + entry.hours, 0)
-    const billableHours = filteredEntries.filter((entry) => entry.billable).reduce((sum, entry) => sum + entry.hours, 0)
-    const utilization = totalHours > 0 ? (billableHours / totalHours) * 100 : 0
-
-    return {
-      totalHours,
-      billableHours,
-      utilization,
-      averageHoursPerEntry: filteredEntries.length > 0 ? totalHours / filteredEntries.length : 0,
-    }
-  }, [filteredEntries])
-
-  const exportEntriesToCsv = useCallback(() => {
-    if (filteredEntries.length === 0) {
-      toast.error(t('zzpTimeTracking.noEntriesToExport'))
-      return
-    }
-
-    const headers = [
-      t('zzpTimeTracking.columnDate'),
-      t('zzpTimeTracking.columnDescription'),
-      t('zzpTimeTracking.columnProject'),
-      t('zzpTimeTracking.customer'),
-      t('zzpTimeTracking.columnHours'),
-      t('zzpTimeTracking.columnBillable'),
-      t('zzpTimeTracking.hourlyRate'),
-    ]
-
-    const rows = filteredEntries.map((entry) => [
-      entry.entry_date,
-      entry.description,
-      entry.project_name || '-',
-      entry.customer_id ? customerMap[entry.customer_id] || '-' : '-',
-      entry.hours.toString(),
-      entry.billable ? t('zzpTimeTracking.billable') : t('zzpTimeTracking.nonBillable'),
-      entry.hourly_rate_cents ? (entry.hourly_rate_cents / 100).toFixed(2) : '-',
-    ])
-
-    const csv = [
-      headers.map(escapeCsv).join(','),
-      ...rows.map((row) => row.map(escapeCsv).join(',')),
-    ].join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `uren-${formatDateISO(currentWeekStart)}.csv`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-
-    toast.success(t('zzpTimeTracking.exportSuccess'))
-  }, [filteredEntries, customerMap, currentWeekStart])
-
-  const duplicateEntry = useCallback((entry: ZZPTimeEntry) => {
-    setEditingEntry({
-      ...entry,
-      id: '',
-      entry_date: formatDateISO(new Date()),
-    })
-    setIsFormOpen(true)
-  }, [])
-
-  // Calculate total hours for selected customer and period
-  const invoiceHoursData = useMemo(() => {
-    if (!invoiceCustomerId) {
-      return { totalHours: 0, entries: [] }
-    }
-
-    const periodEntries = entries.filter(entry => 
-      entry.customer_id === invoiceCustomerId &&
-      !entry.is_invoiced &&
-      entry.billable &&
-      entry.entry_date >= invoicePeriodStart &&
-      entry.entry_date <= invoicePeriodEnd
-    )
-
-    const totalHours = periodEntries.reduce((sum, entry) => sum + entry.hours, 0)
-
-    return { totalHours, entries: periodEntries }
-  }, [entries, invoiceCustomerId, invoicePeriodStart, invoicePeriodEnd])
-
-  // Calculate total amount for invoice
-  const invoiceTotalAmount = useMemo(() => {
-    const rate = parseFloat(invoiceHourlyRate)
-    if (isNaN(rate) || rate <= 0) return 0
-    return invoiceHoursData.totalHours * rate
-  }, [invoiceHoursData.totalHours, invoiceHourlyRate])
-
-  // Handle invoice generation
-  const handleGenerateInvoice = useCallback(async () => {
-    if (!user?.id) return
-
-    if (!invoiceCustomerId) {
-      toast.error('Selecteer een klant')
-      return
-    }
-
-    const rate = parseFloat(invoiceHourlyRate)
-    if (isNaN(rate) || rate <= 0) {
-      toast.error('Voer een geldig uurtarief in')
-      return
-    }
-
-    if (invoiceHoursData.totalHours === 0) {
-      toast.error('Geen open uren gevonden voor deze klant en periode')
-      return
-    }
-
-    setIsGeneratingInvoice(true)
-
-    try {
-      const invoiceData: ZZPTimeEntryInvoiceCreate = {
-        customer_id: invoiceCustomerId,
-        period_start: invoicePeriodStart,
-        period_end: invoicePeriodEnd,
-        hourly_rate_cents: Math.round(rate * 100),
-      }
-
-      const invoice = await zzpApi.timeEntries.generateInvoice(invoiceData)
-      
-      toast.success('Factuur succesvol aangemaakt', {
-        description: `Factuur ${invoice.invoice_number} voor ${invoiceHoursData.totalHours.toFixed(1)}h`
-      })
-
-      // Reload entries to reflect is_invoiced changes
-      await Promise.all([loadEntries(), loadWeeklySummary()])
-
-      // Reset form
-      setInvoiceCustomerId('')
-      setInvoiceHourlyRate('')
-
-      // Navigate to invoice detail page
-      navigateTo(`/zzp/invoices/${invoice.id}`)
-    } catch (error) {
-      console.error('Failed to generate invoice:', error)
-      toast.error('Fout bij aanmaken factuur', {
-        description: parseApiError(error)
-      })
-    } finally {
-      setIsGeneratingInvoice(false)
-    }
-  }, [user?.id, invoiceCustomerId, invoicePeriodStart, invoicePeriodEnd, invoiceHourlyRate, invoiceHoursData, loadEntries, loadWeeklySummary])
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
-              <Clock size={28} className="text-primary sm:hidden" weight="duotone" />
-              <Clock size={40} className="text-primary hidden sm:block" weight="duotone" />
-              {t('zzpTimeTracking.title')}
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              {t('zzpTimeTracking.pageDescription')}
-            </p>
-          </div>
-          <div className="flex gap-2 w-full sm:w-auto">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsInvoiceDialogOpen(true)}
-                  className="gap-2 h-10 sm:h-11 flex-1 sm:flex-none"
-                >
-                  <FileText size={18} />
-                  <span className="hidden sm:inline">{t('zzpTimeTracking.createInvoice')}</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{t('zzpTimeTracking.createInvoiceTooltip')}</p>
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline"
-                  onClick={exportEntriesToCsv}
-                  className="gap-2 h-10 sm:h-11 flex-1 sm:flex-none"
-                >
-                  <Export size={18} />
-                  <span className="hidden sm:inline">{t('zzpTimeTracking.export')}</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{t('zzpTimeTracking.exportTooltip')}</p>
-              </TooltipContent>
-            </Tooltip>
-            <Button onClick={openNewForm} className="gap-2 h-10 sm:h-11 flex-1 sm:flex-none">
-              <Plus size={18} weight="bold" />
-              {t('zzpTimeTracking.newEntry')}
-            </Button>
-          </div>
-        </div>
-
-        {/* Invoice Generation Block */}
-        <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/5 border-green-500/30 mb-6">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Receipt size={20} className="text-green-600" weight="duotone" />
-              Facturatie deze week
-            </CardTitle>
-            <CardDescription>
-              Maak een factuur voor gewerkte uren
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Customer selector */}
-              <div className="space-y-2">
-                <Label htmlFor="invoice-customer" className="text-sm font-medium">
-                  Klant
-                </Label>
-                <Select value={invoiceCustomerId} onValueChange={setInvoiceCustomerId}>
-                  <SelectTrigger id="invoice-customer" className="h-10">
-                    <SelectValue placeholder="Selecteer klant" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={String(customer.id)}>
-                        {customer.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Period start */}
-              <div className="space-y-2">
-                <Label htmlFor="invoice-period-start" className="text-sm font-medium">
-                  Periode start
-                </Label>
-                <Input
-                  id="invoice-period-start"
-                  type="date"
-                  value={invoicePeriodStart}
-                  onChange={(e) => setInvoicePeriodStart(e.target.value)}
-                  className="h-10"
-                />
-              </div>
-
-              {/* Period end */}
-              <div className="space-y-2">
-                <Label htmlFor="invoice-period-end" className="text-sm font-medium">
-                  Periode eind
-                </Label>
-                <Input
-                  id="invoice-period-end"
-                  type="date"
-                  value={invoicePeriodEnd}
-                  onChange={(e) => setInvoicePeriodEnd(e.target.value)}
-                  className="h-10"
-                />
-              </div>
-
-              {/* Hourly rate */}
-              <div className="space-y-2">
-                <Label htmlFor="invoice-rate" className="text-sm font-medium">
-                  Uurtarief (€)
-                </Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
-                  <Input
-                    id="invoice-rate"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={invoiceHourlyRate}
-                    onChange={(e) => setInvoiceHourlyRate(e.target.value)}
-                    className="h-10 pl-8"
-                  />
-                </div>
-              </div>
-
-              {/* Summary display */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-muted-foreground">
-                  Totaal uren
-                </Label>
-                <div className="h-10 px-3 bg-secondary/50 rounded-md flex items-center">
-                  <span className="font-semibold text-primary">
-                    {invoiceHoursData.totalHours.toFixed(1)}h
-                  </span>
-                </div>
-              </div>
-
-              {/* Total amount */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-muted-foreground">
-                  Totaal bedrag (excl. BTW)
-                </Label>
-                <div className="h-10 px-3 bg-secondary/50 rounded-md flex items-center">
-                  <span className="font-semibold text-green-600">
-                    € {invoiceTotalAmount.toFixed(2)}
-                  </span>
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label>Project</Label>
+              <Input value={formState.project_name} onChange={(event) => setFormState((prev) => ({ ...prev, project_name: event.target.value }))} />
             </div>
-
-            {/* Generate button */}
-            <div className="mt-4 flex justify-end">
-              <Button
-                onClick={handleGenerateInvoice}
-                disabled={!invoiceCustomerId || !invoiceHourlyRate || invoiceHoursData.totalHours === 0 || isGeneratingInvoice}
-                className="gap-2"
-              >
-                {isGeneratingInvoice && <SpinnerGap size={18} className="animate-spin" />}
-                <FileText size={18} />
-                Maak factuur
+            <div className="space-y-2">
+              <Label>Uurtarief (€)</Label>
+              <Input type="number" min="0" step="0.01" value={formState.hourly_rate} onChange={(event) => setFormState((prev) => ({ ...prev, hourly_rate: event.target.value }))} />
+            </div>
+            <div className="flex justify-end">
+              <Button disabled={isSavingEntry} onClick={() => void saveEntry()}>
+                {isSavingEntry ? 'Opslaan...' : 'Opslaan'}
               </Button>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Clock-in/out Card (Dagstart) */}
-        <ClockInCard
-          activeSession={activeSession}
-          onClockIn={handleClockIn}
-          onClockOut={handleClockOut}
-          isLoading={isSessionLoading}
-        />
-
-        {/* Week Navigation */}
-        <Card className="bg-card/80 backdrop-blur-sm border border-border/50 mb-6">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goToPreviousWeek}
-                className="gap-1"
-              >
-                <CaretLeft size={18} />
-                <span className="hidden sm:inline">{t('zzpTimeTracking.previousWeek')}</span>
-              </Button>
-              
-              <div className="flex items-center gap-3">
-                <CalendarBlank size={20} className="text-primary" weight="duotone" />
-                <span className="font-semibold text-sm sm:text-base">{weekRangeDisplay}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToCurrentWeek}
-                  className="h-7 px-2 text-xs"
-                >
-                  {t('zzpTimeTracking.today')}
-                </Button>
-              </div>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goToNextWeek}
-                className="gap-1"
-              >
-                <span className="hidden sm:inline">{t('zzpTimeTracking.nextWeek')}</span>
-                <CaretRight size={18} />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Stats Cards */}
-        {isWeeklyLoading ? (
-          <StatsLoadingSkeleton />
-        ) : (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
-            <StatsCard 
-              title={t('zzpTimeTracking.totalHours')} 
-              value={weeklySummary?.total_hours.toFixed(1) || '0.0'} 
-              unit="h"
-              icon={Timer}
-              className="border-primary/20"
-            />
-            <StatsCard 
-              title={t('zzpTimeTracking.billableHours')} 
-              value={weeklySummary?.billable_hours.toFixed(1) || '0.0'} 
-              unit="h"
-              icon={Receipt}
-              className="border-green-500/20"
-            />
-            <StatsCard
-              title={t('zzpTimeTracking.utilization')}
-              value={productivityMetrics.utilization.toFixed(0)}
-              unit="%"
-              icon={TrendUp}
-              className="col-span-2 lg:col-span-1 border-blue-500/20"
-            />
           </div>
-        )}
-
-        {/* Weekly Summary Bar */}
-        {!isWeeklyLoading && weeklySummary && (
-          <WeeklySummaryBar 
-            entriesByDay={weeklySummary.entries_by_day} 
-            weekStart={currentWeekStart}
-          />
-        )}
-
-        {!showLoading && (
-          <Card className="bg-card/80 backdrop-blur-sm border border-border/50 mb-6">
-            <CardContent className="p-4">
-              {/* Invoiced filter tabs */}
-              <div className="flex gap-2 mb-4 pb-4 border-b border-border/50">
-                <Button
-                  variant={invoicedFilter === 'open' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setInvoicedFilter('open')}
-                  className="flex-1 sm:flex-none"
-                >
-                  Open uren
-                </Button>
-                <Button
-                  variant={invoicedFilter === 'invoiced' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setInvoicedFilter('invoiced')}
-                  className="flex-1 sm:flex-none"
-                >
-                  <Lock size={14} className="mr-1" />
-                  Gefactureerde uren
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="md:col-span-2 relative">
-                  <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder={t('zzpTimeTracking.searchPlaceholder')}
-                    className="pl-9"
-                  />
-                </div>
-                <Select value={billableFilter} onValueChange={(v: 'all' | 'billable' | 'non-billable') => setBillableFilter(v)}>
-                  <SelectTrigger className="gap-2">
-                    <div className="flex items-center gap-2">
-                      <Funnel size={14} />
-                      <SelectValue />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t('zzpTimeTracking.filterAll')}</SelectItem>
-                    <SelectItem value="billable">{t('zzpTimeTracking.filterBillable')}</SelectItem>
-                    <SelectItem value="non-billable">{t('zzpTimeTracking.filterNonBillable')}</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={sortOption} onValueChange={(v: 'date-desc' | 'date-asc' | 'hours-desc' | 'hours-asc') => setSortOption(v)}>
-                  <SelectTrigger className="gap-2">
-                    <div className="flex items-center gap-2">
-                      <ArrowsDownUp size={14} />
-                      <SelectValue />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="date-desc">{t('zzpTimeTracking.sortDateDesc')}</SelectItem>
-                    <SelectItem value="date-asc">{t('zzpTimeTracking.sortDateAsc')}</SelectItem>
-                    <SelectItem value="hours-desc">{t('zzpTimeTracking.sortHoursDesc')}</SelectItem>
-                    <SelectItem value="hours-asc">{t('zzpTimeTracking.sortHoursAsc')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Show loading, empty state or content */}
-        {showLoading ? (
-          <TableLoadingSkeleton />
-        ) : filteredEntries.length === 0 ? (
-          <EmptyState onAddEntry={openNewForm} />
-        ) : (
-          <Card className="bg-card/80 backdrop-blur-sm" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
-            <CardHeader className="pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <CardTitle className="text-lg">
-                    {invoicedFilter === 'open' ? 'Open uren' : 'Gefactureerde uren'}
-                  </CardTitle>
-                  <CardDescription>
-                    {filteredEntries.length} {filteredEntries.length === 1 ? t('zzpTimeTracking.entry') : t('zzpTimeTracking.entries')} {t('zzpTimeTracking.thisWeek')}
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Mobile: Card list */}
-              <div className="sm:hidden space-y-3">
-                {filteredEntries.map((entry) => (
-                  <EntryCard
-                    key={entry.id}
-                    entry={entry}
-                    customerName={entry.customer_id ? customerMap[entry.customer_id] : undefined}
-                    onEdit={() => openEditForm(entry)}
-                    onDuplicate={() => duplicateEntry(entry)}
-                    onDelete={() => setDeletingEntry(entry)}
-                  />
-                ))}
-              </div>
-
-              {/* Desktop: Table */}
-              <div className="hidden sm:block rounded-lg border border-border/50 overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-secondary/50 hover:bg-secondary/50">
-                      <TableHead className="font-semibold">{t('zzpTimeTracking.columnDate')}</TableHead>
-                      <TableHead className="font-semibold">{t('zzpTimeTracking.columnDescription')}</TableHead>
-                      <TableHead className="font-semibold hidden lg:table-cell">{t('zzpTimeTracking.columnProject')}</TableHead>
-                      <TableHead className="font-semibold text-right">{t('zzpTimeTracking.columnHours')}</TableHead>
-                      <TableHead className="font-semibold">{t('zzpTimeTracking.columnBillable')}</TableHead>
-                      <TableHead className="text-right font-semibold">{t('zzpTimeTracking.columnActions')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredEntries.map((entry) => (
-                      <TableRow key={entry.id} className="hover:bg-secondary/30">
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                              <CalendarBlank size={16} className="text-primary" weight="duotone" />
-                            </div>
-                            <span className="font-medium">{formatDateDisplay(entry.entry_date)}</span>
-                            {entry.is_invoiced && (
-                              <Lock size={16} className="text-amber-600" weight="fill" />
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="max-w-xs">
-                            <p className="font-medium truncate">{entry.description}</p>
-                            {entry.customer_id && customerMap[entry.customer_id] && (
-                              <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-                                <User size={12} />
-                                {customerMap[entry.customer_id]}
-                              </p>
-                            )}
-                            {entry.invoice_id && (
-                              <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-                                <Receipt size={12} />
-                                Gefactureerd
-                              </p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground hidden lg:table-cell">
-                          {entry.project_name || '-'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className="font-semibold text-primary">{entry.hours}h</span>
-                        </TableCell>
-                        <TableCell>
-                          <BillableBadge billable={entry.billable} />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditForm(entry)}
-                              className="h-8 w-8 p-0"
-                              disabled={entry.is_invoiced}
-                            >
-                              <PencilSimple size={16} />
-                              <span className="sr-only">{t('common.edit')}</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => duplicateEntry(entry)}
-                              className="h-8 w-8 p-0"
-                            >
-                              <Copy size={16} />
-                              <span className="sr-only">{t('zzpTimeTracking.duplicate')}</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeletingEntry(entry)}
-                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                              disabled={entry.is_invoiced}
-                            >
-                              <TrashSimple size={16} />
-                              <span className="sr-only">{t('common.delete')}</span>
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Time entry form dialog */}
-      <TimeEntryFormDialog
-        open={isFormOpen}
-        onOpenChange={(open) => {
-          setIsFormOpen(open)
-          if (!open) setEditingEntry(undefined)
-        }}
-        entry={editingEntry}
-        onSave={handleSaveEntry}
-        customers={customers}
-      />
-
-      {/* Delete confirmation dialog */}
-      <DeleteConfirmDialog
-        open={!!deletingEntry}
-        onOpenChange={(open) => {
-          if (!open) setDeletingEntry(undefined)
-        }}
-        onConfirm={handleDeleteEntry}
-        entryDescription={deletingEntry?.description || ''}
-      />
-
-      {/* Create invoice dialog */}
-      <CreateInvoiceDialog
-        open={isInvoiceDialogOpen}
-        onOpenChange={setIsInvoiceDialogOpen}
-        entries={entries}
-        customers={customers}
-        onSuccess={loadEntries}
-      />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -549,6 +549,7 @@ async def generate_invoice_from_time_entries(
             and_(
                 ZZPTimeEntry.administration_id == administration.id,
                 ZZPTimeEntry.customer_id == invoice_data.customer_id,
+                ZZPTimeEntry.billable == True,
                 ZZPTimeEntry.is_invoiced == False,
                 ZZPTimeEntry.entry_date >= period_start,
                 ZZPTimeEntry.entry_date <= period_end
@@ -562,7 +563,7 @@ async def generate_invoice_from_time_entries(
             status_code=400,
             detail={
                 "code": "NO_TIME_ENTRIES",
-                "message": "Geen uren gevonden voor deze periode en klant."
+                "message": "Geen factureerbare uren gevonden voor deze periode en klant."
             }
         )
     

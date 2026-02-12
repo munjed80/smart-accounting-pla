@@ -41,6 +41,7 @@ export const IntelligentUploadPortal = () => {
   const [reprocessingIds, setReprocessingIds] = useState<Set<string>>(new Set())
   const fileInputRef = useRef<HTMLInputElement>(null)
   const isMountedRef = useRef(true)
+  const isDev = import.meta.env.DEV
 
   const fetchDocuments = async () => {
     if (!isMountedRef.current) return
@@ -410,7 +411,8 @@ export const IntelligentUploadPortal = () => {
             {t('upload.uploadDocuments')}
           </CardTitle>
           <CardDescription>
-            {t('upload.uploadDescription')} <code className="bg-secondary px-2 py-0.5 rounded text-xs">POST /api/v1/documents/upload</code>
+            {t('upload.uploadDescription')}
+            {isDev && <> <code className="bg-secondary px-2 py-0.5 rounded text-xs">POST /api/v1/documents/upload</code></>}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -595,13 +597,16 @@ export const IntelligentUploadPortal = () => {
         </CardContent>
       </Card>
 
-      <Alert>
-        <Sparkle size={16} weight="duotone" />
-        <AlertDescription>
-          <strong>{t('upload.backendIntegration')}</strong> {t('upload.filesUploadedTo')} <code className="bg-secondary px-2 py-0.5 rounded text-xs">{getApiBaseUrl()}/documents/upload</code>. 
-          {t('upload.sparkWorkerInfo')}
-        </AlertDescription>
-      </Alert>
+      {/* Developer-only: Backend integration info */}
+      {isDev && (
+        <Alert>
+          <Sparkle size={16} weight="duotone" />
+          <AlertDescription>
+            <strong>{t('upload.backendIntegration')}</strong> {t('upload.filesUploadedTo')} <code className="bg-secondary px-2 py-0.5 rounded text-xs">{getApiBaseUrl()}/documents/upload</code>. 
+            {t('upload.sparkWorkerInfo')}
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   )
 }

@@ -68,8 +68,14 @@ export const IntelligentUploadPortal = () => {
     isMountedRef.current = true
     fetchDocuments()
     
+    // Poll for document status updates every 5 seconds
+    const pollInterval = setInterval(() => {
+      fetchDocuments()
+    }, 5000)
+    
     return () => {
       isMountedRef.current = false
+      clearInterval(pollInterval)
     }
   }, [])
 
@@ -203,6 +209,9 @@ export const IntelligentUploadPortal = () => {
             toast.success(t('upload.uploadSuccess'), {
               description: `${fileItem.file.name} - Document ID: ${response.document_id.substring(0, 8)}...`
             })
+            
+            // Refresh document list to show newly uploaded document
+            await fetchDocuments()
           }
 
         } catch (error) {

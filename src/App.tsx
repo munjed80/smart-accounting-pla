@@ -41,10 +41,34 @@ import { administrationApi, accountantClientApi } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { cleanupOverlayPortals } from '@/hooks/useCloseOverlayOnRouteChange'
 import { Database } from '@phosphor-icons/react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 
 // Delay for Radix UI to complete cleanup before our global cleanup runs
 // Increased to 200ms to handle slower devices and ensure animations complete
 const GLOBAL_CLEANUP_DELAY_MS = 200
+
+const BOOT_TIMEOUT_MS = 15000
+
+type BootStage = 'auth' | 'onboarding-check' | 'ready' | 'error'
+
+interface BootErrorState {
+  message: string
+  detail?: string
+}
+
+const BootDiagnosticsBanner = ({ stage, isLoading, isCheckingOnboarding }: { stage: BootStage; isLoading: boolean; isCheckingOnboarding: boolean }) => {
+  if (!import.meta.env.DEV) return null
+
+  return (
+    <div className="fixed bottom-2 left-2 z-[120] rounded-md border bg-background/95 px-3 py-2 text-xs shadow-lg">
+      <p className="font-semibold">Boot diagnostics</p>
+      <p>stage: {stage}</p>
+      <p>authLoading: {String(isLoading)}</p>
+      <p>onboardingLoading: {String(isCheckingOnboarding)}</p>
+    </div>
+  )
+}
 
 // URL-based routing with path support
 type Route = 
@@ -232,7 +256,7 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
 }
 
 const AppContent = () => {
-  const { user, isAuthenticated, isLoading } = useAuth()
+  const { user, isAuthenticated, isLoading, checkSession } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
   const isAccountantOnly = user?.role === 'accountant'
   const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'expenses' | 'time' | 'agenda'>('dashboard')
@@ -242,6 +266,8 @@ const AppContent = () => {
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null)
   const [needsAccountantOnboarding, setNeedsAccountantOnboarding] = useState<boolean | null>(null)
   const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(false)
+  const [bootStage, setBootStage] = useState<BootStage>('auth')
+  const [bootError, setBootError] = useState<BootErrorState | null>(null)
   
   // Track if we've set the initial tab based on role (to avoid resetting on every render)
   const [hasSetInitialTab, setHasSetInitialTab] = useState(false)
@@ -319,6 +345,15 @@ const AppContent = () => {
     const path = tabToPath(tab, isAccountant)
     navigateTo(path)
   }
+
+  const retryBootstrap = () => {
+    setBootError(null)
+    setNeedsOnboarding(null)
+    setNeedsAccountantOnboarding(null)
+    setIsCheckingOnboarding(false)
+    setBootStage('auth')
+    void checkSession()
+  }
   
   // Check if user needs onboarding (first login)
   // ZZP users: check for no administrations
@@ -337,6 +372,7 @@ const AppContent = () => {
       }
       
       setIsCheckingOnboarding(true)
+      setBootStage('onboarding-check')
       try {
         const userIsAccountant = user.role === 'accountant' || user.role === 'admin'
         
@@ -351,6 +387,7 @@ const AppContent = () => {
           if (needsSetup) {
             navigateTo('/accountant/onboarding')
           }
+          setBootStage('ready')
         } else {
           // For ZZP users, check if they have any administrations
           const administrations = await administrationApi.list()
@@ -362,12 +399,15 @@ const AppContent = () => {
           if (needsSetup) {
             navigateTo('/onboarding')
           }
+          setBootStage('ready')
         }
       } catch (error) {
         console.error('Failed to check onboarding status:', error)
         // Don't block user if check fails, let them proceed
         setNeedsOnboarding(false)
         setNeedsAccountantOnboarding(false)
+        setBootError({ message: 'Bootstrap controle mislukt', detail: error instanceof Error ? error.message : 'Onbekende fout' })
+        setBootStage('error')
       } finally {
         setIsCheckingOnboarding(false)
       }
@@ -375,6 +415,34 @@ const AppContent = () => {
     
     checkOnboarding()
   }, [isAuthenticated, user, needsOnboarding, needsAccountantOnboarding])
+
+
+  useEffect(() => {
+    if (isLoading) {
+      setBootStage('auth')
+      return
+    }
+
+    if (bootStage !== 'error') {
+      setBootStage(isCheckingOnboarding ? 'onboarding-check' : 'ready')
+    }
+  }, [isLoading, isCheckingOnboarding, bootStage])
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    const timer = window.setTimeout(() => {
+      if (isLoading || isCheckingOnboarding || needsOnboarding === null || needsAccountantOnboarding === null) {
+        setBootError({
+          message: 'De app startte niet op tijd',
+          detail: 'Initialisatie duurde te lang. Controleer netwerk/API-configuratie en probeer opnieuw.',
+        })
+        setBootStage('error')
+      }
+    }, BOOT_TIMEOUT_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [isAuthenticated, isLoading, isCheckingOnboarding, needsOnboarding, needsAccountantOnboarding])
 
   // Handle special auth routes first (before checking authentication)
   if (route.type === 'verify-email') {
@@ -403,6 +471,26 @@ const AppContent = () => {
     )
   }
 
+
+  if (bootError && isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center p-4">
+        <div className="max-w-lg w-full rounded-lg border bg-card p-6 space-y-4">
+          <h2 className="text-lg font-semibold">{bootError.message}</h2>
+          {bootError.detail && <p className="text-sm text-muted-foreground">{bootError.detail}</p>}
+          <div className="flex gap-2">
+            <Button onClick={retryBootstrap}>Opnieuw proberen</Button>
+            <Button variant="outline" onClick={() => navigateTo('/settings')}>Naar Instellingen</Button>
+          </div>
+          <Alert>
+            <AlertDescription>De UI blijft niet meer hangen op een permanente spinner. Gebruik de retry-knop om bootstrap opnieuw te starten.</AlertDescription>
+          </Alert>
+        </div>
+        <BootDiagnosticsBanner stage={bootStage} isLoading={isLoading} isCheckingOnboarding={isCheckingOnboarding} />
+      </div>
+    )
+  }
+
   if (isLoading || isCheckingOnboarding) {
     // Only show loading screen if user is authenticated (loading app content)
     // Don't show loading for login/auth operations as it unmounts the LoginPage and loses error state
@@ -413,6 +501,7 @@ const AppContent = () => {
             <Database size={64} className="mx-auto mb-4 text-primary animate-pulse" weight="duotone" />
             <p className="text-muted-foreground">Laden...</p>
           </div>
+          <BootDiagnosticsBanner stage={bootStage} isLoading={isLoading} isCheckingOnboarding={isCheckingOnboarding} />
         </div>
       )
     }
@@ -427,6 +516,7 @@ const AppContent = () => {
           <Database size={64} className="mx-auto mb-4 text-primary animate-pulse" weight="duotone" />
           <p className="text-muted-foreground">Laden...</p>
         </div>
+        <BootDiagnosticsBanner stage={bootStage} isLoading={isLoading} isCheckingOnboarding={isCheckingOnboarding} />
       </div>
     )
   }
@@ -607,14 +697,17 @@ const AppContent = () => {
   }
 
   return (
-    <AppShell 
-      activeTab={activeTab} 
-      onTabChange={handleTabChange}
-    >
-      <DashboardErrorBoundary pageName={getPageName()}>
-        {renderTabContent()}
-      </DashboardErrorBoundary>
-    </AppShell>
+    <>
+      <AppShell 
+        activeTab={activeTab} 
+        onTabChange={handleTabChange}
+      >
+        <DashboardErrorBoundary pageName={getPageName()}>
+          {renderTabContent()}
+        </DashboardErrorBoundary>
+      </AppShell>
+      <BootDiagnosticsBanner stage={bootStage} isLoading={isLoading} isCheckingOnboarding={isCheckingOnboarding} />
+    </>
   )
 }
 
@@ -630,13 +723,15 @@ const queryClient = new QueryClient({
 })
 
 function App() {
+  const isPwaEnabled = import.meta.env.PROD && import.meta.env.VITE_ENABLE_PWA === 'true'
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ActiveClientProvider>
           <AppContent />
-          <PWAInstallPrompt />
-          <PWAUpdatePrompt />
+          {isPwaEnabled ? <PWAInstallPrompt /> : null}
+          {isPwaEnabled ? <PWAUpdatePrompt /> : null}
         </ActiveClientProvider>
       </AuthProvider>
     </QueryClientProvider>

@@ -4,6 +4,7 @@ ZZP Schemas
 Pydantic schemas for ZZP-specific API operations including validation.
 """
 import re
+from decimal import Decimal
 from datetime import datetime
 from enum import Enum
 from typing import Optional, List

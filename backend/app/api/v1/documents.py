@@ -69,6 +69,16 @@ async def upload_document(
     administration_id: Annotated[UUID | None, Form()] = None,
 ):
     """Upload a document and enqueue for processing"""
+    print(f"\n{'='*80}")
+    print(f"📤 UPLOAD REQUEST RECEIVED")
+    print(f"{'='*80}")
+    print(f"User ID: {current_user.id}")
+    print(f"User Email: {current_user.email}")
+    print(f"Filename: {file.filename}")
+    print(f"Content-Type: {file.content_type}")
+    print(f"Administration ID (from request): {administration_id}")
+    print(f"{'='*80}\n")
+    
     # Validate file type
     if file.content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
@@ -78,6 +88,10 @@ async def upload_document(
     
     # Read file content
     content = await file.read()
+    file_size_mb = len(content) / (1024 * 1024)
+    max_size_mb = settings.MAX_UPLOAD_SIZE / (1024 * 1024)
+    print(f"📊 File size: {file_size_mb:.2f}MB (max: {max_size_mb:.0f}MB)")
+    
     if len(content) > settings.MAX_UPLOAD_SIZE:
         raise HTTPException(
             status_code=400,
@@ -123,6 +137,8 @@ async def upload_document(
     ext = original_filename.rsplit(".", 1)[-1] if "." in original_filename else "bin"
     
     # Create document record
+    print(f"📝 Creating document record...")
+    print(f"   Administration: {administration.id} ({administration.name})")
     document = Document(
         administration_id=administration.id,
         original_filename=original_filename,
@@ -133,20 +149,24 @@ async def upload_document(
     )
     db.add(document)
     await db.flush()
+    print(f"✅ Document record created with ID: {document.id}")
     
     # Create storage path
     storage_dir = Path(settings.UPLOAD_DIR) / str(administration.id) / str(document.id)
     storage_dir.mkdir(parents=True, exist_ok=True)
     storage_path = storage_dir / f"original.{ext}"
     
+    print(f"💾 Saving file to: {storage_path}")
     # Save file
     async with aiofiles.open(storage_path, "wb") as f:
         await f.write(content)
+    print(f"✅ File saved successfully")
     
     # Update storage path
     document.storage_path = str(storage_path)
     await db.commit()
     await db.refresh(document)
+    print(f"✅ Document record updated in database")
     
     # Enqueue job to Redis Streams
     job_data = {
@@ -157,7 +177,18 @@ async def upload_document(
         "original_filename": original_filename,
     }
     
-    await enqueue_document_job(redis_client, job_data)
+    print(f"📬 Attempting to enqueue job to Redis...")
+    enqueue_result = await enqueue_document_job(redis_client, job_data)
+    if enqueue_result:
+        print(f"✅ Job enqueued to Redis successfully")
+    else:
+        print(f"⚠️  Job not enqueued (Redis disabled or error)")
+    
+    print(f"\n{'='*80}")
+    print(f"✅ UPLOAD COMPLETED SUCCESSFULLY")
+    print(f"Document ID: {document.id}")
+    print(f"Status: {document.status}")
+    print(f"{'='*80}\n")
     
     return DocumentUploadResponse(
         message="Document uploaded successfully",

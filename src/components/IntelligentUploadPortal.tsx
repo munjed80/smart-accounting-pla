@@ -68,8 +68,14 @@ export const IntelligentUploadPortal = () => {
     isMountedRef.current = true
     fetchDocuments()
     
+    // Poll for document status updates every 5 seconds
+    const pollInterval = setInterval(() => {
+      fetchDocuments()
+    }, 5000)
+    
     return () => {
       isMountedRef.current = false
+      clearInterval(pollInterval)
     }
   }, [])
 
@@ -95,6 +101,10 @@ export const IntelligentUploadPortal = () => {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || [])
+    console.log('📁 Files selected:', selectedFiles.length)
+    selectedFiles.forEach((file, idx) => {
+      console.log(`  ${idx + 1}. ${file.name} (${(file.size / 1024).toFixed(2)} KB, ${file.type})`)
+    })
     addFiles(selectedFiles)
   }
 
@@ -131,6 +141,14 @@ export const IntelligentUploadPortal = () => {
   const uploadFile = async (fileItem: UploadedFile) => {
     if (!isMountedRef.current) return
     
+    console.log('='.repeat(80))
+    console.log('🚀 STARTING UPLOAD')
+    console.log('='.repeat(80))
+    console.log('File:', fileItem.file.name)
+    console.log('Size:', (fileItem.file.size / 1024).toFixed(2), 'KB')
+    console.log('Type:', fileItem.file.type)
+    console.log('='  .repeat(80))
+    
     setFiles((prev) =>
       prev.map((f) =>
         f.id === fileItem.id ? { ...f, status: 'uploading', progress: 10 } : f
@@ -162,7 +180,16 @@ export const IntelligentUploadPortal = () => {
             )
           }
 
+          console.log('📤 Calling documentApi.upload()...')
+          console.log('   Endpoint: /api/v1/documents/upload')
+          console.log('   Method: POST')
+          console.log('   Content-Type: multipart/form-data')
+          
           const response = await documentApi.upload(fileItem.file)
+          
+          console.log('✅ Upload response received:', response)
+          console.log('   Document ID:', response.document_id)
+          console.log('   Message:', response.message)
           
           if (isMountedRef.current) {
             setFiles((prev) =>
@@ -182,11 +209,16 @@ export const IntelligentUploadPortal = () => {
             toast.success(t('upload.uploadSuccess'), {
               description: `${fileItem.file.name} - Document ID: ${response.document_id.substring(0, 8)}...`
             })
+            
+            // Refresh document list to show newly uploaded document
+            await fetchDocuments()
           }
 
         } catch (error) {
           const errorMessage = getErrorMessage(error)
-          console.error('Upload failed:', error)
+          console.error('❌ Upload failed:', error)
+          console.error('   Error message:', errorMessage)
+          console.error('   Error details:', error)
           if (isMountedRef.current) {
             setFiles((prev) =>
               prev.map((f) =>

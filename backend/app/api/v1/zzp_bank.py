@@ -44,6 +44,8 @@ from app.schemas.zzp import (
     ZZPBankTransactionMatchListResponse,
 )
 from app.api.v1.deps import CurrentUser, require_zzp
+from app.repositories.ledger_repository import LedgerRepository
+from app.services.ledger_service import LedgerPostingService, LedgerPostingError
 
 router = APIRouter()
 
@@ -796,6 +798,16 @@ async def match_transaction_to_invoice(
         invoice.status = InvoiceStatus.PAID.value
     
     await db.commit()
+
+    try:
+        ledger_service = LedgerPostingService(LedgerRepository(db, administration.id))
+        await ledger_service.post_bank_transaction(transaction.id)
+        if invoice.status == InvoiceStatus.PAID.value:
+            await ledger_service.post_invoice_payment(invoice.id)
+        await db.commit()
+    except LedgerPostingError:
+        pass
+
     await db.refresh(invoice)
     
     # Build message

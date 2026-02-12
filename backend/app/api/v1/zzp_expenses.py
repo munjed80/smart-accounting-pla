@@ -22,6 +22,8 @@ from app.schemas.zzp import (
     ExpenseListResponse,
 )
 from app.api.v1.deps import CurrentUser, require_zzp
+from app.repositories.ledger_repository import LedgerRepository
+from app.services.ledger_service import LedgerPostingService, LedgerPostingError
 
 router = APIRouter()
 
@@ -169,6 +171,14 @@ async def create_expense(
     
     db.add(expense)
     await db.commit()
+
+    try:
+        ledger_service = LedgerPostingService(LedgerRepository(db, administration.id))
+        await ledger_service.post_expense(expense.id)
+        await db.commit()
+    except LedgerPostingError:
+        pass
+
     await db.refresh(expense)
     
     return expense_to_response(expense)

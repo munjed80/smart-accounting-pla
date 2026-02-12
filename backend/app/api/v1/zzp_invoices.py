@@ -40,6 +40,8 @@ from app.schemas.zzp import (
     InvoiceLineResponse,
 )
 from app.api.v1.deps import CurrentUser, require_zzp
+from app.repositories.ledger_repository import LedgerRepository
+from app.services.ledger_service import LedgerPostingService, LedgerPostingError
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -325,6 +327,13 @@ async def create_invoice(
     invoice.total_cents = subtotal + vat_total
     
     await db.commit()
+
+    try:
+        ledger_service = LedgerPostingService(LedgerRepository(db, administration.id))
+        await ledger_service.post_invoice(invoice.id)
+        await db.commit()
+    except LedgerPostingError as e:
+        logger.warning(f"Invoice ledger posting skipped for {invoice.id}: {e}")
     
     # Reload with lines
     result = await db.execute(
@@ -560,6 +569,15 @@ async def update_invoice_status(
         invoice.paid_at = None
     
     await db.commit()
+
+    if new_status == InvoiceStatus.PAID.value:
+        try:
+            ledger_service = LedgerPostingService(LedgerRepository(db, administration.id))
+            await ledger_service.post_invoice_payment(invoice.id)
+            await db.commit()
+        except LedgerPostingError as e:
+            logger.warning(f"Invoice payment posting skipped for {invoice.id}: {e}")
+
     await db.refresh(invoice)
     
     return invoice_to_response(invoice)

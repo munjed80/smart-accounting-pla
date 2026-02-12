@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.core.database import engine
-from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta, zzp_customers, zzp_profile, zzp_invoices, zzp_expenses, zzp_time, zzp_calendar, zzp_work_sessions, zzp_bank, zzp_insights, zzp_quotes, zzp_dashboard, bookkeeping, client_data, zzp_payments
+from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta, zzp_customers, zzp_profile, zzp_invoices, zzp_expenses, zzp_time, zzp_calendar, zzp_work_sessions, zzp_bank, zzp_insights, zzp_quotes, zzp_dashboard, bookkeeping, client_data, zzp_payments, zzp_ledger
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +232,7 @@ api_v1_router.include_router(zzp_insights.router, prefix="/zzp", tags=["zzp-ai-i
 api_v1_router.include_router(zzp_quotes.router, prefix="/zzp", tags=["zzp-quotes"])
 api_v1_router.include_router(zzp_dashboard.router, prefix="/zzp", tags=["zzp-dashboard"])
 api_v1_router.include_router(zzp_payments.router, prefix="/zzp", tags=["zzp-payments"])
+api_v1_router.include_router(zzp_ledger.router, prefix="/zzp", tags=["zzp-ledger"])
 api_v1_router.include_router(observability.router, prefix="/ops", tags=["observability"])
 api_v1_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_v1_router.include_router(meta.router, tags=["metadata"])

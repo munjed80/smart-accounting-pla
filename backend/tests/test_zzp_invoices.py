@@ -376,18 +376,17 @@ class TestInvoiceSendEmail:
 @pytest_asyncio.fixture
 async def test_invoice_draft(test_user, test_administration, test_customer, db_session):
     """Create a draft invoice for testing."""
-    invoice = ZZPInvoice(
-        administration_id=test_administration.id,
-        customer_id=test_customer.id,
-        invoice_number="INV-2026-0001",
-        status=InvoiceStatus.DRAFT.value,
-        issue_date=date.today(),
-        seller_company_name="Test Company",
-        customer_name="Test Customer",
-        subtotal_cents=10000,
-        vat_total_cents=2100,
-        total_cents=12100,
-    )
+    invoice = ZZPInvoice()
+    invoice.administration_id = test_administration.id
+    invoice.customer_id = test_customer.id
+    invoice.invoice_number = "INV-2026-0001"
+    invoice.status = InvoiceStatus.DRAFT.value
+    invoice.issue_date = date.today()
+    invoice.seller_company_name = "Test Company"
+    invoice.customer_name = "Test Customer"
+    invoice.subtotal_cents = 10000
+    invoice.vat_total_cents = 2100
+    invoice.total_cents = 12100
     db_session.add(invoice)
     await db_session.commit()
     await db_session.refresh(invoice)
@@ -397,18 +396,17 @@ async def test_invoice_draft(test_user, test_administration, test_customer, db_s
 @pytest_asyncio.fixture
 async def test_invoice_sent(test_user, test_administration, test_customer, db_session):
     """Create a sent invoice for testing."""
-    invoice = ZZPInvoice(
-        administration_id=test_administration.id,
-        customer_id=test_customer.id,
-        invoice_number="INV-2026-0002",
-        status=InvoiceStatus.SENT.value,
-        issue_date=date.today(),
-        seller_company_name="Test Company",
-        customer_name="Test Customer",
-        subtotal_cents=10000,
-        vat_total_cents=2100,
-        total_cents=12100,
-    )
+    invoice = ZZPInvoice()
+    invoice.administration_id = test_administration.id
+    invoice.customer_id = test_customer.id
+    invoice.invoice_number = "INV-2026-0002"
+    invoice.status = InvoiceStatus.SENT.value
+    invoice.issue_date = date.today()
+    invoice.seller_company_name = "Test Company"
+    invoice.customer_name = "Test Customer"
+    invoice.subtotal_cents = 10000
+    invoice.vat_total_cents = 2100
+    invoice.total_cents = 12100
     db_session.add(invoice)
     await db_session.commit()
     await db_session.refresh(invoice)
@@ -418,18 +416,17 @@ async def test_invoice_sent(test_user, test_administration, test_customer, db_se
 @pytest_asyncio.fixture
 async def test_invoice_paid(test_user, test_administration, test_customer, db_session):
     """Create a paid invoice for testing."""
-    invoice = ZZPInvoice(
-        administration_id=test_administration.id,
-        customer_id=test_customer.id,
-        invoice_number="INV-2026-0003",
-        status=InvoiceStatus.PAID.value,
-        issue_date=date.today(),
-        seller_company_name="Test Company",
-        customer_name="Test Customer",
-        subtotal_cents=10000,
-        vat_total_cents=2100,
-        total_cents=12100,
-    )
+    invoice = ZZPInvoice()
+    invoice.administration_id = test_administration.id
+    invoice.customer_id = test_customer.id
+    invoice.invoice_number = "INV-2026-0003"
+    invoice.status = InvoiceStatus.PAID.value
+    invoice.issue_date = date.today()
+    invoice.seller_company_name = "Test Company"
+    invoice.customer_name = "Test Customer"
+    invoice.subtotal_cents = 10000
+    invoice.vat_total_cents = 2100
+    invoice.total_cents = 12100
     db_session.add(invoice)
     await db_session.commit()
     await db_session.refresh(invoice)
@@ -439,18 +436,17 @@ async def test_invoice_paid(test_user, test_administration, test_customer, db_se
 @pytest_asyncio.fixture
 async def test_invoice_cancelled(test_user, test_administration, test_customer, db_session):
     """Create a cancelled invoice for testing."""
-    invoice = ZZPInvoice(
-        administration_id=test_administration.id,
-        customer_id=test_customer.id,
-        invoice_number="INV-2026-0004",
-        status=InvoiceStatus.CANCELLED.value,
-        issue_date=date.today(),
-        seller_company_name="Test Company",
-        customer_name="Test Customer",
-        subtotal_cents=10000,
-        vat_total_cents=2100,
-        total_cents=12100,
-    )
+    invoice = ZZPInvoice()
+    invoice.administration_id = test_administration.id
+    invoice.customer_id = test_customer.id
+    invoice.invoice_number = "INV-2026-0004"
+    invoice.status = InvoiceStatus.CANCELLED.value
+    invoice.issue_date = date.today()
+    invoice.seller_company_name = "Test Company"
+    invoice.customer_name = "Test Customer"
+    invoice.subtotal_cents = 10000
+    invoice.vat_total_cents = 2100
+    invoice.total_cents = 12100
     db_session.add(invoice)
     await db_session.commit()
     await db_session.refresh(invoice)
@@ -460,12 +456,11 @@ async def test_invoice_cancelled(test_user, test_administration, test_customer, 
 @pytest_asyncio.fixture
 async def test_customer(test_administration, db_session):
     """Create a test customer for invoice tests."""
-    customer = ZZPCustomer(
-        administration_id=test_administration.id,
-        name="Test Customer B.V.",
-        email="customer@test.nl",
-        status="active",
-    )
+    customer = ZZPCustomer()
+    customer.administration_id = test_administration.id
+    customer.name = "Test Customer B.V."
+    customer.email = "customer@test.nl"
+    customer.status = "active"
     db_session.add(customer)
     await db_session.commit()
     await db_session.refresh(customer)

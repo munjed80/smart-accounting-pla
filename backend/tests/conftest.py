@@ -68,14 +68,13 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 @pytest_asyncio.fixture(scope="function")
 async def test_user(db_session: AsyncSession) -> User:
     """Create a test ZZP user."""
-    user = User(
-        email="test-zzp@example.com",
-        hashed_password=get_password_hash("TestPassword123"),
-        full_name="Test ZZP User",
-        role=UserRole.ZZP.value,
-        is_active=True,
-        email_verified_at=datetime.now(timezone.utc),
-    )
+    user = User()
+    user.email = "test-zzp@example.com"
+    user.hashed_password = get_password_hash("TestPassword123")
+    user.full_name = "Test ZZP User"
+    user.role = UserRole.ZZP.value
+    user.is_active = True
+    user.email_verified_at = datetime.now(timezone.utc)
     db_session.add(user)
     await db_session.commit()
     await db_session.refresh(user)
@@ -85,19 +84,17 @@ async def test_user(db_session: AsyncSession) -> User:
 @pytest_asyncio.fixture(scope="function")
 async def test_administration(db_session: AsyncSession, test_user: User) -> Administration:
     """Create a test administration for the ZZP user."""
-    administration = Administration(
-        name="Test ZZP Administration",
-        is_active=True,
-    )
+    administration = Administration()
+    administration.name = "Test ZZP Administration"
+    administration.is_active = True
     db_session.add(administration)
     await db_session.flush()  # Flush to get the auto-generated id
     
     # Create membership
-    membership = AdministrationMember(
-        user_id=test_user.id,
-        administration_id=administration.id,
-        role=MemberRole.OWNER,
-    )
+    membership = AdministrationMember()
+    membership.user_id = test_user.id
+    membership.administration_id = administration.id
+    membership.role = MemberRole.OWNER
     db_session.add(membership)
     
     await db_session.commit()
@@ -139,12 +136,11 @@ async def async_client(
 @pytest_asyncio.fixture(scope="function")
 async def test_customer(db_session: AsyncSession, test_administration: Administration) -> ZZPCustomer:
     """Create a test customer for the administration."""
-    customer = ZZPCustomer(
-        administration_id=test_administration.id,
-        name="Test Customer B.V.",
-        email="customer@test.com",
-        status="active",
-    )
+    customer = ZZPCustomer()
+    customer.administration_id = test_administration.id
+    customer.name = "Test Customer B.V."
+    customer.email = "customer@test.com"
+    customer.status = "active"
     db_session.add(customer)
     await db_session.commit()
     await db_session.refresh(customer)

@@ -1586,7 +1586,8 @@ export const ZZPInvoicesPage = () => {
         }, 100)
         
         // Clean up blob URL after a delay
-        const revokeDelay = isMobile() 
+        // iOS needs longer delay due to slower blob loading, Android works fine with standard delay
+        const revokeDelay = isIOS() 
           ? PDF_URL_REVOCATION_DELAY_MS * IOS_REVOCATION_DELAY_MULTIPLIER 
           : PDF_URL_REVOCATION_DELAY_MS
         setTimeout(() => {
@@ -1649,20 +1650,26 @@ export const ZZPInvoicesPage = () => {
       console.log('[PDF Share] Blob received, size:', pdfBlob.size, 'bytes')
       
       // Check if Web Share API supports file sharing
-      const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' })
-      const shareData = {
-        title: t('zzpInvoices.shareTitle').replace('{number}', invoiceNumber),
-        text: t('zzpInvoices.shareText').replace('{number}', invoiceNumber),
-        files: [pdfFile],
+      // Only create File object if we can actually use it
+      if (navigator.share && navigator.canShare) {
+        const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' })
+        const shareData = {
+          title: t('zzpInvoices.shareTitle').replace('{number}', invoiceNumber),
+          text: t('zzpInvoices.shareText').replace('{number}', invoiceNumber),
+          files: [pdfFile],
+        }
+        
+        if (navigator.canShare(shareData)) {
+          // Share the actual PDF file
+          console.log('[PDF Share] Sharing PDF file via Web Share API...')
+          await navigator.share(shareData)
+          console.log('[PDF Share] File shared successfully')
+          toast.success(t('zzpInvoices.shareSuccess'))
+          return
+        }
       }
       
-      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
-        // Share the actual PDF file
-        console.log('[PDF Share] Sharing PDF file via Web Share API...')
-        await navigator.share(shareData)
-        console.log('[PDF Share] File shared successfully')
-        toast.success(t('zzpInvoices.shareSuccess'))
-      } else if (navigator.share) {
+      if (navigator.share) {
         // Fallback: Share PDF URL instead of file (for browsers that don't support file sharing)
         console.log('[PDF Share] File sharing not supported, sharing URL instead...')
         const pdfUrl = zzpApi.invoices.getPdfUrl(invoice.id)

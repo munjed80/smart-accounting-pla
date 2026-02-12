@@ -22,6 +22,8 @@ from app.core.roles import UserRole
 from app.models.administration import Administration, AdministrationMember, MemberRole
 from app.models.zzp import ZZPCustomer
 from app.core.security import create_access_token, get_password_hash
+# Import all models to ensure they're registered with Base.metadata
+import app.models  # noqa
 
 
 # Note: Tests require PostgreSQL for UUID column types.

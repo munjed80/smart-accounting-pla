@@ -265,10 +265,13 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         elements.append(Spacer(1, 0.5*cm))
         
         # Totals section (aligned to the right)
+        # NOTE: Bold styling for the total row is applied via TableStyle below,
+        # NOT with inline HTML tags like "<b>Totaal</b>". Using plain strings here
+        # prevents the HTML tags from appearing as literal text in the PDF.
         totals_data = [
             ["Subtotaal", format_amount(invoice.subtotal_cents)],
             ["BTW", format_amount(invoice.vat_total_cents)],
-            ["<b>Totaal</b>", f"<b>{format_amount(invoice.total_cents)}</b>"],
+            ["Totaal", format_amount(invoice.total_cents)],
         ]
         
         totals_table = Table(totals_data, colWidths=[4*cm, 4*cm])
@@ -294,12 +297,18 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         elements.append(wrapper_table)
         elements.append(Spacer(1, 1*cm))
         
-        # Payment information
+        # Payment information with company details
         payment_info_parts = []
         if invoice.seller_iban:
             payment_info_parts.append(f"<b>IBAN:</b> {invoice.seller_iban}")
         payment_info_parts.append(f"<b>T.n.v.:</b> {invoice.seller_company_name or '-'}")
         payment_info_parts.append(f"<b>Kenmerk:</b> {invoice.invoice_number}")
+        
+        # Add company registration details
+        if invoice.seller_kvk_number:
+            payment_info_parts.append(f"<b>KvK:</b> {invoice.seller_kvk_number}")
+        if invoice.seller_btw_number:
+            payment_info_parts.append(f"<b>BTW:</b> {invoice.seller_btw_number}")
         
         payment_text = "<br/>".join(payment_info_parts)
         
@@ -330,21 +339,7 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
             ]))
             elements.append(notes_table)
         
-        # Business IDs footer
-        elements.append(Spacer(1, 0.5*cm))
-        business_ids = []
-        if invoice.seller_kvk_number:
-            business_ids.append(f"KVK: {invoice.seller_kvk_number}")
-        if invoice.seller_btw_number:
-            business_ids.append(f"BTW: {invoice.seller_btw_number}")
-        
-        if business_ids:
-            footer_text = " | ".join(business_ids)
-            footer_para = Paragraph(
-                f"<para align=center>{footer_text}</para>",
-                small_style
-            )
-            elements.append(footer_para)
+
         
         # Build PDF
         doc.build(elements, canvasmaker=NumberedCanvas)

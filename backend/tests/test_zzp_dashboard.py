@@ -67,44 +67,41 @@ async def test_zzp_dashboard_with_invoices(
     today = date.today()
     
     # Create a sent invoice (open)
-    sent_invoice = ZZPInvoice(
-        administration_id=test_administration.id,
-        customer_id=test_customer.id,
-        invoice_number="INV-2026-0001",
-        status=InvoiceStatus.SENT.value,
-        issue_date=today - timedelta(days=10),
-        due_date=today + timedelta(days=20),
-        subtotal_cents=10000,
-        vat_total_cents=2100,
-        total_cents=12100,
-    )
+    sent_invoice = ZZPInvoice()
+    sent_invoice.administration_id = test_administration.id
+    sent_invoice.customer_id = test_customer.id
+    sent_invoice.invoice_number = "INV-2026-0001"
+    sent_invoice.status = InvoiceStatus.SENT.value
+    sent_invoice.issue_date = today - timedelta(days=10)
+    sent_invoice.due_date = today + timedelta(days=20)
+    sent_invoice.subtotal_cents = 10000
+    sent_invoice.vat_total_cents = 2100
+    sent_invoice.total_cents = 12100
     db_session.add(sent_invoice)
     
     # Create a paid invoice (this month)
-    paid_invoice = ZZPInvoice(
-        administration_id=test_administration.id,
-        customer_id=test_customer.id,
-        invoice_number="INV-2026-0002",
-        status=InvoiceStatus.PAID.value,
-        issue_date=today - timedelta(days=30),
-        due_date=today - timedelta(days=15),
-        subtotal_cents=20000,
-        vat_total_cents=4200,
-        total_cents=24200,
-    )
+    paid_invoice = ZZPInvoice()
+    paid_invoice.administration_id = test_administration.id
+    paid_invoice.customer_id = test_customer.id
+    paid_invoice.invoice_number = "INV-2026-0002"
+    paid_invoice.status = InvoiceStatus.PAID.value
+    paid_invoice.issue_date = today - timedelta(days=30)
+    paid_invoice.due_date = today - timedelta(days=15)
+    paid_invoice.subtotal_cents = 20000
+    paid_invoice.vat_total_cents = 4200
+    paid_invoice.total_cents = 24200
     db_session.add(paid_invoice)
     
     # Create a draft invoice
-    draft_invoice = ZZPInvoice(
-        administration_id=test_administration.id,
-        customer_id=test_customer.id,
-        invoice_number="INV-2026-0003",
-        status=InvoiceStatus.DRAFT.value,
-        issue_date=today,
-        subtotal_cents=5000,
-        vat_total_cents=1050,
-        total_cents=6050,
-    )
+    draft_invoice = ZZPInvoice()
+    draft_invoice.administration_id = test_administration.id
+    draft_invoice.customer_id = test_customer.id
+    draft_invoice.invoice_number = "INV-2026-0003"
+    draft_invoice.status = InvoiceStatus.DRAFT.value
+    draft_invoice.issue_date = today
+    draft_invoice.subtotal_cents = 5000
+    draft_invoice.vat_total_cents = 1050
+    draft_invoice.total_cents = 6050
     db_session.add(draft_invoice)
     
     await db_session.commit()
@@ -139,15 +136,14 @@ async def test_zzp_dashboard_with_expenses(
     today = date.today()
     
     # Create an expense this month
-    expense = ZZPExpense(
-        administration_id=test_administration.id,
-        vendor="Test Vendor",
-        expense_date=today - timedelta(days=5),
-        amount_cents=5000,
-        vat_rate=Decimal("21.0"),
-        vat_amount_cents=868,  # 5000 * 21 / 121
-        category="kantoorkosten",
-    )
+    expense = ZZPExpense()
+    expense.administration_id = test_administration.id
+    expense.vendor = "Test Vendor"
+    expense.expense_date = today - timedelta(days=5)
+    expense.amount_cents = 5000
+    expense.vat_rate = Decimal("21.0")
+    expense.vat_amount_cents = 868  # 5000 * 21 / 121
+    expense.category = "kantoorkosten"
     db_session.add(expense)
     await db_session.commit()
     
@@ -178,24 +174,22 @@ async def test_zzp_dashboard_with_time_entries(
     monday = today - timedelta(days=today.weekday())
     
     # Create a billable time entry
-    time_entry = ZZPTimeEntry(
-        administration_id=test_administration.id,
-        entry_date=monday,
-        description="Test work",
-        hours=Decimal("8.0"),
-        billable=True,
-        hourly_rate_cents=7500,
-    )
+    time_entry = ZZPTimeEntry()
+    time_entry.administration_id = test_administration.id
+    time_entry.entry_date = monday
+    time_entry.description = "Test work"
+    time_entry.hours = Decimal("8.0")
+    time_entry.billable = True
+    time_entry.hourly_rate_cents = 7500
     db_session.add(time_entry)
     
     # Create a non-billable time entry
-    non_billable = ZZPTimeEntry(
-        administration_id=test_administration.id,
-        entry_date=monday + timedelta(days=1),
-        description="Admin work",
-        hours=Decimal("2.0"),
-        billable=False,
-    )
+    non_billable = ZZPTimeEntry()
+    non_billable.administration_id = test_administration.id
+    non_billable.entry_date = monday + timedelta(days=1)
+    non_billable.description = "Admin work"
+    non_billable.hours = Decimal("2.0")
+    non_billable.billable = False
     db_session.add(non_billable)
     
     await db_session.commit()
@@ -223,13 +217,12 @@ async def test_zzp_dashboard_profile_complete(
 ):
     """Test dashboard shows profile_complete correctly."""
     # Create a complete profile
-    profile = BusinessProfile(
-        administration_id=test_administration.id,
-        company_name="Test Company",
-        kvk_number="12345678",
-        btw_number="NL123456789B01",
-        iban="NL91ABNA0417164300",
-    )
+    profile = BusinessProfile()
+    profile.administration_id = test_administration.id
+    profile.company_name = "Test Company"
+    profile.kvk_number = "12345678"
+    profile.btw_number = "NL123456789B01"
+    profile.iban = "NL91ABNA0417164300"
     db_session.add(profile)
     await db_session.commit()
     

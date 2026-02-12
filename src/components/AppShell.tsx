@@ -44,6 +44,7 @@ import {
   Users,
   Clock,
   CalendarBlank,
+  ListChecks,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 
@@ -205,7 +206,7 @@ const menuItems: MenuItem[] = [
   {
     label: t('sidebar.boekingen'),
     tabValue: 'transactions',
-    icon: <Receipt size={20} weight="duotone" />,
+    icon: <ListChecks size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',
   },

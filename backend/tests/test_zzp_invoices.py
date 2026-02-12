@@ -4,6 +4,7 @@ Tests for ZZP Invoice API endpoints.
 Tests invoice status updates and PDF generation endpoints.
 """
 import pytest
+import pytest_asyncio
 from datetime import date
 from uuid import uuid4
 from unittest.mock import patch, MagicMock
@@ -372,7 +373,7 @@ class TestInvoiceSendEmail:
 # These fixtures are async-compatible and should be used with async tests.
 # In a full integration test setup, ensure conftest.py provides async fixtures.
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def test_invoice_draft(test_user, test_administration, test_customer, db_session):
     """Create a draft invoice for testing."""
     invoice = ZZPInvoice(
@@ -393,7 +394,7 @@ async def test_invoice_draft(test_user, test_administration, test_customer, db_s
     return invoice
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def test_invoice_sent(test_user, test_administration, test_customer, db_session):
     """Create a sent invoice for testing."""
     invoice = ZZPInvoice(
@@ -414,7 +415,7 @@ async def test_invoice_sent(test_user, test_administration, test_customer, db_se
     return invoice
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def test_invoice_paid(test_user, test_administration, test_customer, db_session):
     """Create a paid invoice for testing."""
     invoice = ZZPInvoice(
@@ -435,7 +436,7 @@ async def test_invoice_paid(test_user, test_administration, test_customer, db_se
     return invoice
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def test_invoice_cancelled(test_user, test_administration, test_customer, db_session):
     """Create a cancelled invoice for testing."""
     invoice = ZZPInvoice(
@@ -456,7 +457,7 @@ async def test_invoice_cancelled(test_user, test_administration, test_customer, 
     return invoice
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def test_customer(test_administration, db_session):
     """Create a test customer for invoice tests."""
     customer = ZZPCustomer(

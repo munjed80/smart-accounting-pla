@@ -146,7 +146,15 @@ const menuItems: MenuItem[] = [
   },
   // === ZZP MVP Navigation (Dutch-first, minimal) ===
   // Reordered menu items for better UX
-  // 1. Klanten (Customers)
+  // 1. Overzicht (Dashboard/Overview)
+  {
+    label: t('sidebar.overzicht'),
+    tabValue: 'dashboard',
+    icon: <House size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  // 2. Klanten (Customers)
   {
     label: t('sidebar.klanten'),
     tabValue: 'customers',
@@ -154,7 +162,7 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // 2. Facturen (Invoices)
+  // 3. Facturen (Invoices)
   {
     label: t('sidebar.facturen'),
     tabValue: 'invoices',
@@ -162,7 +170,7 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // 3. Uitgaven (Expenses)
+  // 4. Uitgaven (Expenses)
   {
     label: t('sidebar.uitgaven'),
     tabValue: 'expenses',
@@ -170,7 +178,7 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // 4. Uren (Time Tracking)
+  // 5. Uren (Time Tracking)
   {
     label: t('sidebar.uren'),
     tabValue: 'time',
@@ -178,7 +186,7 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // 5. Agenda
+  // 6. Agenda
   {
     label: t('sidebar.agenda'),
     tabValue: 'agenda',
@@ -186,7 +194,7 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // 6. Boekhouder (Links/consent page)
+  // 7. Boekhouder (Links/consent page)
   {
     label: t('sidebar.boekhouder'),
     tabValue: 'boekhouder',
@@ -194,7 +202,7 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // 7. Documenten (AI Upload + document status list)
+  // 8. Documenten (AI Upload + document status list)
   {
     label: t('sidebar.documenten'),
     tabValue: 'upload',
@@ -202,7 +210,7 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // 8. Boekingen (Transactions list + stats)
+  // 9. Boekingen (Transactions list + stats)
   {
     label: t('sidebar.boekingen'),
     tabValue: 'transactions',

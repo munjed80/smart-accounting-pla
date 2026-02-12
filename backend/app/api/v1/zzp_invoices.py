@@ -20,6 +20,7 @@ from sqlalchemy.orm import selectinload
 from app.core.config import settings
 from app.core.database import get_db
 from app.services.invoice_pdf import generate_invoice_pdf, get_invoice_pdf_filename
+from app.services.invoice_pdf_reportlab import generate_invoice_pdf_reportlab
 from app.services.email import email_service
 from app.models.zzp import (
     ZZPInvoice, 
@@ -694,12 +695,12 @@ async def get_invoice_pdf(
     )
 
 
-@router.post("/invoices/{invoice_id}/send")
+@router.post("/invoices/{invoice_id}/send", response_model=InvoiceResponse)
 async def send_invoice(
     invoice_id: UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-):
+) -> InvoiceResponse:
     """
     Send invoice via email to the customer and update status to 'sent'.
     
@@ -751,7 +752,6 @@ async def send_invoice(
     
     # Generate PDF
     try:
-        from app.services.invoice_pdf_reportlab import generate_invoice_pdf_reportlab, get_invoice_pdf_filename
         pdf_bytes = generate_invoice_pdf_reportlab(invoice)
         filename = get_invoice_pdf_filename(invoice)
     except Exception as pdf_error:

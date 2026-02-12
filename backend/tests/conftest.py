@@ -19,7 +19,8 @@ from app.main import app
 from app.core.database import get_db, Base
 from app.models.user import User
 from app.core.roles import UserRole
-from app.models.administration import Administration, AdministrationMember
+from app.models.administration import Administration, AdministrationMember, MemberRole
+from app.models.zzp import ZZPCustomer
 from app.core.security import create_access_token, get_password_hash
 
 
@@ -131,3 +132,18 @@ async def async_client(
         yield client
     
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture(scope="function")
+async def test_customer(db_session: AsyncSession, test_administration: Administration) -> ZZPCustomer:
+    """Create a test customer for the administration."""
+    customer = ZZPCustomer(
+        administration_id=test_administration.id,
+        name="Test Customer B.V.",
+        email="customer@test.com",
+        status="active",
+    )
+    db_session.add(customer)
+    await db_session.commit()
+    await db_session.refresh(customer)
+    return customer

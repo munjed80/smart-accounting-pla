@@ -36,10 +36,6 @@ class User(Base):
     memberships = relationship("AdministrationMember", back_populates="user", cascade="all, delete-orphan")
     reconciliation_actions = relationship("ReconciliationAction", back_populates="accountant", cascade="all, delete-orphan")
     
-    def __init__(self, **kwargs):
-        """Initialize User with keyword arguments for mapped columns."""
-        super().__init__(**kwargs)
-    
     @property
     def is_email_verified(self) -> bool:
         """Check if user's email is verified."""

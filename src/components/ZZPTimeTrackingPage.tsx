@@ -10,10 +10,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { CalendarBlank, Clock, CurrencyEur, PencilSimple, Plus, Receipt, TrashSimple, WarningCircle } from '@phosphor-icons/react'
-import { zzpApi, ZZPCustomer, ZZPTimeEntry, ZZPTimeEntryCreate } from '@/lib/api'
+import { WorkSession, zzpApi, ZZPCustomer, ZZPTimeEntry, ZZPTimeEntryCreate } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
 import { toast } from 'sonner'
 import { navigateTo } from '@/lib/navigation'
+import {
+  formatDurationHHMMSS,
+  getInvoicePeriodRange,
+  InvoicePeriodMode,
+  minutesToHours,
+  toLocalISODate,
+  totalMinutesForEntries,
+} from '@/lib/timeTracking'
 
 const NO_CUSTOMER = '__none__'
 
@@ -26,24 +34,17 @@ type EntryFormState = {
   hourly_rate: string
 }
 
-const getMonday = (value: Date): Date => {
-  const d = new Date(value)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  d.setDate(diff)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-const toISODate = (value: Date): string => value.toISOString().slice(0, 10)
-const addDays = (value: Date, days: number): Date => {
-  const d = new Date(value)
-  d.setDate(d.getDate() + days)
-  return d
-}
+const INVOICE_MODE_STORAGE_KEY = 'uren_invoice_mode'
 
 const parseHours = (value: ZZPTimeEntry['hours']): number => Number(value || 0)
-const parseRate = (entry: ZZPTimeEntry): number => Number(entry.hourly_rate || 0)
+
+const getInitialInvoiceMode = (): InvoicePeriodMode => {
+  const savedMode = localStorage.getItem(INVOICE_MODE_STORAGE_KEY)
+  if (savedMode === 'daily' || savedMode === 'weekly' || savedMode === 'monthly' || savedMode === 'custom') {
+    return savedMode
+  }
+  return 'weekly'
+}
 
 const groupByDay = (entries: ZZPTimeEntry[]) => {
   return entries.reduce<Record<string, ZZPTimeEntry[]>>((acc, entry) => {
@@ -55,7 +56,7 @@ const groupByDay = (entries: ZZPTimeEntry[]) => {
 }
 
 const defaultFormState = (): EntryFormState => ({
-  entry_date: toISODate(new Date()),
+  entry_date: toLocalISODate(new Date()),
   hours: '1',
   description: '',
   customer_id: '',
@@ -64,8 +65,11 @@ const defaultFormState = (): EntryFormState => ({
 })
 
 export const ZZPTimeTrackingPage = () => {
-  const monday = useMemo(() => getMonday(new Date()), [])
-  const sunday = useMemo(() => addDays(monday, 6), [monday])
+  const [invoiceMode, setInvoiceMode] = useState<InvoicePeriodMode>(() => getInitialInvoiceMode())
+  const initialPeriod = useMemo(
+    () => getInvoicePeriodRange(invoiceMode, new Date()) ?? getInvoicePeriodRange('weekly', new Date()),
+    [invoiceMode],
+  )
 
   const [customers, setCustomers] = useState<ZZPCustomer[]>([])
   const [openEntries, setOpenEntries] = useState<ZZPTimeEntry[]>([])
@@ -77,8 +81,8 @@ export const ZZPTimeTrackingPage = () => {
   const [pageError, setPageError] = useState<string | null>(null)
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('')
-  const [periodStart, setPeriodStart] = useState<string>(toISODate(monday))
-  const [periodEnd, setPeriodEnd] = useState<string>(toISODate(sunday))
+  const [periodStart, setPeriodStart] = useState<string>(initialPeriod?.start || '')
+  const [periodEnd, setPeriodEnd] = useState<string>(initialPeriod?.end || '')
   const [hourlyRate, setHourlyRate] = useState<string>('')
 
   const [invoicedFilterCustomerId, setInvoicedFilterCustomerId] = useState<string>('')
@@ -89,6 +93,9 @@ export const ZZPTimeTrackingPage = () => {
   const [editingEntry, setEditingEntry] = useState<ZZPTimeEntry | null>(null)
   const [formState, setFormState] = useState<EntryFormState>(defaultFormState)
   const [isSavingEntry, setIsSavingEntry] = useState(false)
+  const [activeSession, setActiveSession] = useState<WorkSession | null>(null)
+  const [isClockActionLoading, setIsClockActionLoading] = useState(false)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
 
   const customerMap = useMemo(() => Object.fromEntries(customers.map((c) => [c.id, c.name])), [customers])
 
@@ -119,15 +126,17 @@ export const ZZPTimeTrackingPage = () => {
     setLoading(true)
     setPageError(null)
     try {
-      const [customerRes, openRes, invoicedRes] = await Promise.all([
+      const [customerRes, openRes, invoicedRes, activeSessionRes] = await Promise.all([
         zzpApi.customers.list(),
         zzpApi.timeEntries.listOpen(),
         zzpApi.timeEntries.listInvoiced(),
+        zzpApi.workSessions.getActive(),
       ])
 
       setCustomers(customerRes.customers)
       setOpenEntries(openRes)
       setInvoicedEntries(invoicedRes)
+      setActiveSession(activeSessionRes)
       await fetchInvoiceNumbers(invoicedRes)
 
       try {
@@ -151,6 +160,34 @@ export const ZZPTimeTrackingPage = () => {
     void fetchData()
   }, [fetchData])
 
+  useEffect(() => {
+    localStorage.setItem(INVOICE_MODE_STORAGE_KEY, invoiceMode)
+  }, [invoiceMode])
+
+  useEffect(() => {
+    const period = getInvoicePeriodRange(invoiceMode)
+    if (!period) return
+    setPeriodStart(period.start)
+    setPeriodEnd(period.end)
+  }, [invoiceMode])
+
+  useEffect(() => {
+    if (!activeSession?.started_at) {
+      setElapsedSeconds(0)
+      return
+    }
+
+    const updateElapsed = () => {
+      const startedAt = new Date(activeSession.started_at).getTime()
+      const now = Date.now()
+      setElapsedSeconds(Math.max(0, Math.floor((now - startedAt) / 1000)))
+    }
+
+    updateElapsed()
+    const intervalId = window.setInterval(updateElapsed, 1000)
+    return () => window.clearInterval(intervalId)
+  }, [activeSession])
+
   const filteredOpenEntries = useMemo(() => {
     return openEntries.filter((entry) => {
       if (selectedCustomerId && entry.customer_id !== selectedCustomerId) return false
@@ -171,17 +208,40 @@ export const ZZPTimeTrackingPage = () => {
 
   const groupedOpenEntries = useMemo(() => groupByDay(filteredOpenEntries), [filteredOpenEntries])
 
-  const totalOpenHours = useMemo(
-    () => filteredOpenEntries.reduce((sum, entry) => sum + parseHours(entry.hours), 0),
-    [filteredOpenEntries],
-  )
+  const totalOpenMinutes = useMemo(() => totalMinutesForEntries(filteredOpenEntries), [filteredOpenEntries])
+  const totalOpenHours = useMemo(() => minutesToHours(totalOpenMinutes), [totalOpenMinutes])
 
   const totalOpenAmount = useMemo(() => totalOpenHours * Number(hourlyRate || 0), [totalOpenHours, hourlyRate])
 
-  const weeklyOpenHours = useMemo(
-    () => openEntries.reduce((sum, entry) => sum + parseHours(entry.hours), 0),
-    [openEntries],
-  )
+  const weeklyOpenMinutes = useMemo(() => totalMinutesForEntries(openEntries), [openEntries])
+  const weeklyOpenHours = useMemo(() => minutesToHours(weeklyOpenMinutes), [weeklyOpenMinutes])
+
+  const handleClockIn = async () => {
+    setIsClockActionLoading(true)
+    try {
+      const session = await zzpApi.workSessions.start()
+      setActiveSession(session)
+      toast.success('Inchecken gestart')
+    } catch (error) {
+      toast.error(parseApiError(error))
+    } finally {
+      setIsClockActionLoading(false)
+    }
+  }
+
+  const handleClockOut = async () => {
+    setIsClockActionLoading(true)
+    try {
+      const response = await zzpApi.workSessions.stop()
+      setActiveSession(null)
+      setOpenEntries((prev) => [response.time_entry, ...prev])
+      toast.success('Uitgecheckt en uren toegevoegd')
+    } catch (error) {
+      toast.error(parseApiError(error))
+    } finally {
+      setIsClockActionLoading(false)
+    }
+  }
 
   const openForm = (entry?: ZZPTimeEntry) => {
     if (entry) {
@@ -296,6 +356,21 @@ export const ZZPTimeTrackingPage = () => {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
+              <Label>Facturatie modus</Label>
+              <Select value={invoiceMode} onValueChange={(value) => setInvoiceMode(value as InvoicePeriodMode)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Kies modus" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Dagelijks</SelectItem>
+                  <SelectItem value="weekly">Wekelijks</SelectItem>
+                  <SelectItem value="monthly">Maandelijks</SelectItem>
+                  <SelectItem value="custom">Aangepaste periode</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label>Klant</Label>
               <Select value={selectedCustomerId || NO_CUSTOMER} onValueChange={(value) => setSelectedCustomerId(value === NO_CUSTOMER ? '' : value)}>
                 <SelectTrigger>
@@ -344,6 +419,27 @@ export const ZZPTimeTrackingPage = () => {
           <Button disabled={!selectedCustomerId || totalOpenHours === 0 || invoicing} onClick={() => void handleInvoiceWeek()}>
             {invoicing ? 'Factuur maken...' : 'Maak factuur'}
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Clock size={20} />OnClock</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">Actieve sessie: {activeSession ? 'ja' : 'nee'}</p>
+          {activeSession ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <Button variant="outline" disabled={isClockActionLoading} onClick={() => void handleClockOut()}>
+                {isClockActionLoading ? 'Uitchecken...' : 'Uitchecken'}
+              </Button>
+              <p className="text-sm">Lopende tijd: <span className="font-semibold">{formatDurationHHMMSS(elapsedSeconds)}</span></p>
+            </div>
+          ) : (
+            <Button disabled={isClockActionLoading} onClick={() => void handleClockIn()}>
+              {isClockActionLoading ? 'Inchecken...' : 'Inchecken'}
+            </Button>
+          )}
         </CardContent>
       </Card>
 

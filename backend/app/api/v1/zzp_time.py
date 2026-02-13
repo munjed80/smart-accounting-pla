@@ -268,7 +268,7 @@ async def invoice_week(
         raise HTTPException(status_code=404, detail={"code": "CUSTOMER_NOT_FOUND", "message": "Klant niet gevonden."})
 
     try:
-        entries_result = await db.execute(
+        query = (
             select(ZZPTimeEntry)
             .where(
                 ZZPTimeEntry.administration_id == administration.id,
@@ -278,8 +278,10 @@ async def invoice_week(
                 ZZPTimeEntry.entry_date >= payload.period_start,
                 ZZPTimeEntry.entry_date <= payload.period_end,
             )
+            .order_by(ZZPTimeEntry.entry_date.asc(), ZZPTimeEntry.created_at.asc())
             .with_for_update()
-        ).order_by(ZZPTimeEntry.entry_date)
+        )
+        entries_result = await db.execute(query)
         entries = entries_result.scalars().all()
 
         if not entries:

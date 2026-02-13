@@ -145,7 +145,7 @@ class BusinessProfileUpdate(BaseModel):
     kvk_number: Optional[str] = Field(None, max_length=20)
     btw_number: Optional[str] = Field(None, max_length=30)
     iban: Optional[str] = Field(None, max_length=34)
-    default_hourly_rate: Optional[str] = Field(None, ge=0)
+    default_hourly_rate: Optional[float] = Field(None, ge=0)
     email: Optional[str] = Field(None, max_length=255)
     phone: Optional[str] = Field(None, max_length=50)
     website: Optional[str] = Field(None, max_length=255)

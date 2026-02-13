@@ -13,9 +13,9 @@ from typing import AsyncGenerator, Generator
 
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, StaticPool
 
-from app.main import app
+from app.main import app as fastapi_app
 from app.core.database import get_db, Base
 from app.models.user import User
 from app.core.roles import UserRole
@@ -23,7 +23,7 @@ from app.models.administration import Administration, AdministrationMember, Memb
 from app.models.zzp import ZZPCustomer
 from app.core.security import create_access_token, get_password_hash
 # Import all models to ensure they're registered with Base.metadata
-import app.models  # noqa
+from app import models  # noqa
 
 
 # Note: Tests require PostgreSQL for UUID column types.
@@ -37,7 +37,7 @@ async def test_engine():
     """Create a test database engine."""
     engine = create_async_engine(
         TEST_DATABASE_URL,
-        poolclass=NullPool,
+        poolclass=StaticPool,  # Use StaticPool instead of NullPool for in-memory SQLite
         echo=False,
     )
     
@@ -125,15 +125,15 @@ async def async_client(
     async def override_get_db():
         yield db_session
     
-    app.dependency_overrides[get_db] = override_get_db
+    fastapi_app.dependency_overrides[get_db] = override_get_db
     
     async with AsyncClient(
-        transport=ASGITransport(app=app),
+        transport=ASGITransport(app=fastapi_app),
         base_url="http://test"
     ) as client:
         yield client
     
-    app.dependency_overrides.clear()
+    fastapi_app.dependency_overrides.clear()
 
 
 @pytest_asyncio.fixture(scope="function")

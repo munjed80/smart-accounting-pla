@@ -578,13 +578,7 @@ async def update_invoice_status(
         except LedgerPostingError as e:
             logger.warning(f"Invoice payment posting skipped for {invoice.id}: {e}")
 
-    # Refresh invoice with lines eagerly loaded
-    result = await db.execute(
-        select(ZZPInvoice)
-        .options(selectinload(ZZPInvoice.lines))
-        .where(ZZPInvoice.id == invoice.id)
-    )
-    invoice = result.scalar_one()
+    await db.refresh(invoice)
     
     return invoice_to_response(invoice)
 
@@ -670,6 +664,7 @@ async def get_invoice_pdf(
     
     try:
         # Try ReportLab first (pure Python, Docker-safe, no system dependencies)
+        from app.services.invoice_pdf_reportlab import generate_invoice_pdf_reportlab, get_invoice_pdf_filename
         pdf_bytes = generate_invoice_pdf_reportlab(invoice)
         filename = get_invoice_pdf_filename(invoice)
         
@@ -872,13 +867,6 @@ Dit is een geautomatiseerd bericht van Smart Accounting Platform.
     # Update invoice status to 'sent'
     invoice.status = InvoiceStatus.SENT.value
     await db.commit()
-    
-    # Reload invoice with lines eagerly loaded
-    result = await db.execute(
-        select(ZZPInvoice)
-        .options(selectinload(ZZPInvoice.lines))
-        .where(ZZPInvoice.id == invoice.id)
-    )
-    invoice = result.scalar_one()
+    await db.refresh(invoice)
     
     return invoice_to_response(invoice)

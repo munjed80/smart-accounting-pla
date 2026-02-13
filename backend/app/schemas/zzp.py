@@ -900,25 +900,77 @@ class ZZPBankTransactionMatchListResponse(BaseModel):
     total: int
 
 
+
+# ============================================================================
+# AI Insights Schemas (for ZZP insights service)
+# ============================================================================
+
+class InsightType(str):
+    """Insight type enum values."""
+    INVOICE_OVERDUE = "invoice_overdue"
+    UNBILLED_HOURS = "unbilled_hours"
+    MISSING_PROFILE = "missing_profile"
+    BTW_DEADLINE = "btw_deadline"
+    NO_ACTIVITY = "no_activity"
+    INVOICE_FOLLOWUP = "invoice_followup"
+
+
+class InsightSeverity(str):
+    """Insight severity enum values."""
+    ACTION_NEEDED = "action_needed"  # Red/urgent - requires immediate action
+    SUGGESTION = "suggestion"          # Yellow/warning - helpful suggestion
+    INFO = "info"                      # Blue/info - informational
+
+
+class InsightAction(BaseModel):
+    """Action that can be taken on an insight."""
+    type: str  # Type of action
+    label: str  # Button label
+    route: str  # Frontend route to navigate to
+    params: Optional[dict] = None  # Optional route parameters
+
+
+class ZZPInsight(BaseModel):
+    """Individual AI insight."""
+    id: str  # Unique insight ID
+    type: str  # InsightType value
+    severity: str  # InsightSeverity value
+    title: str  # Short title
+    description: str  # Detailed description
+    reason: str  # Why this insight was generated (explainability)
+    action: InsightAction  # Suggested action
+    related_id: Optional[str] = None  # Related entity ID
+    related_type: Optional[str] = None  # Related entity type
+    amount_cents: Optional[int] = None  # Related amount if applicable
+
+
 # ============================================================================
 # Insights Schema
 # ============================================================================
 
 class ZZPInsightsResponse(BaseModel):
-    """ZZP insights and analytics response."""
-    revenue_this_month: int
-    revenue_last_month: int
-    expenses_this_month: int
-    expenses_last_month: int
-    profit_this_month: int
-    profit_last_month: int
-    open_invoices_count: int
-    open_invoices_total_cents: int
-    overdue_invoices_count: int
-    overdue_invoices_total_cents: int
-    unbilled_hours: Decimal
-    unbilled_hours_value_cents: int
-    top_customers: List[dict]  # Customer revenue breakdown
-    expense_breakdown: List[dict]  # Expenses by category
-    revenue_trend: List[dict]  # Monthly revenue trend
-    monthly_comparison: dict
+    """ZZP insights and analytics response with AI insights."""
+    # AI Insights
+    insights: List[ZZPInsight] = []
+    total_action_needed: int = 0
+    total_suggestions: int = 0
+    generated_at: datetime
+    ai_model_version: str = "rules-v1"
+    
+    # Financial metrics
+    revenue_this_month: int = 0
+    revenue_last_month: int = 0
+    expenses_this_month: int = 0
+    expenses_last_month: int = 0
+    profit_this_month: int = 0
+    profit_last_month: int = 0
+    open_invoices_count: int = 0
+    open_invoices_total_cents: int = 0
+    overdue_invoices_count: int = 0
+    overdue_invoices_total_cents: int = 0
+    unbilled_hours: Decimal = Decimal("0")
+    unbilled_hours_value_cents: int = 0
+    top_customers: List[dict] = []  # Customer revenue breakdown
+    expense_breakdown: List[dict] = []  # Expenses by category
+    revenue_trend: List[dict] = []  # Monthly revenue trend
+    monthly_comparison: dict = {}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from '@/lib/AuthContext'
+import { NetworkError, ServerError } from '@/lib/errors'
 import { ActiveClientProvider } from '@/lib/ActiveClientContext'
 import { LoginPage } from '@/components/LoginPage'
 import { VerifyEmailPage } from '@/components/VerifyEmailPage'
@@ -256,7 +257,7 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
 }
 
 const AppContent = () => {
-  const { user, isAuthenticated, isLoading, checkSession } = useAuth()
+  const { user, isAuthenticated, isLoading, checkSession, logout } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
   const isAccountantOnly = user?.role === 'accountant'
   const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'expenses' | 'time' | 'agenda'>('dashboard')
@@ -406,7 +407,17 @@ const AppContent = () => {
         // Don't block user if check fails, let them proceed
         setNeedsOnboarding(false)
         setNeedsAccountantOnboarding(false)
-        setBootError({ message: 'Bootstrap controle mislukt', detail: error instanceof Error ? error.message : 'Onbekende fout' })
+
+        const defaultDetail = error instanceof Error ? error.message : 'Onbekende fout'
+        if (error instanceof NetworkError || error instanceof ServerError) {
+          setBootError({
+            message: 'Backend is niet bereikbaar',
+            detail: 'De server reageert niet of geeft een fout (5xx). Probeer opnieuw of log uit en opnieuw in.',
+          })
+        } else {
+          setBootError({ message: 'Bootstrap controle mislukt', detail: defaultDetail })
+        }
+
         setBootStage('error')
       } finally {
         setIsCheckingOnboarding(false)
@@ -480,7 +491,7 @@ const AppContent = () => {
           {bootError.detail && <p className="text-sm text-muted-foreground">{bootError.detail}</p>}
           <div className="flex gap-2">
             <Button onClick={retryBootstrap}>Opnieuw proberen</Button>
-            <Button variant="outline" onClick={() => navigateTo('/settings')}>Naar Instellingen</Button>
+            <Button variant="outline" onClick={logout}>Uitloggen</Button>
           </div>
           <Alert>
             <AlertDescription>De UI blijft niet meer hangen op een permanente spinner. Gebruik de retry-knop om bootstrap opnieuw te starten.</AlertDescription>

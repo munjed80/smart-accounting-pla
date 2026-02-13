@@ -137,17 +137,18 @@ async def lifespan(app: FastAPI):
     - Cleanup resources if needed
     """
     # Startup
+    logger.info("Application startup initiated")
     try:
         verify_orm_mappings()
     except Exception as e:
-        logger.critical(f"ORM mapper configuration failed: {e}")
+        logger.exception("ORM mapper configuration failed during startup")
         raise RuntimeError(f"Application cannot start: ORM mapping error - {e}") from e
     
     # Verify database enums match expected values
     try:
         await verify_database_enums()
     except RuntimeError as e:
-        logger.critical(f"Database enum verification failed: {e}")
+        logger.exception("Database enum verification failed during startup")
         raise
     except Exception as e:
         # Non-critical: log warning but allow startup (DB might not be ready yet)
@@ -155,7 +156,8 @@ async def lifespan(app: FastAPI):
     
     # Log enum and router status for production diagnostics
     log_enum_and_router_status()
-    
+    logger.info("Application startup completed successfully")
+
     yield
     
     # Shutdown (cleanup if needed)

@@ -36,40 +36,6 @@ class User(Base):
     memberships = relationship("AdministrationMember", back_populates="user", cascade="all, delete-orphan")
     reconciliation_actions = relationship("ReconciliationAction", back_populates="accountant", cascade="all, delete-orphan")
     
-    def __init__(
-        self,
-        email: str,
-        hashed_password: str,
-        full_name: str,
-        role: str = "zzp",
-        is_active: bool = True,
-        email_verified_at: Optional[datetime] = None,
-        last_login_at: Optional[datetime] = None,
-        **kwargs
-    ):
-        """Initialize a User instance.
-        
-        Args:
-            email: User's email address (unique).
-            hashed_password: Hashed password for authentication.
-            full_name: User's full name.
-            role: User role (zzp, accountant, or admin). Defaults to "zzp".
-            is_active: Whether the user account is active. Defaults to True.
-            email_verified_at: Timestamp when email was verified. Optional.
-            last_login_at: Timestamp of last login. Optional.
-            **kwargs: Additional keyword arguments passed to SQLAlchemy's base constructor.
-        """
-        super().__init__(
-            email=email,
-            hashed_password=hashed_password,
-            full_name=full_name,
-            role=role,
-            is_active=is_active,
-            email_verified_at=email_verified_at,
-            last_login_at=last_login_at,
-            **kwargs
-        )
-    
     @property
     def is_email_verified(self) -> bool:
         """Check if user's email is verified."""

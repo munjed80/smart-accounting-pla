@@ -198,24 +198,21 @@ class TestInvoicePdfEndpoint:
         test_invoice_sent: ZZPInvoice,
         auth_headers: dict
     ):
-        """PDF endpoint returns 503 when both PDF libraries are not available."""
-        # Mock both ReportLab and WeasyPrint to raise RuntimeError
-        # Patch where they're used (in zzp_invoices module)
-        with patch('app.api.v1.zzp_invoices.generate_invoice_pdf_reportlab') as mock_reportlab:
-            with patch('app.api.v1.zzp_invoices.generate_invoice_pdf') as mock_weasyprint:
-                mock_reportlab.side_effect = RuntimeError("ReportLab not available")
-                mock_weasyprint.side_effect = RuntimeError(
-                    "PDF generation is not available. WeasyPrint library or its system dependencies are not installed."
-                )
-                
-                response = await async_client.get(
-                    f"/api/v1/zzp/invoices/{test_invoice_sent.id}/pdf",
-                    headers=auth_headers
-                )
-                
-                assert response.status_code == 503
-                data = response.json()
-                assert data["detail"]["code"] == "PDF_NOT_AVAILABLE"
+        """PDF endpoint returns 503 when WeasyPrint is not available."""
+        # Mock generate_invoice_pdf to raise RuntimeError (WeasyPrint unavailable)
+        with patch('app.services.invoice_pdf.generate_invoice_pdf') as mock_gen:
+            mock_gen.side_effect = RuntimeError(
+                "PDF generation is not available. WeasyPrint library or its system dependencies are not installed."
+            )
+            
+            response = await async_client.get(
+                f"/api/v1/zzp/invoices/{test_invoice_sent.id}/pdf",
+                headers=auth_headers
+            )
+            
+            assert response.status_code == 503
+            data = response.json()
+            assert data["detail"]["code"] == "PDF_NOT_AVAILABLE"
 
 
 class TestInvoiceDelete:

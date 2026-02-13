@@ -76,8 +76,20 @@ def session_to_response(session: WorkSession) -> WorkSessionResponse:
     # Calculate duration in seconds if session is active
     duration_seconds = None
     if session.started_at:
-        end_time = session.ended_at or datetime.now(timezone.utc)
-        duration = end_time - session.started_at
+        # Ensure started_at is timezone-aware for comparison
+        started_at = session.started_at
+        if started_at.tzinfo is None:
+            started_at = started_at.replace(tzinfo=timezone.utc)
+        
+        # Get end time (either session end or current time)
+        if session.ended_at:
+            end_time = session.ended_at
+            if end_time.tzinfo is None:
+                end_time = end_time.replace(tzinfo=timezone.utc)
+        else:
+            end_time = datetime.now(timezone.utc)
+        
+        duration = end_time - started_at
         duration_seconds = int(duration.total_seconds())
     
     return WorkSessionResponse(
@@ -246,8 +258,13 @@ async def stop_work_session(
     # End the session
     ended_at = datetime.now(timezone.utc)
     
+    # Ensure started_at is timezone-aware for comparison
+    started_at = session.started_at
+    if started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+    
     # Validate: ended_at must be after started_at
-    if ended_at <= session.started_at:
+    if ended_at <= started_at:
         raise HTTPException(
             status_code=400,
             detail={
@@ -257,7 +274,7 @@ async def stop_work_session(
         )
     
     # Calculate duration in minutes
-    duration = ended_at - session.started_at
+    duration = ended_at - started_at
     total_minutes = duration.total_seconds() / 60
     
     # Subtract break time

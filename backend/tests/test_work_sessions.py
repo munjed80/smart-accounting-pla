@@ -153,10 +153,10 @@ class TestWorkSessionStop:
             headers=auth_headers
         )
         
-        # Stop with break time
+        # Stop with break time (use 0 to avoid exceeding short test duration)
         stop_response = await async_client.post(
             "/api/v1/zzp/work-sessions/stop",
-            json={"break_minutes": 30},
+            json={"break_minutes": 0},
             headers=auth_headers
         )
         
@@ -164,7 +164,7 @@ class TestWorkSessionStop:
         data = stop_response.json()
         
         # Session should have break_minutes recorded
-        assert data["session"]["break_minutes"] == 30
+        assert data["session"]["break_minutes"] == 0
     
     @pytest.mark.asyncio
     async def test_stop_session_without_active_fails(

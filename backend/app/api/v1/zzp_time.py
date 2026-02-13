@@ -32,6 +32,9 @@ router = APIRouter()
 
 
 def _to_cents(amount: Decimal) -> int:
+    """Convert a Decimal or float amount to cents."""
+    if not isinstance(amount, Decimal):
+        amount = Decimal(str(amount))
     return int((amount * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
@@ -121,7 +124,7 @@ async def create_time_entry(
     entry = ZZPTimeEntry(
         user_id=current_user.id,
         administration_id=administration.id,
-        entry_date=entry_in.entry_date,
+        entry_date=date.fromisoformat(entry_in.entry_date),
         description=entry_in.description,
         hours=entry_in.hours,
         project_name=entry_in.project_name,
@@ -307,6 +310,10 @@ async def invoice_week(
                 status_code=400,
                 detail={"code": "MISSING_HOURLY_RATE", "message": "Geen uurtarief opgegeven en geen standaardtarief gevonden."},
             )
+        
+        # Ensure rate is Decimal for arithmetic
+        if not isinstance(rate, Decimal):
+            rate = Decimal(str(rate))
 
         invoice_number = await generate_invoice_number(administration.id, db)
         issue_date = date.today()
@@ -388,5 +395,5 @@ async def invoice_week(
         invoice_number=invoice.invoice_number,
         total_hours=total_hours,
         rate=rate,
-        total_amount=_from_cents(invoice.total_cents),
+        total_amount=invoice.total_cents,
     )

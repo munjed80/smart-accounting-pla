@@ -38,6 +38,12 @@ const INVOICE_MODE_STORAGE_KEY = 'uren_invoice_mode'
 
 const parseHours = (value: ZZPTimeEntry['hours']): number => Number(value || 0)
 
+const parseDecimalInput = (value: string): number => {
+  const normalized = value.replace(',', '.').trim()
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) ? parsed : NaN
+}
+
 const getInitialInvoiceMode = (): InvoicePeriodMode => {
   const savedMode = localStorage.getItem(INVOICE_MODE_STORAGE_KEY)
   if (savedMode === 'daily' || savedMode === 'weekly' || savedMode === 'monthly' || savedMode === 'custom') {
@@ -92,6 +98,7 @@ export const ZZPTimeTrackingPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<ZZPTimeEntry | null>(null)
   const [formState, setFormState] = useState<EntryFormState>(defaultFormState)
+  const [formError, setFormError] = useState<string | null>(null)
   const [isSavingEntry, setIsSavingEntry] = useState(false)
   const [activeSession, setActiveSession] = useState<WorkSession | null>(null)
   const [isClockActionLoading, setIsClockActionLoading] = useState(false)
@@ -244,6 +251,7 @@ export const ZZPTimeTrackingPage = () => {
   }
 
   const openForm = (entry?: ZZPTimeEntry) => {
+    setFormError(null)
     if (entry) {
       setEditingEntry(entry)
       setFormState({
@@ -262,20 +270,54 @@ export const ZZPTimeTrackingPage = () => {
   }
 
   const saveEntry = async () => {
+    const parsedHours = parseDecimalInput(formState.hours)
+    const parsedHourlyRate = formState.hourly_rate ? parseDecimalInput(formState.hourly_rate) : undefined
+    const description = formState.description.trim()
+    const selectedCustomerId = formState.customer_id || null
+
+    if (!formState.entry_date) {
+      setFormError('Datum is verplicht.')
+      return
+    }
+
+    if (!description) {
+      setFormError('Omschrijving is verplicht.')
+      return
+    }
+
+    if (!Number.isFinite(parsedHours) || parsedHours <= 0 || parsedHours > 24) {
+      setFormError('Uren moeten groter zijn dan 0 en maximaal 24.')
+      return
+    }
+
+    if (parsedHourlyRate !== undefined && (!Number.isFinite(parsedHourlyRate) || parsedHourlyRate < 0)) {
+      setFormError('Uurtarief moet 0 of hoger zijn.')
+      return
+    }
+
+    if (selectedCustomerId && !customers.some((customer) => customer.id === selectedCustomerId)) {
+      setFormError('Geselecteerde klant is niet meer beschikbaar. Kies opnieuw.')
+      return
+    }
+
+    setFormError(null)
     setIsSavingEntry(true)
     try {
       const payload: ZZPTimeEntryCreate = {
         entry_date: formState.entry_date,
-        hours: Number(formState.hours),
-        description: formState.description,
-        customer_id: formState.customer_id || undefined,
+        hours: parsedHours,
+        description,
+        customer_id: selectedCustomerId || undefined,
         project_name: formState.project_name || undefined,
-        hourly_rate: formState.hourly_rate ? Number(formState.hourly_rate) : undefined,
+        hourly_rate: parsedHourlyRate,
         billable: true,
       }
 
       if (editingEntry) {
-        await zzpApi.timeEntries.update(editingEntry.id, payload)
+        await zzpApi.timeEntries.update(editingEntry.id, {
+          ...payload,
+          customer_id: selectedCustomerId,
+        })
         toast.success('Uren bijgewerkt')
       } else {
         await zzpApi.timeEntries.create(payload)
@@ -427,16 +469,30 @@ export const ZZPTimeTrackingPage = () => {
           <CardTitle className="flex items-center gap-2"><Clock size={20} />OnClock</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">Actieve sessie: {activeSession ? 'ja' : 'nee'}</p>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            Actieve sessie:
+            <Badge variant={activeSession ? 'default' : 'secondary'} className={activeSession ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/40' : ''}>
+              {activeSession ? 'ja' : 'nee'}
+            </Badge>
+          </div>
           {activeSession ? (
             <div className="flex flex-wrap items-center gap-3">
-              <Button variant="outline" disabled={isClockActionLoading} onClick={() => void handleClockOut()}>
+              <Button
+                variant="destructive"
+                className="bg-red-600 hover:bg-red-700 text-white"
+                disabled={isClockActionLoading}
+                onClick={() => void handleClockOut()}
+              >
                 {isClockActionLoading ? 'Uitchecken...' : 'Uitchecken'}
               </Button>
               <p className="text-sm">Lopende tijd: <span className="font-semibold">{formatDurationHHMMSS(elapsedSeconds)}</span></p>
             </div>
           ) : (
-            <Button disabled={isClockActionLoading} onClick={() => void handleClockIn()}>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              disabled={isClockActionLoading}
+              onClick={() => void handleClockIn()}
+            >
               {isClockActionLoading ? 'Inchecken...' : 'Inchecken'}
             </Button>
           )}
@@ -571,6 +627,12 @@ export const ZZPTimeTrackingPage = () => {
             <DialogTitle>{editingEntry ? 'Open uren bewerken' : 'Uren toevoegen'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            {formError && (
+              <Alert className="border-destructive/40 bg-destructive/5">
+                <WarningCircle size={16} weight="fill" />
+                <AlertDescription>{formError}</AlertDescription>
+              </Alert>
+            )}
             <div className="space-y-2">
               <Label>Datum</Label>
               <Input type="date" value={formState.entry_date} onChange={(event) => setFormState((prev) => ({ ...prev, entry_date: event.target.value }))} />

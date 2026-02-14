@@ -1,4 +1,5 @@
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
@@ -46,7 +47,7 @@ async def test_invoice_week_marks_entries_invoiced(
     assert payload["invoice_number"].startswith("INV-")
     assert Decimal(payload["total_hours"]) == Decimal("8.00")
 
-    invoice = await db_session.scalar(select(ZZPInvoice).where(ZZPInvoice.id == payload["invoice_id"]))
+    invoice = await db_session.scalar(select(ZZPInvoice).where(ZZPInvoice.id == UUID(payload["invoice_id"])))
     assert invoice is not None
 
     entries = (await db_session.execute(select(ZZPTimeEntry))).scalars().all()

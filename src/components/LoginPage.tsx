@@ -5,9 +5,9 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Database, Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning, CircleNotch, WifiHigh, WifiSlash, Clock } from '@phosphor-icons/react'
+import { Database, Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning, CircleNotch, Clock } from '@phosphor-icons/react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason, checkApiHealth, getErrorMessage, getValidationErrors, HealthCheckResult } from '@/lib/api'
+import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason, getErrorMessage, getValidationErrors } from '@/lib/api'
 import { AxiosError } from 'axios'
 import { t } from '@/i18n'
 
@@ -46,10 +46,6 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   // State for field-level validation errors (for 422 responses)
   const [registerFieldErrors, setRegisterFieldErrors] = useState<Record<string, string>>({})
 
-  // State for API health check
-  const [healthCheck, setHealthCheck] = useState<HealthCheckResult | null>(null)
-  const [isCheckingHealth, setIsCheckingHealth] = useState(false)
-
   // State for resend verification cooldown
   const [resendCooldown, setResendCooldown] = useState(0)
   const [isResending, setIsResending] = useState(false)
@@ -86,27 +82,6 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
       })
     }, 1000)
   }, [])
-
-  // Run health check on mount to detect connectivity issues early
-  useEffect(() => {
-    runHealthCheck()
-  }, [])
-
-  const runHealthCheck = async () => {
-    setIsCheckingHealth(true)
-    try {
-      const result = await checkApiHealth()
-      setHealthCheck(result)
-    } catch {
-      setHealthCheck({
-        success: false,
-        status: 'error',
-        message: 'Health check failed unexpectedly',
-      })
-    } finally {
-      setIsCheckingHealth(false)
-    }
-  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -526,69 +501,6 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
             </Card>
           </TabsContent>
         </Tabs>
-
-        {/* API Connectivity Test Panel */}
-        <div className="mt-6 p-4 bg-card/60 backdrop-blur-sm rounded-lg border border-border/50">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-muted-foreground">{t('api.connectivity')}</span>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={runHealthCheck}
-              disabled={isCheckingHealth}
-              className="h-7 px-2 text-xs"
-            >
-              {isCheckingHealth ? (
-                <CircleNotch size={14} className="mr-1 animate-spin" />
-              ) : (
-                <WifiHigh size={14} className="mr-1" />
-              )}
-              {isCheckingHealth ? t('api.checking') : t('api.test')}
-            </Button>
-          </div>
-          
-          {healthCheck && (
-            <div className={`p-3 rounded-md text-sm ${
-              healthCheck.success 
-                ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-                : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-            }`}>
-              <div className="flex items-center gap-2">
-                {healthCheck.success ? (
-                  <CheckCircle size={16} className="text-green-600 dark:text-green-400" weight="fill" />
-                ) : (
-                  <WifiSlash size={16} className="text-red-600 dark:text-red-400" weight="fill" />
-                )}
-                <span className={`font-medium ${
-                  healthCheck.success 
-                    ? 'text-green-700 dark:text-green-400' 
-                    : 'text-red-700 dark:text-red-400'
-                }`}>
-                  {healthCheck.message}
-                </span>
-              </div>
-              {healthCheck.details && (
-                <p className={`mt-1 text-xs ${
-                  healthCheck.success 
-                    ? 'text-green-600 dark:text-green-500' 
-                    : 'text-red-600 dark:text-red-500'
-                }`}>
-                  {healthCheck.details}
-                </p>
-              )}
-            </div>
-          )}
-          
-          {!healthCheck && !isCheckingHealth && (
-            <p className="text-xs text-muted-foreground">
-              {t('api.testConnectivity')}
-            </p>
-          )}
-        </div>
-
-        <p className="text-center text-xs text-muted-foreground mt-4">
-          Backend API: <code className="bg-secondary px-2 py-1 rounded">{apiUrl}</code>
-        </p>
       </div>
     </div>
   )

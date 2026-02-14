@@ -44,11 +44,16 @@ class TestWeasyPrintOptional:
         auth_headers
     ):
         """Test that PDF endpoint returns 503 when WeasyPrint is not available."""
-        from app.services import invoice_pdf
-        
-        # Mock generate_invoice_pdf to raise RuntimeError (WeasyPrint unavailable)
+        from app.api.v1 import zzp_invoices
+
+        # Force ReportLab primary generation to fail so endpoint reaches WeasyPrint fallback,
+        # then simulate WeasyPrint being unavailable.
         with patch.object(
-            invoice_pdf,
+            zzp_invoices,
+            'generate_invoice_pdf_reportlab',
+            side_effect=Exception("ReportLab unavailable")
+        ), patch.object(
+            zzp_invoices,
             'generate_invoice_pdf',
             side_effect=RuntimeError("PDF generation is not available. WeasyPrint library or its system dependencies are not installed.")
         ):
@@ -56,7 +61,7 @@ class TestWeasyPrintOptional:
                 f"/api/v1/zzp/invoices/{test_invoice_sent.id}/pdf",
                 headers=auth_headers
             )
-            
+
             assert response.status_code == 503
             data = response.json()
             assert data["detail"]["code"] == "PDF_NOT_AVAILABLE"

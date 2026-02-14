@@ -1190,7 +1190,10 @@ const InvoiceCard = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={onDownloadPdf} disabled={isDownloading}>
+              <DropdownMenuItem onClick={(event) => {
+                event.stopPropagation()
+                onDownloadPdf()
+              }} disabled={isDownloading}>
                 {isDownloading ? (
                   <SpinnerGap size={16} className="mr-2 animate-spin" />
                 ) : (
@@ -1198,11 +1201,17 @@ const InvoiceCard = ({
                 )}
                 {t('zzpInvoices.downloadPdf')}
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={onCopyLink}>
+              <DropdownMenuItem onClick={(event) => {
+                event.stopPropagation()
+                onCopyLink()
+              }}>
                 <CopySimple size={16} className="mr-2" />
                 {t('zzpInvoices.copyInvoiceLink')}
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={onShare}>
+              <DropdownMenuItem onClick={(event) => {
+                event.stopPropagation()
+                onShare()
+              }}>
                 <ShareNetwork size={16} className="mr-2" />
                 {t('zzpInvoices.share')}
               </DropdownMenuItem>
@@ -1214,7 +1223,10 @@ const InvoiceCard = ({
               
               {/* Send invoice - only for draft invoices */}
               {invoice.status === 'draft' && (
-                <DropdownMenuItem onSelect={onSendInvoice} disabled={isUpdatingStatus}>
+                <DropdownMenuItem onClick={(event) => {
+                  event.stopPropagation()
+                  onSendInvoice()
+                }} disabled={isUpdatingStatus}>
                   {isUpdatingStatus ? (
                     <SpinnerGap size={16} className="mr-2 animate-spin" />
                   ) : (
@@ -1228,7 +1240,10 @@ const InvoiceCard = ({
               {invoice.status !== 'draft' && invoice.status !== 'cancelled' && (
                 <>
                   {invoice.status === 'paid' ? (
-                    <DropdownMenuItem onSelect={onMarkUnpaid} disabled={isUpdatingStatus}>
+                    <DropdownMenuItem onClick={(event) => {
+                      event.stopPropagation()
+                      onMarkUnpaid()
+                    }} disabled={isUpdatingStatus}>
                       {isUpdatingStatus ? (
                         <SpinnerGap size={16} className="mr-2 animate-spin" />
                       ) : (
@@ -1237,7 +1252,10 @@ const InvoiceCard = ({
                       {t('zzpInvoices.markUnpaid')}
                     </DropdownMenuItem>
                   ) : (
-                    <DropdownMenuItem onSelect={onMarkPaid} disabled={isUpdatingStatus}>
+                    <DropdownMenuItem onClick={(event) => {
+                      event.stopPropagation()
+                      onMarkPaid()
+                    }} disabled={isUpdatingStatus}>
                       {isUpdatingStatus ? (
                         <SpinnerGap size={16} className="mr-2 animate-spin" />
                       ) : (
@@ -1254,7 +1272,10 @@ const InvoiceCard = ({
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
-                    onSelect={onDelete}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onDelete()
+                    }}
                     className="text-destructive focus:text-destructive"
                   >
                     <TrashSimple size={16} className="mr-2" />

@@ -28,9 +28,9 @@ interface FeatureCardProps {
 
 const FeatureCard = ({ icon, title, description }: FeatureCardProps) => {
   return (
-    <Card className="border-2 border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg">
+    <Card className="h-full border border-primary/10 bg-gradient-to-br from-background to-primary/5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl">
       <CardHeader>
-        <div className="mb-3 text-primary">
+        <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
           {icon}
         </div>
         <CardTitle className="text-lg">{title}</CardTitle>
@@ -53,7 +53,7 @@ interface PricingCardProps {
 
 const PricingCard = ({ title, price, features, comingSoon = false, highlighted = false }: PricingCardProps) => {
   return (
-    <Card className={`border-2 ${highlighted ? 'border-primary shadow-xl scale-105' : 'border-border'} transition-all duration-300 hover:shadow-lg relative`}>
+    <Card className={`relative border ${highlighted ? 'scale-105 border-primary/50 bg-gradient-to-b from-primary/10 to-background shadow-2xl shadow-primary/15' : 'border-border bg-background/95'} transition-all duration-300 hover:shadow-xl`}>
       {comingSoon && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-semibold">
           Binnenkort
@@ -279,7 +279,7 @@ export const LandingPage = () => {
   ]
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -349,10 +349,14 @@ export const LandingPage = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-secondary/5 -z-10" />
+      <section className="relative overflow-hidden border-b border-primary/10">
+        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/20 via-background to-secondary/10" />
+        <div className="absolute -top-24 left-1/2 -z-10 h-72 w-72 -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-32">
           <div className="text-center">
+            <span className="inline-flex items-center rounded-full border border-primary/25 bg-primary/10 px-4 py-1 text-sm font-medium text-primary">
+              Slim boekhouden voor moderne ondernemers
+            </span>
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-foreground mb-6">
               Boekhouden voor ZZP'ers,
               <span className="text-primary block mt-2">sneller dan ooit tevoren</span>
@@ -383,18 +387,24 @@ export const LandingPage = () => {
             </div>
 
             {/* Benefits */}
-            <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
-              <div className="flex items-start gap-3">
-                <CheckCircle className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
-                <p className="text-sm text-muted-foreground text-left">Geen creditcard nodig</p>
+            <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
+              <div className="rounded-xl border border-primary/15 bg-background/75 p-4 text-left shadow-sm backdrop-blur-sm">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
+                  <p className="text-sm text-muted-foreground">Geen creditcard nodig</p>
+                </div>
               </div>
-              <div className="flex items-start gap-3">
-                <CheckCircle className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
-                <p className="text-sm text-muted-foreground text-left">14 dagen gratis proberen</p>
+              <div className="rounded-xl border border-primary/15 bg-background/75 p-4 text-left shadow-sm backdrop-blur-sm">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
+                  <p className="text-sm text-muted-foreground">14 dagen gratis proberen</p>
+                </div>
               </div>
-              <div className="flex items-start gap-3">
-                <CheckCircle className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
-                <p className="text-sm text-muted-foreground text-left">Opzeggen wanneer je wilt</p>
+              <div className="rounded-xl border border-primary/15 bg-background/75 p-4 text-left shadow-sm backdrop-blur-sm">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
+                  <p className="text-sm text-muted-foreground">Opzeggen wanneer je wilt</p>
+                </div>
               </div>
             </div>
 
@@ -409,11 +419,11 @@ export const LandingPage = () => {
       </section>
 
       {/* Social Proof / Trust Strip */}
-      <section id="product" className="border-y border-border bg-muted/30">
+      <section id="product" className="border-y border-border bg-gradient-to-r from-muted/40 to-primary/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
             <p className="text-sm font-semibold text-primary mb-4">VERTROUWD DOOR PROFESSIONALS</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center justify-items-center opacity-60">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center justify-items-center">
               <div className="text-2xl font-bold text-muted-foreground">500+ ZZP'ers</div>
               <div className="text-2xl font-bold text-muted-foreground">50+ Boekhouders</div>
               <div className="text-2xl font-bold text-muted-foreground">99.9% Uptime</div>
@@ -441,7 +451,7 @@ export const LandingPage = () => {
       </section>
 
       {/* Voor Boekhouders Section */}
-      <section id="boekhouder" className="py-20 bg-muted/30">
+      <section id="boekhouder" className="py-20 bg-gradient-to-b from-muted/40 to-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Voor Boekhouders</h2>
@@ -470,7 +480,7 @@ export const LandingPage = () => {
             {steps.map((step, index) => (
               <div key={index} className="relative">
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-16 h-16 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-2xl font-bold mb-4">
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground shadow-lg shadow-primary/30">
                     {step.step}
                   </div>
                   <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
@@ -486,7 +496,7 @@ export const LandingPage = () => {
       </section>
 
       {/* Pricing Section */}
-      <section id="prijzen" className="py-20 bg-muted/30">
+      <section id="prijzen" className="py-20 bg-gradient-to-b from-primary/5 to-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Transparante prijzen</h2>
@@ -511,7 +521,7 @@ export const LandingPage = () => {
               Alles wat je moet weten over Smart Accounting
             </p>
           </div>
-          <Card>
+          <Card className="border-primary/15 shadow-lg shadow-primary/10">
             <CardContent className="p-0">
               {faqItems.map((faq, index) => (
                 <FAQItem

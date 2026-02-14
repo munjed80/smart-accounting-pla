@@ -8,7 +8,7 @@ import asyncio
 import pytest
 import pytest_asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from typing import AsyncGenerator, Generator
 
 from httpx import ASGITransport, AsyncClient
@@ -20,7 +20,7 @@ from app.core.database import get_db, Base
 from app.models.user import User
 from app.core.roles import UserRole
 from app.models.administration import Administration, AdministrationMember, MemberRole
-from app.models.zzp import ZZPCustomer
+from app.models.zzp import ZZPCustomer, ZZPInvoice, InvoiceStatus
 from app.core.security import create_access_token, get_password_hash
 # Import all models to ensure they're registered with Base.metadata
 from app import models  # noqa
@@ -149,3 +149,28 @@ async def test_customer(db_session: AsyncSession, test_administration: Administr
     await db_session.commit()
     await db_session.refresh(customer)
     return customer
+
+
+@pytest_asyncio.fixture(scope="function")
+async def test_invoice_sent(
+    db_session: AsyncSession,
+    test_administration: Administration,
+    test_customer: ZZPCustomer,
+) -> ZZPInvoice:
+    """Create a sent invoice for tests that require an existing invoice."""
+    invoice = ZZPInvoice(
+        administration_id=test_administration.id,
+        customer_id=test_customer.id,
+        invoice_number=f"INV-TEST-{uuid.uuid4().hex[:8].upper()}",
+        status=InvoiceStatus.SENT.value,
+        issue_date=date.today(),
+        seller_company_name="Test Company",
+        customer_name=test_customer.name,
+        subtotal_cents=10000,
+        vat_total_cents=2100,
+        total_cents=12100,
+    )
+    db_session.add(invoice)
+    await db_session.commit()
+    await db_session.refresh(invoice)
+    return invoice

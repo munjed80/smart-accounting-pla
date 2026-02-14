@@ -1,554 +1,429 @@
-"""
-Admin API endpoints for user management.
-
-This module provides secure administrative endpoints for managing users,
-particularly for fixing user roles when needed.
-
-Security:
-- All endpoints require admin authentication
-- Admin users must be in ADMIN_WHITELIST to access these endpoints
-"""
+import json
 import logging
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, EmailStr
-from sqlalchemy import select, func
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
+from app.api.v1.deps import CurrentUser, require_super_admin
 from app.core.database import get_db
-from app.core.config import settings
-from app.models.user import User
+from app.core.security import create_access_token
 from app.models.administration import Administration, AdministrationMember, MemberRole
-from app.models.accountant_dashboard import AccountantClientAssignment
-from app.api.v1.deps import CurrentUser
-
+from app.models.subscription import AdminAuditLog, Plan, Subscription
+from app.models.transaction import Transaction
+from app.models.user import User
+from app.models.zzp import ZZPInvoice
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-# Valid roles that can be assigned
-VALID_ROLES = {"zzp", "accountant", "admin"}
+class AdminOverviewResponse(BaseModel):
+    users_count: int
+    administrations_count: int
+    active_subscriptions_count: int
+    mrr_estimate: float
+    invoices_last_30_days: int
 
 
-class UpdateRoleRequest(BaseModel):
-    """Request body for updating a user's role."""
-    role: str = Field(..., pattern="^(zzp|accountant|admin)$", description="New role for the user")
+class AdministrationListItem(BaseModel):
+    id: UUID
+    name: str
+    owner_email: str | None
+    plan: str | None
+    subscription_status: str | None
+    created_at: datetime
+    last_activity: datetime | None
 
 
-class UpdateRoleResponse(BaseModel):
-    """Response after successfully updating a user's role."""
-    message: str
-    user_id: UUID
-    old_role: str
-    new_role: str
+class AdministrationListResponse(BaseModel):
+    administrations: list[AdministrationListItem]
+    total: int
 
 
 class UserListItem(BaseModel):
-    """User item for list response."""
     id: UUID
     email: str
     full_name: str
     role: str
     is_active: bool
-    is_email_verified: bool
-
-    class Config:
-        from_attributes = True
+    last_login_at: datetime | None
+    administration_membership_count: int
 
 
 class UserListResponse(BaseModel):
-    """Response for listing users."""
     users: list[UserListItem]
     total: int
 
 
-def require_admin(current_user: CurrentUser) -> User:
-    """
-    Dependency to require admin access.
-    
-    Verifies the current user is an admin AND is in the admin whitelist.
-    """
-    if current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
-        )
-    
-    # Also check whitelist for extra security
-    whitelist = settings.admin_whitelist_list
-    if current_user.email.lower() not in whitelist:
-        logger.warning(
-            "Admin endpoint access attempted by non-whitelisted admin",
-            extra={
-                "event": "admin_access_blocked",
-                "user_id": str(current_user.id),
-                "email": current_user.email,
-            }
-        )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access is restricted to whitelisted users"
-        )
-    
+class UpdateUserStatusRequest(BaseModel):
+    is_active: bool
+
+
+class UpdateSubscriptionRequest(BaseModel):
+    plan_id: UUID | None = None
+    status: str | None = Field(default=None, pattern="^(trial|active|past_due|canceled)$")
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+
+
+class ImpersonateResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    impersonated_user_id: UUID
+
+
+def _ensure_super_admin(current_user: CurrentUser) -> User:
+    require_super_admin(current_user)
     return current_user
 
 
-AdminUser = Annotated[User, Depends(require_admin)]
+SuperAdminUser = Annotated[User, Depends(_ensure_super_admin)]
 
 
-@router.patch("/users/{user_id}/role", response_model=UpdateRoleResponse)
-async def update_user_role(
-    user_id: UUID,
-    request: UpdateRoleRequest,
-    admin_user: AdminUser,
+def _latest_subscription_subquery():
+    return (
+        select(
+            Subscription.administration_id.label("administration_id"),
+            func.max(Subscription.created_at).label("max_created_at"),
+        )
+        .group_by(Subscription.administration_id)
+        .subquery("latest_subscription")
+    )
+
+
+async def _write_audit_log(
+    db: AsyncSession,
+    actor_user_id: UUID,
+    action: str,
+    target_type: str,
+    target_id: str,
+    details: dict | None = None,
+) -> None:
+    audit_entry = AdminAuditLog(
+        actor_user_id=actor_user_id,
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        details=json.dumps(details) if details else None,
+    )
+    db.add(audit_entry)
+
+
+@router.get("/overview", response_model=AdminOverviewResponse)
+async def get_admin_overview(
+    super_admin: SuperAdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """
-    Update a user's role.
-    
-    This endpoint allows administrators to change a user's role.
-    Use this to fix accounts that were created with the wrong role.
-    
-    Security:
-    - Requires admin authentication
-    - Admin must be in ADMIN_WHITELIST
-    - Cannot demote yourself (prevents lockout)
-    
-    Args:
-        user_id: UUID of the user to update
-        request: Request body containing the new role
-        
-    Returns:
-        UpdateRoleResponse with the old and new roles
-        
-    Raises:
-        404: User not found
-        400: Invalid role or self-demotion attempt
-        403: Not authorized (not admin or not whitelisted)
-    """
-    # Find the target user
-    result = await db.execute(select(User).where(User.id == user_id))
-    target_user = result.scalar_one_or_none()
-    
-    if not target_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    latest_subscription_sq = _latest_subscription_subquery()
+
+    users_count = (await db.execute(select(func.count()).select_from(User))).scalar() or 0
+    administrations_count = (await db.execute(select(func.count()).select_from(Administration))).scalar() or 0
+
+    active_subscriptions_count = (
+        await db.execute(
+            select(func.count())
+            .select_from(Subscription)
+            .join(
+                latest_subscription_sq,
+                and_(
+                    latest_subscription_sq.c.administration_id == Subscription.administration_id,
+                    latest_subscription_sq.c.max_created_at == Subscription.created_at,
+                ),
+            )
+            .where(Subscription.status.in_(["active", "trial"]))
         )
-    
-    # Validate role
-    if request.role not in VALID_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid role. Must be one of: {', '.join(sorted(VALID_ROLES))}"
+    ).scalar() or 0
+
+    mrr_raw = (
+        await db.execute(
+            select(func.coalesce(func.sum(Plan.price_monthly), Decimal("0")))
+            .select_from(Subscription)
+            .join(
+                latest_subscription_sq,
+                and_(
+                    latest_subscription_sq.c.administration_id == Subscription.administration_id,
+                    latest_subscription_sq.c.max_created_at == Subscription.created_at,
+                ),
+            )
+            .join(Plan, Plan.id == Subscription.plan_id)
+            .where(Subscription.status == "active")
         )
-    
-    # Prevent self-demotion from admin (to avoid lockout)
-    if admin_user.id == target_user.id and request.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot demote yourself from admin. Ask another admin to do this."
+    ).scalar() or Decimal("0")
+
+    invoices_last_30_days = (
+        await db.execute(
+            select(func.count()).select_from(ZZPInvoice).where(ZZPInvoice.created_at >= thirty_days_ago)
         )
-    
-    # Store old role for response
-    old_role = target_user.role
-    
-    # Update the role
-    target_user.role = request.role
-    await db.commit()
-    
+    ).scalar() or 0
+
+    logger.info("Admin overview requested", extra={"event": "admin_overview", "user_id": str(super_admin.id)})
+
+    return AdminOverviewResponse(
+        users_count=users_count,
+        administrations_count=administrations_count,
+        active_subscriptions_count=active_subscriptions_count,
+        mrr_estimate=float(mrr_raw),
+        invoices_last_30_days=invoices_last_30_days,
+    )
+
+
+@router.get("/administrations", response_model=AdministrationListResponse)
+async def list_administrations(
+    super_admin: SuperAdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    query: str | None = None,
+    status: str | None = Query(default=None, pattern="^(trial|active|past_due|canceled)$"),
+    plan: str | None = None,
+):
+    owner_alias = User
+    latest_subscription_sq = _latest_subscription_subquery()
+
+    stmt = (
+        select(
+            Administration.id,
+            Administration.name,
+            owner_alias.email,
+            Plan.name.label("plan_name"),
+            Subscription.status,
+            Administration.created_at,
+            func.max(Transaction.created_at).label("last_activity"),
+        )
+        .select_from(Administration)
+        .outerjoin(
+            AdministrationMember,
+            and_(AdministrationMember.administration_id == Administration.id, AdministrationMember.role == MemberRole.OWNER),
+        )
+        .outerjoin(owner_alias, owner_alias.id == AdministrationMember.user_id)
+        .outerjoin(
+            latest_subscription_sq,
+            latest_subscription_sq.c.administration_id == Administration.id,
+        )
+        .outerjoin(
+            Subscription,
+            and_(
+                Subscription.administration_id == latest_subscription_sq.c.administration_id,
+                Subscription.created_at == latest_subscription_sq.c.max_created_at,
+            ),
+        )
+        .outerjoin(Plan, Plan.id == Subscription.plan_id)
+        .outerjoin(Transaction, Transaction.administration_id == Administration.id)
+        .group_by(
+            Administration.id,
+            Administration.name,
+            owner_alias.email,
+            Plan.name,
+            Subscription.status,
+            Administration.created_at,
+        )
+        .order_by(Administration.created_at.desc())
+    )
+
+    if query:
+        q = f"%{query.lower()}%"
+        stmt = stmt.where(
+            or_(func.lower(Administration.name).like(q), func.lower(func.coalesce(owner_alias.email, "")).like(q))
+        )
+    if status:
+        stmt = stmt.where(Subscription.status == status)
+    if plan:
+        stmt = stmt.where(func.lower(Plan.name) == plan.lower())
+
+    rows = (await db.execute(stmt)).all()
+    administrations = [
+        AdministrationListItem(
+            id=row.id,
+            name=row.name,
+            owner_email=row.email,
+            plan=row.plan_name,
+            subscription_status=row.status,
+            created_at=row.created_at,
+            last_activity=row.last_activity,
+        )
+        for row in rows
+    ]
+
     logger.info(
-        "User role updated",
-        extra={
-            "event": "user_role_updated",
-            "admin_user_id": str(admin_user.id),
-            "target_user_id": str(target_user.id),
-            "old_role": old_role,
-            "new_role": request.role,
-        }
+        "Admin administrations list requested",
+        extra={"event": "admin_administrations_list", "user_id": str(super_admin.id), "count": len(administrations)},
     )
-    
-    return UpdateRoleResponse(
-        message=f"Role updated successfully from '{old_role}' to '{request.role}'",
-        user_id=target_user.id,
-        old_role=old_role,
-        new_role=request.role,
-    )
+
+    return AdministrationListResponse(administrations=administrations, total=len(administrations))
 
 
 @router.get("/users", response_model=UserListResponse)
 async def list_users(
-    admin_user: AdminUser,
+    super_admin: SuperAdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    role: str | None = None,
-    limit: int = 100,
-    offset: int = 0,
+    query: str | None = None,
+    role: str | None = Query(default=None, pattern="^(super_admin|admin|accountant|zzp)$"),
 ):
-    """
-    List all users.
-    
-    Returns a paginated list of users with optional role filtering.
-    
-    Args:
-        role: Optional filter by role (zzp, accountant, admin)
-        limit: Maximum number of users to return (default 100, max 500)
-        offset: Number of users to skip for pagination
-        
-    Returns:
-        UserListResponse with list of users and total count
-    """
-    # Validate and cap limit
-    limit = min(limit, 500)
-    
-    # Build base query filter
-    base_filter = User.role == role if role else True
-    if role and role not in VALID_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid role filter. Must be one of: {', '.join(sorted(VALID_ROLES))}"
+    stmt = (
+        select(
+            User.id,
+            User.email,
+            User.full_name,
+            User.role,
+            User.is_active,
+            User.last_login_at,
+            func.count(AdministrationMember.id).label("membership_count"),
         )
-    
-    # Get total count efficiently using COUNT
-    count_query = select(func.count()).select_from(User)
-    if role:
-        count_query = count_query.where(User.role == role)
-    count_result = await db.execute(count_query)
-    total = count_result.scalar() or 0
-    
-    # Get paginated results
-    query = select(User)
-    if role:
-        query = query.where(User.role == role)
-    query = query.order_by(User.created_at.desc()).offset(offset).limit(limit)
-    result = await db.execute(query)
-    users = result.scalars().all()
-    
-    return UserListResponse(
-        users=[
-            UserListItem(
-                id=user.id,
-                email=user.email,
-                full_name=user.full_name,
-                role=user.role,
-                is_active=user.is_active,
-                is_email_verified=user.is_email_verified,
-            )
-            for user in users
-        ],
-        total=total,
+        .outerjoin(AdministrationMember, AdministrationMember.user_id == User.id)
+        .group_by(User.id)
+        .order_by(User.created_at.desc())
     )
 
+    if query:
+        q = f"%{query.lower()}%"
+        stmt = stmt.where(or_(func.lower(User.email).like(q), func.lower(User.full_name).like(q)))
+    if role:
+        stmt = stmt.where(User.role == role)
 
-@router.get("/users/{user_id}", response_model=UserListItem)
-async def get_user(
+    rows = (await db.execute(stmt)).all()
+    users = [
+        UserListItem(
+            id=row.id,
+            email=row.email,
+            full_name=row.full_name,
+            role=row.role,
+            is_active=row.is_active,
+            last_login_at=row.last_login_at,
+            administration_membership_count=row.membership_count,
+        )
+        for row in rows
+    ]
+
+    logger.info(
+        "Admin users list requested",
+        extra={"event": "admin_users_list", "user_id": str(super_admin.id), "count": len(users)},
+    )
+
+    return UserListResponse(users=users, total=len(users))
+
+
+@router.patch("/users/{user_id}/status")
+async def update_user_status(
     user_id: UUID,
-    admin_user: AdminUser,
+    payload: UpdateUserStatusRequest,
+    super_admin: SuperAdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """
-    Get details of a specific user.
-    
-    Args:
-        user_id: UUID of the user to retrieve
-        
-    Returns:
-        UserListItem with user details
-        
-    Raises:
-        404: User not found
-    """
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    return UserListItem(
-        id=user.id,
-        email=user.email,
-        full_name=user.full_name,
-        role=user.role,
-        is_active=user.is_active,
-        is_email_verified=user.is_email_verified,
+        raise HTTPException(status_code=404, detail="User not found")
+
+    old_status = user.is_active
+    user.is_active = payload.is_active
+
+    await _write_audit_log(
+        db,
+        actor_user_id=super_admin.id,
+        action="user_status_updated",
+        target_type="user",
+        target_id=str(user.id),
+        details={"old_is_active": old_status, "new_is_active": payload.is_active},
     )
-
-
-# ===========================================================================
-# DEV-ONLY ENDPOINTS: Accountant-Client Assignment Seeding
-# ===========================================================================
-# These endpoints are available to admin/accountant users for development
-# purposes to quickly set up accountant-client assignments.
-# ===========================================================================
-
-
-class DevAssignmentByEmailRequest(BaseModel):
-    """Request body for dev assignment by email."""
-    accountant_email: EmailStr = Field(..., description="Email of the accountant to assign clients to")
-    client_email: EmailStr | None = Field(None, description="Email of specific ZZP client (or None for all)")
-
-
-class DevAssignmentResult(BaseModel):
-    """Result of a single assignment operation."""
-    client_email: str
-    administration_name: str
-    status: str  # "created", "exists", "skipped"
-    message: str
-
-
-class DevAssignmentResponse(BaseModel):
-    """Response from dev assignment endpoint."""
-    accountant_email: str
-    accountant_name: str
-    total_assigned: int
-    total_skipped: int
-    results: list[DevAssignmentResult]
-
-
-class DevAssignmentsListItem(BaseModel):
-    """Item in dev assignments list."""
-    id: UUID
-    accountant_email: str
-    accountant_name: str
-    administration_id: UUID
-    administration_name: str
-    client_user_email: str | None = None
-    assigned_at: str
-
-
-class DevAssignmentsListResponse(BaseModel):
-    """Response for listing all assignments."""
-    assignments: list[DevAssignmentsListItem]
-    total: int
-
-
-@router.post("/dev/seed-assignments", response_model=DevAssignmentResponse)
-async def dev_seed_assignments(
-    request: DevAssignmentByEmailRequest,
-    current_user: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    """
-    DEV ENDPOINT: Create accountant-client assignments.
-    
-    This endpoint is for development purposes to quickly set up accountant-client
-    assignments. It:
-    1. Finds the accountant by email
-    2. Finds ZZP users (specific one or all) with administrations
-    3. Creates AccountantClientAssignment records
-    4. Is idempotent (skips existing assignments)
-    
-    Access: Requires accountant or admin role.
-    
-    Args:
-        accountant_email: Email of the accountant to assign clients to
-        client_email: Optional email of specific ZZP client (None = all ZZP users)
-    
-    Returns:
-        DevAssignmentResponse with list of results
-    """
-    # Verify caller is accountant or admin
-    if current_user.role not in ["accountant", "admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This endpoint requires accountant or admin role"
-        )
-    
-    # 1. Find the accountant
-    accountant_result = await db.execute(
-        select(User).where(User.email == request.accountant_email.lower().strip())
-    )
-    accountant = accountant_result.scalar_one_or_none()
-    
-    if not accountant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "ACCOUNTANT_NOT_FOUND", "message": f"Accountant not found: {request.accountant_email}"}
-        )
-    
-    if accountant.role not in ["accountant", "admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"code": "NOT_ACCOUNTANT", "message": f"User {request.accountant_email} has role '{accountant.role}', not accountant"}
-        )
-    
-    # 2. Find ZZP users
-    if request.client_email:
-        zzp_query = select(User).where(
-            User.email == request.client_email.lower().strip(),
-            User.role == "zzp"
-        )
-    else:
-        zzp_query = select(User).where(User.role == "zzp")
-    
-    zzp_result = await db.execute(zzp_query)
-    zzp_users = zzp_result.scalars().all()
-    
-    if not zzp_users:
-        if request.client_email:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={"code": "ZZP_NOT_FOUND", "message": f"No ZZP user found with email: {request.client_email}"}
-            )
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "NO_ZZP_USERS", "message": "No ZZP users found in database"}
-        )
-    
-    # 3. Process each ZZP user
-    results = []
-    total_assigned = 0
-    total_skipped = 0
-    
-    for zzp_user in zzp_users:
-        # Find administrations where this user is OWNER
-        admin_member_result = await db.execute(
-            select(AdministrationMember)
-            .options(selectinload(AdministrationMember.administration))
-            .where(AdministrationMember.user_id == zzp_user.id)
-            .where(AdministrationMember.role == MemberRole.OWNER)
-        )
-        admin_members = admin_member_result.scalars().all()
-        
-        if not admin_members:
-            results.append(DevAssignmentResult(
-                client_email=zzp_user.email,
-                administration_name="N/A",
-                status="skipped",
-                message="No administration found (user needs to complete onboarding)"
-            ))
-            total_skipped += 1
-            continue
-        
-        for member in admin_members:
-            administration = member.administration
-            if not administration:
-                continue
-            
-            # Check if assignment already exists
-            existing_result = await db.execute(
-                select(AccountantClientAssignment)
-                .where(AccountantClientAssignment.accountant_id == accountant.id)
-                .where(AccountantClientAssignment.administration_id == administration.id)
-            )
-            existing = existing_result.scalar_one_or_none()
-            
-            if existing:
-                results.append(DevAssignmentResult(
-                    client_email=zzp_user.email,
-                    administration_name=administration.name,
-                    status="exists",
-                    message="Assignment already exists"
-                ))
-                total_skipped += 1
-                continue
-            
-            # Create assignment
-            assignment = AccountantClientAssignment(
-                accountant_id=accountant.id,
-                administration_id=administration.id,
-                is_primary=True,
-                assigned_by_id=current_user.id,
-                notes=f"Created via dev/seed-assignments API for {zzp_user.email}",
-            )
-            db.add(assignment)
-            
-            results.append(DevAssignmentResult(
-                client_email=zzp_user.email,
-                administration_name=administration.name,
-                status="created",
-                message="Assignment created successfully"
-            ))
-            total_assigned += 1
-    
     await db.commit()
-    
-    return DevAssignmentResponse(
-        accountant_email=accountant.email,
-        accountant_name=accountant.full_name,
-        total_assigned=total_assigned,
-        total_skipped=total_skipped,
-        results=results,
+
+    logger.info(
+        "Admin updated user status",
+        extra={"event": "admin_user_status_updated", "actor": str(super_admin.id), "target": str(user.id)},
     )
+    return {"message": "User status updated"}
 
 
-@router.get("/dev/assignments", response_model=DevAssignmentsListResponse)
-async def dev_list_assignments(
-    current_user: CurrentUser,
+@router.patch("/administrations/{admin_id}/subscription")
+async def update_administration_subscription(
+    admin_id: UUID,
+    payload: UpdateSubscriptionRequest,
+    super_admin: SuperAdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    accountant_email: str | None = None,
 ):
-    """
-    DEV ENDPOINT: List all accountant-client assignments.
-    
-    Returns all assignments in the system for debugging/verification.
-    
-    Access: Requires accountant or admin role.
-    
-    Args:
-        accountant_email: Optional filter by accountant email
-    
-    Returns:
-        DevAssignmentsListResponse with list of all assignments
-    """
-    # Verify caller is accountant or admin
-    if current_user.role not in ["accountant", "admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This endpoint requires accountant or admin role"
+    administration = (await db.execute(select(Administration).where(Administration.id == admin_id))).scalar_one_or_none()
+    if not administration:
+        raise HTTPException(status_code=404, detail="Administration not found")
+
+    subscription = (
+        await db.execute(
+            select(Subscription)
+            .where(Subscription.administration_id == admin_id)
+            .order_by(Subscription.created_at.desc())
         )
-    
-    query = (
-        select(AccountantClientAssignment)
-        .options(
-            selectinload(AccountantClientAssignment.accountant),
-            selectinload(AccountantClientAssignment.administration),
+    ).scalars().first()
+
+    if not subscription:
+        if not payload.plan_id:
+            raise HTTPException(status_code=400, detail="plan_id is required when creating a subscription")
+        subscription = Subscription(
+            administration_id=admin_id,
+            plan_id=payload.plan_id,
+            status=payload.status or "trial",
+            starts_at=payload.starts_at or datetime.now(timezone.utc),
+            ends_at=payload.ends_at,
         )
-        .order_by(AccountantClientAssignment.assigned_at.desc())
+        db.add(subscription)
+        action = "subscription_created"
+    else:
+        if payload.plan_id:
+            subscription.plan_id = payload.plan_id
+        if payload.status:
+            subscription.status = payload.status
+        if payload.starts_at:
+            subscription.starts_at = payload.starts_at
+        if payload.ends_at is not None:
+            subscription.ends_at = payload.ends_at
+        action = "subscription_updated"
+
+    await _write_audit_log(
+        db,
+        actor_user_id=super_admin.id,
+        action=action,
+        target_type="administration",
+        target_id=str(admin_id),
+        details=payload.model_dump(exclude_none=True),
     )
-    
-    if accountant_email:
-        # Filter by accountant email via subquery
-        accountant_subquery = select(User.id).where(User.email == accountant_email.lower().strip())
-        query = query.where(AccountantClientAssignment.accountant_id.in_(accountant_subquery))
-    
-    result = await db.execute(query)
-    assignments = result.scalars().all()
-    
-    items = []
-    for assignment in assignments:
-        # Get client user email if possible
-        client_email = None
-        if assignment.administration:
-            # Find the owner of the administration
-            owner_result = await db.execute(
-                select(AdministrationMember)
-                .options(selectinload(AdministrationMember.user))
-                .where(AdministrationMember.administration_id == assignment.administration_id)
-                .where(AdministrationMember.role == MemberRole.OWNER)
-                .limit(1)
-            )
-            owner_member = owner_result.scalar_one_or_none()
-            if owner_member and owner_member.user:
-                client_email = owner_member.user.email
-        
-        items.append(DevAssignmentsListItem(
-            id=assignment.id,
-            accountant_email=assignment.accountant.email if assignment.accountant else "Unknown",
-            accountant_name=assignment.accountant.full_name if assignment.accountant else "Unknown",
-            administration_id=assignment.administration_id,
-            administration_name=assignment.administration.name if assignment.administration else "Unknown",
-            client_user_email=client_email,
-            assigned_at=assignment.assigned_at.isoformat() if assignment.assigned_at else "N/A",
-        ))
-    
-    return DevAssignmentsListResponse(
-        assignments=items,
-        total=len(items),
+    await db.commit()
+
+    logger.info(
+        "Admin changed administration subscription",
+        extra={"event": "admin_subscription_updated", "actor": str(super_admin.id), "administration_id": str(admin_id)},
     )
+    return {"message": "Subscription updated"}
+
+
+@router.post("/impersonate/{user_id}", response_model=ImpersonateResponse)
+async def impersonate_user(
+    user_id: UUID,
+    super_admin: SuperAdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    token = create_access_token(
+        data={"sub": str(user.id), "impersonated_by": str(super_admin.id), "is_impersonation": True}
+    )
+
+    await _write_audit_log(
+        db,
+        actor_user_id=super_admin.id,
+        action="impersonation_issued",
+        target_type="user",
+        target_id=str(user.id),
+        details={"impersonated_email": user.email},
+    )
+    await db.commit()
+
+    logger.warning(
+        "Impersonation token issued",
+        extra={"event": "admin_impersonation", "actor": str(super_admin.id), "target": str(user.id)},
+    )
+
+    return ImpersonateResponse(access_token=token, impersonated_user_id=user.id)

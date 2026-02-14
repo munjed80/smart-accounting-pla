@@ -357,7 +357,7 @@ export interface User {
   id: string
   email: string
   full_name: string
-  role: 'zzp' | 'accountant' | 'admin'
+  role: 'zzp' | 'accountant' | 'admin' | 'super_admin'
   is_active: boolean
   is_email_verified?: boolean
 }
@@ -4329,4 +4329,60 @@ export const zzpApi = {
 
   // ------------ Links / Consent (from zzpConsentApi) ------------
   ...zzpConsentApi,
+}
+
+
+export interface AdminOverview {
+  users_count: number
+  administrations_count: number
+  active_subscriptions_count: number
+  mrr_estimate: number
+  invoices_last_30_days: number
+}
+
+export interface AdminCompanyRow {
+  id: string
+  name: string
+  owner_email: string | null
+  plan: string | null
+  subscription_status: 'trial' | 'active' | 'past_due' | 'canceled' | null
+  created_at: string
+  last_activity: string | null
+}
+
+export interface AdminUserRow {
+  id: string
+  email: string
+  full_name: string
+  role: 'zzp' | 'accountant' | 'admin' | 'super_admin'
+  is_active: boolean
+  last_login_at: string | null
+  administration_membership_count: number
+}
+
+export const adminApi = {
+  getOverview: async (): Promise<AdminOverview> => {
+    const response = await api.get('/admin/overview')
+    return response.data
+  },
+  getAdministrations: async (params?: { query?: string; status?: string; plan?: string }): Promise<{ administrations: AdminCompanyRow[]; total: number }> => {
+    const response = await api.get('/admin/administrations', { params })
+    return response.data
+  },
+  getUsers: async (params?: { query?: string; role?: string }): Promise<{ users: AdminUserRow[]; total: number }> => {
+    const response = await api.get('/admin/users', { params })
+    return response.data
+  },
+  updateUserStatus: async (userId: string, is_active: boolean): Promise<{ message: string }> => {
+    const response = await api.patch(`/admin/users/${userId}/status`, { is_active })
+    return response.data
+  },
+  updateAdministrationSubscription: async (administrationId: string, payload: { plan_id?: string; status?: string; starts_at?: string; ends_at?: string | null }): Promise<{ message: string }> => {
+    const response = await api.patch(`/admin/administrations/${administrationId}/subscription`, payload)
+    return response.data
+  },
+  impersonate: async (userId: string): Promise<{ access_token: string; token_type: string; impersonated_user_id: string }> => {
+    const response = await api.post(`/admin/impersonate/${userId}`)
+    return response.data
+  },
 }

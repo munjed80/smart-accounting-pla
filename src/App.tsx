@@ -34,6 +34,7 @@ import { IntelligentUploadPortal } from '@/components/IntelligentUploadPortal'
 import { SmartTransactionList } from '@/components/SmartTransactionList'
 import { SettingsPage } from '@/components/SettingsPage'
 import { SupportPage } from '@/components/SupportPage'
+import { AdminDashboard } from '@/components/AdminDashboard'
 import { AppShell } from '@/components/AppShell'
 import { DashboardErrorBoundary } from '@/components/DashboardErrorBoundary'
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt'
@@ -149,7 +150,7 @@ const getRouteFromURL = (): Route => {
 }
 
 // Map URL paths to tab values
-const pathToTab = (path: string, isAccountant: boolean): string => {
+const pathToTab = (path: string, isAccountant: boolean, isSuperAdmin = false): string => {
   // Normalize path
   const normalizedPath = path.toLowerCase().replace(/\/$/, '') || '/'
   
@@ -188,6 +189,8 @@ const pathToTab = (path: string, isAccountant: boolean): string => {
       return 'settings'
     case '/support':
       return 'support'
+    case '/admin':
+      return 'admin'
     case '/dashboard/boekhouder':
     case '/zzp/boekhouder':
       return 'boekhouder'
@@ -204,19 +207,19 @@ const pathToTab = (path: string, isAccountant: boolean): string => {
     case '/':
     default:
       // Default based on role
-      return isAccountant ? 'workqueue' : 'dashboard'
+      return isSuperAdmin ? 'admin' : isAccountant ? 'workqueue' : 'dashboard'
   }
 }
 
 // Map tab values to URL paths
-const tabToPath = (tab: string, isAccountant: boolean): string => {
+const tabToPath = (tab: string, isAccountant: boolean, isSuperAdmin = false): string => {
   switch (tab) {
     case 'dashboard':
       return '/dashboard'
     case 'transactions':
       return '/transactions'
     case 'workqueue':
-      return isAccountant ? '/accountant' : '/dashboard'
+      return isSuperAdmin ? '/admin' : isAccountant ? '/accountant' : '/dashboard'
     case 'reviewqueue':
       return '/accountant/review-queue'
     case 'reminders':
@@ -239,6 +242,8 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
       return '/settings'
     case 'support':
       return '/support'
+    case 'admin':
+      return '/admin'
     case 'boekhouder':
       return '/dashboard/boekhouder'
     case 'customers':
@@ -252,15 +257,16 @@ const tabToPath = (tab: string, isAccountant: boolean): string => {
     case 'agenda':
       return '/zzp/agenda'
     default:
-      return isAccountant ? '/accountant' : '/dashboard'
+      return isSuperAdmin ? '/admin' : isAccountant ? '/accountant' : '/dashboard'
   }
 }
 
 const AppContent = () => {
   const { user, isAuthenticated, isLoading, checkSession, logout } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
+  const isSuperAdmin = user?.role === 'super_admin'
   const isAccountantOnly = user?.role === 'accountant'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'expenses' | 'time' | 'agenda'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'expenses' | 'time' | 'agenda' | 'admin'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
   // Onboarding state - tracks if user needs onboarding (no administrations for ZZP, no clients for accountants)
@@ -281,13 +287,13 @@ const AppContent = () => {
       
       // Update active tab based on URL path
       if (newRoute.type === 'app' && user) {
-        const newTab = pathToTab(newRoute.path, isAccountant)
+        const newTab = pathToTab(newRoute.path, isAccountant, isSuperAdmin)
         setActiveTab(newTab as typeof activeTab)
       }
     }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
-  }, [user, isAccountant])
+  }, [user, isAccountant, isSuperAdmin])
   
   // Global overlay cleanup on route changes
   // This provides a backstop cleanup in case individual components don't properly
@@ -318,16 +324,16 @@ const AppContent = () => {
       if (!hasSetInitialTab) {
         // Set initial tab based on URL path or default to role-appropriate tab
         if (route.type === 'app') {
-          const tabFromPath = pathToTab(route.path, userIsAccountant)
+          const tabFromPath = pathToTab(route.path, userIsAccountant, user.role === "super_admin")
           setActiveTab(tabFromPath as typeof activeTab)
         } else {
-          const defaultTab = userIsAccountant ? 'workqueue' : 'dashboard'
+          const defaultTab = user.role === 'super_admin' ? 'admin' : userIsAccountant ? 'workqueue' : 'dashboard'
           setActiveTab(defaultTab)
         }
         setHasSetInitialTab(true)
       } else if (route.type === 'app') {
         // Sync tab with route when URL changes
-        const tabFromPath = pathToTab(route.path, userIsAccountant)
+        const tabFromPath = pathToTab(route.path, userIsAccountant, user.role === "super_admin")
         if (tabFromPath !== activeTab) {
           setActiveTab(tabFromPath as typeof activeTab)
         }
@@ -343,7 +349,7 @@ const AppContent = () => {
   // Handle tab change - update URL
   const handleTabChange = (tab: string) => {
     setActiveTab(tab as typeof activeTab)
-    const path = tabToPath(tab, isAccountant)
+    const path = tabToPath(tab, isAccountant, isSuperAdmin)
     navigateTo(path)
   }
 
@@ -543,7 +549,7 @@ const AppContent = () => {
         onSuccess={(loggedInUser) => {
           // Navigate to the role-appropriate landing page - no "/" fallback
           const userIsAccountant = loggedInUser?.role === 'accountant' || loggedInUser?.role === 'admin'
-          const landingPath = userIsAccountant ? '/accountant' : '/dashboard'
+          const landingPath = loggedInUser?.role === 'super_admin' ? '/admin' : userIsAccountant ? '/accountant' : '/dashboard'
           navigateTo(landingPath)
         }}
         onForgotPassword={() => navigateTo('/forgot-password')}
@@ -578,7 +584,7 @@ const AppContent = () => {
           setNeedsOnboarding(false)
           // Navigate to role-appropriate landing page - no "/" fallback
           const userIsAccountant = user?.role === 'accountant' || user?.role === 'admin'
-          const landingPath = userIsAccountant ? '/accountant' : '/dashboard'
+          const landingPath = isSuperAdmin ? '/admin' : userIsAccountant ? '/accountant' : '/dashboard'
           navigateTo(landingPath)
         }}
       />
@@ -675,6 +681,8 @@ const AppContent = () => {
         return <SettingsPage />
       case 'support':
         return <SupportPage />
+      case 'admin':
+        return isSuperAdmin ? <AdminDashboard /> : <SmartDashboard />
       default:
         return <SmartDashboard />
     }
@@ -703,6 +711,7 @@ const AppContent = () => {
       case 'upload': return 'Upload'
       case 'settings': return 'Instellingen'
       case 'support': return 'Ondersteuning'
+      case 'admin': return 'Systeembeheer'
       default: return 'Overzicht'
     }
   }

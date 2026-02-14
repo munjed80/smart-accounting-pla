@@ -17,7 +17,7 @@ interface AuthContextType {
   login: (credentials: LoginRequest) => Promise<User>
   register: (data: RegisterRequest) => Promise<RegisterResponse>
   logout: () => void
-  hasPermission: (role: 'zzp' | 'accountant' | 'admin') => boolean
+  hasPermission: (role: 'zzp' | 'accountant' | 'admin' | 'super_admin') => boolean
   checkSession: () => Promise<void>
   resendVerification: (email: string) => Promise<void>
   forgotPassword: (email: string) => Promise<void>
@@ -210,10 +210,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     toast.success('Logged out successfully')
   }, [])
 
-  const hasPermission = useCallback((requiredRole: 'zzp' | 'accountant' | 'admin'): boolean => {
+  const hasPermission = useCallback((requiredRole: 'zzp' | 'accountant' | 'admin' | 'super_admin'): boolean => {
     if (!user) return false
 
     const roleHierarchy = {
+      super_admin: 4,
       admin: 3,
       accountant: 2,
       zzp: 1,

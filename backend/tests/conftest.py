@@ -82,6 +82,28 @@ async def test_user(db_session: AsyncSession) -> User:
     return user
 
 
+
+
+@pytest_asyncio.fixture(scope="function")
+async def super_admin_user(db_session: AsyncSession) -> User:
+    user = User(
+        email="super-admin@example.com",
+        hashed_password=get_password_hash("SuperPassword123"),
+        full_name="Super Admin",
+        role=UserRole.SUPER_ADMIN.value,
+        is_active=True,
+        email_verified_at=datetime.now(timezone.utc)
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture(scope="function")
+async def super_admin_headers(super_admin_user: User) -> dict:
+    token = create_access_token(data={"sub": str(super_admin_user.id), "email": super_admin_user.email})
+    return {"Authorization": f"Bearer {token}"}
 @pytest_asyncio.fixture(scope="function")
 async def test_administration(db_session: AsyncSession, test_user: User) -> Administration:
     """Create a test administration for the ZZP user."""

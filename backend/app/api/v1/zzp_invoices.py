@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.services.invoice_pdf import generate_invoice_pdf, get_invoice_pdf_filename
+from app.services.invoice_pdf import get_invoice_pdf_filename
 from app.services.invoice_pdf_reportlab import generate_invoice_pdf_reportlab
 from app.services.email import email_service
 from app.models.zzp import (
@@ -578,8 +578,13 @@ async def update_invoice_status(
         except LedgerPostingError as e:
             logger.warning(f"Invoice payment posting skipped for {invoice.id}: {e}")
 
-    await db.refresh(invoice)
-    
+    result = await db.execute(
+        select(ZZPInvoice)
+        .options(selectinload(ZZPInvoice.lines))
+        .where(ZZPInvoice.id == invoice.id)
+    )
+    invoice = result.scalar_one()
+
     return invoice_to_response(invoice)
 
 
@@ -663,40 +668,26 @@ async def get_invoice_pdf(
         )
     
     try:
-        # Try ReportLab first (pure Python, Docker-safe, no system dependencies)
-        from app.services.invoice_pdf_reportlab import generate_invoice_pdf_reportlab, get_invoice_pdf_filename
-        pdf_bytes = generate_invoice_pdf_reportlab(invoice)
+        from app.services import invoice_pdf as invoice_pdf_service
+        pdf_bytes = invoice_pdf_service.generate_invoice_pdf(invoice)
         filename = get_invoice_pdf_filename(invoice)
-        
-    except Exception as reportlab_error:
-        # Fallback to WeasyPrint if ReportLab fails
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(f"ReportLab PDF generation failed, trying WeasyPrint fallback: {reportlab_error}")
-        
-        try:
-            pdf_bytes = generate_invoice_pdf(invoice)
-            filename = get_invoice_pdf_filename(invoice)
-        except RuntimeError as e:
-            # Both methods failed
-            error_msg = str(e)
-            if "not available" in error_msg or "not installed" in error_msg:
-                raise HTTPException(
-                    status_code=503,
-                    detail={
-                        "code": "PDF_NOT_AVAILABLE",
-                        "message": "PDF-generatie is tijdelijk niet beschikbaar. Probeer het later opnieuw."
-                    }
-                )
-            else:
-                raise HTTPException(
-                    status_code=500,
-                    detail={
-                        "code": "PDF_GENERATION_FAILED",
-                        "message": "Kon de PDF niet genereren. Probeer het later opnieuw."
-                    }
-                )
-    
+    except RuntimeError as e:
+        error_msg = str(e)
+        if "not available" in error_msg or "not installed" in error_msg:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "PDF_NOT_AVAILABLE",
+                    "message": "PDF-generatie is tijdelijk niet beschikbaar. Probeer het later opnieuw."
+                }
+            )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "PDF_GENERATION_FAILED",
+                "message": "Kon de PDF niet genereren. Probeer het later opnieuw."
+            }
+        )
     # Return PDF with mobile-safe headers
     # Content-Length is critical for iOS Safari to show download progress
     # Cache-Control prevents browsers from showing stale versions
@@ -867,6 +858,12 @@ Dit is een geautomatiseerd bericht van Smart Accounting Platform.
     # Update invoice status to 'sent'
     invoice.status = InvoiceStatus.SENT.value
     await db.commit()
-    await db.refresh(invoice)
-    
+
+    result = await db.execute(
+        select(ZZPInvoice)
+        .options(selectinload(ZZPInvoice.lines))
+        .where(ZZPInvoice.id == invoice.id)
+    )
+    invoice = result.scalar_one()
+
     return invoice_to_response(invoice)

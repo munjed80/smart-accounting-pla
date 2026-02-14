@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Annotated, Optional
 from uuid import UUID
@@ -31,8 +31,13 @@ from app.schemas.zzp import (
 router = APIRouter()
 
 
+def _to_decimal(value: Decimal | float | int | str) -> Decimal:
+    return value if isinstance(value, Decimal) else Decimal(str(value))
+
+
 def _to_cents(amount: Decimal) -> int:
-    return int((amount * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    decimal_amount = _to_decimal(amount)
+    return int((decimal_amount * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def _from_cents(amount_cents: int) -> Decimal:
@@ -121,7 +126,7 @@ async def create_time_entry(
     entry = ZZPTimeEntry(
         user_id=current_user.id,
         administration_id=administration.id,
-        entry_date=entry_in.entry_date,
+        entry_date=date.fromisoformat(entry_in.entry_date),
         description=entry_in.description,
         hours=entry_in.hours,
         project_name=entry_in.project_name,
@@ -163,6 +168,8 @@ async def update_time_entry(
         )
 
     for field, value in entry_in.model_dump(exclude_unset=True).items():
+        if field == "entry_date" and isinstance(value, str):
+            value = date.fromisoformat(value)
         setattr(entry, field, value)
 
     if "hourly_rate" in entry_in.model_dump(exclude_unset=True):
@@ -293,7 +300,7 @@ async def invoice_week(
                 },
             )
 
-        total_hours = sum((e.hours for e in entries), Decimal("0"))
+        total_hours = sum((_to_decimal(e.hours) for e in entries), Decimal("0"))
 
         rate = payload.hourly_rate
         if rate is None:
@@ -307,6 +314,7 @@ async def invoice_week(
                 status_code=400,
                 detail={"code": "MISSING_HOURLY_RATE", "message": "Geen uurtarief opgegeven en geen standaardtarief gevonden."},
             )
+        rate = _to_decimal(rate)
 
         invoice_number = await generate_invoice_number(administration.id, db)
         issue_date = date.today()
@@ -388,5 +396,5 @@ async def invoice_week(
         invoice_number=invoice.invoice_number,
         total_hours=total_hours,
         rate=rate,
-        total_amount=_from_cents(invoice.total_cents),
+        total_amount=invoice.total_cents,
     )

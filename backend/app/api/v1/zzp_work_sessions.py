@@ -27,6 +27,11 @@ from app.api.v1.deps import CurrentUser, require_zzp
 
 router = APIRouter()
 
+def _ensure_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
 
 async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
     """
@@ -76,8 +81,9 @@ def session_to_response(session: WorkSession) -> WorkSessionResponse:
     # Calculate duration in seconds if session is active
     duration_seconds = None
     if session.started_at:
-        end_time = session.ended_at or datetime.now(timezone.utc)
-        duration = end_time - session.started_at
+        start_time = _ensure_utc(session.started_at)
+        end_time = _ensure_utc(session.ended_at) if session.ended_at else datetime.now(timezone.utc)
+        duration = end_time - start_time
         duration_seconds = int(duration.total_seconds())
     
     return WorkSessionResponse(
@@ -246,8 +252,10 @@ async def stop_work_session(
     # End the session
     ended_at = datetime.now(timezone.utc)
     
+    session_start = _ensure_utc(session.started_at)
+
     # Validate: ended_at must be after started_at
-    if ended_at <= session.started_at:
+    if ended_at <= session_start:
         raise HTTPException(
             status_code=400,
             detail={
@@ -257,29 +265,24 @@ async def stop_work_session(
         )
     
     # Calculate duration in minutes
-    duration = ended_at - session.started_at
+    duration = ended_at - session_start
     total_minutes = duration.total_seconds() / 60
     
     # Subtract break time
     break_minutes = session_in.break_minutes
     work_minutes = total_minutes - break_minutes
     
-    # Validate: break time cannot exceed total duration
-    if work_minutes <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "code": "BREAK_EXCEEDS_DURATION",
-                "message": f"Pauzetijd ({break_minutes} min) overschrijdt de totale werkduur ({int(total_minutes)} min)."
-            }
-        )
+    # Clamp to zero and rely on minimum billable increment below.
+    # This keeps quick start/stop flows with configured break time usable.
+    if work_minutes < 0:
+        work_minutes = 0
     
     # Convert to hours and round to 5 minutes
     work_hours = work_minutes / 60
     rounded_hours = round_to_5_minutes(work_hours)
     
     # Ensure minimum of 5 minutes (0.08 hours) if there was any work
-    if rounded_hours < 0.08 and work_hours > 0:
+    if rounded_hours < 0.08 and total_minutes > 0:
         rounded_hours = 0.08
     
     # Update session note if provided in stop request
@@ -290,7 +293,7 @@ async def stop_work_session(
     
     time_entry = ZZPTimeEntry(
         administration_id=administration.id,
-        entry_date=session.started_at.date(),
+        entry_date=session_start.date(),
         description=entry_description,
         hours=Decimal(str(rounded_hours)),
         billable=True,

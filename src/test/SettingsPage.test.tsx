@@ -4,7 +4,7 @@
  * Tests ensuring Settings page handles errors and empty states properly
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { SettingsPage } from '../components/SettingsPage'
 import * as api from '../lib/api'
@@ -93,8 +93,11 @@ vi.mock('sonner', () => ({
 }))
 
 describe('SettingsPage', () => {
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>
+
   beforeEach(() => {
     vi.clearAllMocks()
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     
     // Default mock implementations
     vi.mocked(AuthContext.useAuth).mockReturnValue({
@@ -119,6 +122,10 @@ describe('SettingsPage', () => {
       build_time: '2024-01-01T00:00:00Z',
       env_name: 'test',
     } as any)
+  })
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore()
   })
 
   it('renders error alert when API fails', async () => {

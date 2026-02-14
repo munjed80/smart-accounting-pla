@@ -64,6 +64,14 @@ CHART_OF_ACCOUNTS_TEMPLATE = [
 ]
 
 
+DEFAULT_PLANS = [
+    {"name": "FREE", "price_monthly": Decimal("0.00"), "max_invoices": 25, "max_storage_mb": 256, "max_users": 1},
+    {"name": "TRIAL", "price_monthly": Decimal("0.00"), "max_invoices": 200, "max_storage_mb": 1024, "max_users": 2},
+    {"name": "BASIC", "price_monthly": Decimal("19.00"), "max_invoices": 500, "max_storage_mb": 2048, "max_users": 3},
+    {"name": "PRO", "price_monthly": Decimal("49.00"), "max_invoices": 5000, "max_storage_mb": 10240, "max_users": 15},
+]
+
+
 def get_db_connection():
     """Get database connection from environment"""
     db_url = os.environ.get(
@@ -150,7 +158,30 @@ def seed_chart_of_accounts(conn, administration_id: str):
     cursor.close()
 
 
-def seed_admin_user(conn, email: str, password: str, full_name: str = "System Administrator"):
+def seed_default_plans(conn):
+    """Seed default subscription plans idempotently."""
+    cursor = conn.cursor()
+
+    for plan in DEFAULT_PLANS:
+        cursor.execute(
+            """
+            INSERT INTO plans (id, name, price_monthly, max_invoices, max_storage_mb, max_users)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (name) DO UPDATE SET
+                price_monthly = EXCLUDED.price_monthly,
+                max_invoices = EXCLUDED.max_invoices,
+                max_storage_mb = EXCLUDED.max_storage_mb,
+                max_users = EXCLUDED.max_users
+            """,
+            (str(uuid.uuid4()), plan["name"], plan["price_monthly"], plan["max_invoices"], plan["max_storage_mb"], plan["max_users"])
+        )
+
+    conn.commit()
+    print(f"Seeded/updated {len(DEFAULT_PLANS)} default plans")
+    cursor.close()
+
+
+def seed_admin_user(conn, email: str, password: str, full_name: str = "System Administrator", role: str = "admin"):
     """
     Seed an admin user in the database.
     
@@ -181,17 +212,16 @@ def seed_admin_user(conn, email: str, password: str, full_name: str = "System Ad
     existing = cursor.fetchone()
     
     if existing:
-        user_id, role = existing
-        if role == "admin":
-            print(f"Admin user already exists: {email}")
+        user_id, existing_role = existing
+        if existing_role == role:
+            print(f"Privileged user already exists: {email} ({role})")
         else:
-            # Update existing user to admin role
             cursor.execute(
                 "UPDATE users SET role = %s, updated_at = %s WHERE id = %s",
-                ("admin", datetime.now(timezone.utc), user_id)
+                (role, datetime.now(timezone.utc), user_id)
             )
             conn.commit()
-            print(f"Updated existing user to admin role: {email}")
+            print(f"Updated existing user to role {role}: {email}")
         cursor.close()
         return str(user_id)
     
@@ -212,11 +242,11 @@ def seed_admin_user(conn, email: str, password: str, full_name: str = "System Ad
     cursor.execute(
         """INSERT INTO users (id, email, hashed_password, full_name, role, is_active, email_verified_at, created_at, updated_at)
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-        (user_id, email.lower(), hashed_password, full_name, "admin", True, now, now, now)
+        (user_id, email.lower(), hashed_password, full_name, role, True, now, now, now)
     )
     
     conn.commit()
-    print(f"Created admin user: {email}")
+    print(f"Created privileged user ({role}): {email}")
     print(f"IMPORTANT: Add this email to ADMIN_WHITELIST environment variable to allow login!")
     cursor.close()
     
@@ -235,6 +265,7 @@ def main():
         
         # Seed VAT codes
         seed_vat_codes(conn)
+        seed_default_plans(conn)
         
         # Check for administrations and seed chart of accounts
         cursor = conn.cursor()
@@ -255,7 +286,14 @@ def main():
         
         if admin_email and admin_password:
             print("\n--- Admin User Seeding ---")
-            seed_admin_user(conn, admin_email, admin_password, admin_name)
+            seed_admin_user(conn, admin_email, admin_password, admin_name, role="admin")
+
+        super_admin_email = os.environ.get("SEED_SUPER_ADMIN_EMAIL")
+        super_admin_password = os.environ.get("SEED_SUPER_ADMIN_PASSWORD")
+        super_admin_name = os.environ.get("SEED_SUPER_ADMIN_NAME", "Platform Super Admin")
+        if super_admin_email and super_admin_password:
+            print("\n--- Super Admin User Seeding ---")
+            seed_admin_user(conn, super_admin_email, super_admin_password, super_admin_name, role="super_admin")
         
         conn.close()
         print("=" * 60)

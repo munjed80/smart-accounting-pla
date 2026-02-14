@@ -28,6 +28,8 @@ export const UserRole = {
   ACCOUNTANT: 'accountant',
   /** System administrator */
   ADMIN: 'admin',
+  /** Platform super administrator */
+  SUPER_ADMIN: 'super_admin',
 } as const
 
 export type UserRoleType = typeof UserRole[keyof typeof UserRole]

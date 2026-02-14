@@ -42,6 +42,7 @@ def verify_orm_mappings() -> None:
         ZZPExpense, ZZPTimeEntry, ZZPCalendarEvent,
         WorkSession, ZZPBankTransactionMatch,
         ZZPPayment, ZZPPaymentAllocation,
+        Plan, Subscription, AdminAuditLog,
     )
     
     # This will raise InvalidRequestError if any relationships are misconfigured

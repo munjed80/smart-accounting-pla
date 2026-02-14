@@ -311,9 +311,8 @@ async def login(
                 },
             )
         
-        # Admin role safety: block admin login unless explicitly whitelisted
-        # This prevents unauthorized admin access even if someone gains admin role
-        if user.role == "admin":
+        # Admin and super-admin role safety: block access unless explicitly whitelisted
+        if user.role in {"admin", "super_admin"}:
             whitelist = settings.admin_whitelist_list
             if user.email.lower() not in whitelist:
                 logger.warning(
@@ -328,7 +327,7 @@ async def login(
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail={
-                        "message": "Admin access is restricted",
+                        "message": "Privileged access is restricted",
                         "code": "ADMIN_NOT_WHITELISTED",
                         "hint": "Contact your system administrator if you need admin access",
                     },

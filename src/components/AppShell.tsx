@@ -53,7 +53,7 @@ interface MenuItem {
   label: string
   tabValue: string
   icon: ReactNode
-  rolesAllowed: Array<'zzp' | 'accountant' | 'admin'>
+  rolesAllowed: Array<'zzp' | 'accountant' | 'admin' | 'super_admin'>
   section?: 'main' | 'secondary'
   // Accounting concept grouping for accountants (5 core concepts)
   accountingSection?: 'activa' | 'debiteuren' | 'crediteuren' | 'grootboek' | 'winstverlies'
@@ -218,6 +218,14 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
+
+  {
+    label: 'Systeembeheer',
+    tabValue: 'admin',
+    icon: <Database size={20} weight="duotone" />,
+    rolesAllowed: ['super_admin'],
+    section: 'main',
+  },
   // === ZZP Secondary items ===
   // Settings
   {
@@ -266,6 +274,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   const isDev = import.meta.env.DEV
 
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
+  const isSuperAdmin = user?.role === 'super_admin'
   
   // Protection: Close sidebar on route changes
   useCloseOverlayOnRouteChange(() => setSidebarOpen(false))
@@ -286,13 +295,13 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   }, [sidebarOpen])
   
   // Determine the home tab based on user role
-  const homeTab = isAccountant ? 'workqueue' : 'dashboard'
-  const homeLabel = isAccountant ? t('sidebar.backToWorkQueue') : t('sidebar.backToOverzicht')
+  const homeTab = isSuperAdmin ? 'admin' : isAccountant ? 'workqueue' : 'dashboard'
+  const homeLabel = isSuperAdmin ? 'Terug naar Systeembeheer' : isAccountant ? t('sidebar.backToWorkQueue') : t('sidebar.backToOverzicht')
 
   // Filter menu items based on user role and hidden flag
   const visibleMenuItems = menuItems.filter(item => 
     user?.role && 
-    item.rolesAllowed.includes(user.role as 'zzp' | 'accountant' | 'admin') &&
+    item.rolesAllowed.includes(user.role as 'zzp' | 'accountant' | 'admin' | 'super_admin') &&
     !item.hidden
   )
   

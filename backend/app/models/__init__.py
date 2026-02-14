@@ -44,6 +44,11 @@ from app.models.zzp import (
     ZZPQuoteLine,
     ZZPQuoteCounter,
 )
+from app.models.subscription import (
+    Plan,
+    Subscription,
+    AdminAuditLog,
+)
 from app.models.payment import (
     ZZPPayment,
     ZZPPaymentAllocation,
@@ -115,4 +120,7 @@ __all__ = [
     "ZZPPaymentAllocation",
     "PaymentStatus",
     "PaymentMethod",
+    "Plan",
+    "Subscription",
+    "AdminAuditLog",
 ]

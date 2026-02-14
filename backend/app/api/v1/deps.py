@@ -304,6 +304,20 @@ def require_accountant_only(current_user: User) -> None:
         )
 
 
+
+
+def require_super_admin(current_user: User) -> None:
+    """
+    Guard: Allows ONLY users with role = SUPER_ADMIN.
+
+    Raises:
+        HTTP 403: If user role is not 'super_admin'
+    """
+    if current_user.role != UserRole.SUPER_ADMIN.value:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "FORBIDDEN_ROLE", "message": "This endpoint is only available for super admins"}
+        )
 async def require_assigned_accountant_client(
     client_id: UUID,
     current_user: User,

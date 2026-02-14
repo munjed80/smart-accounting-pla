@@ -35,6 +35,7 @@ class UserRole(str, Enum):
     ZZP = "zzp"
     ACCOUNTANT = "accountant"
     ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
 
 
 # Set of all valid roles (lowercase)

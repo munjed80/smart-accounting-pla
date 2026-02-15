@@ -576,10 +576,10 @@ export const ZZPTimeTrackingPage = () => {
                             <p className="font-semibold">{parseHours(entry.hours).toFixed(2)}u</p>
                             <div className="flex items-center gap-2">
                             <Button variant="outline" size="sm" onClick={() => openForm(entry)}>
-                              <PencilSimple size={14} className="mr-1" />Bewerken
+                              <PencilSimple size={14} className="mr-1 text-emerald-500" />Bewerken
                             </Button>
                             <Button variant="outline" size="sm" onClick={() => void handleDeleteEntry(entry)}>
-                              <TrashSimple size={14} className="mr-1" />Verwijderen
+                              <TrashSimple size={14} className="mr-1 text-red-500" />Verwijderen
                             </Button>
                             </div>
                           </div>

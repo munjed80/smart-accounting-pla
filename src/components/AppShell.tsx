@@ -45,6 +45,7 @@ import {
   Clock,
   CalendarBlank,
   ListChecks,
+  CurrencyEur,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 

@@ -526,20 +526,20 @@ export const ClientDossierPage = ({ clientId, initialTab = 'invoices' }: ClientD
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-9 mb-6">
-            <TabsTrigger value="invoices" className="flex items-center gap-2">
+          <TabsList className="mb-6 flex w-full flex-nowrap items-center justify-start gap-2 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <TabsTrigger value="invoices" className="flex-none items-center gap-2">
               Facturen
             </TabsTrigger>
-            <TabsTrigger value="expenses" className="flex items-center gap-2">
+            <TabsTrigger value="expenses" className="flex-none items-center gap-2">
               Uitgaven
             </TabsTrigger>
-            <TabsTrigger value="hours" className="flex items-center gap-2">
+            <TabsTrigger value="hours" className="flex-none items-center gap-2">
               Uren
             </TabsTrigger>
-            <TabsTrigger value="vat" className="flex items-center gap-2">
+            <TabsTrigger value="vat" className="flex-none items-center gap-2">
               BTW-aangifte
             </TabsTrigger>
-            <TabsTrigger value="issues" className="flex items-center gap-2">
+            <TabsTrigger value="issues" className="flex-none items-center gap-2">
               <ClipboardText size={18} />
               {t('dossier.tabs.issues')}
               {overview && (overview.error_count > 0 || overview.warning_count > 0) && (
@@ -548,19 +548,19 @@ export const ClientDossierPage = ({ clientId, initialTab = 'invoices' }: ClientD
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="bookkeeping" className="flex items-center gap-2">
+            <TabsTrigger value="bookkeeping" className="flex-none items-center gap-2">
               <Book size={18} />
               {t('dossier.tabs.bookkeeping')}
             </TabsTrigger>
-            <TabsTrigger value="periods" className="flex items-center gap-2">
+            <TabsTrigger value="periods" className="flex-none items-center gap-2">
               <CalendarBlank size={18} />
               {t('dossier.tabs.periods')}
             </TabsTrigger>
-            <TabsTrigger value="decisions" className="flex items-center gap-2">
+            <TabsTrigger value="decisions" className="flex-none items-center gap-2">
               <ListChecks size={18} />
               {t('dossier.tabs.decisions')}
             </TabsTrigger>
-            <TabsTrigger value="audit" className="flex items-center gap-2">
+            <TabsTrigger value="audit" className="flex-none items-center gap-2">
               <ClockCounterClockwise size={18} />
               {t('dossier.tabs.audit')}
             </TabsTrigger>

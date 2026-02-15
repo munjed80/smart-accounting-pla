@@ -387,6 +387,12 @@ class ZZPExpense(Base):
     # Optional fields
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     attachment_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    commitment_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("financial_commitments.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -398,6 +404,7 @@ class ZZPExpense(Base):
     
     # Relationships
     administration = relationship("Administration")
+    commitment = relationship("FinancialCommitment")
 
 
 class ZZPTimeEntry(Base):

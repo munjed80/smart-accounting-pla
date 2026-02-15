@@ -2,14 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { zzpApi, ZZPCommitment } from '@/lib/api'
+import { Button } from '@/components/ui/button'
+import { zzpApi, ZZPCommitment, ZZPCommitmentOverview } from '@/lib/api'
+import { toast } from 'sonner'
 
 const eur = (cents: number) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(cents / 100)
 
 export const ZZPCommitmentsOverviewPage = () => {
   const [typeFilter, setTypeFilter] = useState<'all' | 'lease' | 'loan' | 'subscription'>('all')
   const [commitments, setCommitments] = useState<ZZPCommitment[]>([])
-  const [overview, setOverview] = useState<{ monthly_total_cents: number; upcoming_total_cents: number; warning_count: number; by_type: Record<string, number> } | null>(null)
+  const [overview, setOverview] = useState<ZZPCommitmentOverview | null>(null)
 
   const load = async () => {
     const [listResp, overviewResp] = await Promise.all([
@@ -29,12 +31,31 @@ export const ZZPCommitmentsOverviewPage = () => {
 
   const max = Math.max(1, ...monthlyPoints.map(p => p.value))
 
+  const createExpenseFromCommitment = async (item: ZZPCommitment) => {
+    const dueDate = item.next_due_date || new Date().toISOString().slice(0, 10)
+    const amount = item.monthly_payment_cents || item.amount_cents
+    try {
+      await zzpApi.expenses.create({
+        vendor: item.name,
+        description: `Automatisch aangemaakt vanuit verplichting: ${item.name}`,
+        expense_date: dueDate,
+        amount_cents: amount,
+        vat_rate: item.btw_rate ?? 21,
+        category: item.type === 'subscription' ? 'software' : 'algemeen',
+        commitment_id: item.id,
+      })
+      toast.success('Uitgave aangemaakt vanuit verplichting')
+    } catch {
+      toast.error('Kon uitgave niet aanmaken')
+    }
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Overzicht vaste verplichtingen</h1>
-        <Select value={typeFilter} onValueChange={(v: any) => setTypeFilter(v)}>
-          <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+    <div className="space-y-4 pb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-xl sm:text-2xl font-semibold">Overzicht vaste verplichtingen</h1>
+        <Select value={typeFilter} onValueChange={(v: 'all' | 'lease' | 'loan' | 'subscription') => setTypeFilter(v)}>
+          <SelectTrigger className="w-full sm:w-56"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Alle typen</SelectItem>
             <SelectItem value="lease">Lease</SelectItem>
@@ -45,16 +66,36 @@ export const ZZPCommitmentsOverviewPage = () => {
       </div>
 
       {overview && (
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card><CardHeader><CardTitle>Maandlasten</CardTitle></CardHeader><CardContent>{eur(overview.monthly_total_cents)}</CardContent></Card>
           <Card><CardHeader><CardTitle>Komende 30 dagen</CardTitle></CardHeader><CardContent>{eur(overview.upcoming_total_cents)}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Waarschuwingen</CardTitle></CardHeader><CardContent>{overview.warning_count} hoge betalingen</CardContent></Card>
+          <Card><CardHeader><CardTitle>Waarschuwingen</CardTitle></CardHeader><CardContent>{overview.warning_count}</CardContent></Card>
         </div>
       )}
 
-      {overview && overview.warning_count > 0 && (
-        <Alert><AlertDescription>Let op: er zijn grote betalingen gepland in de komende 30 dagen.</AlertDescription></Alert>
-      )}
+      {overview?.alerts?.map((alert, idx) => (
+        <Alert key={`${alert.code}-${idx}`}>
+          <AlertDescription>{alert.message}</AlertDescription>
+        </Alert>
+      ))}
+
+      <Card>
+        <CardHeader><CardTitle>Aankomende verplichtingen</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {(overview?.upcoming || []).map(item => (
+            <div key={item.id} className="rounded-md border p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium">{item.name}</p>
+                <p className="text-xs text-muted-foreground">Volgende vervaldatum: {item.next_due_date || '-'}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">{eur(item.monthly_payment_cents || item.amount_cents)}</span>
+                <Button size="sm" variant="outline" onClick={() => createExpenseFromCommitment(item)}>Maak uitgave aan</Button>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle>Maandelijkse verplichtingen (top 6)</CardTitle></CardHeader>

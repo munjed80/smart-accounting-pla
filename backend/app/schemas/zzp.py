@@ -331,6 +331,7 @@ class ExpenseCreate(BaseModel):
     category: str = Field("algemeen", description="Expense category")
     notes: Optional[str] = Field(None, description="Additional notes")
     attachment_url: Optional[str] = Field(None, max_length=500, description="Receipt/document URL")
+    commitment_id: Optional[UUID] = Field(None, description="Linked financial commitment")
     
     @field_validator('expense_date')
     @classmethod
@@ -359,6 +360,7 @@ class ExpenseUpdate(BaseModel):
     category: Optional[str] = Field(None)
     notes: Optional[str] = Field(None)
     attachment_url: Optional[str] = Field(None, max_length=500)
+    commitment_id: Optional[UUID] = Field(None)
     
     @field_validator('expense_date')
     @classmethod
@@ -394,6 +396,7 @@ class ExpenseResponse(BaseModel):
     category: str
     notes: Optional[str]
     attachment_url: Optional[str]
+    commitment_id: Optional[UUID]
     created_at: datetime
     updated_at: datetime
     

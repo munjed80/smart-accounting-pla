@@ -1,11 +1,15 @@
 import pytest
-from datetime import date
+from datetime import date, timedelta
 
+from app.models.administration import Administration, AdministrationMember, MemberRole
 from app.models.bank import BankAccount, BankTransaction, BankTransactionStatus
+from app.models.user import User
+from app.core.roles import UserRole
+from app.core.security import create_access_token, get_password_hash
 
 
 @pytest.mark.asyncio
-async def test_commitments_crud(async_client, auth_headers):
+async def test_commitments_crud_and_next_due(async_client, auth_headers):
     payload = {
         "type": "loan",
         "name": "Zakelijke lening bus",
@@ -13,13 +17,14 @@ async def test_commitments_crud(async_client, auth_headers):
         "monthly_payment_cents": 45000,
         "principal_amount_cents": 500000,
         "interest_rate": 5.2,
-        "start_date": "2026-01-01",
-        "end_date": "2028-12-31",
+        "start_date": date.today().replace(day=1).isoformat(),
+        "end_date": (date.today() + timedelta(days=365)).isoformat(),
     }
 
     create = await async_client.post('/api/v1/zzp/commitments', headers=auth_headers, json=payload)
     assert create.status_code == 201
     item = create.json()
+    assert item['next_due_date'] is not None
 
     list_resp = await async_client.get('/api/v1/zzp/commitments', headers=auth_headers)
     assert list_resp.status_code == 200
@@ -46,9 +51,38 @@ async def test_commitments_crud(async_client, auth_headers):
 
 
 @pytest.mark.asyncio
-async def test_commitment_overview_and_suggestions(async_client, auth_headers, db_session, test_administration):
-    overview = await async_client.get('/api/v1/zzp/commitments/overview/summary', headers=auth_headers)
+async def test_commitment_overview_alerts_and_suggestions(async_client, auth_headers, db_session, test_administration):
+    # near renewal alert
+    subscription_payload = {
+        "type": "subscription",
+        "name": "Adobe",
+        "amount_cents": 2600,
+        "recurring_frequency": "yearly",
+        "start_date": "2025-01-01",
+        "renewal_date": (date.today() + timedelta(days=7)).isoformat(),
+    }
+    await async_client.post('/api/v1/zzp/commitments', headers=auth_headers, json=subscription_payload)
+
+    # ending lease alert
+    lease_payload = {
+        "type": "lease",
+        "name": "Lease auto",
+        "amount_cents": 90000,
+        "monthly_payment_cents": 90000,
+        "principal_amount_cents": 1200000,
+        "interest_rate": 4,
+        "start_date": "2024-01-01",
+        "end_date": (date.today() + timedelta(days=20)).isoformat(),
+    }
+    await async_client.post('/api/v1/zzp/commitments', headers=auth_headers, json=lease_payload)
+
+    overview = await async_client.get('/api/v1/zzp/commitments/overview/summary?threshold_cents=1000', headers=auth_headers)
     assert overview.status_code == 200
+    alerts = overview.json()['alerts']
+    codes = {a['code'] for a in alerts}
+    assert 'subscription_renewal' in codes
+    assert 'lease_loan_ending' in codes
+    assert 'monthly_threshold' in codes
 
     bank_account = BankAccount(
         administration_id=test_administration.id,
@@ -59,7 +93,7 @@ async def test_commitment_overview_and_suggestions(async_client, auth_headers, d
     db_session.add(bank_account)
     await db_session.flush()
 
-    for d in [date(2026,1,5), date(2026,2,5), date(2026,3,5)]:
+    for d in [date(2026, 1, 5), date(2026, 2, 5), date(2026, 3, 5)]:
         db_session.add(BankTransaction(
             administration_id=test_administration.id,
             bank_account_id=bank_account.id,
@@ -77,3 +111,65 @@ async def test_commitment_overview_and_suggestions(async_client, auth_headers, d
     suggestions = await async_client.get('/api/v1/zzp/commitments/subscriptions/suggestions', headers=auth_headers)
     assert suggestions.status_code == 200
     assert len(suggestions.json()['suggestions']) >= 1
+
+
+@pytest.mark.asyncio
+async def test_commitment_tenant_safety_and_expense_link(async_client, auth_headers, db_session, test_administration):
+    create = await async_client.post('/api/v1/zzp/commitments', headers=auth_headers, json={
+        "type": "loan",
+        "name": "Tenant-lening",
+        "amount_cents": 30000,
+        "monthly_payment_cents": 30000,
+        "principal_amount_cents": 300000,
+        "interest_rate": 2.5,
+        "start_date": "2026-01-01",
+    })
+    assert create.status_code == 201
+    commitment_id = create.json()['id']
+
+    # expense link should work for same tenant
+    expense = await async_client.post('/api/v1/zzp/expenses', headers=auth_headers, json={
+        "vendor": "Tenant-lening",
+        "expense_date": date.today().isoformat(),
+        "amount_cents": 30000,
+        "vat_rate": 21,
+        "category": "algemeen",
+        "commitment_id": commitment_id,
+    })
+    assert expense.status_code == 201
+    assert expense.json()['commitment_id'] == commitment_id
+
+    # Create second tenant
+    other_user = User(
+        email='other-zzp@example.com',
+        hashed_password=get_password_hash('TestPassword123'),
+        full_name='Other ZZP',
+        role=UserRole.ZZP.value,
+        is_active=True,
+    )
+    db_session.add(other_user)
+    await db_session.flush()
+
+    other_admin = Administration(name='Other Admin', is_active=True)
+    db_session.add(other_admin)
+    await db_session.flush()
+
+    db_session.add(AdministrationMember(user_id=other_user.id, administration_id=other_admin.id, role=MemberRole.OWNER))
+    await db_session.commit()
+
+    other_headers = {"Authorization": f"Bearer {create_access_token(data={'sub': str(other_user.id), 'email': other_user.email})}"}
+
+    # other tenant cannot read commitment
+    detail = await async_client.get(f'/api/v1/zzp/commitments/{commitment_id}', headers=other_headers)
+    assert detail.status_code == 404
+
+    # other tenant cannot link expense to foreign commitment
+    bad_link = await async_client.post('/api/v1/zzp/expenses', headers=other_headers, json={
+        "vendor": "hack",
+        "expense_date": date.today().isoformat(),
+        "amount_cents": 1000,
+        "vat_rate": 21,
+        "category": "algemeen",
+        "commitment_id": commitment_id,
+    })
+    assert bad_link.status_code == 404

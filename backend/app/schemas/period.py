@@ -114,6 +114,18 @@ class LockPeriodResponse(BaseModel):
     message: str
 
 
+
+
+class PeriodStatusUpdateRequest(BaseModel):
+    """Request to update period status for filing readiness."""
+    status: str = Field(..., description="Target status (READY_FOR_FILING or FINALIZED)")
+
+
+class PeriodStatusUpdateResponse(BaseModel):
+    """Response from period status update."""
+    period: PeriodResponse
+    message: str
+
 class SnapshotSummary(BaseModel):
     """Summary metrics from a period snapshot."""
     total_assets: Optional[Decimal] = None

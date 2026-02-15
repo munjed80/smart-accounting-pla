@@ -81,19 +81,19 @@ type Route =
   | { type: 'onboarding' }
   | { type: 'accountant-onboarding' }
   | { type: 'app'; path: string }
-  | { type: 'client-dossier'; clientId: string; tab: 'issues' | 'periods' | 'decisions' }
+  | { type: 'client-dossier'; clientId: string; tab: 'issues' | 'periods' | 'decisions' | 'bookkeeping' | 'audit' | 'vat' }
   | { type: 'bulk-operations-history' }
   | { type: 'bank-reconciliation' }
 
 // Parse client dossier route
-const parseClientDossierRoute = (path: string): { clientId: string; tab: 'issues' | 'periods' | 'decisions' } | null => {
+const parseClientDossierRoute = (path: string): { clientId: string; tab: 'issues' | 'periods' | 'decisions' | 'bookkeeping' | 'audit' | 'vat' } | null => {
   // Match /accountant/clients/:clientId or /accountant/clients/:clientId/:tab
   const match = path.match(/^\/accountant\/clients\/([^/]+)(?:\/([^/]+))?$/)
   if (match) {
     const clientId = match[1]
     const tabParam = match[2] || 'issues'
-    const validTabs = ['issues', 'periods', 'decisions']
-    const tab = validTabs.includes(tabParam) ? tabParam as 'issues' | 'periods' | 'decisions' : 'issues'
+    const validTabs = ['issues', 'periods', 'decisions', 'bookkeeping', 'audit', 'vat']
+    const tab = validTabs.includes(tabParam) ? tabParam as 'issues' | 'periods' | 'decisions' | 'bookkeeping' | 'audit' | 'vat' : 'issues'
     return { clientId, tab }
   }
   return null
@@ -510,7 +510,7 @@ const AppContent = () => {
   }
 
   // Show client dossier page for accountants
-  if (route.type === 'client-dossier' && isAccountant) {
+  if (route.type === 'client-dossier' && (isAccountant || isSuperAdmin)) {
     return (
       <AppShell 
         activeTab="clients" 

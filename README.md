@@ -1270,3 +1270,17 @@ npm run check:all
 ```
 
 The backend smoke test imports the FastAPI app and verifies critical routes (`/health`, `/docs`, `/openapi.json`) are registered.
+
+## BTW-aangifte (accountant)
+
+Voor accountants is in het klantdossier een aparte tab **BTW-aangifte** beschikbaar.
+
+Workflow:
+1. Open **Accountant → Klanten → Open dossier**.
+2. Ga naar de tab **BTW-aangifte**.
+3. Selecteer een periode en klik **Valideren**.
+4. Controleer rubrieken (1a t/m 5g), ICP-overzicht en afwijkingen.
+5. Download export via **Download BTW overzicht (PDF)** of **Export CSV**.
+6. Klik **Markeer als klaar** om de periode als klaar voor handmatige aangifte te markeren.
+
+Belangrijk: verzending naar de Belastingdienst gebeurt **handmatig** buiten de app. De app levert het concept met rubrieken en ICP-overzicht.

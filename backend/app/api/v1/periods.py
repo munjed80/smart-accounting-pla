@@ -35,6 +35,8 @@ from app.schemas.period import (
     PeriodsListResponse,
     FinalizationPrerequisiteErrorResponse,
     PeriodStatus,
+    PeriodStatusUpdateRequest,
+    PeriodStatusUpdateResponse,
 )
 from app.services.period import PeriodControlService, PeriodControlError
 from app.services.period.control import (
@@ -43,6 +45,7 @@ from app.services.period.control import (
     FinalizationPrerequisiteError,
 )
 from app.api.v1.deps import CurrentUser, require_assigned_client
+from app.services.vat import VatReportService
 
 router = APIRouter()
 
@@ -131,6 +134,60 @@ async def get_period(
             can_finalize=validation_status["can_finalize"],
             validation_summary=validation_status["validation_summary"],
         ),
+    )
+
+
+
+
+@router.patch(
+    "/clients/{client_id}/periods/{period_id}",
+    response_model=PeriodStatusUpdateResponse,
+)
+async def update_period_status(
+    client_id: UUID,
+    period_id: UUID,
+    body: PeriodStatusUpdateRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Update period status for VAT filing readiness."""
+    await require_assigned_client(client_id, current_user, db)
+
+    result = await db.execute(
+        select(AccountingPeriod)
+        .where(AccountingPeriod.id == period_id)
+        .where(AccountingPeriod.administration_id == client_id)
+    )
+    period = result.scalar_one_or_none()
+
+    if not period:
+        raise HTTPException(status_code=404, detail="Period not found")
+
+    target_status = body.status.upper()
+    if target_status not in {"READY_FOR_FILING", "FINALIZED"}:
+        raise HTTPException(status_code=422, detail="Unsupported period status")
+
+    vat_service = VatReportService(db, client_id)
+    anomalies = await vat_service.validate_vat_return(period_id)
+    red_count = sum(1 for anomaly in anomalies if anomaly.severity == "RED")
+    if red_count > 0:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Kan niet afronden: {red_count} blokkerende BTW-afwijking(en).",
+        )
+
+    period.status = ModelPeriodStatus.FINALIZED
+    period.is_closed = True
+    period.finalized_at = datetime.now(timezone.utc)
+    period.finalized_by_id = current_user.id
+    period.closed_at = period.finalized_at
+
+    await db.commit()
+    await db.refresh(period)
+
+    return PeriodStatusUpdateResponse(
+        period=convert_period_to_response(period),
+        message="Periode gemarkeerd als klaar voor handmatige BTW-aangifte.",
     )
 
 

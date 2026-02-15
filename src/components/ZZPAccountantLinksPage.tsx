@@ -203,20 +203,41 @@ export const ZZPAccountantLinksPage = () => {
     setIsLoading(true)
     setError(null)
     try {
-      const [pendingResponse, activeResponse] = await Promise.all([
+      const [pendingResponse, activeResponse] = await Promise.allSettled([
         zzpApi.getMandates(),
         zzpApi.getActiveLinks(),
       ])
-      setPendingRequests(pendingResponse.mandates.map((m) => ({
-        assignment_id: m.id,
-        accountant_id: m.accountant_user_id,
-        accountant_email: m.accountant_email || "",
-        accountant_name: m.accountant_name || "",
-        administration_id: m.client_company_id,
-        administration_name: m.client_company_name,
-        invited_at: m.created_at,
-      })))
-      setActiveLinks(activeResponse.active_links)
+
+      const loadErrors: string[] = []
+
+      if (pendingResponse.status === 'fulfilled') {
+        const { mandates } = pendingResponse.value
+        setPendingRequests(mandates.map((m) => ({
+          assignment_id: m.id,
+          accountant_id: m.accountant_user_id,
+          accountant_email: m.accountant_email || "",
+          accountant_name: m.accountant_name || "",
+          administration_id: m.client_company_id,
+          administration_name: m.client_company_name,
+          invited_at: m.created_at,
+        })))
+      } else {
+        console.error('Failed to load pending accountant requests:', pendingResponse.reason)
+        setPendingRequests([])
+        loadErrors.push(getErrorMessage(pendingResponse.reason))
+      }
+
+      if (activeResponse.status === 'fulfilled') {
+        setActiveLinks(activeResponse.value.active_links)
+      } else {
+        console.error('Failed to load active accountant links:', activeResponse.reason)
+        setActiveLinks([])
+        loadErrors.push(getErrorMessage(activeResponse.reason))
+      }
+
+      if (loadErrors.length > 0) {
+        setError(loadErrors.join(' · '))
+      }
     } catch (err) {
       console.error('Failed to load accountant links:', err)
       setError(getErrorMessage(err))

@@ -18,16 +18,24 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    commitment_type = sa.Enum('lease', 'loan', 'subscription', name='commitmenttype')
     recurring_frequency = sa.Enum('monthly', 'yearly', name='recurringfrequency')
-    commitment_type.create(op.get_bind(), checkfirst=True)
+
+    op.execute("""
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'commitmenttype') THEN
+            CREATE TYPE commitmenttype AS ENUM ('lease', 'loan', 'subscription');
+        END IF;
+    END$$;
+    """)
+
     recurring_frequency.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         'financial_commitments',
         sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('administration_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('administrations.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('type', commitment_type, nullable=False),
+        sa.Column('type', sa.Enum('lease', 'loan', 'subscription', name='commitmenttype', create_type=False), nullable=False),
         sa.Column('name', sa.String(length=255), nullable=False),
         sa.Column('amount_cents', sa.Integer(), nullable=False, server_default='0'),
         sa.Column('monthly_payment_cents', sa.Integer(), nullable=True),
@@ -51,5 +59,4 @@ def downgrade() -> None:
     op.drop_index('ix_financial_commitments_administration_id', table_name='financial_commitments')
     op.drop_table('financial_commitments')
 
-    sa.Enum(name='recurringfrequency').drop(op.get_bind(), checkfirst=True)
-    sa.Enum(name='commitmenttype').drop(op.get_bind(), checkfirst=True)
+    # Keep enum types in place to avoid breaking dependencies from other migrations/tables.

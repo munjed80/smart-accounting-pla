@@ -1333,8 +1333,14 @@ async def search_client_companies_for_mandates(
     q: str = Query(..., min_length=2),
     limit: int = Query(10, ge=1, le=50),
 ):
-    """Search ZZP client companies by administration/company name for mandate requests."""
+    """Search ZZP client companies for mandate requests by name, kvk, vat, or owner email."""
     verify_accountant_role(current_user)
+
+    normalized_query = q.strip().lower()
+    if len(normalized_query) < 2:
+        return MandateSearchResponse(results=[], total_count=0)
+
+    pattern = f"%{normalized_query}%"
 
     result = await db.execute(
         select(Administration, AdministrationMember, User)
@@ -1343,7 +1349,13 @@ async def search_client_companies_for_mandates(
         .where(AdministrationMember.role == MemberRole.OWNER)
         .where(User.role == 'zzp')
         .where(Administration.is_active == True)
-        .where(func.lower(Administration.name).like(f"%{q.lower()}%"))
+        .where(
+            func.lower(Administration.name).like(pattern)
+            | func.lower(func.coalesce(Administration.kvk_number, '')).like(pattern)
+            | func.lower(func.coalesce(Administration.btw_number, '')).like(pattern)
+            | func.lower(User.email).like(pattern)
+            | func.lower(func.coalesce(User.full_name, '')).like(pattern)
+        )
         .order_by(Administration.name.asc())
         .limit(limit)
     )
@@ -1353,6 +1365,8 @@ async def search_client_companies_for_mandates(
         MandateSearchItem(
             client_company_id=administration.id,
             company_name=administration.name,
+            kvk_number=administration.kvk_number,
+            btw_number=administration.btw_number,
             owner_user_id=owner.id,
             owner_name=owner.full_name,
             owner_email=owner.email,
@@ -1372,15 +1386,38 @@ async def create_mandate_request(
     """Create a pending mandate request for a specific client company."""
     verify_accountant_role(current_user)
 
+    client_result = await db.execute(
+        select(Administration)
+        .where(Administration.id == request.client_company_id)
+        .where(Administration.is_active == True)
+        .limit(1)
+    )
+    client_admin = client_result.scalar_one_or_none()
+    if not client_admin:
+        raise HTTPException(status_code=404, detail={"code": "CLIENT_NOT_FOUND", "message": "Klantbedrijf niet gevonden."})
+
     owner_result = await db.execute(
         select(AdministrationMember)
+        .join(User, User.id == AdministrationMember.user_id)
         .where(AdministrationMember.administration_id == request.client_company_id)
-        .where(AdministrationMember.role == MemberRole.OWNER)
+        .where(AdministrationMember.role.in_([MemberRole.OWNER, MemberRole.ADMIN]))
+        .where(User.role == 'zzp')
+        .order_by(AdministrationMember.role.asc())
         .limit(1)
     )
     owner_membership = owner_result.scalar_one_or_none()
     if not owner_membership:
-        raise HTTPException(status_code=404, detail={"code": "CLIENT_NOT_FOUND", "message": "Klantbedrijf niet gevonden."})
+        fallback_result = await db.execute(
+            select(AdministrationMember)
+            .join(User, User.id == AdministrationMember.user_id)
+            .where(AdministrationMember.administration_id == request.client_company_id)
+            .where(User.role == 'zzp')
+            .limit(1)
+        )
+        owner_membership = fallback_result.scalar_one_or_none()
+
+    if not owner_membership:
+        raise HTTPException(status_code=404, detail={"code": "CLIENT_NOT_FOUND", "message": "Geen ZZP-contact gevonden voor dit klantbedrijf."})
 
     assignment_result = await db.execute(
         select(AccountantClientAssignment)
@@ -1389,6 +1426,9 @@ async def create_mandate_request(
         .limit(1)
     )
     assignment = assignment_result.scalar_one_or_none()
+
+    if assignment and assignment.status == AssignmentStatus.ACTIVE:
+        return MandateActionResponse(id=assignment.id, status='approved', message='Machtiging is al goedgekeurd.')
 
     if assignment:
         assignment.status = AssignmentStatus.PENDING

@@ -477,6 +477,8 @@ class MandateSearchItem(BaseModel):
     """Search result row for ZZP client companies."""
     client_company_id: UUID
     company_name: str
+    kvk_number: Optional[str] = None
+    btw_number: Optional[str] = None
     owner_user_id: UUID
     owner_name: str
     owner_email: str

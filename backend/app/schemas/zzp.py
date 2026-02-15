@@ -28,6 +28,9 @@ EXPENSE_CATEGORIES = [
     "telefoon",
     "internet",
     "overig",
+    "Abonnement",
+    "Lease",
+    "Lening",
 ]
 
 

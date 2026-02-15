@@ -173,3 +173,38 @@ async def test_commitment_tenant_safety_and_expense_link(async_client, auth_head
         "commitment_id": commitment_id,
     })
     assert bad_link.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_commitment_validation_rules(async_client, auth_headers):
+    invalid_amount = await async_client.post('/api/v1/zzp/commitments', headers=auth_headers, json={
+        "type": "loan",
+        "name": "Invalid",
+        "amount_cents": 0,
+        "monthly_payment_cents": 1000,
+        "principal_amount_cents": 10000,
+        "interest_rate": 10,
+        "start_date": "2026-01-01",
+    })
+    assert invalid_amount.status_code == 422
+
+    invalid_interest = await async_client.post('/api/v1/zzp/commitments', headers=auth_headers, json={
+        "type": "loan",
+        "name": "Invalid",
+        "amount_cents": 1000,
+        "monthly_payment_cents": 1000,
+        "principal_amount_cents": 10000,
+        "interest_rate": 120,
+        "start_date": "2026-01-01",
+    })
+    assert invalid_interest.status_code == 422
+
+    invalid_date = await async_client.post('/api/v1/zzp/commitments', headers=auth_headers, json={
+        "type": "subscription",
+        "name": "Invalid",
+        "amount_cents": 1000,
+        "recurring_frequency": "monthly",
+        "start_date": "2026-02-01",
+        "end_date": "2026-01-01",
+    })
+    assert invalid_date.status_code == 422

@@ -1701,6 +1701,7 @@ export const nl = {
       overview: "Overzicht",
       bookkeeping: "Boekingen",
       audit: "Audit",
+      vat: "BTW-aangifte",
     },
   },
 

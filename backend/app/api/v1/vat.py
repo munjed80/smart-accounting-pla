@@ -13,6 +13,7 @@ from uuid import UUID
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,7 +32,7 @@ from app.schemas.vat import (
     VatCodeResponse,
     VatCodesListResponse,
 )
-from app.services.vat import VatReportService
+from app.services.vat import VatReportService, generate_vat_overview_pdf
 from app.services.vat.report import VatReportError, PeriodNotEligibleError
 from app.api.v1.deps import CurrentUser
 
@@ -44,12 +45,19 @@ async def verify_accountant_access(
     db: AsyncSession,
 ) -> Administration:
     """Verify user has accountant access to the client."""
-    if current_user.role not in ["accountant", "admin"]:
+    if current_user.role not in ["accountant", "admin", "super_admin"]:
         raise HTTPException(
             status_code=403,
             detail="This endpoint is only available for accountants"
         )
-    
+
+    if current_user.role == "super_admin":
+        administration_result = await db.execute(select(Administration).where(Administration.id == client_id))
+        administration = administration_result.scalar_one_or_none()
+        if not administration:
+            raise HTTPException(status_code=404, detail="Client not found")
+        return administration
+
     result = await db.execute(
         select(Administration)
         .join(AdministrationMember)
@@ -318,7 +326,7 @@ async def list_vat_codes(
     active_only: bool = Query(True, description="Only return active VAT codes"),
 ):
     """List all available VAT codes."""
-    if current_user.role not in ["accountant", "admin"]:
+    if current_user.role not in ["accountant", "admin", "super_admin"]:
         raise HTTPException(
             status_code=403,
             detail="This endpoint is only available for accountants"
@@ -350,4 +358,36 @@ async def list_vat_codes(
             for vc in vat_codes
         ],
         total_count=len(vat_codes),
+    )
+
+
+@router.get(
+    "/clients/{client_id}/periods/{period_id}/reports/vat.pdf",
+    summary="Download VAT Overview PDF",
+)
+async def download_vat_report_pdf(
+    client_id: UUID,
+    period_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Download a printable VAT overview PDF for manual filing."""
+    administration = await verify_accountant_access(client_id, current_user, db)
+
+    service = VatReportService(db, client_id)
+    try:
+        report = await service.generate_vat_report(period_id, allow_draft=True)
+    except (PeriodNotEligibleError, VatReportError) as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    pdf_bytes = generate_vat_overview_pdf(administration, report)
+    filename = f"btw-overzicht-{report.period_name.lower().replace(' ', '-')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(pdf_bytes)),
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
     )

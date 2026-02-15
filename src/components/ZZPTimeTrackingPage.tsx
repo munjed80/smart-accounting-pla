@@ -99,6 +99,7 @@ export const ZZPTimeTrackingPage = () => {
   const [editingEntry, setEditingEntry] = useState<ZZPTimeEntry | null>(null)
   const [formState, setFormState] = useState<EntryFormState>(defaultFormState)
   const [formError, setFormError] = useState<string | null>(null)
+  const [formValidationErrors, setFormValidationErrors] = useState<string[]>([])
   const [isSavingEntry, setIsSavingEntry] = useState(false)
   const [activeSession, setActiveSession] = useState<WorkSession | null>(null)
   const [isClockActionLoading, setIsClockActionLoading] = useState(false)
@@ -252,6 +253,7 @@ export const ZZPTimeTrackingPage = () => {
 
   const openForm = (entry?: ZZPTimeEntry) => {
     setFormError(null)
+    setFormValidationErrors([])
     if (entry) {
       setEditingEntry(entry)
       setFormState({
@@ -277,30 +279,36 @@ export const ZZPTimeTrackingPage = () => {
 
     if (!formState.entry_date) {
       setFormError('Datum is verplicht.')
+      setFormValidationErrors([])
       return
     }
 
     if (!description) {
       setFormError('Omschrijving is verplicht.')
+      setFormValidationErrors([])
       return
     }
 
     if (!Number.isFinite(parsedHours) || parsedHours <= 0 || parsedHours > 24) {
       setFormError('Uren moeten groter zijn dan 0 en maximaal 24.')
+      setFormValidationErrors([])
       return
     }
 
     if (parsedHourlyRate !== undefined && (!Number.isFinite(parsedHourlyRate) || parsedHourlyRate < 0)) {
       setFormError('Uurtarief moet 0 of hoger zijn.')
+      setFormValidationErrors([])
       return
     }
 
     if (selectedCustomerId && !customers.some((customer) => customer.id === selectedCustomerId)) {
       setFormError('Geselecteerde klant is niet meer beschikbaar. Kies opnieuw.')
+      setFormValidationErrors([])
       return
     }
 
     setFormError(null)
+    setFormValidationErrors([])
     setIsSavingEntry(true)
     try {
       const payload: ZZPTimeEntryCreate = {
@@ -314,10 +322,14 @@ export const ZZPTimeTrackingPage = () => {
       }
 
       if (editingEntry) {
-        await zzpApi.timeEntries.update(editingEntry.id, {
+        const response = await zzpApi.timeEntries.update(editingEntry.id, {
           ...payload,
           customer_id: selectedCustomerId,
         })
+        console.info('[Uren] Update response', { status: response.status, entryId: editingEntry.id })
+        if (response.status !== 200 && response.status !== 204) {
+          throw new Error(`TIME_ENTRY_UPDATE_FAILED_STATUS_${response.status}`)
+        }
         toast.success('Uren bijgewerkt')
       } else {
         await zzpApi.timeEntries.create(payload)
@@ -328,9 +340,29 @@ export const ZZPTimeTrackingPage = () => {
       await fetchData()
     } catch (error) {
       const message = parseApiError(error)
+      const rawError = error as { response?: { data?: { detail?: unknown }; status?: number } }
+      const detail = rawError?.response?.data?.detail
+      if (Array.isArray(detail)) {
+        const validationMessages = detail.map((item) => {
+          if (typeof item === 'string') return item
+          if (item && typeof item === 'object') {
+            const location = Array.isArray((item as { loc?: unknown[] }).loc)
+              ? (item as { loc?: unknown[] }).loc?.join('.')
+              : null
+            const detailMessage = (item as { msg?: string }).msg || 'Ongeldige invoer'
+            return location ? `${location}: ${detailMessage}` : detailMessage
+          }
+          return 'Ongeldige invoer'
+        })
+        setFormValidationErrors(validationMessages)
+        setFormError('Controleer de invoer en probeer opnieuw.')
+      } else {
+        setFormValidationErrors([])
+      }
       if (String(message).includes('TIME_ENTRY_INVOICED') || String(message).includes('Gefactureerde')) {
         toast.error('Deze uren zijn al gefactureerd en kunnen niet worden aangepast.')
       } else {
+        setFormError(String(message))
         toast.error(message)
       }
     } finally {
@@ -630,7 +662,16 @@ export const ZZPTimeTrackingPage = () => {
             {formError && (
               <Alert className="border-destructive/40 bg-destructive/5">
                 <WarningCircle size={16} weight="fill" />
-                <AlertDescription>{formError}</AlertDescription>
+                <AlertDescription>
+                  <p>{formError}</p>
+                  {formValidationErrors.length > 0 && (
+                    <ul className="mt-2 list-disc pl-4">
+                      {formValidationErrors.map((validationError) => (
+                        <li key={validationError}>{validationError}</li>
+                      ))}
+                    </ul>
+                  )}
+                </AlertDescription>
               </Alert>
             )}
             <div className="space-y-2">

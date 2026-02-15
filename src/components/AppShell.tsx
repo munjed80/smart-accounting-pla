@@ -194,6 +194,28 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
+
+  {
+    label: 'Verplichtingen Overzicht',
+    tabValue: 'obligations-overview',
+    icon: <List size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  {
+    label: 'Lease & Leningen',
+    tabValue: 'lease-loans',
+    icon: <CurrencyEur size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  {
+    label: 'Abonnementen',
+    tabValue: 'subscriptions',
+    icon: <ArrowsLeftRight size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
   // 7. Boekhouder (Links/consent page)
   {
     label: t('sidebar.boekhouder'),

@@ -18,6 +18,15 @@ describe('routing mappings for accountant pages', () => {
     expect(tabToPath('bank', true)).toBe('/accountant/bank')
   })
 
+
+
+  it('maps zzp obligations routes', () => {
+    expect(pathToTab('/zzp/verplichtingen/overzicht', false)).toBe('obligations-overview')
+    expect(pathToTab('/zzp/verplichtingen/lease-leningen', false)).toBe('lease-loans')
+    expect(pathToTab('/zzp/verplichtingen/abonnementen', false)).toBe('subscriptions')
+    expect(tabToPath('obligations-overview', false)).toBe('/zzp/verplichtingen/overzicht')
+  })
+
   it('falls back to role-based default for unknown routes', () => {
     expect(pathToTab('/something-else', true, false)).toBe('workqueue')
     expect(pathToTab('/something-else', false, false)).toBe('dashboard')

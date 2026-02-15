@@ -26,6 +26,9 @@ import { ZZPInvoicesPage } from '@/components/ZZPInvoicesPage'
 import { ZZPExpensesPage } from '@/components/ZZPExpensesPage'
 import { ZZPTimeTrackingPage } from '@/components/ZZPTimeTrackingPage'
 import { ZZPAgendaPage } from '@/components/ZZPAgendaPage'
+import { ZZPCommitmentsOverviewPage } from '@/components/ZZPCommitmentsOverviewPage'
+import { ZZPLeaseLoansPage } from '@/components/ZZPLeaseLoansPage'
+import { ZZPSubscriptionsPage } from '@/components/ZZPSubscriptionsPage'
 import { ClientDossierPage } from '@/components/ClientDossierPage'
 import { BulkOperationsHistoryPage } from '@/components/BulkOperationsHistoryPage'
 import { BankReconciliationPage } from '@/components/BankReconciliationPage'
@@ -166,7 +169,7 @@ const AppContent = () => {
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
   const isSuperAdmin = user?.role === 'super_admin'
   const isAccountantOnly = user?.role === 'accountant'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'expenses' | 'time' | 'agenda' | 'admin'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'expenses' | 'time' | 'agenda' | 'obligations-overview' | 'lease-loans' | 'subscriptions' | 'admin'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
   // Onboarding state - tracks if user needs onboarding (no administrations for ZZP, no clients for accountants)
@@ -587,8 +590,13 @@ const AppContent = () => {
         // ZZP-only page for time tracking (coming soon)
         return !isAccountant ? <ZZPTimeTrackingPage /> : <SmartDashboard />
       case 'agenda':
-        // ZZP-only page for agenda
         return !isAccountant ? <ZZPAgendaPage /> : <SmartDashboard />
+      case 'obligations-overview':
+        return !isAccountant ? <ZZPCommitmentsOverviewPage /> : <SmartDashboard />
+      case 'lease-loans':
+        return !isAccountant ? <ZZPLeaseLoansPage /> : <SmartDashboard />
+      case 'subscriptions':
+        return !isAccountant ? <ZZPSubscriptionsPage /> : <SmartDashboard />
       case 'dashboard':
         return <SmartDashboard />
       case 'transactions':
@@ -624,6 +632,9 @@ const AppContent = () => {
       case 'expenses': return 'Uitgaven'
       case 'time': return 'Uren'
       case 'agenda': return 'Agenda'
+      case 'obligations-overview': return 'Verplichtingen Overzicht'
+      case 'lease-loans': return 'Lease & Leningen'
+      case 'subscriptions': return 'Abonnementen'
       case 'dashboard': return 'Overzicht'
       case 'transactions': return 'Transacties'
       case 'upload': return 'Upload'

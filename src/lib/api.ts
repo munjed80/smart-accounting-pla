@@ -4015,6 +4015,73 @@ export interface WorkSessionStopResponse {
   message: string
 }
 
+
+export interface ZZPCommitment {
+  id: string
+  administration_id: string
+  type: 'lease' | 'loan' | 'subscription'
+  name: string
+  amount_cents: number
+  monthly_payment_cents?: number | null
+  principal_amount_cents?: number | null
+  interest_rate?: number | null
+  recurring_frequency?: 'monthly' | 'yearly' | null
+  start_date: string
+  end_date?: string | null
+  contract_term_months?: number | null
+  renewal_date?: string | null
+  btw_rate?: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ZZPCommitmentCreate {
+  type: 'lease' | 'loan' | 'subscription'
+  name: string
+  amount_cents: number
+  monthly_payment_cents?: number
+  principal_amount_cents?: number
+  interest_rate?: number
+  recurring_frequency?: 'monthly' | 'yearly'
+  start_date: string
+  end_date?: string
+  contract_term_months?: number
+  renewal_date?: string
+  btw_rate?: number
+}
+
+export type ZZPCommitmentUpdate = Partial<ZZPCommitmentCreate>
+
+export interface ZZPCommitmentListResponse {
+  commitments: ZZPCommitment[]
+  total: number
+}
+
+export interface ZZPCommitmentOverview {
+  monthly_total_cents: number
+  upcoming_total_cents: number
+  warning_count: number
+  by_type: Record<string, number>
+  upcoming: ZZPCommitment[]
+}
+
+export interface ZZPAmortizationRow {
+  month_index: number
+  due_date: string
+  payment_cents: number
+  interest_cents: number
+  principal_cents: number
+  remaining_balance_cents: number
+}
+
+export interface ZZPCommitmentSuggestion {
+  bank_transaction_id: string
+  booking_date: string
+  amount_cents: number
+  description: string
+  confidence: number
+}
+
 // ============ ZZP API Functions ============
 
 export const zzpApi = {
@@ -4356,6 +4423,42 @@ export const zzpApi = {
 
     delete: async (eventId: string): Promise<void> => {
       await api.delete(`/zzp/calendar-events/${eventId}`)
+    },
+  },
+
+
+  // ------------ Commitments (Verplichtingen) ------------
+  commitments: {
+    list: async (type?: 'lease' | 'loan' | 'subscription'): Promise<ZZPCommitmentListResponse> => {
+      const response = await api.get<ZZPCommitmentListResponse>('/zzp/commitments', { params: type ? { type } : undefined })
+      return response.data
+    },
+    overview: async (): Promise<ZZPCommitmentOverview> => {
+      const response = await api.get<ZZPCommitmentOverview>('/zzp/commitments/overview/summary')
+      return response.data
+    },
+    create: async (data: ZZPCommitmentCreate): Promise<ZZPCommitment> => {
+      const response = await api.post<ZZPCommitment>('/zzp/commitments', data)
+      return response.data
+    },
+    get: async (id: string): Promise<ZZPCommitment> => {
+      const response = await api.get<ZZPCommitment>(`/zzp/commitments/${id}`)
+      return response.data
+    },
+    update: async (id: string, data: ZZPCommitmentUpdate): Promise<ZZPCommitment> => {
+      const response = await api.patch<ZZPCommitment>(`/zzp/commitments/${id}`, data)
+      return response.data
+    },
+    delete: async (id: string): Promise<void> => {
+      await api.delete(`/zzp/commitments/${id}`)
+    },
+    amortization: async (id: string): Promise<ZZPAmortizationRow[]> => {
+      const response = await api.get<ZZPAmortizationRow[]>(`/zzp/commitments/${id}/amortization`)
+      return response.data
+    },
+    suggestions: async (): Promise<{ suggestions: ZZPCommitmentSuggestion[] }> => {
+      const response = await api.get<{ suggestions: ZZPCommitmentSuggestion[] }>('/zzp/commitments/subscriptions/suggestions')
+      return response.data
     },
   },
 

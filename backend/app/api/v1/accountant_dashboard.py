@@ -19,8 +19,6 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.models.user import User
-
-logger = logging.getLogger(__name__)
 from app.models.administration import Administration, AdministrationMember, MemberRole
 from app.models.issues import ClientIssue, IssueSeverity
 from app.models.accountant_dashboard import (
@@ -84,6 +82,8 @@ from app.services.accountant_dashboard import (
     UnauthorizedClientError,
 )
 from app.api.v1.deps import CurrentUser, require_accountant
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 

@@ -19,8 +19,6 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.models.user import User
-
-logger = logging.getLogger(__name__)
 from app.models.accountant_dashboard import (
     AccountantClientAssignment,
     AssignmentStatus,
@@ -37,6 +35,8 @@ from app.schemas.accountant_dashboard import (
     MandateActionResponse,
 )
 from app.api.v1.deps import CurrentUser, require_zzp
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 

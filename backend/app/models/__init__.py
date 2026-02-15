@@ -44,6 +44,11 @@ from app.models.zzp import (
     ZZPQuoteLine,
     ZZPQuoteCounter,
 )
+from app.models.financial_commitment import (
+    FinancialCommitment,
+    CommitmentType,
+    RecurringFrequency,
+)
 from app.models.subscription import (
     Plan,
     Subscription,
@@ -120,6 +125,9 @@ __all__ = [
     "ZZPPaymentAllocation",
     "PaymentStatus",
     "PaymentMethod",
+    "FinancialCommitment",
+    "CommitmentType",
+    "RecurringFrequency",
     "Plan",
     "Subscription",
     "AdminAuditLog",

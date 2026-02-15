@@ -3719,6 +3719,11 @@ export interface ZZPTimeEntryCreate {
 
 export interface ZZPTimeEntryUpdate extends Partial<ZZPTimeEntryCreate> {}
 
+export interface ZZPTimeEntryMutationResponse {
+  entry: ZZPTimeEntry | null
+  status: number
+}
+
 export interface ZZPTimeEntryListResponse {
   entries: ZZPTimeEntry[]
   total: number
@@ -4062,9 +4067,12 @@ export const zzpApi = {
       return response.data
     },
 
-    update: async (entryId: string, data: ZZPTimeEntryUpdate): Promise<ZZPTimeEntry> => {
-      const response = await api.patch<ZZPTimeEntry>(`/zzp/time-entries/${entryId}`, data)
-      return response.data
+    update: async (entryId: string, data: ZZPTimeEntryUpdate): Promise<ZZPTimeEntryMutationResponse> => {
+      const response = await api.patch<ZZPTimeEntry>(`/uren/${entryId}`, data)
+      return {
+        entry: response.data ?? null,
+        status: response.status,
+      }
     },
 
     delete: async (entryId: string): Promise<void> => {

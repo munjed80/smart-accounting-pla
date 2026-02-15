@@ -95,6 +95,9 @@ const DEFAULT_CATEGORIES = [
   'opleiding',
   'representatie',
   'overig',
+  'Abonnement',
+  'Lease',
+  'Lening',
 ]
 
 // VAT rate options
@@ -612,7 +615,7 @@ const ExpenseCard = ({
           </div>
           <div className="min-w-0 flex-1">
             <h4 className="font-semibold truncate">{expense.vendor}</h4>
-            {expense.commitment_id && <Badge variant="secondary" className="mt-1">Linked to commitment</Badge>}
+            {expense.commitment_id && <a href={`/zzp/verplichtingen/overzicht#commitment-${expense.commitment_id}`}><Badge variant="secondary" className="mt-1">Gekoppeld aan verplichting</Badge></a>}
             {expense.description && (
               <p className="text-sm text-muted-foreground truncate mt-0.5">
                 {expense.description}
@@ -1019,12 +1022,12 @@ export const ZZPExpensesPage = () => {
                   </div>
                 ) : (
                   expenses.map((expense) => (
-                    <ExpenseCard
-                      key={expense.id}
+                    <div key={expense.id} id={`expense-${expense.id}`}><ExpenseCard
                       expense={expense}
                       onEdit={() => openEditForm(expense)}
                       onDelete={() => setDeletingExpense(expense)}
                     />
+                    </div>
                   ))
                 )}
               </div>
@@ -1055,7 +1058,7 @@ export const ZZPExpensesPage = () => {
                       </TableRow>
                     ) : (
                       expenses.map((expense) => (
-                        <TableRow key={expense.id} className="hover:bg-secondary/30">
+                        <TableRow id={`expense-${expense.id}`} key={expense.id} className="hover:bg-secondary/30">
                           <TableCell className="text-muted-foreground">
                             {new Date(expense.expense_date).toLocaleDateString('nl-NL')}
                           </TableCell>
@@ -1066,7 +1069,7 @@ export const ZZPExpensesPage = () => {
                               </div>
                               <div>
                                 <span className="font-medium">{expense.vendor}</span>
-                                {expense.commitment_id && <Badge variant="secondary" className="ml-2">Linked to commitment</Badge>}
+                                {expense.commitment_id && <a href={`/zzp/verplichtingen/overzicht#commitment-${expense.commitment_id}`}><Badge variant="secondary" className="ml-2">Gekoppeld aan verplichting</Badge></a>}
                                 {expense.description && (
                                   <p className="text-xs text-muted-foreground truncate max-w-[200px]">
                                     {expense.description}

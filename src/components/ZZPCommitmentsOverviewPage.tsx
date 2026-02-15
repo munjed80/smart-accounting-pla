@@ -1,12 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
+import axios from 'axios'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { zzpApi, ZZPCommitment, ZZPCommitmentOverview } from '@/lib/api'
+import { parseApiError } from '@/lib/utils'
+import { navigateTo } from '@/lib/navigation'
 import { toast } from 'sonner'
 
 const eur = (cents: number) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(cents / 100)
+const todayStr = () => new Date().toISOString().slice(0, 10)
+const isExpired = (item: ZZPCommitment) => !!item.end_date && item.end_date < todayStr() && !item.next_due_date
+const expenseCategory = (type: ZZPCommitment['type']) => (type === 'subscription' ? 'Abonnement' : type === 'lease' ? 'Lease' : 'Lening')
+const errorWithStatus = (error: unknown) => {
+  if (axios.isAxiosError(error) && error.response?.status) return `${error.response.status}: ${parseApiError(error)}`
+  return parseApiError(error)
+}
 
 export const ZZPCommitmentsOverviewPage = () => {
   const [typeFilter, setTypeFilter] = useState<'all' | 'lease' | 'loan' | 'subscription'>('all')
@@ -14,12 +25,16 @@ export const ZZPCommitmentsOverviewPage = () => {
   const [overview, setOverview] = useState<ZZPCommitmentOverview | null>(null)
 
   const load = async () => {
-    const [listResp, overviewResp] = await Promise.all([
-      zzpApi.commitments.list(typeFilter === 'all' ? undefined : typeFilter),
-      zzpApi.commitments.overview(),
-    ])
-    setCommitments(listResp.commitments)
-    setOverview(overviewResp)
+    try {
+      const [listResp, overviewResp] = await Promise.all([
+        zzpApi.commitments.list(typeFilter === 'all' ? undefined : typeFilter),
+        zzpApi.commitments.overview(),
+      ])
+      setCommitments(listResp.commitments)
+      setOverview(overviewResp)
+    } catch (error) {
+      toast.error(errorWithStatus(error))
+    }
   }
 
   useEffect(() => { load() }, [typeFilter])
@@ -32,21 +47,26 @@ export const ZZPCommitmentsOverviewPage = () => {
   const max = Math.max(1, ...monthlyPoints.map(p => p.value))
 
   const createExpenseFromCommitment = async (item: ZZPCommitment) => {
-    const dueDate = item.next_due_date || new Date().toISOString().slice(0, 10)
+    const dueDate = item.next_due_date || todayStr()
     const amount = item.monthly_payment_cents || item.amount_cents
     try {
-      await zzpApi.expenses.create({
+      const created = await zzpApi.expenses.create({
         vendor: item.name,
         description: `Automatisch aangemaakt vanuit verplichting: ${item.name}`,
         expense_date: dueDate,
         amount_cents: amount,
         vat_rate: item.btw_rate ?? 21,
-        category: item.type === 'subscription' ? 'software' : 'algemeen',
+        category: expenseCategory(item.type),
         commitment_id: item.id,
       })
-      toast.success('Uitgave aangemaakt vanuit verplichting')
-    } catch {
-      toast.error('Kon uitgave niet aanmaken')
+      toast.success('Uitgave aangemaakt', {
+        action: {
+          label: 'Open uitgave',
+          onClick: () => navigateTo(`/zzp/expenses#expense-${created.id}`),
+        },
+      })
+    } catch (error) {
+      toast.error(errorWithStatus(error))
     }
   }
 
@@ -83,10 +103,13 @@ export const ZZPCommitmentsOverviewPage = () => {
         <CardHeader><CardTitle>Aankomende verplichtingen</CardTitle></CardHeader>
         <CardContent className="space-y-2">
           {(overview?.upcoming || []).map(item => (
-            <div key={item.id} className="rounded-md border p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div id={`commitment-${item.id}`} key={item.id} className="rounded-md border p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium">{item.name}</p>
-                <p className="text-xs text-muted-foreground">Volgende vervaldatum: {item.next_due_date || '-'}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">Volgende vervaldatum: {item.next_due_date || '-'}</p>
+                  {isExpired(item) ? <Badge variant="secondary">Afgelopen</Badge> : null}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">{eur(item.monthly_payment_cents || item.amount_cents)}</span>

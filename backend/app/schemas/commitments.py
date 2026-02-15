@@ -11,9 +11,9 @@ RecurringFrequencyLiteral = Literal["monthly", "yearly"]
 class CommitmentCreate(BaseModel):
     type: CommitmentTypeLiteral
     name: str = Field(..., min_length=2, max_length=255)
-    amount_cents: int = Field(..., ge=0)
-    monthly_payment_cents: Optional[int] = Field(None, ge=0)
-    principal_amount_cents: Optional[int] = Field(None, ge=0)
+    amount_cents: int = Field(..., gt=0)
+    monthly_payment_cents: Optional[int] = Field(None, gt=0)
+    principal_amount_cents: Optional[int] = Field(None, gt=0)
     interest_rate: Optional[float] = Field(None, ge=0, le=100)
     recurring_frequency: Optional[RecurringFrequencyLiteral] = None
     start_date: date
@@ -40,9 +40,9 @@ class CommitmentCreate(BaseModel):
 class CommitmentUpdate(BaseModel):
     type: Optional[CommitmentTypeLiteral] = None
     name: Optional[str] = Field(None, min_length=2, max_length=255)
-    amount_cents: Optional[int] = Field(None, ge=0)
-    monthly_payment_cents: Optional[int] = Field(None, ge=0)
-    principal_amount_cents: Optional[int] = Field(None, ge=0)
+    amount_cents: Optional[int] = Field(None, gt=0)
+    monthly_payment_cents: Optional[int] = Field(None, gt=0)
+    principal_amount_cents: Optional[int] = Field(None, gt=0)
     interest_rate: Optional[float] = Field(None, ge=0, le=100)
     recurring_frequency: Optional[RecurringFrequencyLiteral] = None
     start_date: Optional[date] = None

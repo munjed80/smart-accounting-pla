@@ -11,7 +11,6 @@ import { OnboardingPage } from '@/components/OnboardingPage'
 import { AccountantOnboardingPage } from '@/components/AccountantOnboardingPage'
 import { LandingPage } from '@/pages/LandingPage'
 import { SmartDashboard } from '@/components/SmartDashboard'
-import { AccountantDashboard } from '@/components/AccountantDashboard'
 import { AccountantHomePage } from '@/components/AccountantHomePage'
 import { AccountantReviewQueuePage } from '@/components/AccountantReviewQueuePage'
 import { AccountantRemindersPage } from '@/components/AccountantRemindersPage'
@@ -41,6 +40,7 @@ import { PWAInstallPrompt } from '@/components/PWAInstallPrompt'
 import { PWAUpdatePrompt } from '@/components/PWAUpdatePrompt'
 import { administrationApi, accountantClientApi } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
+import { pathToTab, tabToPath } from '@/lib/routing'
 import { cleanupOverlayPortals } from '@/hooks/useCloseOverlayOnRouteChange'
 import { Database } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -147,118 +147,6 @@ const getRouteFromURL = (): Route => {
   
   // Return app route with current path for navigation
   return { type: 'app', path: path || '/' }
-}
-
-// Map URL paths to tab values
-const pathToTab = (path: string, isAccountant: boolean, isSuperAdmin = false): string => {
-  // Normalize path
-  const normalizedPath = path.toLowerCase().replace(/\/$/, '') || '/'
-  
-  switch (normalizedPath) {
-    case '/dashboard':
-      return 'dashboard'
-    case '/transactions':
-      return 'transactions'
-    case '/accountant/review':
-    case '/accountant/review-queue':
-      return 'reviewqueue'
-    case '/accountant':
-    case '/accountant/overview':
-    case '/workqueue':
-      return 'workqueue'
-    case '/clients':
-    case '/accountant/clients':
-      return 'clients'
-    case '/accountant/reminders':
-      return 'reminders'
-    case '/accountant/acties':
-    case '/accountant/activity':
-      return 'acties'
-    case '/accountant/bank':
-      return 'bank'
-    case '/accountant/crediteuren':
-      return 'crediteuren'
-    case '/accountant/winst-verlies':
-      return 'profitloss'
-    case '/accountant/grootboek':
-      return 'grootboek'
-    case '/ai-upload':
-    case '/upload':
-      return 'upload'
-    case '/settings':
-      return 'settings'
-    case '/support':
-      return 'support'
-    case '/admin':
-      return 'admin'
-    case '/dashboard/boekhouder':
-    case '/zzp/boekhouder':
-      return 'boekhouder'
-    case '/zzp/customers':
-      return 'customers'
-    case '/zzp/invoices':
-      return 'invoices'
-    case '/zzp/expenses':
-      return 'expenses'
-    case '/zzp/time':
-      return 'time'
-    case '/zzp/agenda':
-      return 'agenda'
-    case '/':
-    default:
-      // Default based on role
-      return isSuperAdmin ? 'admin' : isAccountant ? 'workqueue' : 'dashboard'
-  }
-}
-
-// Map tab values to URL paths
-const tabToPath = (tab: string, isAccountant: boolean, isSuperAdmin = false): string => {
-  switch (tab) {
-    case 'dashboard':
-      return '/dashboard'
-    case 'transactions':
-      return '/transactions'
-    case 'workqueue':
-      return isSuperAdmin ? '/admin' : isAccountant ? '/accountant' : '/dashboard'
-    case 'reviewqueue':
-      return '/accountant/review-queue'
-    case 'reminders':
-      return '/accountant/reminders'
-    case 'acties':
-      return '/accountant/acties'
-    case 'bank':
-      return '/accountant/bank'
-    case 'crediteuren':
-      return '/accountant/crediteuren'
-    case 'profitloss':
-      return '/accountant/winst-verlies'
-    case 'grootboek':
-      return '/accountant/grootboek'
-    case 'clients':
-      return isAccountant ? '/accountant/clients' : '/clients'
-    case 'upload':
-      return '/ai-upload'
-    case 'settings':
-      return '/settings'
-    case 'support':
-      return '/support'
-    case 'admin':
-      return '/admin'
-    case 'boekhouder':
-      return '/dashboard/boekhouder'
-    case 'customers':
-      return '/zzp/customers'
-    case 'invoices':
-      return '/zzp/invoices'
-    case 'expenses':
-      return '/zzp/expenses'
-    case 'time':
-      return '/zzp/time'
-    case 'agenda':
-      return '/zzp/agenda'
-    default:
-      return isSuperAdmin ? '/admin' : isAccountant ? '/accountant' : '/dashboard'
-  }
 }
 
 const isAdminRoutePath = (path: string): boolean => path === '/admin' || path.startsWith('/admin/')

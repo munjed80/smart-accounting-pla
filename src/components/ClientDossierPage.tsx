@@ -101,6 +101,9 @@ const incrementTodayCompleted = (): number => {
   return newCount
 }
 
+const dossierTabsListClassName = 'mb-6 flex w-full flex-nowrap items-center justify-start gap-2 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
+const dossierTabTriggerClassName = 'flex-none items-center gap-2'
+
 export const ClientDossierPage = ({ clientId, initialTab = 'invoices' }: ClientDossierPageProps) => {
   const { user } = useAuth()
   const { activeClientId, allLinks, setActiveClient, refreshLinks, isLoading: activeClientLoading } = useActiveClient()
@@ -526,20 +529,20 @@ export const ClientDossierPage = ({ clientId, initialTab = 'invoices' }: ClientD
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="mb-6 flex w-full flex-nowrap items-center justify-start gap-2 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <TabsTrigger value="invoices" className="flex-none items-center gap-2">
+          <TabsList className={dossierTabsListClassName}>
+            <TabsTrigger value="invoices" className={dossierTabTriggerClassName}>
               Facturen
             </TabsTrigger>
-            <TabsTrigger value="expenses" className="flex-none items-center gap-2">
+            <TabsTrigger value="expenses" className={dossierTabTriggerClassName}>
               Uitgaven
             </TabsTrigger>
-            <TabsTrigger value="hours" className="flex-none items-center gap-2">
+            <TabsTrigger value="hours" className={dossierTabTriggerClassName}>
               Uren
             </TabsTrigger>
-            <TabsTrigger value="vat" className="flex-none items-center gap-2">
+            <TabsTrigger value="vat" className={dossierTabTriggerClassName}>
               BTW-aangifte
             </TabsTrigger>
-            <TabsTrigger value="issues" className="flex-none items-center gap-2">
+            <TabsTrigger value="issues" className={dossierTabTriggerClassName}>
               <ClipboardText size={18} />
               {t('dossier.tabs.issues')}
               {overview && (overview.error_count > 0 || overview.warning_count > 0) && (
@@ -548,19 +551,19 @@ export const ClientDossierPage = ({ clientId, initialTab = 'invoices' }: ClientD
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="bookkeeping" className="flex-none items-center gap-2">
+            <TabsTrigger value="bookkeeping" className={dossierTabTriggerClassName}>
               <Book size={18} />
               {t('dossier.tabs.bookkeeping')}
             </TabsTrigger>
-            <TabsTrigger value="periods" className="flex-none items-center gap-2">
+            <TabsTrigger value="periods" className={dossierTabTriggerClassName}>
               <CalendarBlank size={18} />
               {t('dossier.tabs.periods')}
             </TabsTrigger>
-            <TabsTrigger value="decisions" className="flex-none items-center gap-2">
+            <TabsTrigger value="decisions" className={dossierTabTriggerClassName}>
               <ListChecks size={18} />
               {t('dossier.tabs.decisions')}
             </TabsTrigger>
-            <TabsTrigger value="audit" className="flex-none items-center gap-2">
+            <TabsTrigger value="audit" className={dossierTabTriggerClassName}>
               <ClockCounterClockwise size={18} />
               {t('dossier.tabs.audit')}
             </TabsTrigger>

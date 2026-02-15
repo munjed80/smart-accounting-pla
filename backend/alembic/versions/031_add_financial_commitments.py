@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision: str = '031_add_financial_commitments'
-down_revision: Union[str, None] = '030_super_admin_subscriptions'
+down_revision: Union[str, None] = '6681ce17afc5'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

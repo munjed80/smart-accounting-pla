@@ -270,6 +270,50 @@ def seed_admin_user(conn, email: str, password: str, full_name: str = "System Ad
     return user_id
 
 
+
+def seed_approved_mandate(conn, accountant_email: str, client_company_id: str):
+    """Create/update an approved mandate between accountant and client company."""
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id FROM users WHERE email = %s", (accountant_email.lower().strip(),))
+    accountant = cursor.fetchone()
+    if not accountant:
+        raise ValueError(f"Accountant niet gevonden: {accountant_email}")
+    accountant_id = accountant[0]
+
+    cursor.execute(
+        """
+        SELECT am.user_id
+        FROM administration_members am
+        JOIN users u ON u.id = am.user_id
+        WHERE am.administration_id = %s AND am.role = 'OWNER' AND u.role = 'zzp'
+        LIMIT 1
+        """,
+        (client_company_id,),
+    )
+    owner = cursor.fetchone()
+    if not owner:
+        raise ValueError(f"Geen ZZP eigenaar gevonden voor administratie {client_company_id}")
+    client_user_id = owner[0]
+
+    cursor.execute(
+        """
+        INSERT INTO accountant_client_assignments (
+          id, accountant_id, client_user_id, administration_id, status, invited_by, is_primary,
+          assigned_by_id, assigned_at, approved_at, updated_at, notes, scopes
+        )
+        VALUES (%s, %s, %s, %s, 'ACTIVE', 'ACCOUNTANT', TRUE, %s, NOW(), NOW(), NOW(), %s,
+          ARRAY['invoices','customers','expenses','hours','documents','bookkeeping','settings','vat','reports'])
+        ON CONFLICT (accountant_id, administration_id)
+        DO UPDATE SET status='ACTIVE', client_user_id=EXCLUDED.client_user_id, approved_at=NOW(), revoked_at=NULL, updated_at=NOW()
+        """,
+        (str(uuid.uuid4()), accountant_id, client_user_id, client_company_id, accountant_id, 'Seeded approved mandate'),
+    )
+    conn.commit()
+    cursor.close()
+    print(f"Seeded approved mandate: {accountant_email} -> {client_company_id}")
+
+
 def main():
     """Main seed script entry point"""
     print("=" * 60)
@@ -311,6 +355,12 @@ def main():
         if super_admin_email and super_admin_password:
             print("\n--- Super Admin User Seeding ---")
             seed_admin_user(conn, super_admin_email, super_admin_password, super_admin_name, role="super_admin")
+
+        mandate_accountant_email = os.environ.get("SEED_MANDATE_ACCOUNTANT_EMAIL")
+        mandate_client_company_id = os.environ.get("SEED_MANDATE_CLIENT_COMPANY_ID")
+        if mandate_accountant_email and mandate_client_company_id:
+            print("\n--- Approved Mandate Seeding ---")
+            seed_approved_mandate(conn, mandate_accountant_email, mandate_client_company_id)
         
         conn.close()
         print("=" * 60)

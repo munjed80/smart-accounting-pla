@@ -1205,6 +1205,25 @@ export const ledgerApi = {
   },
 }
 
+
+
+export const accountantDossierApi = {
+  getInvoices: async (clientId: string): Promise<ZZPInvoiceListResponse> => {
+    const response = await api.get<ZZPInvoiceListResponse>(`/accountant/clients/${clientId}/invoices`)
+    return response.data
+  },
+
+  getExpenses: async (clientId: string): Promise<ZZPExpenseListResponse> => {
+    const response = await api.get<ZZPExpenseListResponse>(`/accountant/clients/${clientId}/expenses`)
+    return response.data
+  },
+
+  getHours: async (clientId: string): Promise<ZZPTimeEntryListResponse> => {
+    const response = await api.get<ZZPTimeEntryListResponse>(`/accountant/clients/${clientId}/hours`)
+    return response.data
+  },
+}
+
 // ============ Bookkeeping API ============
 
 export const bookkeepingApi = {
@@ -2635,6 +2654,45 @@ export interface ClientLinksResponse {
   total_count: number
 }
 
+
+
+export interface MandateSearchItem {
+  client_company_id: string
+  company_name: string
+  owner_user_id: string
+  owner_name: string
+  owner_email: string
+}
+
+export interface MandateSearchResponse {
+  results: MandateSearchItem[]
+  total_count: number
+}
+
+export interface MandateItem {
+  id: string
+  accountant_user_id: string
+  client_user_id: string
+  client_company_id: string
+  client_company_name: string
+  accountant_name?: string | null
+  accountant_email?: string | null
+  status: 'pending' | 'approved' | 'rejected' | 'revoked'
+  created_at: string
+  updated_at: string
+}
+
+export interface MandateListResponse {
+  mandates: MandateItem[]
+  total_count: number
+}
+
+export interface MandateActionResponse {
+  id: string
+  status: 'pending' | 'approved' | 'rejected' | 'revoked'
+  message: string
+}
+
 // ============ Permission Scopes Types ============
 
 export type PermissionScope = 
@@ -2787,6 +2845,26 @@ export const accountantApi = {
     const response = await api.put<UpdateScopesResponse>(`/accountant/clients/${clientId}/scopes`, request)
     return response.data
   },
+
+  searchMandateClients: async (query: string): Promise<MandateSearchResponse> => {
+    const response = await api.get<MandateSearchResponse>('/accountant/mandates/search-clients', { params: { q: query } })
+    return response.data
+  },
+
+  createMandate: async (clientCompanyId: string): Promise<MandateActionResponse> => {
+    const response = await api.post<MandateActionResponse>('/accountant/mandates', { client_company_id: clientCompanyId })
+    return response.data
+  },
+
+  getMandates: async (): Promise<MandateListResponse> => {
+    const response = await api.get<MandateListResponse>('/accountant/mandates')
+    return response.data
+  },
+
+  revokeMandate: async (mandateId: string): Promise<MandateActionResponse> => {
+    const response = await api.delete<MandateActionResponse>(`/accountant/mandates/${mandateId}`)
+    return response.data
+  },
 }
 
 // ZZP Client Consent API
@@ -2828,6 +2906,21 @@ const zzpConsentApi = {
    */
   revokeLink: async (assignmentId: string): Promise<RejectLinkResponse> => {
     const response = await api.post<RejectLinkResponse>(`/zzp/links/${assignmentId}/revoke`)
+    return response.data
+  },
+
+  getMandates: async (): Promise<MandateListResponse> => {
+    const response = await api.get<MandateListResponse>('/zzp/mandates')
+    return response.data
+  },
+
+  approveMandate: async (mandateId: string): Promise<MandateActionResponse> => {
+    const response = await api.post<MandateActionResponse>(`/zzp/mandates/${mandateId}/approve`)
+    return response.data
+  },
+
+  rejectMandate: async (mandateId: string): Promise<MandateActionResponse> => {
+    const response = await api.post<MandateActionResponse>(`/zzp/mandates/${mandateId}/reject`)
     return response.data
   },
 }

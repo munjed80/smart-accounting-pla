@@ -204,10 +204,18 @@ export const ZZPAccountantLinksPage = () => {
     setError(null)
     try {
       const [pendingResponse, activeResponse] = await Promise.all([
-        zzpApi.getPendingLinks(),
+        zzpApi.getMandates(),
         zzpApi.getActiveLinks(),
       ])
-      setPendingRequests(pendingResponse.pending_requests)
+      setPendingRequests(pendingResponse.mandates.map((m) => ({
+        assignment_id: m.id,
+        accountant_id: m.accountant_user_id,
+        accountant_email: m.accountant_email || "",
+        accountant_name: m.accountant_name || "",
+        administration_id: m.client_company_id,
+        administration_name: m.client_company_name,
+        invited_at: m.created_at,
+      })))
       setActiveLinks(activeResponse.active_links)
     } catch (err) {
       console.error('Failed to load accountant links:', err)
@@ -228,7 +236,7 @@ export const ZZPAccountantLinksPage = () => {
     setApprovingIds(prev => new Set(prev).add(assignmentId))
     
     try {
-      const response = await zzpApi.approveLink(assignmentId)
+      const response = await zzpApi.approveMandate(assignmentId)
       toast.success(t('zzpAccountantLinks.approvedSuccess'))
       
       // Move from pending to active, using server timestamp from response
@@ -240,7 +248,7 @@ export const ZZPAccountantLinksPage = () => {
         accountant_name: request.accountant_name,
         administration_id: request.administration_id,
         administration_name: request.administration_name,
-        approved_at: response.approved_at,
+        approved_at: new Date().toISOString(),
       }])
     } catch (err) {
       toast.error(getErrorMessage(err))
@@ -258,7 +266,7 @@ export const ZZPAccountantLinksPage = () => {
     setRejectingIds(prev => new Set(prev).add(assignmentId))
     
     try {
-      await zzpApi.rejectLink(assignmentId)
+      await zzpApi.rejectMandate(assignmentId)
       toast.success(t('zzpAccountantLinks.rejectedSuccess'))
       
       // Remove from list

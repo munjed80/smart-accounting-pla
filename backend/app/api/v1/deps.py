@@ -96,6 +96,22 @@ async def require_assigned_client(
                     "message": "Toegang is in afwachting van goedkeuring door de klant."
                 }
             )
+        elif assignment.status == AssignmentStatus.REJECTED:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "MANDATE_REJECTED",
+                    "message": "Machtiging is afgewezen door de klant."
+                }
+            )
+        elif assignment.status == AssignmentStatus.REJECTED:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "MANDATE_REJECTED",
+                    "message": "Machtiging is afgewezen door de klant."
+                }
+            )
         else:  # REVOKED
             raise HTTPException(
                 status_code=403,
@@ -275,7 +291,7 @@ def require_zzp(current_user: User) -> None:
 
 def require_accountant(current_user: User) -> None:
     """
-    Guard: Allows users with role = ACCOUNTANT or ADMIN.
+    Guard: Allows users with role = ACCOUNTANT, SUPER_ADMIN, or ADMIN.
     
     Admin users are considered accountants for permission purposes,
     matching the frontend behavior (isAccountantRole).
@@ -283,11 +299,80 @@ def require_accountant(current_user: User) -> None:
     Raises:
         HTTP 403: If user role is not 'accountant' or 'admin'
     """
-    if current_user.role not in (UserRole.ACCOUNTANT.value, UserRole.ADMIN.value):
+    if current_user.role not in (UserRole.ACCOUNTANT.value, UserRole.SUPER_ADMIN.value, UserRole.ADMIN.value):
         raise HTTPException(
             status_code=403,
             detail={"code": "FORBIDDEN_ROLE", "message": "This endpoint is only available for accountants"}
         )
+
+
+async def require_approved_mandate_client(
+    client_id: UUID,
+    current_user: User,
+    db: AsyncSession,
+    required_scope: Optional[str] = None,
+) -> Administration:
+    """
+    Verify accountant/super_admin has an APPROVED mandate (ACTIVE assignment) for a client.
+
+    This dependency enforces mandate-based access only (no direct membership bypass),
+    matching accountant dossier requirements.
+    """
+    require_accountant(current_user)
+
+    if current_user.role not in (UserRole.ACCOUNTANT.value, UserRole.SUPER_ADMIN.value):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "FORBIDDEN_ROLE",
+                "message": "Deze endpoint is alleen beschikbaar voor accountants met goedgekeurde machtiging.",
+            },
+        )
+
+    from app.models.accountant_dashboard import AssignmentStatus
+
+    assignment_result = await db.execute(
+        select(Administration, AccountantClientAssignment)
+        .join(AccountantClientAssignment, AccountantClientAssignment.administration_id == Administration.id)
+        .where(Administration.id == client_id)
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+    )
+    result_tuple = assignment_result.first()
+
+    if not result_tuple:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "MANDATE_NOT_APPROVED",
+                "message": "Geen goedgekeurde machtiging voor deze klant.",
+            },
+        )
+
+    administration, assignment = result_tuple
+
+    if assignment.status != AssignmentStatus.ACTIVE:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "MANDATE_NOT_APPROVED",
+                "message": "Machtiging is niet goedgekeurd voor deze klant.",
+            },
+        )
+
+    if required_scope:
+        scopes = assignment.scopes or DEFAULT_SCOPES
+        if required_scope not in scopes:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "SCOPE_MISSING",
+                    "message": f"Geen toegang tot deze module. Ontbrekende machtiging: {required_scope}",
+                    "required_scope": required_scope,
+                    "granted_scopes": scopes,
+                },
+            )
+
+    return administration
 
 
 def require_accountant_only(current_user: User) -> None:

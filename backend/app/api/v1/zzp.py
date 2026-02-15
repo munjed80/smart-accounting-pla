@@ -29,6 +29,9 @@ from app.schemas.accountant_dashboard import (
     RejectLinkResponse,
     ZZPActiveLinksResponse,
     ActiveAccountantLink,
+    MandateListResponse,
+    MandateItem,
+    MandateActionResponse,
 )
 from app.api.v1.deps import CurrentUser, require_zzp
 
@@ -154,7 +157,7 @@ async def reject_link(
     """
     Reject an accountant link request.
     
-    This changes the assignment status to REVOKED,
+    This changes the assignment status to REJECTED,
     denying the accountant access to the client's data.
     """
     require_zzp(current_user)
@@ -176,17 +179,17 @@ async def reject_link(
             }
         )
     
-    # Check if already revoked
-    if assignment.status == AssignmentStatus.REVOKED:
+    # Check if already rejected/revoked
+    if assignment.status in (AssignmentStatus.REJECTED, AssignmentStatus.REVOKED):
         return RejectLinkResponse(
             assignment_id=assignment.id,
-            status="REVOKED",
+            status="REJECTED",
             revoked_at=assignment.revoked_at or datetime.now(timezone.utc),
             message="Koppeling is al afgewezen.",
         )
     
-    # Revoke the assignment
-    assignment.status = AssignmentStatus.REVOKED
+    # Reject the assignment
+    assignment.status = AssignmentStatus.REJECTED
     assignment.revoked_at = datetime.now(timezone.utc)
     
     await db.commit()
@@ -194,7 +197,7 @@ async def reject_link(
     
     return RejectLinkResponse(
         assignment_id=assignment.id,
-        status="REVOKED",
+        status="REJECTED",
         revoked_at=assignment.revoked_at,
         message="Koppeling succesvol afgewezen.",
     )
@@ -278,10 +281,10 @@ async def revoke_link(
         )
     
     # Check if already revoked
-    if assignment.status == AssignmentStatus.REVOKED:
+    if assignment.status in (AssignmentStatus.REVOKED, AssignmentStatus.REJECTED):
         return RejectLinkResponse(
             assignment_id=assignment.id,
-            status="REVOKED",
+            status="REJECTED",
             revoked_at=assignment.revoked_at or datetime.now(timezone.utc),
             message="Koppeling is al ingetrokken.",
         )
@@ -305,7 +308,109 @@ async def revoke_link(
     
     return RejectLinkResponse(
         assignment_id=assignment.id,
-        status="REVOKED",
+        status="REJECTED",
         revoked_at=assignment.revoked_at,
         message="Koppeling succesvol ingetrokken.",
     )
+
+
+def _mandate_status_to_api(status: AssignmentStatus) -> str:
+    mapping = {
+        AssignmentStatus.PENDING: "pending",
+        AssignmentStatus.ACTIVE: "approved",
+        AssignmentStatus.REJECTED: "rejected",
+        AssignmentStatus.REVOKED: "revoked",
+    }
+    return mapping[status]
+
+
+@router.get('/mandates', response_model=MandateListResponse)
+async def list_incoming_mandates(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """List incoming mandate requests for the current ZZP client."""
+    require_zzp(current_user)
+
+    result = await db.execute(
+        select(AccountantClientAssignment)
+        .options(
+            selectinload(AccountantClientAssignment.accountant),
+            selectinload(AccountantClientAssignment.administration),
+        )
+        .where(AccountantClientAssignment.client_user_id == current_user.id)
+        .where(AccountantClientAssignment.status == AssignmentStatus.PENDING)
+        .order_by(AccountantClientAssignment.assigned_at.desc())
+    )
+    assignments = result.scalars().all()
+
+    mandates = [
+        MandateItem(
+            id=item.id,
+            accountant_user_id=item.accountant_id,
+            client_user_id=item.client_user_id,
+            client_company_id=item.administration_id,
+            client_company_name=item.administration.name if item.administration else 'Onbekend',
+            accountant_name=item.accountant.full_name if item.accountant else None,
+            accountant_email=item.accountant.email if item.accountant else None,
+            status=_mandate_status_to_api(item.status),
+            created_at=item.assigned_at,
+            updated_at=item.updated_at,
+        )
+        for item in assignments
+    ]
+
+    return MandateListResponse(mandates=mandates, total_count=len(mandates))
+
+
+@router.post('/mandates/{mandate_id}/approve', response_model=MandateActionResponse)
+async def approve_mandate(
+    mandate_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Approve a pending mandate request."""
+    require_zzp(current_user)
+
+    result = await db.execute(
+        select(AccountantClientAssignment)
+        .where(AccountantClientAssignment.id == mandate_id)
+        .where(AccountantClientAssignment.client_user_id == current_user.id)
+    )
+    assignment = result.scalar_one_or_none()
+
+    if not assignment:
+        raise HTTPException(status_code=404, detail={"code": "MANDATE_NOT_FOUND", "message": "Machtiging niet gevonden."})
+
+    assignment.status = AssignmentStatus.ACTIVE
+    assignment.approved_at = datetime.now(timezone.utc)
+    assignment.revoked_at = None
+    await db.commit()
+
+    return MandateActionResponse(id=assignment.id, status='approved', message='Machtiging goedgekeurd.')
+
+
+@router.post('/mandates/{mandate_id}/reject', response_model=MandateActionResponse)
+async def reject_mandate(
+    mandate_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Reject a pending mandate request."""
+    require_zzp(current_user)
+
+    result = await db.execute(
+        select(AccountantClientAssignment)
+        .where(AccountantClientAssignment.id == mandate_id)
+        .where(AccountantClientAssignment.client_user_id == current_user.id)
+    )
+    assignment = result.scalar_one_or_none()
+
+    if not assignment:
+        raise HTTPException(status_code=404, detail={"code": "MANDATE_NOT_FOUND", "message": "Machtiging niet gevonden."})
+
+    assignment.status = AssignmentStatus.REJECTED
+    assignment.revoked_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    return MandateActionResponse(id=assignment.id, status='rejected', message='Machtiging afgewezen.')

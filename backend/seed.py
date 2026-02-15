@@ -181,6 +181,20 @@ def seed_default_plans(conn):
     cursor.close()
 
 
+def _hash_password(password: str) -> str:
+    """Hash a plain-text password using bcrypt (or passlib fallback)."""
+    try:
+        import bcrypt
+
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    except ImportError:
+        print("WARNING: bcrypt not available, using passlib")
+        from passlib.context import CryptContext
+
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        return pwd_context.hash(password)
+
+
 def seed_admin_user(conn, email: str, password: str, full_name: str = "System Administrator", role: str = "admin"):
     """
     Seed an admin user in the database.
@@ -207,33 +221,36 @@ def seed_admin_user(conn, email: str, password: str, full_name: str = "System Ad
     
     cursor = conn.cursor()
     
+    # Hash password once so both create and update paths use the current env secret.
+    hashed_password = _hash_password(password)
+
     # Check if user already exists
     cursor.execute("SELECT id, role FROM users WHERE email = %s", (email.lower(),))
     existing = cursor.fetchone()
     
     if existing:
         user_id, existing_role = existing
+        now = datetime.now(timezone.utc)
+        cursor.execute(
+            """
+            UPDATE users
+            SET role = %s,
+                hashed_password = %s,
+                full_name = %s,
+                is_active = %s,
+                email_verified_at = COALESCE(email_verified_at, %s),
+                updated_at = %s
+            WHERE id = %s
+            """,
+            (role, hashed_password, full_name, True, now, now, user_id),
+        )
+        conn.commit()
         if existing_role == role:
-            print(f"Privileged user already exists: {email} ({role})")
+            print(f"Privileged user already exists and was refreshed from env: {email} ({role})")
         else:
-            cursor.execute(
-                "UPDATE users SET role = %s, updated_at = %s WHERE id = %s",
-                (role, datetime.now(timezone.utc), user_id)
-            )
-            conn.commit()
-            print(f"Updated existing user to role {role}: {email}")
+            print(f"Updated existing user to role {role} and refreshed credentials: {email}")
         cursor.close()
         return str(user_id)
-    
-    # Hash the password using bcrypt
-    try:
-        import bcrypt
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-    except ImportError:
-        print("WARNING: bcrypt not available, using passlib")
-        from passlib.context import CryptContext
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        hashed_password = pwd_context.hash(password)
     
     # Create new admin user
     user_id = str(uuid.uuid4())

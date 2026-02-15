@@ -21,7 +21,8 @@ class AssignmentStatus(str, enum.Enum):
     """Status of an accountant-client assignment."""
     PENDING = "PENDING"  # Invited but not yet approved by client
     ACTIVE = "ACTIVE"    # Approved and active
-    REVOKED = "REVOKED"  # Revoked by client or accountant
+    REJECTED = "REJECTED"  # Rejected by the client
+    REVOKED = "REVOKED"  # Revoked by client or accountant after approval
 
 
 class InvitedBy(str, enum.Enum):
@@ -95,6 +96,9 @@ class AccountantClientAssignment(Base):
     is_primary: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     assigned_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
     assigned_by_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True

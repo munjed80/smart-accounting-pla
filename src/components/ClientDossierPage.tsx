@@ -52,6 +52,7 @@ import {
 } from '@phosphor-icons/react'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
+import { toast } from 'sonner'
 
 // Import sub-pages
 import { ClientIssuesTab } from '@/components/ClientIssuesTab'
@@ -60,10 +61,11 @@ import { ClientDecisionsTab } from '@/components/ClientDecisionsTab'
 import { ClientBookkeepingTab } from '@/components/ClientBookkeepingTab'
 import { ClientAuditTab } from '@/components/ClientAuditTab'
 import { ClientVatTab } from '@/components/ClientVatTab'
+import { ClientDossierDataTab } from '@/components/ClientDossierDataTab'
 
 interface ClientDossierPageProps {
   clientId: string
-  initialTab?: 'issues' | 'periods' | 'decisions' | 'bookkeeping' | 'audit' | 'vat'
+  initialTab?: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'periods' | 'decisions' | 'bookkeeping' | 'audit'
 }
 
 // Session storage key for today's completed actions
@@ -99,9 +101,9 @@ const incrementTodayCompleted = (): number => {
   return newCount
 }
 
-export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDossierPageProps) => {
+export const ClientDossierPage = ({ clientId, initialTab = 'invoices' }: ClientDossierPageProps) => {
   const { user } = useAuth()
-  const { activeClientId, allLinks, setActiveClient, refreshLinks } = useActiveClient()
+  const { activeClientId, allLinks, setActiveClient, refreshLinks, isLoading: activeClientLoading } = useActiveClient()
   const [overview, setOverview] = useState<LedgerClientOverview | null>(null)
   const [scopes, setScopes] = useState<ClientScopesResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -197,11 +199,16 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
   }
 
   useEffect(() => {
+    if (!activeClientLoading && !activeClientId) {
+      toast.error('Selecteer eerst een klant om een dossier te openen.')
+      navigateTo('/accountant/clients')
+      return
+    }
     if (clientId) {
       fetchOverview()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId])
+  }, [clientId, activeClientId, activeClientLoading])
 
   const handleBack = () => {
     navigateTo('/accountant/clients')
@@ -519,7 +526,19 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-6 mb-6">
+          <TabsList className="grid w-full grid-cols-9 mb-6">
+            <TabsTrigger value="invoices" className="flex items-center gap-2">
+              Facturen
+            </TabsTrigger>
+            <TabsTrigger value="expenses" className="flex items-center gap-2">
+              Uitgaven
+            </TabsTrigger>
+            <TabsTrigger value="hours" className="flex items-center gap-2">
+              Uren
+            </TabsTrigger>
+            <TabsTrigger value="vat" className="flex items-center gap-2">
+              BTW-aangifte
+            </TabsTrigger>
             <TabsTrigger value="issues" className="flex items-center gap-2">
               <ClipboardText size={18} />
               {t('dossier.tabs.issues')}
@@ -541,15 +560,23 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
               <ListChecks size={18} />
               {t('dossier.tabs.decisions')}
             </TabsTrigger>
-            <TabsTrigger value="vat" className="flex items-center gap-2">
-              <CalendarBlank size={18} />
-              BTW-aangifte
-            </TabsTrigger>
             <TabsTrigger value="audit" className="flex items-center gap-2">
               <ClockCounterClockwise size={18} />
               {t('dossier.tabs.audit')}
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="invoices">
+            <ClientDossierDataTab clientId={clientId} type="invoices" />
+          </TabsContent>
+
+          <TabsContent value="expenses">
+            <ClientDossierDataTab clientId={clientId} type="expenses" />
+          </TabsContent>
+
+          <TabsContent value="hours">
+            <ClientDossierDataTab clientId={clientId} type="hours" />
+          </TabsContent>
 
           <TabsContent value="issues">
             <ClientIssuesTab 

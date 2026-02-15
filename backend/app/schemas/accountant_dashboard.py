@@ -464,3 +464,49 @@ class AccountantClientLinksWithScopesResponse(BaseModel):
     pending_count: int
     active_count: int
     total_count: int
+
+
+# ============ Mandates (Machtigingen) Schemas ============
+
+class MandateCreateRequest(BaseModel):
+    """Create a new mandate request for a client company."""
+    client_company_id: UUID
+
+
+class MandateSearchItem(BaseModel):
+    """Search result row for ZZP client companies."""
+    client_company_id: UUID
+    company_name: str
+    owner_user_id: UUID
+    owner_name: str
+    owner_email: str
+
+
+class MandateSearchResponse(BaseModel):
+    results: List[MandateSearchItem]
+    total_count: int
+
+
+class MandateItem(BaseModel):
+    """Mandate row for accountant and ZZP lists."""
+    id: UUID
+    accountant_user_id: UUID
+    client_user_id: UUID
+    client_company_id: UUID
+    client_company_name: str
+    accountant_name: Optional[str] = None
+    accountant_email: Optional[str] = None
+    status: str  # pending, approved, rejected, revoked
+    created_at: datetime
+    updated_at: datetime
+
+
+class MandateListResponse(BaseModel):
+    mandates: List[MandateItem]
+    total_count: int
+
+
+class MandateActionResponse(BaseModel):
+    id: UUID
+    status: str
+    message: str

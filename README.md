@@ -1284,3 +1284,26 @@ Workflow:
 6. Klik **Markeer als klaar** om de periode als klaar voor handmatige aangifte te markeren.
 
 Belangrijk: verzending naar de Belastingdienst gebeurt **handmatig** buiten de app. De app levert het concept met rubrieken en ICP-overzicht.
+
+## Machtigingen en accountant-toegang (Open dossier)
+
+Voor het accountant-dossier gelden nu expliciete machtigingsregels:
+
+- De dossier-data endpoints voor **Facturen**, **Uitgaven** en **Uren** lopen via:
+  - `GET /api/v1/accountant/clients/{client_id}/invoices`
+  - `GET /api/v1/accountant/clients/{client_id}/expenses`
+  - `GET /api/v1/accountant/clients/{client_id}/hours`
+- Toegang wordt alleen gegeven als:
+  1. gebruiker rol `accountant` of `super_admin` heeft, en
+  2. er een **goedgekeurde machtiging** (actieve koppeling) bestaat tussen accountant en klant.
+- Zonder goedgekeurde machtiging geeft de API `403` met duidelijke melding.
+- Frontend dossier-tabbladen tonen fouten expliciet (HTTP status + melding) en falen niet stil.
+
+Praktisch gevolg: accountants zien alleen data van de geselecteerde klant waarvoor een goedgekeurde machtiging bestaat.
+
+
+Dev seed optie voor een directe goedgekeurde machtiging:
+- `SEED_MANDATE_ACCOUNTANT_EMAIL=<accountant@email>`
+- `SEED_MANDATE_CLIENT_COMPANY_ID=<administration_uuid>`
+
+Bij `python backend/seed.py` wordt dan een goedgekeurde machtiging aangemaakt/geüpdatet.

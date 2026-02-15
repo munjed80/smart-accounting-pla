@@ -66,6 +66,12 @@ from app.schemas.accountant_dashboard import (
     ScopesSummary,
     ClientLinkItemWithScopes,
     AccountantClientLinksWithScopesResponse,
+    MandateCreateRequest,
+    MandateSearchItem,
+    MandateSearchResponse,
+    MandateItem,
+    MandateListResponse,
+    MandateActionResponse,
 )
 from app.services.accountant_dashboard import (
     AccountantDashboardService,
@@ -911,7 +917,7 @@ async def list_client_links(
             selectinload(AccountantClientAssignment.administration),
         )
         .where(AccountantClientAssignment.accountant_id == current_user.id)
-        .where(AccountantClientAssignment.status != AssignmentStatus.REVOKED)
+        .where(AccountantClientAssignment.status.in_([AssignmentStatus.PENDING, AssignmentStatus.ACTIVE]))
         .order_by(AccountantClientAssignment.assigned_at.desc())
     )
     assignments = assignments_result.scalars().all()
@@ -1228,7 +1234,7 @@ async def list_client_links_with_scopes(
             selectinload(AccountantClientAssignment.administration),
         )
         .where(AccountantClientAssignment.accountant_id == current_user.id)
-        .where(AccountantClientAssignment.status != AssignmentStatus.REVOKED)
+        .where(AccountantClientAssignment.status.in_([AssignmentStatus.PENDING, AssignmentStatus.ACTIVE]))
         .order_by(AccountantClientAssignment.assigned_at.desc())
     )
     assignments = assignments_result.scalars().all()
@@ -1308,3 +1314,168 @@ async def list_client_links_with_scopes(
         active_count=active_count,
         total_count=len(links),
     )
+
+
+def _mandate_status_to_api(status: AssignmentStatus) -> str:
+    mapping = {
+        AssignmentStatus.PENDING: "pending",
+        AssignmentStatus.ACTIVE: "approved",
+        AssignmentStatus.REJECTED: "rejected",
+        AssignmentStatus.REVOKED: "revoked",
+    }
+    return mapping[status]
+
+
+@router.get('/mandates/search-clients', response_model=MandateSearchResponse)
+async def search_client_companies_for_mandates(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    q: str = Query(..., min_length=2),
+    limit: int = Query(10, ge=1, le=50),
+):
+    """Search ZZP client companies by administration/company name for mandate requests."""
+    verify_accountant_role(current_user)
+
+    result = await db.execute(
+        select(Administration, AdministrationMember, User)
+        .join(AdministrationMember, AdministrationMember.administration_id == Administration.id)
+        .join(User, User.id == AdministrationMember.user_id)
+        .where(AdministrationMember.role == MemberRole.OWNER)
+        .where(User.role == 'zzp')
+        .where(Administration.is_active == True)
+        .where(func.lower(Administration.name).like(f"%{q.lower()}%"))
+        .order_by(Administration.name.asc())
+        .limit(limit)
+    )
+
+    rows = result.all()
+    items = [
+        MandateSearchItem(
+            client_company_id=administration.id,
+            company_name=administration.name,
+            owner_user_id=owner.id,
+            owner_name=owner.full_name,
+            owner_email=owner.email,
+        )
+        for administration, _membership, owner in rows
+    ]
+
+    return MandateSearchResponse(results=items, total_count=len(items))
+
+
+@router.post('/mandates', response_model=MandateActionResponse)
+async def create_mandate_request(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: MandateCreateRequest,
+):
+    """Create a pending mandate request for a specific client company."""
+    verify_accountant_role(current_user)
+
+    owner_result = await db.execute(
+        select(AdministrationMember)
+        .where(AdministrationMember.administration_id == request.client_company_id)
+        .where(AdministrationMember.role == MemberRole.OWNER)
+        .limit(1)
+    )
+    owner_membership = owner_result.scalar_one_or_none()
+    if not owner_membership:
+        raise HTTPException(status_code=404, detail={"code": "CLIENT_NOT_FOUND", "message": "Klantbedrijf niet gevonden."})
+
+    assignment_result = await db.execute(
+        select(AccountantClientAssignment)
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+        .where(AccountantClientAssignment.administration_id == request.client_company_id)
+        .limit(1)
+    )
+    assignment = assignment_result.scalar_one_or_none()
+
+    if assignment:
+        assignment.status = AssignmentStatus.PENDING
+        assignment.client_user_id = owner_membership.user_id
+        assignment.revoked_at = None
+        assignment.approved_at = None
+        assignment.invited_by = InvitedBy.ACCOUNTANT
+        assignment.assigned_by_id = current_user.id
+        assignment.assigned_at = datetime.now(timezone.utc)
+        message = 'Toegangsverzoek opnieuw verstuurd.'
+    else:
+        assignment = AccountantClientAssignment(
+            accountant_id=current_user.id,
+            client_user_id=owner_membership.user_id,
+            administration_id=request.client_company_id,
+            status=AssignmentStatus.PENDING,
+            invited_by=InvitedBy.ACCOUNTANT,
+            is_primary=True,
+            assigned_by_id=current_user.id,
+            notes='Mandate request created by accountant',
+        )
+        db.add(assignment)
+        message = 'Toegangsverzoek verstuurd.'
+
+    await db.commit()
+    await db.refresh(assignment)
+
+    return MandateActionResponse(id=assignment.id, status='pending', message=message)
+
+
+@router.get('/mandates', response_model=MandateListResponse)
+async def list_accountant_mandates(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """List all mandates for the logged in accountant."""
+    verify_accountant_role(current_user)
+
+    result = await db.execute(
+        select(AccountantClientAssignment)
+        .options(
+            selectinload(AccountantClientAssignment.client_user),
+            selectinload(AccountantClientAssignment.administration),
+        )
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+        .order_by(AccountantClientAssignment.assigned_at.desc())
+    )
+    assignments = result.scalars().all()
+
+    mandates = [
+        MandateItem(
+            id=item.id,
+            accountant_user_id=item.accountant_id,
+            client_user_id=item.client_user_id,
+            client_company_id=item.administration_id,
+            client_company_name=item.administration.name if item.administration else 'Onbekend',
+            status=_mandate_status_to_api(item.status),
+            created_at=item.assigned_at,
+            updated_at=item.updated_at,
+        )
+        for item in assignments
+    ]
+
+    return MandateListResponse(mandates=mandates, total_count=len(mandates))
+
+
+@router.delete('/mandates/{mandate_id}', response_model=MandateActionResponse)
+async def revoke_accountant_mandate(
+    mandate_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Revoke a mandate owned by the logged in accountant."""
+    verify_accountant_role(current_user)
+
+    result = await db.execute(
+        select(AccountantClientAssignment)
+        .where(AccountantClientAssignment.id == mandate_id)
+        .where(AccountantClientAssignment.accountant_id == current_user.id)
+    )
+    assignment = result.scalar_one_or_none()
+
+    if not assignment:
+        raise HTTPException(status_code=404, detail={"code": "MANDATE_NOT_FOUND", "message": "Machtiging niet gevonden."})
+
+    assignment.status = AssignmentStatus.REVOKED
+    assignment.revoked_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    return MandateActionResponse(id=assignment.id, status='revoked', message='Machtiging ingetrokken.')

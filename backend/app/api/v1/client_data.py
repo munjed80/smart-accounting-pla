@@ -11,6 +11,7 @@ Uses unified administration_id access pattern to ensure data consistency.
 All endpoints respect AccountantClientAssignment scopes and permissions.
 """
 from datetime import date
+from decimal import Decimal
 from typing import Annotated, Optional
 from uuid import UUID
 
@@ -33,10 +34,9 @@ from app.schemas.zzp import (
     CustomerListResponse,
     ExpenseResponse,
     ExpenseListResponse,
-    TimeEntryResponse,
     TimeEntryListResponse,
 )
-from app.api.v1.deps import CurrentUser, require_assigned_client
+from app.api.v1.deps import CurrentUser, require_approved_mandate_client
 
 router = APIRouter()
 
@@ -114,7 +114,7 @@ async def list_client_invoices(
     Requires 'invoices' scope in AccountantClientAssignment.
     """
     # Verify access with 'invoices' scope
-    administration = await require_assigned_client(
+    administration = await require_approved_mandate_client(
         client_id, current_user, db, required_scope="invoices"
     )
     
@@ -161,7 +161,7 @@ async def get_client_invoice(
     from fastapi import HTTPException
     
     # Verify access with 'invoices' scope
-    administration = await require_assigned_client(
+    administration = await require_approved_mandate_client(
         client_id, current_user, db, required_scope="invoices"
     )
     
@@ -197,7 +197,7 @@ async def list_client_customers(
     Requires 'customers' scope in AccountantClientAssignment.
     """
     # Verify access with 'customers' scope
-    administration = await require_assigned_client(
+    administration = await require_approved_mandate_client(
         client_id, current_user, db, required_scope="customers"
     )
     
@@ -237,7 +237,7 @@ async def list_client_expenses(
     Requires 'expenses' scope in AccountantClientAssignment.
     """
     # Verify access with 'expenses' scope
-    administration = await require_assigned_client(
+    administration = await require_approved_mandate_client(
         client_id, current_user, db, required_scope="expenses"
     )
     
@@ -262,10 +262,13 @@ async def list_client_expenses(
     
     return ExpenseListResponse(
         expenses=[ExpenseResponse.model_validate(e) for e in expenses],
-        total=len(expenses)
+        total=len(expenses),
+        total_amount_cents=sum(e.amount_cents for e in expenses),
+        total_vat_cents=sum(e.vat_amount_cents for e in expenses),
     )
 
 
+@router.get("/clients/{client_id}/hours", response_model=TimeEntryListResponse)
 @router.get("/clients/{client_id}/time-entries", response_model=TimeEntryListResponse)
 async def list_client_time_entries(
     client_id: UUID,
@@ -281,7 +284,7 @@ async def list_client_time_entries(
     Requires 'hours' scope in AccountantClientAssignment.
     """
     # Verify access with 'hours' scope
-    administration = await require_assigned_client(
+    administration = await require_approved_mandate_client(
         client_id, current_user, db, required_scope="hours"
     )
     
@@ -297,7 +300,7 @@ async def list_client_time_entries(
     if to_date:
         query = query.where(ZZPTimeEntry.entry_date <= date.fromisoformat(to_date))
     if billable is not None:
-        query = query.where(ZZPTimeEntry.is_billable == billable)
+        query = query.where(ZZPTimeEntry.billable == billable)
     
     query = query.order_by(ZZPTimeEntry.entry_date.desc())
     
@@ -305,6 +308,10 @@ async def list_client_time_entries(
     time_entries = result.scalars().all()
     
     return TimeEntryListResponse(
-        time_entries=[TimeEntryResponse.model_validate(t) for t in time_entries],
-        total=len(time_entries)
+        entries=time_entries,
+        total=len(time_entries),
+        total_hours=sum((t.hours for t in time_entries), Decimal("0")),
+        total_billable_hours=sum((t.hours for t in time_entries if t.billable), Decimal("0")),
+        open_entries=sum(1 for t in time_entries if not t.is_invoiced),
+        invoiced_entries=sum(1 for t in time_entries if t.is_invoiced),
     )

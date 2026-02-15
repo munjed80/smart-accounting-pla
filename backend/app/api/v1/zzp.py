@@ -327,7 +327,7 @@ def _mandate_status_to_api(status: AssignmentStatus) -> str:
     return mapping[status]
 
 
-@router.get('/mandates', response_model=MandateListResponse)
+@router.get('/mandates/incoming', response_model=MandateListResponse)
 async def list_incoming_mandates(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -366,8 +366,8 @@ async def list_incoming_mandates(
     return MandateListResponse(mandates=mandates, total_count=len(mandates))
 
 
-@router.post('/mandates/{mandate_id}/approve', response_model=MandateActionResponse)
-async def approve_mandate(
+@router.post('/mandates/{mandate_id}/accept', response_model=MandateActionResponse)
+async def accept_mandate(
     mandate_id: UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],

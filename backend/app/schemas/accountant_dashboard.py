@@ -468,25 +468,9 @@ class AccountantClientLinksWithScopesResponse(BaseModel):
 
 # ============ Mandates (Machtigingen) Schemas ============
 
-class MandateCreateRequest(BaseModel):
-    """Create a new mandate request for a client company."""
-    client_company_id: UUID
-
-
-class MandateSearchItem(BaseModel):
-    """Search result row for ZZP client companies."""
-    client_company_id: UUID
-    company_name: str
-    kvk_number: Optional[str] = None
-    btw_number: Optional[str] = None
-    owner_user_id: UUID
-    owner_name: str
-    owner_email: str
-
-
-class MandateSearchResponse(BaseModel):
-    results: List[MandateSearchItem]
-    total_count: int
+class MandateCreateByEmailRequest(BaseModel):
+    """Create a new mandate request by ZZP email address."""
+    email: str
 
 
 class MandateItem(BaseModel):

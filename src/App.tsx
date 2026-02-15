@@ -261,6 +261,18 @@ const tabToPath = (tab: string, isAccountant: boolean, isSuperAdmin = false): st
   }
 }
 
+const isAdminRoutePath = (path: string): boolean => path === '/admin' || path.startsWith('/admin/')
+
+const ForbiddenAdminAccess = () => (
+  <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center p-4">
+    <div className="max-w-lg w-full rounded-lg border bg-card p-6 space-y-3">
+      <h2 className="text-lg font-semibold">403 - Geen toegang</h2>
+      <p className="text-sm text-muted-foreground">Alleen super administrators hebben toegang tot het admin dashboard.</p>
+      <Button onClick={() => navigateTo('/dashboard')}>Terug naar dashboard</Button>
+    </div>
+  </div>
+)
+
 const AppContent = () => {
   const { user, isAuthenticated, isLoading, checkSession, logout } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
@@ -382,8 +394,15 @@ const AppContent = () => {
       setBootStage('onboarding-check')
       try {
         const userIsAccountant = user.role === 'accountant' || user.role === 'admin'
-        
-        if (userIsAccountant) {
+
+        if (user.role === 'super_admin') {
+          setNeedsOnboarding(false)
+          setNeedsAccountantOnboarding(false)
+          if (route.type === 'onboarding' || route.type === 'accountant-onboarding') {
+            navigateTo('/admin')
+          }
+          setBootStage('ready')
+        } else if (userIsAccountant) {
           // For accountants, check if they have any assigned clients
           const clientsResponse = await accountantClientApi.listClients()
           const needsSetup = clientsResponse.clients.length === 0
@@ -431,7 +450,7 @@ const AppContent = () => {
     }
     
     checkOnboarding()
-  }, [isAuthenticated, user, needsOnboarding, needsAccountantOnboarding])
+  }, [isAuthenticated, user, needsOnboarding, needsAccountantOnboarding, route])
 
 
   useEffect(() => {
@@ -557,6 +576,17 @@ const AppContent = () => {
     )
   }
   
+  // Protect admin routes for non-super-admin users
+  if (route.type === 'app' && isAdminRoutePath(route.path) && !isSuperAdmin) {
+    return <ForbiddenAdminAccess />
+  }
+
+  // Super admins should never see onboarding flows
+  if (isSuperAdmin && (route.type === 'onboarding' || route.type === 'accountant-onboarding')) {
+    navigateTo('/admin')
+    return null
+  }
+
   // Show accountant-specific onboarding if needed (no assigned clients)
   if (route.type === 'accountant-onboarding' || needsAccountantOnboarding === true) {
     return (

@@ -1,17 +1,22 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { adminApi } from '@/lib/api'
+import { navigateTo } from '@/lib/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { AdminLayout, AdminSection } from '@/components/AdminLayout'
 import { toast } from 'sonner'
 
-const tabs = ['overview', 'companies', 'users', 'subscriptions'] as const
-
-type Tab = typeof tabs[number]
-
 export const AdminDashboard = () => {
-  const [tab, setTab] = useState<Tab>('overview')
+  const getSectionFromPath = (): AdminSection => {
+    const [, , rawSection] = window.location.pathname.split('/')
+    const section = rawSection as AdminSection | undefined
+    const allowedSections: AdminSection[] = ['users', 'companies', 'subscriptions', 'revenue', 'logs']
+    return section && allowedSections.includes(section) ? section : 'users'
+  }
+
+  const [section, setSection] = useState<AdminSection>(getSectionFromPath)
   const [query, setQuery] = useState('')
 
   const overviewQuery = useQuery({
@@ -22,14 +27,19 @@ export const AdminDashboard = () => {
   const companiesQuery = useQuery({
     queryKey: ['admin-companies', query],
     queryFn: () => adminApi.getAdministrations({ query }),
-    enabled: tab === 'companies' || tab === 'subscriptions',
+    enabled: section === 'companies' || section === 'subscriptions',
   })
 
   const usersQuery = useQuery({
     queryKey: ['admin-users', query],
     queryFn: () => adminApi.getUsers({ query }),
-    enabled: tab === 'users',
+    enabled: section === 'users',
   })
+
+  const handleSectionChange = (nextSection: AdminSection) => {
+    setSection(nextSection)
+    navigateTo(nextSection === 'users' ? '/admin' : `/admin/${nextSection}`)
+  }
 
   const handleToggleUser = async (userId: string, isActive: boolean) => {
     try {
@@ -54,20 +64,12 @@ export const AdminDashboard = () => {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        {tabs.map((t) => (
-          <Button key={t} variant={tab === t ? 'default' : 'outline'} onClick={() => setTab(t)}>
-            {t === 'overview' ? 'Overzicht' : t === 'companies' ? 'Bedrijven' : t === 'users' ? 'Gebruikers' : 'Abonnementen'}
-          </Button>
-        ))}
-      </div>
-
-      {(tab === 'companies' || tab === 'users' || tab === 'subscriptions') ? (
+    <AdminLayout activeSection={section} onSectionChange={handleSectionChange}>
+      {(section === 'companies' || section === 'users' || section === 'subscriptions') ? (
         <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Zoeken..." />
       ) : null}
 
-      {tab === 'overview' ? (
+      {section === 'users' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           {overviewQuery.isLoading ? <p>Laden...</p> : null}
           {overviewQuery.isError ? <p>Overzicht kon niet geladen worden.</p> : null}
@@ -83,7 +85,7 @@ export const AdminDashboard = () => {
         </div>
       ) : null}
 
-      {tab === 'companies' || tab === 'subscriptions' ? (
+      {section === 'companies' || section === 'subscriptions' ? (
         <div className="space-y-2">
           {companiesQuery.isLoading ? <p>Laden...</p> : null}
           {companiesQuery.data?.administrations.map((company) => (
@@ -115,7 +117,33 @@ export const AdminDashboard = () => {
         </div>
       ) : null}
 
-      {tab === 'users' ? (
+      {section === 'subscriptions' ? (
+        <div className="text-sm text-muted-foreground">Subscriptions overview from company records. Subscription editing is available in the companies list.</div>
+      ) : null}
+
+      {section === 'revenue' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Card>
+            <CardHeader><CardTitle>Monthly Recurring Revenue</CardTitle></CardHeader>
+            <CardContent>{overviewQuery.data ? `€ ${overviewQuery.data.mrr_estimate.toFixed(2)}` : 'Laden...'}</CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Invoices (last 30 days)</CardTitle></CardHeader>
+            <CardContent>{overviewQuery.data ? overviewQuery.data.invoices_last_30_days : 'Laden...'}</CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {section === 'logs' ? (
+        <Card>
+          <CardHeader><CardTitle>System logs</CardTitle></CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Logging endpoint is not exposed yet. Connect this panel to the backend audit stream when available.
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {section === 'users' ? (
         <div className="space-y-2">
           {usersQuery.isLoading ? <p>Laden...</p> : null}
           {usersQuery.data?.users.map((u) => (
@@ -139,9 +167,6 @@ export const AdminDashboard = () => {
         </div>
       ) : null}
 
-      {tab === 'subscriptions' ? (
-        <div className="text-sm text-muted-foreground">Subscriptions beheer gebruikt dezelfde lijst als bedrijven. Grafiek-placeholder komt hier.</div>
-      ) : null}
-    </div>
+    </AdminLayout>
   )
 }

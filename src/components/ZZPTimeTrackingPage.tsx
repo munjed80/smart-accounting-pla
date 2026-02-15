@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { CalendarBlank, Clock, CurrencyEur, PencilSimple, Plus, Receipt, TrashSimple, WarningCircle } from '@phosphor-icons/react'
-import { WorkSession, zzpApi, ZZPCustomer, ZZPTimeEntry, ZZPTimeEntryCreate } from '@/lib/api'
+import { WorkSession, getApiBaseUrl, zzpApi, ZZPCustomer, ZZPTimeEntry, ZZPTimeEntryCreate } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
 import { toast } from 'sonner'
 import { navigateTo } from '@/lib/navigation'
@@ -321,6 +321,19 @@ export const ZZPTimeTrackingPage = () => {
         billable: true,
       }
 
+      const method = editingEntry ? 'PATCH' : 'POST'
+      const endpoint = editingEntry ? `/zzp/time-entries/${editingEntry.id}` : '/zzp/time-entries'
+      const requestUrl = `${getApiBaseUrl()}${endpoint}`
+
+      if (import.meta.env.DEV) {
+        console.info('[Uren] Save request', {
+          method,
+          url: requestUrl,
+          payload,
+          entryId: editingEntry?.id,
+        })
+      }
+
       if (editingEntry) {
         const response = await zzpApi.timeEntries.update(editingEntry.id, {
           ...payload,
@@ -336,12 +349,42 @@ export const ZZPTimeTrackingPage = () => {
         toast.success('Uren toegevoegd')
       }
 
-      setIsFormOpen(false)
       await fetchData()
+      setIsFormOpen(false)
     } catch (error) {
+      const rawError = error as {
+        message?: string
+        code?: string
+        response?: { data?: { detail?: unknown; message?: string } | string; status?: number; statusText?: string }
+        request?: unknown
+      }
       const message = parseApiError(error)
-      const rawError = error as { response?: { data?: { detail?: unknown }; status?: number } }
-      const detail = rawError?.response?.data?.detail
+      const detail = rawError?.response?.data && typeof rawError.response.data === 'object'
+        ? (rawError.response.data as { detail?: unknown }).detail
+        : undefined
+
+      if (import.meta.env.DEV) {
+        console.error('[Uren] Save request failed', {
+          method: editingEntry ? 'PATCH' : 'POST',
+          url: `${getApiBaseUrl()}${editingEntry ? `/zzp/time-entries/${editingEntry.id}` : '/zzp/time-entries'}`,
+          payload: {
+            entry_date: formState.entry_date,
+            hours: parsedHours,
+            description,
+            customer_id: selectedCustomerId || undefined,
+            project_name: formState.project_name || undefined,
+            hourly_rate: parsedHourlyRate,
+            billable: true,
+          },
+          status: rawError?.response?.status,
+          statusText: rawError?.response?.statusText,
+          code: rawError?.code,
+          responseData: rawError?.response?.data,
+          message: rawError?.message,
+          request: rawError?.request,
+        })
+      }
+
       if (Array.isArray(detail)) {
         const validationMessages = detail.map((item) => {
           if (typeof item === 'string') return item
@@ -362,8 +405,18 @@ export const ZZPTimeTrackingPage = () => {
       if (String(message).includes('TIME_ENTRY_INVOICED') || String(message).includes('Gefactureerde')) {
         toast.error('Deze uren zijn al gefactureerd en kunnen niet worden aangepast.')
       } else {
-        setFormError(String(message))
-        toast.error(message)
+        const status = rawError?.response?.status
+        const responseData = rawError?.response?.data
+        const serverMessage = typeof responseData === 'string'
+          ? responseData
+          : (responseData && typeof responseData === 'object' && 'message' in responseData
+              ? String((responseData as { message?: unknown }).message)
+              : null)
+        const finalMessage = status
+          ? `Server fout (${status})${serverMessage ? `: ${serverMessage}` : `: ${String(message)}`}`
+          : String(message)
+        setFormError(finalMessage)
+        toast.error(finalMessage)
       }
     } finally {
       setIsSavingEntry(false)

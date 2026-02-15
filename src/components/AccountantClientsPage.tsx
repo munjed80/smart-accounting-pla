@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { accountantApi, MandateItem, MandateSearchItem, getErrorMessage } from '@/lib/api'
+import { NotFoundError } from '@/lib/errors'
 import { navigateTo } from '@/lib/navigation'
 import { toast } from 'sonner'
 import { useActiveClient } from '@/lib/ActiveClientContext'
@@ -27,6 +28,7 @@ export function AccountantClientsPage() {
   const [searchResults, setSearchResults] = useState<MandateSearchItem[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [selected, setSelected] = useState<MandateSearchItem | null>(null)
+  const [searchError, setSearchError] = useState<string | null>(null)
 
   const loadMandates = async () => {
     try {
@@ -35,7 +37,12 @@ export function AccountantClientsPage() {
       const response = await accountantApi.getMandates()
       setMandates(response.mandates)
     } catch (err: unknown) {
-      setError(getErrorMessage(err))
+      if (err instanceof NotFoundError) {
+        setMandates([])
+        setError(null)
+      } else {
+        setError(getErrorMessage(err))
+      }
     } finally {
       setLoading(false)
     }
@@ -49,10 +56,16 @@ export function AccountantClientsPage() {
     if (query.trim().length < 2) return
     try {
       setSearchLoading(true)
+      setSearchError(null)
       const response = await accountantApi.searchMandateClients(query.trim())
       setSearchResults(response.results)
+      if (response.results.length === 0) {
+        setSelected(null)
+      }
     } catch (err: unknown) {
-      toast.error(getErrorMessage(err))
+      setSearchResults([])
+      setSelected(null)
+      setSearchError(getErrorMessage(err))
     } finally {
       setSearchLoading(false)
     }
@@ -69,6 +82,7 @@ export function AccountantClientsPage() {
       toast.success(result.message)
       setSelected(null)
       setSearchResults([])
+      setSearchError(null)
       setQuery('')
       await loadMandates()
     } catch (err: unknown) {
@@ -121,6 +135,9 @@ export function AccountantClientsPage() {
               {searchLoading ? 'Zoeken...' : 'Zoeken'}
             </Button>
           </div>
+          {searchError && (
+            <div className="text-sm text-destructive">{searchError}</div>
+          )}
           {searchResults.length > 0 && (
             <div className="border rounded-md divide-y">
               {searchResults.map((item) => (
@@ -131,9 +148,13 @@ export function AccountantClientsPage() {
                 >
                   <div className="font-medium">{item.company_name}</div>
                   <div className="text-xs text-muted-foreground">Eigenaar: {item.owner_name} ({item.owner_email})</div>
+                  <div className="text-xs text-muted-foreground">KVK: {item.kvk_number || '—'} · BTW: {item.btw_number || '—'}</div>
                 </button>
               ))}
             </div>
+          )}
+          {!searchLoading && !searchError && query.trim().length >= 2 && searchResults.length === 0 && (
+            <div className="text-sm text-muted-foreground">Geen klantbedrijven gevonden voor deze zoekopdracht.</div>
           )}
           <Button onClick={requestAccess} disabled={!selected}>Toegang aanvragen</Button>
         </CardContent>

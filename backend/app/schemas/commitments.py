@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 CommitmentTypeLiteral = Literal["lease", "loan", "subscription"]
 RecurringFrequencyLiteral = Literal["monthly", "yearly"]
@@ -66,6 +66,7 @@ class CommitmentResponse(BaseModel):
     end_date: Optional[date]
     contract_term_months: Optional[int]
     renewal_date: Optional[date]
+    next_due_date: Optional[date]
     btw_rate: Optional[float]
     created_at: datetime
     updated_at: datetime
@@ -85,12 +86,20 @@ class AmortizationRow(BaseModel):
     remaining_balance_cents: int
 
 
+class CommitmentAlert(BaseModel):
+    code: Literal["subscription_renewal", "lease_loan_ending", "monthly_threshold"]
+    severity: Literal["info", "warning"]
+    message: str
+
+
 class CommitmentOverviewResponse(BaseModel):
     monthly_total_cents: int
     upcoming_total_cents: int
     warning_count: int
     by_type: dict[str, int]
     upcoming: list[CommitmentResponse]
+    alerts: list[CommitmentAlert]
+    threshold_cents: int
 
 
 class CommitmentSuggestion(BaseModel):

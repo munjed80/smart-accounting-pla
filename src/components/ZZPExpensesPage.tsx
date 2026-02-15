@@ -14,6 +14,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -611,6 +612,7 @@ const ExpenseCard = ({
           </div>
           <div className="min-w-0 flex-1">
             <h4 className="font-semibold truncate">{expense.vendor}</h4>
+            {expense.commitment_id && <Badge variant="secondary" className="mt-1">Linked to commitment</Badge>}
             {expense.description && (
               <p className="text-sm text-muted-foreground truncate mt-0.5">
                 {expense.description}
@@ -1064,6 +1066,7 @@ export const ZZPExpensesPage = () => {
                               </div>
                               <div>
                                 <span className="font-medium">{expense.vendor}</span>
+                                {expense.commitment_id && <Badge variant="secondary" className="ml-2">Linked to commitment</Badge>}
                                 {expense.description && (
                                   <p className="text-xs text-muted-foreground truncate max-w-[200px]">
                                     {expense.description}

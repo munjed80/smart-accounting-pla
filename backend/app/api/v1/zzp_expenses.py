@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.zzp import ZZPExpense
+from app.models.financial_commitment import FinancialCommitment
 from app.models.administration import Administration, AdministrationMember
 from app.schemas.zzp import (
     ExpenseCreate,
@@ -77,6 +78,7 @@ def expense_to_response(expense: ZZPExpense) -> ExpenseResponse:
         category=expense.category,
         notes=expense.notes,
         attachment_url=expense.attachment_url,
+        commitment_id=expense.commitment_id,
         created_at=expense.created_at,
         updated_at=expense.updated_at,
     )
@@ -153,6 +155,17 @@ async def create_expense(
     
     administration = await get_user_administration(current_user.id, db)
     
+    commitment_id = expense_in.commitment_id
+    if commitment_id:
+        commitment_check = await db.execute(
+            select(FinancialCommitment.id).where(
+                FinancialCommitment.id == commitment_id,
+                FinancialCommitment.administration_id == administration.id,
+            )
+        )
+        if not commitment_check.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail={"code": "COMMITMENT_NOT_FOUND", "message": "Verplichting niet gevonden."})
+
     # Calculate VAT amount
     vat_amount = calculate_vat_amount(expense_in.amount_cents, expense_in.vat_rate)
     
@@ -167,6 +180,7 @@ async def create_expense(
         category=expense_in.category,
         notes=expense_in.notes,
         attachment_url=expense_in.attachment_url,
+        commitment_id=expense_in.commitment_id,
     )
     
     db.add(expense)
@@ -250,6 +264,16 @@ async def update_expense(
             setattr(expense, field, date.fromisoformat(value))
         elif field == 'vat_rate' and value is not None:
             setattr(expense, field, Decimal(str(value)))
+        elif field == 'commitment_id' and value is not None:
+            commitment_check = await db.execute(
+                select(FinancialCommitment.id).where(
+                    FinancialCommitment.id == value,
+                    FinancialCommitment.administration_id == administration.id,
+                )
+            )
+            if not commitment_check.scalar_one_or_none():
+                raise HTTPException(status_code=404, detail={"code": "COMMITMENT_NOT_FOUND", "message": "Verplichting niet gevonden."})
+            setattr(expense, field, value)
         else:
             setattr(expense, field, value)
     

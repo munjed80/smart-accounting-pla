@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import Annotated, Optional
 from uuid import UUID
 
+import calendar
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +15,7 @@ from app.models.bank import BankTransaction
 from app.models.financial_commitment import CommitmentType, FinancialCommitment, RecurringFrequency
 from app.schemas.commitments import (
     AmortizationRow,
+    CommitmentAlert,
     CommitmentCreate,
     CommitmentListResponse,
     CommitmentOverviewResponse,
@@ -23,6 +25,20 @@ from app.schemas.commitments import (
 )
 
 router = APIRouter(prefix="/commitments")
+
+
+def add_months(base: date, months: int) -> date:
+    month_index = base.month - 1 + months
+    year = base.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(base.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
+
+
+def add_years(base: date, years: int) -> date:
+    target_year = base.year + years
+    day = min(base.day, calendar.monthrange(target_year, base.month)[1])
+    return date(target_year, base.month, day)
 
 
 async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
@@ -40,7 +56,31 @@ async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administra
     return administration
 
 
-def to_response(item: FinancialCommitment) -> CommitmentResponse:
+def compute_next_due_date(item: FinancialCommitment, today: Optional[date] = None) -> Optional[date]:
+    today = today or date.today()
+    if item.end_date and item.end_date < today:
+        return None
+
+    if item.type == CommitmentType.SUBSCRIPTION and item.recurring_frequency == RecurringFrequency.YEARLY:
+        if item.renewal_date and item.renewal_date >= today:
+            return item.renewal_date
+        base = item.renewal_date or item.start_date
+        next_due = base
+        while next_due < today:
+            next_due = add_years(next_due, 1)
+        if item.end_date and next_due > item.end_date:
+            return None
+        return next_due
+
+    next_due = item.start_date
+    while next_due < today:
+        next_due = add_months(next_due, 1)
+    if item.end_date and next_due > item.end_date:
+        return None
+    return next_due
+
+
+def to_response(item: FinancialCommitment, today: Optional[date] = None) -> CommitmentResponse:
     return CommitmentResponse(
         id=item.id,
         administration_id=item.administration_id,
@@ -55,10 +95,20 @@ def to_response(item: FinancialCommitment) -> CommitmentResponse:
         end_date=item.end_date,
         contract_term_months=item.contract_term_months,
         renewal_date=item.renewal_date,
+        next_due_date=compute_next_due_date(item, today=today),
         btw_rate=float(item.btw_rate) if item.btw_rate is not None else None,
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
+
+
+def parse_type_filter(type_raw: Optional[str]) -> Optional[CommitmentType]:
+    if not type_raw:
+        return None
+    try:
+        return CommitmentType(type_raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_TYPE", "message": "Type moet lease, loan of subscription zijn."}) from exc
 
 
 @router.get("", response_model=CommitmentListResponse)
@@ -69,14 +119,112 @@ async def list_commitments(
 ):
     require_zzp(current_user)
     administration = await get_user_administration(current_user.id, db)
+    type_filter = parse_type_filter(type)
 
     query = select(FinancialCommitment).where(FinancialCommitment.administration_id == administration.id)
-    if type:
-        query = query.where(FinancialCommitment.type == CommitmentType(type))
+    if type_filter:
+        query = query.where(FinancialCommitment.type == type_filter)
 
     result = await db.execute(query.order_by(FinancialCommitment.created_at.desc()))
     commitments = result.scalars().all()
-    return CommitmentListResponse(commitments=[to_response(item) for item in commitments], total=len(commitments))
+    today = date.today()
+    return CommitmentListResponse(commitments=[to_response(item, today=today) for item in commitments], total=len(commitments))
+
+
+@router.get("/overview/summary", response_model=CommitmentOverviewResponse)
+async def commitment_overview(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    threshold_cents: int = Query(150000, ge=0),
+):
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
+    result = await db.execute(select(FinancialCommitment).where(FinancialCommitment.administration_id == administration.id))
+    items = result.scalars().all()
+
+    today = date.today()
+    next_30 = today + timedelta(days=30)
+
+    upcoming: list[FinancialCommitment] = []
+    by_type = {"lease": 0, "loan": 0, "subscription": 0}
+
+    monthly_total = 0
+    for item in items:
+        due_date = compute_next_due_date(item, today=today)
+        value = item.monthly_payment_cents or item.amount_cents
+
+        if item.type == CommitmentType.SUBSCRIPTION and item.recurring_frequency == RecurringFrequency.YEARLY:
+            monthly_total += item.amount_cents // 12
+        else:
+            monthly_total += value
+
+        by_type[item.type.value] += value
+        if due_date and due_date <= next_30:
+            upcoming.append(item)
+
+    alerts: list[CommitmentAlert] = []
+    for item in items:
+        due_date = compute_next_due_date(item, today=today)
+        if item.type == CommitmentType.SUBSCRIPTION and due_date and (due_date - today).days <= 14:
+            alerts.append(CommitmentAlert(code="subscription_renewal", severity="warning", message=f"Abonnement '{item.name}' verlengt binnen 14 dagen."))
+        if item.type in {CommitmentType.LEASE, CommitmentType.LOAN} and item.end_date and 0 <= (item.end_date - today).days <= 30:
+            alerts.append(CommitmentAlert(code="lease_loan_ending", severity="warning", message=f"{item.type.value.title()} '{item.name}' eindigt binnen 30 dagen."))
+
+    if monthly_total > threshold_cents:
+        alerts.append(CommitmentAlert(code="monthly_threshold", severity="warning", message="Maandelijkse vaste verplichtingen overschrijden de ingestelde drempel."))
+
+    return CommitmentOverviewResponse(
+        monthly_total_cents=monthly_total,
+        upcoming_total_cents=sum(i.monthly_payment_cents or i.amount_cents for i in upcoming),
+        warning_count=len([a for a in alerts if a.severity == "warning"]),
+        by_type=by_type,
+        upcoming=[to_response(i, today=today) for i in sorted(upcoming, key=lambda x: compute_next_due_date(x, today=today) or date.max)[:8]],
+        alerts=alerts,
+        threshold_cents=threshold_cents,
+    )
+
+
+@router.get("/subscriptions/suggestions", response_model=CommitmentSuggestionsResponse)
+async def subscription_suggestions(current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
+    since = date.today() - timedelta(days=120)
+
+    result = await db.execute(
+        select(BankTransaction)
+        .where(
+            and_(
+                BankTransaction.administration_id == administration.id,
+                BankTransaction.booking_date >= since,
+                BankTransaction.amount < 0,
+            )
+        )
+        .order_by(BankTransaction.booking_date.desc())
+        .limit(100)
+    )
+    txs = result.scalars().all()
+
+    seen: dict[str, list[BankTransaction]] = {}
+    for tx in txs:
+        key = (tx.counterparty_name or tx.description[:30] or "onbekend").lower()
+        seen.setdefault(key, []).append(tx)
+
+    suggestions = []
+    for transactions in seen.values():
+        if len(transactions) < 2:
+            continue
+        avg = int(abs(sum(int(tx.amount * 100) for tx in transactions) / len(transactions)))
+        suggestions.append(
+            {
+                "bank_transaction_id": transactions[0].id,
+                "booking_date": transactions[0].booking_date,
+                "amount_cents": avg,
+                "description": transactions[0].counterparty_name or transactions[0].description,
+                "confidence": min(0.95, 0.4 + (len(transactions) * 0.12)),
+            }
+        )
+
+    return CommitmentSuggestionsResponse(suggestions=suggestions[:10])
 
 
 @router.post("", response_model=CommitmentResponse, status_code=status.HTTP_201_CREATED)
@@ -144,13 +292,19 @@ async def patch_commitment(
     if not item:
         raise HTTPException(status_code=404, detail={"code": "COMMITMENT_NOT_FOUND", "message": "Verplichting niet gevonden."})
 
-    for key, value in payload.model_dump(exclude_unset=True).items():
+    update_data = payload.model_dump(exclude_unset=True)
+    new_start = update_data.get("start_date", item.start_date)
+    new_end = update_data.get("end_date", item.end_date)
+    if new_end and new_end < new_start:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_DATE_RANGE", "message": "Einddatum mag niet voor de startdatum liggen."})
+
+    for key, value in update_data.items():
         if key == "type" and value:
             setattr(item, key, CommitmentType(value))
         elif key in {"interest_rate", "btw_rate"} and value is not None:
             setattr(item, key, Decimal(str(value)))
-        elif key == "recurring_frequency" and value:
-            setattr(item, key, RecurringFrequency(value))
+        elif key == "recurring_frequency":
+            setattr(item, key, RecurringFrequency(value) if value else None)
         else:
             setattr(item, key, value)
 
@@ -220,76 +374,6 @@ async def amortization_schedule(commitment_id: UUID, current_user: CurrentUser, 
         )
         if remaining == 0:
             break
-        due_date = due_date + timedelta(days=30)
+        due_date = add_months(due_date, 1)
 
     return rows
-
-
-@router.get("/overview/summary", response_model=CommitmentOverviewResponse)
-async def commitment_overview(current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
-    require_zzp(current_user)
-    administration = await get_user_administration(current_user.id, db)
-    result = await db.execute(select(FinancialCommitment).where(FinancialCommitment.administration_id == administration.id))
-    items = result.scalars().all()
-
-    today = date.today()
-    next_30 = today + timedelta(days=30)
-    upcoming = [i for i in items if i.start_date <= next_30 and (i.end_date is None or i.end_date >= today)]
-    monthly_total = sum(i.monthly_payment_cents or i.amount_cents for i in items if i.type != CommitmentType.SUBSCRIPTION)
-    monthly_total += sum((i.amount_cents // 12) if i.recurring_frequency and i.recurring_frequency.value == "yearly" else i.amount_cents for i in items if i.type == CommitmentType.SUBSCRIPTION)
-
-    warning_count = len([i for i in upcoming if (i.monthly_payment_cents or i.amount_cents) >= 150000])
-    by_type = {"lease": 0, "loan": 0, "subscription": 0}
-    for item in items:
-        by_type[item.type.value] += item.monthly_payment_cents or item.amount_cents
-
-    return CommitmentOverviewResponse(
-        monthly_total_cents=monthly_total,
-        upcoming_total_cents=sum(i.monthly_payment_cents or i.amount_cents for i in upcoming),
-        warning_count=warning_count,
-        by_type=by_type,
-        upcoming=[to_response(i) for i in sorted(upcoming, key=lambda x: x.start_date)[:8]],
-    )
-
-
-@router.get("/subscriptions/suggestions", response_model=CommitmentSuggestionsResponse)
-async def subscription_suggestions(current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
-    require_zzp(current_user)
-    administration = await get_user_administration(current_user.id, db)
-    since = date.today() - timedelta(days=120)
-
-    result = await db.execute(
-        select(BankTransaction)
-        .where(
-            and_(
-                BankTransaction.administration_id == administration.id,
-                BankTransaction.booking_date >= since,
-                BankTransaction.amount < 0,
-            )
-        )
-        .order_by(BankTransaction.booking_date.desc())
-        .limit(100)
-    )
-    txs = result.scalars().all()
-
-    seen: dict[str, list[BankTransaction]] = {}
-    for tx in txs:
-        key = (tx.counterparty_name or tx.description[:30] or "onbekend").lower()
-        seen.setdefault(key, []).append(tx)
-
-    suggestions = []
-    for transactions in seen.values():
-        if len(transactions) < 2:
-            continue
-        avg = int(abs(sum(int(t.amount * 100) for t in transactions) / len(transactions)))
-        suggestions.append(
-            {
-                "bank_transaction_id": transactions[0].id,
-                "booking_date": transactions[0].booking_date,
-                "amount_cents": avg,
-                "description": transactions[0].counterparty_name or transactions[0].description,
-                "confidence": min(0.95, 0.4 + (len(transactions) * 0.12)),
-            }
-        )
-
-    return CommitmentSuggestionsResponse(suggestions=suggestions[:10])

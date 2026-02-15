@@ -3864,6 +3864,7 @@ export interface ZZPExpense {
   category: string
   notes?: string
   attachment_url?: string
+  commitment_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -3877,6 +3878,7 @@ export interface ZZPExpenseCreate {
   category: string
   notes?: string
   attachment_url?: string
+  commitment_id?: string
 }
 
 export interface ZZPExpenseUpdate extends Partial<ZZPExpenseCreate> {}
@@ -4030,6 +4032,7 @@ export interface ZZPCommitment {
   end_date?: string | null
   contract_term_months?: number | null
   renewal_date?: string | null
+  next_due_date?: string | null
   btw_rate?: number | null
   created_at: string
   updated_at: string
@@ -4057,12 +4060,20 @@ export interface ZZPCommitmentListResponse {
   total: number
 }
 
+export interface ZZPCommitmentAlert {
+  code: "subscription_renewal" | "lease_loan_ending" | "monthly_threshold"
+  severity: "info" | "warning"
+  message: string
+}
+
 export interface ZZPCommitmentOverview {
   monthly_total_cents: number
   upcoming_total_cents: number
   warning_count: number
   by_type: Record<string, number>
   upcoming: ZZPCommitment[]
+  alerts: ZZPCommitmentAlert[]
+  threshold_cents: number
 }
 
 export interface ZZPAmortizationRow {
@@ -4433,8 +4444,10 @@ export const zzpApi = {
       const response = await api.get<ZZPCommitmentListResponse>('/zzp/commitments', { params: type ? { type } : undefined })
       return response.data
     },
-    overview: async (): Promise<ZZPCommitmentOverview> => {
-      const response = await api.get<ZZPCommitmentOverview>('/zzp/commitments/overview/summary')
+    overview: async (threshold_cents?: number): Promise<ZZPCommitmentOverview> => {
+      const response = await api.get<ZZPCommitmentOverview>('/zzp/commitments/overview/summary', {
+        params: threshold_cents ? { threshold_cents } : undefined,
+      })
       return response.data
     },
     create: async (data: ZZPCommitmentCreate): Promise<ZZPCommitment> => {

@@ -1,6 +1,6 @@
 /**
  * ZZPAccountantLinksPage - Manage accountant access requests
- * 
+ *
  * Features:
  * - View pending accountant link requests
  * - Approve or reject requests
@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -29,10 +29,29 @@ import {
   Handshake,
   ShieldCheck,
   Buildings,
-  Envelope,
   WarningCircle,
   Trash,
 } from '@phosphor-icons/react'
+
+const ZZP_LINKS_LOAD_FAILURE_EVENT = 'zzp-links-load-failure'
+
+const reportLoadFailure = (section: 'pending' | 'active', error: unknown) => {
+  const message = getErrorMessage(error)
+  const detail = {
+    section,
+    message,
+    occurred_at: new Date().toISOString(),
+    page: 'ZZPAccountantLinksPage',
+  }
+
+  console.error('[telemetry] ZZP links section failed to load', detail)
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(ZZP_LINKS_LOAD_FAILURE_EVENT, { detail }))
+  }
+
+  return message
+}
 
 // Pending request card component
 const PendingRequestCard = ({
@@ -49,7 +68,7 @@ const PendingRequestCard = ({
   isRejecting: boolean
 }) => {
   const isProcessing = isApproving || isRejecting
-  
+
   return (
     <Card className="border-amber-500/30 bg-amber-500/5">
       <CardContent className="p-4 sm:p-6">
@@ -75,13 +94,13 @@ const PendingRequestCard = ({
               <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
                 {t('zzpAccountantLinks.requestedAccess')}
               </p>
-              
+
               {/* Administration info */}
               <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
                 <Buildings size={16} />
                 <span>{t('zzpAccountantLinks.administration')}: {request.administration_name}</span>
               </div>
-              
+
               {/* Request date */}
               <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                 <Clock size={14} />
@@ -191,76 +210,67 @@ const LoadingSkeleton = () => (
 export const ZZPAccountantLinksPage = () => {
   const [pendingRequests, setPendingRequests] = useState<PendingLinkRequest[]>([])
   const [activeLinks, setActiveLinks] = useState<ActiveAccountantLink[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [isPendingLoading, setIsPendingLoading] = useState(true)
+  const [isActiveLoading, setIsActiveLoading] = useState(true)
+  const [pendingError, setPendingError] = useState<string | null>(null)
+  const [activeError, setActiveError] = useState<string | null>(null)
   const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set())
   const [rejectingIds, setRejectingIds] = useState<Set<string>>(new Set())
   const [revokingIds, setRevokingIds] = useState<Set<string>>(new Set())
-  const showSkeleton = useDelayedLoading(isLoading, 300, pendingRequests.length > 0 || activeLinks.length > 0)
+  const showPendingSkeleton = useDelayedLoading(isPendingLoading, 300, pendingRequests.length > 0)
+  const showActiveSkeleton = useDelayedLoading(isActiveLoading, 300, activeLinks.length > 0)
 
-  // Load pending requests and active links
-  const loadData = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
+  const loadPendingRequests = useCallback(async () => {
+    setIsPendingLoading(true)
+    setPendingError(null)
+
     try {
-      const [pendingResponse, activeResponse] = await Promise.allSettled([
-        zzpApi.getMandates(),
-        zzpApi.getActiveLinks(),
-      ])
-
-      const loadErrors: string[] = []
-
-      if (pendingResponse.status === 'fulfilled') {
-        const { mandates } = pendingResponse.value
-        setPendingRequests(mandates.map((m) => ({
-          assignment_id: m.id,
-          accountant_id: m.accountant_user_id,
-          accountant_email: m.accountant_email || "",
-          accountant_name: m.accountant_name || "",
-          administration_id: m.client_company_id,
-          administration_name: m.client_company_name,
-          invited_at: m.created_at,
-        })))
-      } else {
-        console.error('Failed to load pending accountant requests:', pendingResponse.reason)
-        setPendingRequests([])
-        loadErrors.push(getErrorMessage(pendingResponse.reason))
-      }
-
-      if (activeResponse.status === 'fulfilled') {
-        setActiveLinks(activeResponse.value.active_links)
-      } else {
-        console.error('Failed to load active accountant links:', activeResponse.reason)
-        setActiveLinks([])
-        loadErrors.push(getErrorMessage(activeResponse.reason))
-      }
-
-      if (loadErrors.length > 0) {
-        setError(loadErrors.join(' · '))
-      }
-    } catch (err) {
-      console.error('Failed to load accountant links:', err)
-      setError(getErrorMessage(err))
+      const response = await zzpApi.getMandates()
+      setPendingRequests(response.mandates.map((m) => ({
+        assignment_id: m.id,
+        accountant_id: m.accountant_user_id,
+        accountant_email: m.accountant_email || '',
+        accountant_name: m.accountant_name || '',
+        administration_id: m.client_company_id,
+        administration_name: m.client_company_name,
+        invited_at: m.created_at,
+      })))
+    } catch (error) {
       setPendingRequests([])
-      setActiveLinks([])
+      setPendingError(reportLoadFailure('pending', error))
     } finally {
-      setIsLoading(false)
+      setIsPendingLoading(false)
+    }
+  }, [])
+
+  const loadActiveLinks = useCallback(async () => {
+    setIsActiveLoading(true)
+    setActiveError(null)
+
+    try {
+      const response = await zzpApi.getActiveLinks()
+      setActiveLinks(response.active_links)
+    } catch (error) {
+      setActiveLinks([])
+      setActiveError(reportLoadFailure('active', error))
+    } finally {
+      setIsActiveLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    loadPendingRequests()
+    loadActiveLinks()
+  }, [loadPendingRequests, loadActiveLinks])
 
   // Handle approve
   const handleApprove = async (assignmentId: string, request: PendingLinkRequest) => {
     setApprovingIds(prev => new Set(prev).add(assignmentId))
-    
+
     try {
-      const response = await zzpApi.approveMandate(assignmentId)
+      await zzpApi.approveMandate(assignmentId)
       toast.success(t('zzpAccountantLinks.approvedSuccess'))
-      
-      // Move from pending to active, using server timestamp from response
+
       setPendingRequests(prev => prev.filter(r => r.assignment_id !== assignmentId))
       setActiveLinks(prev => [...prev, {
         assignment_id: request.assignment_id,
@@ -282,15 +292,12 @@ export const ZZPAccountantLinksPage = () => {
     }
   }
 
-  // Handle reject
   const handleReject = async (assignmentId: string) => {
     setRejectingIds(prev => new Set(prev).add(assignmentId))
-    
+
     try {
       await zzpApi.rejectMandate(assignmentId)
       toast.success(t('zzpAccountantLinks.rejectedSuccess'))
-      
-      // Remove from list
       setPendingRequests(prev => prev.filter(r => r.assignment_id !== assignmentId))
     } catch (err) {
       toast.error(getErrorMessage(err))
@@ -303,15 +310,12 @@ export const ZZPAccountantLinksPage = () => {
     }
   }
 
-  // Handle revoke (for active links)
   const handleRevoke = async (assignmentId: string) => {
     setRevokingIds(prev => new Set(prev).add(assignmentId))
-    
+
     try {
       await zzpApi.revokeLink(assignmentId)
       toast.success(t('zzpAccountantLinks.revokedSuccess'))
-      
-      // Remove from active list
       setActiveLinks(prev => prev.filter(r => r.assignment_id !== assignmentId))
     } catch (err) {
       toast.error(getErrorMessage(err))
@@ -326,7 +330,6 @@ export const ZZPAccountantLinksPage = () => {
 
   return (
     <div className="container max-w-3xl mx-auto px-4 py-6 sm:py-8">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
           <Handshake size={32} className="text-primary" weight="duotone" />
@@ -337,19 +340,6 @@ export const ZZPAccountantLinksPage = () => {
         </p>
       </div>
 
-      {/* Error state */}
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <WarningCircle size={18} />
-          <AlertTitle>{t('errors.loadFailed')}</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-          <Button variant="outline" size="sm" onClick={loadData} className="mt-2">
-            {t('common.retry')}
-          </Button>
-        </Alert>
-      )}
-
-      {/* Pending requests section */}
       <section className="mb-8">
         <div className="flex items-center gap-2 mb-4">
           <Clock size={20} className="text-amber-600 dark:text-amber-400" />
@@ -361,7 +351,18 @@ export const ZZPAccountantLinksPage = () => {
           )}
         </div>
 
-        {showSkeleton ? (
+        {pendingError && (
+          <Alert variant="destructive" className="mb-4">
+            <WarningCircle size={18} />
+            <AlertTitle>{t('errors.loadFailed')}</AlertTitle>
+            <AlertDescription>{pendingError}</AlertDescription>
+            <Button variant="outline" size="sm" onClick={loadPendingRequests} className="mt-2">
+              Retry pending
+            </Button>
+          </Alert>
+        )}
+
+        {showPendingSkeleton ? (
           <LoadingSkeleton />
         ) : pendingRequests.length === 0 ? (
           <EmptyState
@@ -385,7 +386,6 @@ export const ZZPAccountantLinksPage = () => {
         )}
       </section>
 
-      {/* Active accountant links section */}
       <section>
         <div className="flex items-center gap-2 mb-4">
           <CheckCircle size={20} className="text-green-600 dark:text-green-400" />
@@ -396,8 +396,19 @@ export const ZZPAccountantLinksPage = () => {
             </Badge>
           )}
         </div>
-        
-        {showSkeleton ? (
+
+        {activeError && (
+          <Alert variant="destructive" className="mb-4">
+            <WarningCircle size={18} />
+            <AlertTitle>{t('errors.loadFailed')}</AlertTitle>
+            <AlertDescription>{activeError}</AlertDescription>
+            <Button variant="outline" size="sm" onClick={loadActiveLinks} className="mt-2">
+              Retry active
+            </Button>
+          </Alert>
+        )}
+
+        {showActiveSkeleton ? (
           <LoadingSkeleton />
         ) : activeLinks.length === 0 ? (
           <Card className="bg-secondary/30 border-dashed">

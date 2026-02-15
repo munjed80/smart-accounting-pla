@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ZZPAccountantLinksPage } from '@/components/ZZPAccountantLinksPage'
 import { zzpApi } from '@/lib/api'
 
@@ -60,5 +60,27 @@ describe('ZZPAccountantLinksPage', () => {
     })
 
     expect(screen.getByText('Active links unavailable')).toBeInTheDocument()
+  })
+
+  it('retries only the active section when Retry active is clicked', async () => {
+    vi.mocked(zzpApi.getMandates).mockResolvedValue({ mandates: [], total_count: 0 })
+    vi.mocked(zzpApi.getActiveLinks)
+      .mockRejectedValueOnce(new Error('Temporary active error'))
+      .mockResolvedValueOnce({ active_links: [], total_count: 0 })
+
+    render(<ZZPAccountantLinksPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Temporary active error')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry active' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('Temporary active error')).not.toBeInTheDocument()
+    })
+
+    expect(zzpApi.getActiveLinks).toHaveBeenCalledTimes(2)
+    expect(zzpApi.getMandates).toHaveBeenCalledTimes(1)
   })
 })

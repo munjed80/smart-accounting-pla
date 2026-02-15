@@ -51,10 +51,12 @@ import { NotFoundError, NetworkError, UnauthorizedError, ValidationError, Server
 // In DEV mode: Allow fallback to localhost for development convenience
 // In PROD mode: VITE_API_URL must be set and must NOT point to localhost
 const isDev = import.meta.env.DEV
-const envApiUrl = import.meta.env.VITE_API_URL as string | undefined
+const envApiUrl = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) as string | undefined
 
-// Store raw VITE_API_URL for diagnostics (before any normalization)
-const rawViteApiUrl = envApiUrl ?? '(not set)'
+// Store raw API URL for diagnostics (before any normalization)
+const rawViteApiUrl = import.meta.env.VITE_API_URL as string | undefined
+const rawNextPublicApiUrl = import.meta.env.NEXT_PUBLIC_API_URL as string | undefined
+const rawConfiguredApiUrl = envApiUrl ?? '(not set)'
 
 /**
  * Normalize URL: trim whitespace, ensure scheme is present, and remove trailing slash.
@@ -208,7 +210,9 @@ const misconfigurationCheck = checkMisconfiguration()
 
 // Log API configuration for debugging (both dev and prod for troubleshooting)
 if (isDev) {
-  console.log('[API Config] VITE_API_URL:', rawViteApiUrl)
+  console.log('[API Config] VITE_API_URL:', rawViteApiUrl ?? '(not set)')
+  console.log('[API Config] NEXT_PUBLIC_API_URL:', rawNextPublicApiUrl ?? '(not set)')
+  console.log('[API Config] Selected API URL:', rawConfiguredApiUrl)
   console.log('[API Config] Normalized Origin:', normalizedEnvApiUrl ?? '(not set)')
   console.log('[API Config] Had API Path Stripped:', envApiUrlHadApiPath)
   console.log('[API Config] Final Base URL:', API_BASE_URL)
@@ -222,7 +226,7 @@ if (isDev) {
 export const getApiBaseUrl = () => API_BASE_URL
 
 // Export the raw VITE_API_URL value for diagnostics
-export const getRawViteApiUrl = () => rawViteApiUrl
+export const getRawViteApiUrl = () => rawConfiguredApiUrl
 
 // Export window.location.origin for diagnostics
 export const getWindowOrigin = () => typeof window !== 'undefined' ? window.location.origin : '(SSR)'
@@ -259,7 +263,12 @@ api.interceptors.request.use(
     
     // DEBUG: Log outgoing request URL (only in DEV mode to avoid exposing info in production)
     if (isDev) {
-      console.log('[API Request]', config.method?.toUpperCase(), config.baseURL + (config.url || ''))
+      const fullUrl = `${config.baseURL || ''}${config.url || ''}`
+      console.log('[API Request]', {
+        method: config.method?.toUpperCase(),
+        url: fullUrl,
+        payload: config.data,
+      })
     }
     
     return config

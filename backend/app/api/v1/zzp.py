@@ -7,6 +7,7 @@ Provides endpoints for ZZP clients to:
 - View active accountant relationships
 - Revoke accountant access
 """
+import logging
 from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
@@ -34,6 +35,8 @@ from app.schemas.accountant_dashboard import (
     MandateActionResponse,
 )
 from app.api.v1.deps import CurrentUser, require_zzp
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -371,6 +374,8 @@ async def approve_mandate(
 ):
     """Approve a pending mandate request."""
     require_zzp(current_user)
+    
+    logger.info(f"ZZP user {current_user.id} ({current_user.email}) approving mandate {mandate_id}")
 
     result = await db.execute(
         select(AccountantClientAssignment)
@@ -380,12 +385,15 @@ async def approve_mandate(
     assignment = result.scalar_one_or_none()
 
     if not assignment:
+        logger.warning(f"Mandate {mandate_id} not found for user {current_user.id}")
         raise HTTPException(status_code=404, detail={"code": "MANDATE_NOT_FOUND", "message": "Machtiging niet gevonden."})
 
     assignment.status = AssignmentStatus.ACTIVE
     assignment.approved_at = datetime.now(timezone.utc)
     assignment.revoked_at = None
     await db.commit()
+    
+    logger.info(f"Mandate {mandate_id} approved by {current_user.email}")
 
     return MandateActionResponse(id=assignment.id, status='approved', message='Machtiging goedgekeurd.')
 
@@ -398,6 +406,8 @@ async def reject_mandate(
 ):
     """Reject a pending mandate request."""
     require_zzp(current_user)
+    
+    logger.info(f"ZZP user {current_user.id} ({current_user.email}) rejecting mandate {mandate_id}")
 
     result = await db.execute(
         select(AccountantClientAssignment)
@@ -407,10 +417,13 @@ async def reject_mandate(
     assignment = result.scalar_one_or_none()
 
     if not assignment:
+        logger.warning(f"Mandate {mandate_id} not found for user {current_user.id}")
         raise HTTPException(status_code=404, detail={"code": "MANDATE_NOT_FOUND", "message": "Machtiging niet gevonden."})
 
     assignment.status = AssignmentStatus.REJECTED
     assignment.revoked_at = datetime.now(timezone.utc)
     await db.commit()
+    
+    logger.info(f"Mandate {mandate_id} rejected by {current_user.email}")
 
     return MandateActionResponse(id=assignment.id, status='rejected', message='Machtiging afgewezen.')

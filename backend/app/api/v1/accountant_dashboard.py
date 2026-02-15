@@ -7,6 +7,7 @@ Provides endpoints for:
 - Bulk operations execution
 - Assignment management
 """
+import logging
 from datetime import datetime, timezone, date
 from typing import Annotated, Optional, List
 from uuid import UUID
@@ -81,6 +82,8 @@ from app.services.accountant_dashboard import (
     UnauthorizedClientError,
 )
 from app.api.v1.deps import CurrentUser, require_accountant
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -1385,6 +1388,8 @@ async def create_mandate_request(
 ):
     """Create a pending mandate request for a specific client company."""
     verify_accountant_role(current_user)
+    
+    logger.info(f"Accountant {current_user.id} ({current_user.email}) requesting mandate for client company {request.client_company_id}")
 
     client_result = await db.execute(
         select(Administration)
@@ -1394,6 +1399,7 @@ async def create_mandate_request(
     )
     client_admin = client_result.scalar_one_or_none()
     if not client_admin:
+        logger.warning(f"Client company {request.client_company_id} not found or inactive")
         raise HTTPException(status_code=404, detail={"code": "CLIENT_NOT_FOUND", "message": "Klantbedrijf niet gevonden."})
 
     owner_result = await db.execute(
@@ -1455,6 +1461,8 @@ async def create_mandate_request(
 
     await db.commit()
     await db.refresh(assignment)
+    
+    logger.info(f"Mandate request created/updated: {assignment.id} (status: {assignment.status.value})")
 
     return MandateActionResponse(id=assignment.id, status='pending', message=message)
 

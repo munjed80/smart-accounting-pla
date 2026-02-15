@@ -2806,27 +2806,6 @@ export interface ZZPActiveLinksResponse {
   total_count: number
 }
 
-
-const mapClientLinksToMandates = (links: ClientLinksResponse): MandateListResponse => ({
-  mandates: links.links.map((link) => ({
-    id: link.assignment_id,
-    accountant_user_id: '',
-    client_user_id: link.client_user_id,
-    client_company_id: link.administration_id,
-    client_company_name: link.administration_name,
-    status: link.status.toLowerCase() === 'active'
-      ? 'approved'
-      : link.status.toLowerCase() === 'pending'
-        ? 'pending'
-        : link.status.toLowerCase() === 'revoked'
-          ? 'revoked'
-          : 'rejected',
-    created_at: link.assigned_at,
-    updated_at: link.approved_at || link.revoked_at || link.assigned_at,
-  })),
-  total_count: links.total_count,
-})
-
 // Accountant Client Assignment API with Consent
 export const accountantApi = {
   /**
@@ -2880,16 +2859,8 @@ export const accountantApi = {
   },
 
   getMandates: async (): Promise<MandateListResponse> => {
-    try {
-      const response = await api.get<MandateListResponse>('/accountant/mandates')
-      return response.data
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
-        const linksResponse = await api.get<ClientLinksResponse>('/accountant/clients/links')
-        return mapClientLinksToMandates(linksResponse.data)
-      }
-      throw error
-    }
+    const response = await api.get<MandateListResponse>('/accountant/mandates')
+    return response.data
   },
 
   revokeMandate: async (mandateId: string): Promise<MandateActionResponse> => {

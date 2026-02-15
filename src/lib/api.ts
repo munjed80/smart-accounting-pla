@@ -4068,7 +4068,7 @@ export const zzpApi = {
     },
 
     update: async (entryId: string, data: ZZPTimeEntryUpdate): Promise<ZZPTimeEntryMutationResponse> => {
-      const response = await api.patch<ZZPTimeEntry>(`/uren/${entryId}`, data)
+      const response = await api.patch<ZZPTimeEntry>(`/zzp/time-entries/${entryId}`, data)
       return {
         entry: response.data ?? null,
         status: response.status,

@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.ledger import AccountingPeriod, PeriodStatus as ModelPeriodStatus
+from app.models.administration import Administration
 from app.schemas.period import (
     PeriodResponse,
     PeriodWithValidationResponse,
@@ -35,6 +36,8 @@ from app.schemas.period import (
     PeriodsListResponse,
     FinalizationPrerequisiteErrorResponse,
     PeriodStatus,
+    PeriodStatusUpdateRequest,
+    PeriodStatusUpdateResponse,
 )
 from app.services.period import PeriodControlService, PeriodControlError
 from app.services.period.control import (
@@ -43,8 +46,21 @@ from app.services.period.control import (
     FinalizationPrerequisiteError,
 )
 from app.api.v1.deps import CurrentUser, require_assigned_client
+from app.services.vat import VatReportService
 
 router = APIRouter()
+
+
+async def require_period_access(client_id: UUID, current_user: CurrentUser, db: AsyncSession) -> Administration:
+    """Allow assigned accountants/admins and super admins to access period endpoints."""
+    if current_user.role == "super_admin":
+        result = await db.execute(select(Administration).where(Administration.id == client_id))
+        administration = result.scalar_one_or_none()
+        if not administration:
+            raise HTTPException(status_code=404, detail="Client not found")
+        return administration
+
+    return await require_assigned_client(client_id, current_user, db)
 
 
 def convert_period_to_response(period: AccountingPeriod) -> PeriodResponse:
@@ -82,7 +98,7 @@ async def list_periods(
     
     Optionally filter by status (OPEN, REVIEW, FINALIZED, LOCKED).
     """
-    administration = await require_assigned_client(client_id, current_user, db)
+    await require_period_access(client_id, current_user, db)
     
     service = PeriodControlService(db, client_id)
     
@@ -114,7 +130,7 @@ async def get_period(
     
     Returns the period and its validation status (RED/YELLOW issues).
     """
-    administration = await require_assigned_client(client_id, current_user, db)
+    await require_period_access(client_id, current_user, db)
     
     service = PeriodControlService(db, client_id)
     
@@ -131,6 +147,60 @@ async def get_period(
             can_finalize=validation_status["can_finalize"],
             validation_summary=validation_status["validation_summary"],
         ),
+    )
+
+
+
+
+@router.patch(
+    "/clients/{client_id}/periods/{period_id}",
+    response_model=PeriodStatusUpdateResponse,
+)
+async def update_period_status(
+    client_id: UUID,
+    period_id: UUID,
+    body: PeriodStatusUpdateRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Update period status for VAT filing readiness."""
+    await require_period_access(client_id, current_user, db)
+
+    result = await db.execute(
+        select(AccountingPeriod)
+        .where(AccountingPeriod.id == period_id)
+        .where(AccountingPeriod.administration_id == client_id)
+    )
+    period = result.scalar_one_or_none()
+
+    if not period:
+        raise HTTPException(status_code=404, detail="Period not found")
+
+    target_status = body.status.upper()
+    if target_status not in {"READY_FOR_FILING", "FINALIZED"}:
+        raise HTTPException(status_code=422, detail="Unsupported period status")
+
+    vat_service = VatReportService(db, client_id)
+    anomalies = await vat_service.validate_vat_return(period_id)
+    red_count = sum(1 for anomaly in anomalies if anomaly.severity == "RED")
+    if red_count > 0:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Kan niet afronden: {red_count} blokkerende BTW-afwijking(en).",
+        )
+
+    period.status = ModelPeriodStatus.FINALIZED
+    period.is_closed = True
+    period.finalized_at = datetime.now(timezone.utc)
+    period.finalized_by_id = current_user.id
+    period.closed_at = period.finalized_at
+
+    await db.commit()
+    await db.refresh(period)
+
+    return PeriodStatusUpdateResponse(
+        period=convert_period_to_response(period),
+        message="Periode gemarkeerd als klaar voor handmatige BTW-aangifte.",
     )
 
 
@@ -152,7 +222,7 @@ async def review_period(
     This triggers a full validation run and transitions the period from OPEN to REVIEW.
     The period will remain in REVIEW status until finalized or reopened.
     """
-    administration = await require_assigned_client(client_id, current_user, db)
+    await require_period_access(client_id, current_user, db)
     
     # Get request metadata for audit
     ip_address = request.client.host if request.client else None
@@ -211,7 +281,7 @@ async def finalize_period(
     
     **Warning:** This action cannot be undone. The period can only be locked further.
     """
-    administration = await require_assigned_client(client_id, current_user, db)
+    await require_period_access(client_id, current_user, db)
     
     # Get request metadata for audit
     ip_address = request.client.host if request.client else None
@@ -275,7 +345,7 @@ async def lock_period(
     
     **⚠️ WARNING: This action is IRREVERSIBLE. Use with extreme caution.**
     """
-    administration = await require_assigned_client(client_id, current_user, db)
+    await require_period_access(client_id, current_user, db)
     
     if not body.confirm_irreversible:
         raise HTTPException(
@@ -330,7 +400,7 @@ async def get_period_snapshot(
     
     This is only available for FINALIZED or LOCKED periods.
     """
-    administration = await require_assigned_client(client_id, current_user, db)
+    await require_period_access(client_id, current_user, db)
     
     service = PeriodControlService(db, client_id)
     
@@ -399,7 +469,7 @@ async def get_period_audit_logs(
     
     Each log entry includes who performed the action, when, and any notes.
     """
-    administration = await require_assigned_client(client_id, current_user, db)
+    await require_period_access(client_id, current_user, db)
     
     service = PeriodControlService(db, client_id)
     

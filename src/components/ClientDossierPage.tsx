@@ -59,10 +59,11 @@ import { ClientPeriodsTab } from '@/components/ClientPeriodsTab'
 import { ClientDecisionsTab } from '@/components/ClientDecisionsTab'
 import { ClientBookkeepingTab } from '@/components/ClientBookkeepingTab'
 import { ClientAuditTab } from '@/components/ClientAuditTab'
+import { ClientVatTab } from '@/components/ClientVatTab'
 
 interface ClientDossierPageProps {
   clientId: string
-  initialTab?: 'issues' | 'periods' | 'decisions' | 'bookkeeping' | 'audit'
+  initialTab?: 'issues' | 'periods' | 'decisions' | 'bookkeeping' | 'audit' | 'vat'
 }
 
 // Session storage key for today's completed actions
@@ -223,7 +224,7 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
   }
 
   // Check if user is accountant
-  if (user?.role !== 'accountant' && user?.role !== 'admin') {
+  if (user?.role !== 'accountant' && user?.role !== 'admin' && user?.role !== 'super_admin') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background p-8">
         <div className="max-w-4xl mx-auto">
@@ -518,7 +519,7 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-6">
+          <TabsList className="grid w-full grid-cols-6 mb-6">
             <TabsTrigger value="issues" className="flex items-center gap-2">
               <ClipboardText size={18} />
               {t('dossier.tabs.issues')}
@@ -539,6 +540,10 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
             <TabsTrigger value="decisions" className="flex items-center gap-2">
               <ListChecks size={18} />
               {t('dossier.tabs.decisions')}
+            </TabsTrigger>
+            <TabsTrigger value="vat" className="flex items-center gap-2">
+              <CalendarBlank size={18} />
+              {t('dossier.tabs.vat')}
             </TabsTrigger>
             <TabsTrigger value="audit" className="flex items-center gap-2">
               <ClockCounterClockwise size={18} />
@@ -563,6 +568,10 @@ export const ClientDossierPage = ({ clientId, initialTab = 'issues' }: ClientDos
 
           <TabsContent value="decisions">
             <ClientDecisionsTab clientId={clientId} />
+          </TabsContent>
+
+          <TabsContent value="vat">
+            <ClientVatTab clientId={clientId} />
           </TabsContent>
 
           <TabsContent value="audit">

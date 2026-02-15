@@ -67,9 +67,7 @@ from app.schemas.accountant_dashboard import (
     ScopesSummary,
     ClientLinkItemWithScopes,
     AccountantClientLinksWithScopesResponse,
-    MandateCreateRequest,
-    MandateSearchItem,
-    MandateSearchResponse,
+    MandateCreateByEmailRequest,
     MandateItem,
     MandateListResponse,
     MandateActionResponse,
@@ -1329,106 +1327,47 @@ def _mandate_status_to_api(status: AssignmentStatus) -> str:
     return mapping[status]
 
 
-@router.get('/mandates/search-clients', response_model=MandateSearchResponse)
-async def search_client_companies_for_mandates(
+@router.post('/mandates/by-email', response_model=MandateActionResponse)
+async def create_mandate_request_by_email(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    q: str = Query(..., min_length=2),
-    limit: int = Query(10, ge=1, le=50),
+    request: MandateCreateByEmailRequest,
 ):
-    """Search ZZP client companies for mandate requests by name, kvk, vat, or owner email."""
+    """Create a pending mandate request by ZZP user email."""
     verify_accountant_role(current_user)
 
-    normalized_query = q.strip().lower()
-    if len(normalized_query) < 2:
-        return MandateSearchResponse(results=[], total_count=0)
+    normalized_email = request.email.strip().lower()
+    if not normalized_email:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_EMAIL", "message": "E-mail is verplicht."})
 
-    pattern = f"%{normalized_query}%"
-
-    result = await db.execute(
-        select(Administration, AdministrationMember, User)
-        .join(AdministrationMember, AdministrationMember.administration_id == Administration.id)
-        .join(User, User.id == AdministrationMember.user_id)
-        .where(AdministrationMember.role == MemberRole.OWNER)
+    user_result = await db.execute(
+        select(User)
+        .where(func.lower(User.email) == normalized_email)
         .where(User.role == 'zzp')
-        .where(Administration.is_active == True)
-        .where(
-            func.lower(Administration.name).like(pattern)
-            | func.lower(func.coalesce(Administration.kvk_number, '')).like(pattern)
-            | func.lower(func.coalesce(Administration.btw_number, '')).like(pattern)
-            | func.lower(User.email).like(pattern)
-            | func.lower(func.coalesce(User.full_name, '')).like(pattern)
-        )
-        .order_by(Administration.name.asc())
-        .limit(limit)
-    )
-
-    rows = result.all()
-    items = [
-        MandateSearchItem(
-            client_company_id=administration.id,
-            company_name=administration.name,
-            kvk_number=administration.kvk_number,
-            btw_number=administration.btw_number,
-            owner_user_id=owner.id,
-            owner_name=owner.full_name,
-            owner_email=owner.email,
-        )
-        for administration, _membership, owner in rows
-    ]
-
-    return MandateSearchResponse(results=items, total_count=len(items))
-
-
-@router.post('/mandates', response_model=MandateActionResponse)
-async def create_mandate_request(
-    current_user: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    request: MandateCreateRequest,
-):
-    """Create a pending mandate request for a specific client company."""
-    verify_accountant_role(current_user)
-    
-    logger.info(f"Accountant {current_user.id} ({current_user.email}) requesting mandate for client company {request.client_company_id}")
-
-    client_result = await db.execute(
-        select(Administration)
-        .where(Administration.id == request.client_company_id)
-        .where(Administration.is_active == True)
         .limit(1)
     )
-    client_admin = client_result.scalar_one_or_none()
-    if not client_admin:
-        logger.warning(f"Client company {request.client_company_id} not found or inactive")
-        raise HTTPException(status_code=404, detail={"code": "CLIENT_NOT_FOUND", "message": "Klantbedrijf niet gevonden."})
+    zzp_user = user_result.scalar_one_or_none()
+    if not zzp_user:
+        raise HTTPException(status_code=404, detail={"code": "ZZP_NOT_FOUND", "message": "ZZP not found"})
 
-    owner_result = await db.execute(
-        select(AdministrationMember)
-        .join(User, User.id == AdministrationMember.user_id)
-        .where(AdministrationMember.administration_id == request.client_company_id)
-        .where(AdministrationMember.role.in_([MemberRole.OWNER, MemberRole.ADMIN]))
-        .where(User.role == 'zzp')
+    admin_result = await db.execute(
+        select(AdministrationMember, Administration)
+        .join(Administration, Administration.id == AdministrationMember.administration_id)
+        .where(AdministrationMember.user_id == zzp_user.id)
+        .where(Administration.is_active == True)
         .order_by(AdministrationMember.role.asc())
         .limit(1)
     )
-    owner_membership = owner_result.scalar_one_or_none()
-    if not owner_membership:
-        fallback_result = await db.execute(
-            select(AdministrationMember)
-            .join(User, User.id == AdministrationMember.user_id)
-            .where(AdministrationMember.administration_id == request.client_company_id)
-            .where(User.role == 'zzp')
-            .limit(1)
-        )
-        owner_membership = fallback_result.scalar_one_or_none()
+    row = admin_result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail={"code": "ZZP_NOT_FOUND", "message": "ZZP not found"})
 
-    if not owner_membership:
-        raise HTTPException(status_code=404, detail={"code": "CLIENT_NOT_FOUND", "message": "Geen ZZP-contact gevonden voor dit klantbedrijf."})
+    _membership, administration = row
 
     assignment_result = await db.execute(
         select(AccountantClientAssignment)
         .where(AccountantClientAssignment.accountant_id == current_user.id)
-        .where(AccountantClientAssignment.administration_id == request.client_company_id)
+        .where(AccountantClientAssignment.administration_id == administration.id)
         .limit(1)
     )
     assignment = assignment_result.scalar_one_or_none()
@@ -1438,7 +1377,7 @@ async def create_mandate_request(
 
     if assignment:
         assignment.status = AssignmentStatus.PENDING
-        assignment.client_user_id = owner_membership.user_id
+        assignment.client_user_id = zzp_user.id
         assignment.revoked_at = None
         assignment.approved_at = None
         assignment.invited_by = InvitedBy.ACCOUNTANT
@@ -1448,21 +1387,19 @@ async def create_mandate_request(
     else:
         assignment = AccountantClientAssignment(
             accountant_id=current_user.id,
-            client_user_id=owner_membership.user_id,
-            administration_id=request.client_company_id,
+            client_user_id=zzp_user.id,
+            administration_id=administration.id,
             status=AssignmentStatus.PENDING,
             invited_by=InvitedBy.ACCOUNTANT,
             is_primary=True,
             assigned_by_id=current_user.id,
-            notes='Mandate request created by accountant',
+            notes='Mandate request created by accountant email',
         )
         db.add(assignment)
         message = 'Toegangsverzoek verstuurd.'
 
     await db.commit()
     await db.refresh(assignment)
-    
-    logger.info(f"Mandate request created/updated: {assignment.id} (status: {assignment.status.value})")
 
     return MandateActionResponse(id=assignment.id, status='pending', message=message)
 

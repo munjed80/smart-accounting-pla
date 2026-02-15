@@ -2152,8 +2152,8 @@ export const nl = {
 
   // Consent workflow - ZZP accountant links page
   zzpAccountantLinks: {
-    title: "Boekhouder-koppelingen",
-    subtitle: "Beheer welke boekhouders toegang hebben tot je administratie",
+    title: "Toegangsverzoeken",
+    subtitle: "Beheer toegangsverzoeken en actieve boekhouder-koppelingen",
     pendingRequests: "Openstaande verzoeken",
     noPendingRequests: "Geen openstaande verzoeken",
     noPendingRequestsDescription: "Je hebt momenteel geen verzoeken van boekhouders om goed te keuren.",

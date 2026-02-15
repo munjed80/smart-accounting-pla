@@ -2656,21 +2656,6 @@ export interface ClientLinksResponse {
 
 
 
-export interface MandateSearchItem {
-  client_company_id: string
-  company_name: string
-  kvk_number?: string | null
-  btw_number?: string | null
-  owner_user_id: string
-  owner_name: string
-  owner_email: string
-}
-
-export interface MandateSearchResponse {
-  results: MandateSearchItem[]
-  total_count: number
-}
-
 export interface MandateItem {
   id: string
   accountant_user_id: string
@@ -2848,13 +2833,8 @@ export const accountantApi = {
     return response.data
   },
 
-  searchMandateClients: async (query: string): Promise<MandateSearchResponse> => {
-    const response = await api.get<MandateSearchResponse>('/accountant/mandates/search-clients', { params: { q: query } })
-    return response.data
-  },
-
-  createMandate: async (clientCompanyId: string): Promise<MandateActionResponse> => {
-    const response = await api.post<MandateActionResponse>('/accountant/mandates', { client_company_id: clientCompanyId })
+  createMandateByEmail: async (email: string): Promise<MandateActionResponse> => {
+    const response = await api.post<MandateActionResponse>('/accountant/mandates/by-email', { email })
     return response.data
   },
 
@@ -2912,12 +2892,12 @@ const zzpConsentApi = {
   },
 
   getMandates: async (): Promise<MandateListResponse> => {
-    const response = await api.get<MandateListResponse>('/zzp/mandates')
+    const response = await api.get<MandateListResponse>('/zzp/mandates/incoming')
     return response.data
   },
 
   approveMandate: async (mandateId: string): Promise<MandateActionResponse> => {
-    const response = await api.post<MandateActionResponse>(`/zzp/mandates/${mandateId}/approve`)
+    const response = await api.post<MandateActionResponse>(`/zzp/mandates/${mandateId}/accept`)
     return response.data
   },
 

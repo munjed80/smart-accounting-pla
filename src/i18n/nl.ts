@@ -146,6 +146,7 @@ export const nl = {
     navigationMenu: "Navigatiemenu",
     navigateApp: "Navigeer door de applicatie",
     // Accounting concept sections
+    sectionWorkflow: "Dagelijks",
     sectionActiva: "Activa",
     sectionDebiteuren: "Debiteuren",
     sectionCrediteuren: "Crediteuren",

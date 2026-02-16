@@ -329,11 +329,12 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   )
   
   // Group items by accounting section for accountants
+  // Reordered to match real-world usage priority: Grootboek (workflow), Debiteuren, Winstverlies, Activa, Crediteuren
   const accountingSections: Array<{ key: string; label: string; items: MenuItem[] }> = isAccountant ? [
     { 
-      key: 'activa', 
-      label: t('sidebar.sectionActiva'), 
-      items: visibleMenuItems.filter(i => i.accountingSection === 'activa' && i.section !== 'secondary') 
+      key: 'grootboek', 
+      label: t('sidebar.sectionGrootboek'), 
+      items: visibleMenuItems.filter(i => i.accountingSection === 'grootboek' && i.section !== 'secondary') 
     },
     { 
       key: 'debiteuren', 
@@ -341,19 +342,19 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
       items: visibleMenuItems.filter(i => i.accountingSection === 'debiteuren' && i.section !== 'secondary') 
     },
     { 
-      key: 'crediteuren', 
-      label: t('sidebar.sectionCrediteuren'), 
-      items: visibleMenuItems.filter(i => i.accountingSection === 'crediteuren' && i.section !== 'secondary') 
-    },
-    { 
-      key: 'grootboek', 
-      label: t('sidebar.sectionGrootboek'), 
-      items: visibleMenuItems.filter(i => i.accountingSection === 'grootboek' && i.section !== 'secondary') 
-    },
-    { 
       key: 'winstverlies', 
       label: t('sidebar.sectionWinstVerlies'), 
       items: visibleMenuItems.filter(i => i.accountingSection === 'winstverlies' && i.section !== 'secondary') 
+    },
+    { 
+      key: 'activa', 
+      label: t('sidebar.sectionActiva'), 
+      items: visibleMenuItems.filter(i => i.accountingSection === 'activa' && i.section !== 'secondary') 
+    },
+    { 
+      key: 'crediteuren', 
+      label: t('sidebar.sectionCrediteuren'), 
+      items: visibleMenuItems.filter(i => i.accountingSection === 'crediteuren' && i.section !== 'secondary') 
     },
   ].filter(section => section.items.length > 0) : []
 

@@ -119,6 +119,8 @@ class MT940Parser(BaseStatementParser):
                     description = self._build_description(current_description_lines)
                     if description:
                         current_transaction['description'] = description
+                    # Store the full text for extracting counterparty info
+                    current_transaction['full_description_text'] = ' '.join(current_description_lines)
                     try:
                         parsed = self._create_transaction(current_transaction)
                         if parsed:
@@ -146,6 +148,8 @@ class MT940Parser(BaseStatementParser):
                 description = self._build_description(current_description_lines)
                 if description:
                     current_transaction['description'] = description
+                # Store the full text for extracting counterparty info
+                current_transaction['full_description_text'] = ' '.join(current_description_lines)
                 try:
                     parsed = self._create_transaction(current_transaction)
                     if parsed:
@@ -162,6 +166,8 @@ class MT940Parser(BaseStatementParser):
             description = self._build_description(current_description_lines)
             if description:
                 current_transaction['description'] = description
+            # Store the full text for extracting counterparty info
+            current_transaction['full_description_text'] = ' '.join(current_description_lines)
             try:
                 parsed = self._create_transaction(current_transaction)
                 if parsed:
@@ -282,10 +288,14 @@ class MT940Parser(BaseStatementParser):
         if not data.get('booking_date') or data.get('amount') is None:
             return None
         
-        # Extract counterparty info from description if available
+        # Extract counterparty info from the full :86: text (not the processed description)
+        # This preserves structured fields like /NAME/ and /IBAN/
+        full_text = data.get('full_description_text', '')
+        counterparty_name = self._extract_counterparty_name(full_text)
+        counterparty_iban = self._extract_counterparty_iban(full_text)
+        
+        # Use the processed description for the description field
         description = data.get('description', '')
-        counterparty_name = self._extract_counterparty_name(description)
-        counterparty_iban = self._extract_counterparty_iban(description)
         
         return ParsedTransaction(
             booking_date=data['booking_date'],

@@ -343,6 +343,8 @@ const InvoiceFormDialog = ({
   const [notes, setNotes] = useState('')
   const [lines, setLines] = useState<InvoiceLineFormData[]>([createEmptyLine()])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [priceSuggestion, setPriceSuggestion] = useState<string | null>(null)
+  const [suggestionMessage, setSuggestionMessage] = useState<string | null>(null)
   
   // Validation errors
   const [customerError, setCustomerError] = useState('')
@@ -389,6 +391,46 @@ const InvoiceFormDialog = ({
       setIsSubmitting(false)
     }
   }, [open, invoice, preSelectedCustomerId])
+
+  // Fetch price suggestion when customer changes (for new invoices or when editing)
+  useEffect(() => {
+    const fetchPriceSuggestion = async () => {
+      if (!customerId || !open || isReadOnly) {
+        setPriceSuggestion(null)
+        setSuggestionMessage(null)
+        return
+      }
+      
+      try {
+        // Get the first line's description if available
+        const firstLineDescription = lines[0]?.description?.trim() || undefined
+        const suggestion = await zzpApi.invoices.suggestPrice(customerId, firstLineDescription)
+        
+        if (suggestion.suggested_price_euros !== null) {
+          // Format price as Euro string with comma decimal separator
+          const formattedPrice = suggestion.suggested_price_euros.toFixed(2).replace('.', ',')
+          setPriceSuggestion(formattedPrice)
+          setSuggestionMessage(suggestion.message)
+          
+          // Auto-fill first line if it's empty
+          if (!lines[0]?.unitPrice || lines[0].unitPrice === '0,00') {
+            const newLines = [...lines]
+            newLines[0] = { ...newLines[0], unitPrice: formattedPrice }
+            setLines(newLines)
+          }
+        } else {
+          setPriceSuggestion(null)
+          setSuggestionMessage(suggestion.message)
+        }
+      } catch (error) {
+        console.error('Failed to fetch price suggestion:', error)
+        setPriceSuggestion(null)
+        setSuggestionMessage(null)
+      }
+    }
+    
+    void fetchPriceSuggestion()
+  }, [customerId, open, isReadOnly])
 
   // Add new line
   const addLine = () => {
@@ -474,8 +516,8 @@ const InvoiceFormDialog = ({
   const handleSave = async () => {
     let hasError = false
 
-    // Validate customer (only required for new invoices)
-    if (!isEdit && !customerId) {
+    // Validate customer (required for both new and edit invoices)
+    if (!customerId) {
       setCustomerError(t('zzpInvoices.formCustomerRequired'))
       hasError = true
     }
@@ -501,7 +543,7 @@ const InvoiceFormDialog = ({
 
     try {
       const invoiceData: ZZPInvoiceCreate = {
-        customer_id: isEdit ? invoice!.customer_id : customerId,
+        customer_id: customerId, // Use the selected customer for both new and edit
         issue_date: issueDate, // Already in YYYY-MM-DD format from input
         due_date: dueDate || undefined, // Already in YYYY-MM-DD format from input
         notes: notes.trim() || undefined,
@@ -560,74 +602,55 @@ const InvoiceFormDialog = ({
         </DialogHeader>
 
         <div className="py-4 space-y-5">
-          {/* Customer section */}
-          {!isEdit ? (
-            <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                <Users size={14} className="text-muted-foreground" />
-                {t('zzpInvoices.formCustomer')} <span className="text-destructive">*</span>
-              </Label>
-              <Select value={customerId} onValueChange={(value) => {
-                setCustomerId(value)
-                setCustomerError('')
-              }} disabled={formDisabled}>
-                <SelectTrigger className={`h-11 ${customerError ? 'border-destructive focus-visible:ring-destructive' : ''}`}>
-                  <SelectValue placeholder={t('zzpInvoices.formCustomerPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeCustomers.length === 0 ? (
-                    <div className="p-3 text-center text-sm text-muted-foreground">
-                      {t('zzpInvoices.noActiveCustomers')}
-                    </div>
-                  ) : (
-                    activeCustomers.map((customer) => (
-                      <SelectItem key={customer.id} value={String(customer.id)}>
-                        <div className="flex items-center gap-2">
-                          <Users size={14} className="text-muted-foreground" />
-                          {customer.name}
-                        </div>
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              {customerError && (
-                <p className="text-sm text-destructive flex items-center gap-1">
-                  <XCircle size={14} />
-                  {customerError}
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                <Users size={14} className="text-muted-foreground" />
-                {t('zzpInvoices.customerDetails')}
-              </Label>
-              <div className="bg-secondary/30 rounded-lg p-4 space-y-2 text-sm">
-                <p className="font-semibold">
-                  {invoice?.customer_name || customers.find(c => c.id === invoice?.customer_id)?.name || t('zzpInvoices.unknownCustomer')}
-                </p>
-                {invoice?.customer_address_street && (
-                  <p className="text-muted-foreground">{invoice.customer_address_street}</p>
+          {/* Customer section - Always show selector, but with info if editing */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-2">
+              <Users size={14} className="text-muted-foreground" />
+              {t('zzpInvoices.formCustomer')} <span className="text-destructive">*</span>
+            </Label>
+            <Select value={customerId} onValueChange={(value) => {
+              setCustomerId(value)
+              setCustomerError('')
+            }} disabled={formDisabled}>
+              <SelectTrigger className={`h-11 ${customerError ? 'border-destructive focus-visible:ring-destructive' : ''}`}>
+                <SelectValue placeholder={t('zzpInvoices.formCustomerPlaceholder')} />
+              </SelectTrigger>
+              <SelectContent>
+                {activeCustomers.length === 0 ? (
+                  <div className="p-3 text-center text-sm text-muted-foreground">
+                    {t('zzpInvoices.noActiveCustomers')}
+                  </div>
+                ) : (
+                  activeCustomers.map((customer) => (
+                    <SelectItem key={customer.id} value={String(customer.id)}>
+                      <div className="flex items-center gap-2">
+                        <Users size={14} className="text-muted-foreground" />
+                        {customer.name}
+                      </div>
+                    </SelectItem>
+                  ))
                 )}
-                {(invoice?.customer_address_postal_code || invoice?.customer_address_city) && (
-                  <p className="text-muted-foreground">
-                    {[invoice?.customer_address_postal_code, invoice?.customer_address_city].filter(Boolean).join(' ')}
-                  </p>
-                )}
-                {invoice?.customer_address_country && (
-                  <p className="text-muted-foreground">{invoice.customer_address_country}</p>
-                )}
-                {invoice?.customer_kvk_number && (
-                  <p className="text-muted-foreground">KVK: {invoice.customer_kvk_number}</p>
-                )}
-                {invoice?.customer_btw_number && (
-                  <p className="text-muted-foreground">BTW: {invoice.customer_btw_number}</p>
-                )}
-              </div>
-            </div>
-          )}
+              </SelectContent>
+            </Select>
+            {customerError && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <XCircle size={14} />
+                {customerError}
+              </p>
+            )}
+            {isEdit && invoice && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Info size={12} />
+                Je kunt de klant wijzigen indien nodig
+              </p>
+            )}
+            {suggestionMessage && priceSuggestion && (
+              <p className="text-xs text-primary flex items-center gap-1">
+                <CurrencyCircleDollar size={12} />
+                {suggestionMessage}: €{priceSuggestion}
+              </p>
+            )}
+          </div>
 
           {/* Date fields - two columns */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

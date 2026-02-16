@@ -4299,6 +4299,21 @@ export const zzpApi = {
       const response = await api.post<ZZPInvoice>(`/zzp/invoices/${invoiceId}/send`)
       return response.data
     },
+    
+    /**
+     * Suggest unit price based on previous invoices for a customer.
+     * Returns suggested price in cents and euros, with a match reason.
+     */
+    suggestPrice: async (customerId: string, description?: string): Promise<{
+      suggested_price_cents: number | null
+      suggested_price_euros: number | null
+      match_reason: string
+      message: string
+    }> => {
+      const params = description ? { description } : {}
+      const response = await api.get(`/zzp/invoices/suggest-price/${customerId}`, { params })
+      return response.data
+    },
   },
 
   // ------------ Expenses ------------

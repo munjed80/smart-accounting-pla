@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -16,6 +16,11 @@ export function ClientDossierDataTab({ clientId, type }: Props) {
   const [invoices, setInvoices] = useState<ZZPInvoice[]>([])
   const [expenses, setExpenses] = useState<ZZPExpense[]>([])
   const [hours, setHours] = useState<ZZPTimeEntry[]>([])
+  const commitmentIdFilter = useMemo(() => {
+    if (type !== 'expenses') return null
+    const params = new URLSearchParams(window.location.search)
+    return params.get('commitmentId')
+  }, [type])
 
   useEffect(() => {
     const load = async () => {
@@ -33,7 +38,10 @@ export function ClientDossierDataTab({ clientId, type }: Props) {
           const response = await accountantDossierApi.getInvoices(clientId)
           setInvoices(response.invoices)
         } else if (type === 'expenses') {
-          const response = await accountantDossierApi.getExpenses(clientId)
+          const response = await accountantDossierApi.getExpenses(
+            clientId,
+            commitmentIdFilter ? { commitment_id: commitmentIdFilter } : undefined,
+          )
           setExpenses(response.expenses)
         } else {
           const response = await accountantDossierApi.getHours(clientId)
@@ -49,7 +57,7 @@ export function ClientDossierDataTab({ clientId, type }: Props) {
     }
 
     load()
-  }, [clientId, type])
+  }, [clientId, type, commitmentIdFilter])
 
   if (isLoading) {
     return <Skeleton className="h-28 w-full" />
@@ -81,7 +89,13 @@ export function ClientDossierDataTab({ clientId, type }: Props) {
   }
 
   if (type === 'expenses') {
-    if (!expenses.length) return <div className="text-sm text-muted-foreground">Geen uitgaven gevonden</div>
+    if (!expenses.length) {
+      return (
+        <div className="text-sm text-muted-foreground">
+          {commitmentIdFilter ? 'Geen uitgaven gevonden voor deze verplichting' : 'Geen uitgaven gevonden'}
+        </div>
+      )
+    }
     return (
       <div className="space-y-3">
         {expenses.map((expense) => (

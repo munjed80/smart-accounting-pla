@@ -272,6 +272,7 @@ async def list_client_expenses(
     from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
     category: Optional[str] = Query(None),
+    commitment_id: Optional[UUID] = Query(None),
 ):
     """
     List all expenses for a client (accountant access).
@@ -296,6 +297,8 @@ async def list_client_expenses(
         query = query.where(ZZPExpense.expense_date <= date.fromisoformat(to_date))
     if category:
         query = query.where(ZZPExpense.category == category)
+    if commitment_id:
+        query = query.where(ZZPExpense.commitment_id == commitment_id)
     
     query = query.order_by(ZZPExpense.expense_date.desc())
     
@@ -366,6 +369,7 @@ async def list_client_commitments(
     db: Annotated[AsyncSession, Depends(get_db)],
     type: Optional[str] = Query(None, pattern=r'^(lease|loan|subscription)$'),
     status: Optional[str] = Query(None, pattern=r'^(active|paused|ended)$'),
+    period_key: Optional[str] = Query(None, pattern=r'^\d{4}-(0[1-9]|1[0-2])$'),
 ):
     """
     List commitments and commitment summary for a client (accountant access, read-only).
@@ -387,14 +391,48 @@ async def list_client_commitments(
     today = date.today()
     next_30 = today + timedelta(days=30)
 
-    linked_counts_query = (
-        select(ZZPExpense.commitment_id, func.count(ZZPExpense.id))
+    linked_counts_subquery = (
+        select(
+            ZZPExpense.commitment_id.label("commitment_id"),
+            func.count(ZZPExpense.id).label("linked_expenses_count"),
+        )
         .where(ZZPExpense.administration_id == administration.id)
         .where(ZZPExpense.commitment_id.is_not(None))
         .group_by(ZZPExpense.commitment_id)
+        .subquery()
     )
-    linked_counts_result = await db.execute(linked_counts_query)
-    linked_counts = {str(commitment_id): int(count) for commitment_id, count in linked_counts_result.all() if commitment_id}
+
+    target_period_key = period_key or today.strftime("%Y-%m")
+    period_counts_subquery = (
+        select(
+            ZZPExpense.commitment_id.label("commitment_id"),
+            func.count(ZZPExpense.id).label("period_expenses_count"),
+        )
+        .where(ZZPExpense.administration_id == administration.id)
+        .where(ZZPExpense.commitment_id.is_not(None))
+        .where(ZZPExpense.period_key == target_period_key)
+        .group_by(ZZPExpense.commitment_id)
+        .subquery()
+    )
+
+    counts_query = (
+        select(
+            FinancialCommitment.id,
+            func.coalesce(linked_counts_subquery.c.linked_expenses_count, 0),
+            func.coalesce(period_counts_subquery.c.period_expenses_count, 0),
+        )
+        .outerjoin(linked_counts_subquery, linked_counts_subquery.c.commitment_id == FinancialCommitment.id)
+        .outerjoin(period_counts_subquery, period_counts_subquery.c.commitment_id == FinancialCommitment.id)
+        .where(FinancialCommitment.administration_id == administration.id)
+    )
+    counts_result = await db.execute(counts_query)
+    commitment_counts = {
+        str(commitment_id): {
+            "linked": int(linked_count),
+            "period": int(period_count),
+        }
+        for commitment_id, linked_count, period_count in counts_result.all()
+    }
 
     response_items: list[AccountantCommitmentItemResponse] = []
     active_items: list[FinancialCommitment] = []
@@ -411,21 +449,30 @@ async def list_client_commitments(
             if due_date and due_date <= next_30:
                 upcoming_30_days_total_cents += _monthly_normalized_cents(item)
 
+        count_data = commitment_counts.get(str(item.id), {"linked": 0, "period": 0})
         response_items.append(
             AccountantCommitmentItemResponse(
                 **base_response.model_dump(),
-                linked_expenses_count=linked_counts.get(str(item.id), 0),
+                linked_expenses_count=count_data["linked"],
+                has_expense_in_period=count_data["period"] > 0,
             )
         )
 
     sorted_items = sorted(response_items, key=lambda commitment: commitment.next_due_date or date.max)
     alerts = _compute_alerts(active_items, threshold_cents=150000, today=today)
 
+    missing_this_period_count = sum(
+        1
+        for commitment in sorted_items
+        if commitment.status == "active" and not commitment.has_expense_in_period
+    )
+
     return AccountantCommitmentsResponse(
         monthly_total_cents=sum(_monthly_normalized_cents(item) for item in active_items),
         upcoming_30_days_total_cents=upcoming_30_days_total_cents,
         warning_count=len([alert for alert in alerts if alert.severity == "warning"]),
         cashflow_stress_label="Onvoldoende data",
+        missing_this_period_count=missing_this_period_count,
         commitments=sorted_items[:10],
         total=len(sorted_items),
     )

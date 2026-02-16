@@ -325,15 +325,27 @@ class MT940Parser(BaseStatementParser):
         """
         Parse MT940 date format (YYMMDD).
         
-        Assumes dates in range 00-49 are 2000-2049,
-        and dates 50-99 are 1950-1999.
+        Uses a sliding window approach: assumes dates are within 50 years
+        in the past or 49 years in the future from current year.
+        This makes the parser future-proof and avoids Y2K-style issues.
         """
         year = int(date_str[:2])
         month = int(date_str[2:4])
         day = int(date_str[4:6])
         
-        # Y2K pivot: 00-49 -> 2000-2049, 50-99 -> 1950-1999
-        full_year = 2000 + year if year < 50 else 1900 + year
+        # Sliding window: calculate full year based on current year
+        current_year = datetime.now().year
+        current_century = (current_year // 100) * 100
+        
+        # Try current century first
+        full_year = current_century + year
+        
+        # If the date is more than 50 years in the future, assume previous century
+        if full_year > current_year + 49:
+            full_year -= 100
+        # If the date is more than 50 years in the past, assume next century
+        elif full_year < current_year - 50:
+            full_year += 100
         
         return date(full_year, month, day)
     

@@ -674,11 +674,21 @@ class BankReconciliationService:
         
         # Check for recurring pattern
         # Look for similar amounts (within 5%)
-        similar_amount_txs = [
-            tx for tx in previous_txs
-            if abs(tx.amount) > 0 and 
-            abs((abs(tx.amount) - abs(transaction.amount)) / abs(tx.amount)) < 0.05
-        ]
+        similar_amount_txs = []
+        for tx in previous_txs:
+            tx_amount = abs(tx.amount)
+            current_amount = abs(transaction.amount)
+            
+            # Skip zero amounts to avoid division by zero
+            if tx_amount == 0 or current_amount == 0:
+                continue
+            
+            # Calculate percentage difference
+            amount_diff = abs(tx_amount - current_amount)
+            percentage_diff = amount_diff / tx_amount
+            
+            if percentage_diff < 0.05:  # Within 5%
+                similar_amount_txs.append(tx)
         
         if len(similar_amount_txs) < 2:
             return []

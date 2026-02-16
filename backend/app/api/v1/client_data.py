@@ -10,13 +10,13 @@ Provides accountants with read-only access to client ZZP data:
 Uses unified administration_id access pattern to ensure data consistency.
 All endpoints respect AccountantClientAssignment scopes and permissions.
 """
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Annotated, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -27,6 +27,7 @@ from app.models.zzp import (
     ZZPExpense,
     ZZPTimeEntry,
 )
+from app.models.financial_commitment import FinancialCommitment, CommitmentType, RecurringFrequency
 from app.schemas.zzp import (
     InvoiceResponse,
     InvoiceListResponse,
@@ -36,9 +37,50 @@ from app.schemas.zzp import (
     ExpenseListResponse,
     TimeEntryListResponse,
 )
+from app.schemas.commitments import AccountantCommitmentsResponse, AccountantCommitmentItemResponse, CommitmentAlert
 from app.api.v1.deps import CurrentUser, require_approved_mandate_client
+from app.api.v1.zzp_commitments import to_response, compute_next_due_date
 
 router = APIRouter()
+
+
+def _monthly_normalized_cents(item: FinancialCommitment) -> int:
+    if item.type == CommitmentType.SUBSCRIPTION and item.recurring_frequency == RecurringFrequency.YEARLY:
+        return item.amount_cents // 12
+    return item.monthly_payment_cents or item.amount_cents
+
+
+def _compute_alerts(items: list[FinancialCommitment], threshold_cents: int, today: date) -> list[CommitmentAlert]:
+    alerts: list[CommitmentAlert] = []
+    for item in items:
+        due_date = compute_next_due_date(item, today=today)
+        if item.type == CommitmentType.SUBSCRIPTION and due_date and (due_date - today).days <= 14:
+            alerts.append(
+                CommitmentAlert(
+                    code="subscription_renewal",
+                    severity="warning",
+                    message=f"Abonnement '{item.name}' verlengt binnen 14 dagen.",
+                )
+            )
+        if item.type in {CommitmentType.LEASE, CommitmentType.LOAN} and item.end_date and 0 <= (item.end_date - today).days <= 30:
+            alerts.append(
+                CommitmentAlert(
+                    code="lease_loan_ending",
+                    severity="warning",
+                    message=f"{item.type.value.title()} '{item.name}' eindigt binnen 30 dagen.",
+                )
+            )
+
+    monthly_total = sum(_monthly_normalized_cents(item) for item in items)
+    if monthly_total > threshold_cents:
+        alerts.append(
+            CommitmentAlert(
+                code="monthly_threshold",
+                severity="warning",
+                message="Maandelijkse vaste verplichtingen overschrijden de ingestelde drempel.",
+            )
+        )
+    return alerts
 
 
 def invoice_to_response(invoice: ZZPInvoice) -> InvoiceResponse:
@@ -314,4 +356,76 @@ async def list_client_time_entries(
         total_billable_hours=sum((t.hours for t in time_entries if t.billable), Decimal("0")),
         open_entries=sum(1 for t in time_entries if not t.is_invoiced),
         invoiced_entries=sum(1 for t in time_entries if t.is_invoiced),
+    )
+
+
+@router.get("/clients/{client_id}/commitments", response_model=AccountantCommitmentsResponse)
+async def list_client_commitments(
+    client_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    type: Optional[str] = Query(None, pattern=r'^(lease|loan|subscription)$'),
+    status: Optional[str] = Query(None, pattern=r'^(active|paused|ended)$'),
+):
+    """
+    List commitments and commitment summary for a client (accountant access, read-only).
+
+    Requires an approved mandate for the client.
+    """
+    administration = await require_approved_mandate_client(client_id, current_user, db)
+
+    query = (
+        select(FinancialCommitment)
+        .where(FinancialCommitment.administration_id == administration.id)
+        .order_by(FinancialCommitment.created_at.desc())
+    )
+    if type:
+        query = query.where(FinancialCommitment.type == type)
+
+    result = await db.execute(query)
+    commitments = result.scalars().all()
+    today = date.today()
+    next_30 = today + timedelta(days=30)
+
+    linked_counts_query = (
+        select(ZZPExpense.commitment_id, func.count(ZZPExpense.id))
+        .where(ZZPExpense.administration_id == administration.id)
+        .where(ZZPExpense.commitment_id.is_not(None))
+        .group_by(ZZPExpense.commitment_id)
+    )
+    linked_counts_result = await db.execute(linked_counts_query)
+    linked_counts = {str(commitment_id): int(count) for commitment_id, count in linked_counts_result.all() if commitment_id}
+
+    response_items: list[AccountantCommitmentItemResponse] = []
+    active_items: list[FinancialCommitment] = []
+    upcoming_30_days_total_cents = 0
+
+    for item in commitments:
+        base_response = to_response(item, today=today)
+        if status and base_response.status != status:
+            continue
+
+        if base_response.status == "active":
+            active_items.append(item)
+            due_date = base_response.next_due_date
+            if due_date and due_date <= next_30:
+                upcoming_30_days_total_cents += _monthly_normalized_cents(item)
+
+        response_items.append(
+            AccountantCommitmentItemResponse(
+                **base_response.model_dump(),
+                linked_expenses_count=linked_counts.get(str(item.id), 0),
+            )
+        )
+
+    sorted_items = sorted(response_items, key=lambda commitment: commitment.next_due_date or date.max)
+    alerts = _compute_alerts(active_items, threshold_cents=150000, today=today)
+
+    return AccountantCommitmentsResponse(
+        monthly_total_cents=sum(_monthly_normalized_cents(item) for item in active_items),
+        upcoming_30_days_total_cents=upcoming_30_days_total_cents,
+        warning_count=len([alert for alert in alerts if alert.severity == "warning"]),
+        cashflow_stress_label="Onvoldoende data",
+        commitments=sorted_items[:10],
+        total=len(sorted_items),
     )

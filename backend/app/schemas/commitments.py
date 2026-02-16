@@ -120,6 +120,19 @@ class CommitmentListResponse(BaseModel):
     total: int
 
 
+class AccountantCommitmentItemResponse(CommitmentResponse):
+    linked_expenses_count: int = 0
+
+
+class AccountantCommitmentsResponse(BaseModel):
+    monthly_total_cents: int
+    upcoming_30_days_total_cents: int
+    warning_count: int
+    cashflow_stress_label: str
+    commitments: list[AccountantCommitmentItemResponse]
+    total: int
+
+
 class AmortizationRow(BaseModel):
     month_index: int
     due_date: date

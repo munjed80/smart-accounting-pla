@@ -84,19 +84,19 @@ type Route =
   | { type: 'onboarding' }
   | { type: 'accountant-onboarding' }
   | { type: 'app'; path: string }
-  | { type: 'client-dossier'; clientId: string; tab: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'bookkeeping' | 'periods' | 'decisions' | 'audit' }
+  | { type: 'client-dossier'; clientId: string; tab: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'bookkeeping' | 'periods' | 'decisions' | 'audit' | 'commitments' }
   | { type: 'bulk-operations-history' }
   | { type: 'bank-reconciliation' }
 
 // Parse client dossier route
-const parseClientDossierRoute = (path: string): { clientId: string; tab: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'bookkeeping' | 'periods' | 'decisions' | 'audit' } | null => {
+const parseClientDossierRoute = (path: string): { clientId: string; tab: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'bookkeeping' | 'periods' | 'decisions' | 'audit' | 'commitments' } | null => {
   // Match /accountant/clients/:clientId or /accountant/clients/:clientId/:tab
   const match = path.match(/^\/accountant\/clients\/([^/]+)(?:\/([^/]+))?$/)
   if (match) {
     const clientId = match[1]
     const tabParam = match[2] || 'invoices'
-    const validTabs = ['invoices', 'expenses', 'hours', 'vat', 'issues', 'bookkeeping', 'periods', 'decisions', 'audit']
-    const tab = validTabs.includes(tabParam) ? tabParam as 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'bookkeeping' | 'periods' | 'decisions' | 'audit' : 'invoices'
+    const validTabs = ['invoices', 'expenses', 'hours', 'vat', 'issues', 'bookkeeping', 'periods', 'decisions', 'audit', 'commitments']
+    const tab = validTabs.includes(tabParam) ? tabParam as 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'bookkeeping' | 'periods' | 'decisions' | 'audit' | 'commitments' : 'invoices'
     return { clientId, tab }
   }
   return null

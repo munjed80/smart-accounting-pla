@@ -264,6 +264,7 @@ export const BTWAangiftePage = ({
   onDownloadSubmissionPackage,
   onDownloadReport,
   onDownloadIcpPackage,
+  onDownloadEvidencePack,
 }: {
   clientId: string
   periodId: string
@@ -274,6 +275,7 @@ export const BTWAangiftePage = ({
   onDownloadSubmissionPackage?: () => void
   onDownloadReport?: () => void
   onDownloadIcpPackage?: () => void
+  onDownloadEvidencePack?: () => void
 }) => {
   const [activeTab, setActiveTab] = useState('boxes')
   
@@ -373,6 +375,16 @@ export const BTWAangiftePage = ({
               >
                 <Globe size={16} className="mr-2" />
                 Download ICP opgaaf
+              </Button>
+            )}
+            {onDownloadEvidencePack && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onDownloadEvidencePack}
+              >
+                <FileText size={16} className="mr-2" />
+                Download bewijsmap
               </Button>
             )}
           </div>

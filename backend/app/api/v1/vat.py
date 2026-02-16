@@ -717,3 +717,52 @@ async def get_vat_box_lines(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get(
+    "/clients/{client_id}/btw/periods/{period_id}/evidence-pack",
+    summary="Download BTW Evidence Pack (Bewijsmap)",
+    description="""
+    Download a comprehensive evidence pack (bewijsmap) for BTW submission.
+    
+    The evidence pack includes:
+    - Box totals with transaction counts
+    - All linked documents list
+    - Complete audit trail with immutable IDs and timestamps
+    
+    **Format:** PDF document
+    
+    **Security:** Enforces consent/active-client isolation.
+    Only accessible by accountants with ACTIVE assignment to the client.
+    """,
+)
+async def download_evidence_pack(
+    client_id: UUID,
+    period_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Download evidence pack PDF for BTW submission."""
+    from app.services.vat.evidence_pack import VatEvidencePackService
+    
+    # Enforce consent/active-client isolation
+    await verify_accountant_access(client_id, current_user, db)
+    
+    try:
+        # Generate evidence pack
+        service = VatEvidencePackService(db, client_id)
+        pdf_bytes, filename = await service.generate_evidence_pack_pdf(period_id)
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(pdf_bytes)),
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+            },
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate evidence pack: {str(e)}")

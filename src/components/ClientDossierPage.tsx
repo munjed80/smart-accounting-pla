@@ -62,10 +62,11 @@ import { ClientBookkeepingTab } from '@/components/ClientBookkeepingTab'
 import { ClientAuditTab } from '@/components/ClientAuditTab'
 import { ClientVatTab } from '@/components/ClientVatTab'
 import { ClientDossierDataTab } from '@/components/ClientDossierDataTab'
+import { ClientCommitmentsTab } from '@/components/ClientCommitmentsTab'
 
 interface ClientDossierPageProps {
   clientId: string
-  initialTab?: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'periods' | 'decisions' | 'bookkeeping' | 'audit'
+  initialTab?: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'periods' | 'decisions' | 'bookkeeping' | 'audit' | 'commitments'
 }
 
 // Session storage key for today's completed actions
@@ -542,6 +543,9 @@ export const ClientDossierPage = ({ clientId, initialTab = 'invoices' }: ClientD
             <TabsTrigger value="vat" className={dossierTabTriggerClassName}>
               BTW-aangifte
             </TabsTrigger>
+            <TabsTrigger value="commitments" className={dossierTabTriggerClassName}>
+              Verplichtingen
+            </TabsTrigger>
             <TabsTrigger value="issues" className={dossierTabTriggerClassName}>
               <ClipboardText size={18} />
               {t('dossier.tabs.issues')}
@@ -579,6 +583,10 @@ export const ClientDossierPage = ({ clientId, initialTab = 'invoices' }: ClientD
 
           <TabsContent value="hours">
             <ClientDossierDataTab clientId={clientId} type="hours" />
+          </TabsContent>
+
+          <TabsContent value="commitments">
+            <ClientCommitmentsTab clientId={clientId} />
           </TabsContent>
 
           <TabsContent value="issues">

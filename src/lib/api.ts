@@ -1222,6 +1222,17 @@ export const accountantDossierApi = {
     const response = await api.get<ZZPTimeEntryListResponse>(`/accountant/clients/${clientId}/hours`)
     return response.data
   },
+
+  getCommitments: async (clientId: string, type?: 'lease' | 'loan' | 'subscription'): Promise<ZZPCommitmentListResponse> => {
+    const params = type ? { type } : undefined
+    const response = await api.get<ZZPCommitmentListResponse>(`/accountant/clients/${clientId}/commitments`, { params })
+    return response.data
+  },
+
+  getCommitmentsOverview: async (clientId: string): Promise<ZZPCommitmentOverview> => {
+    const response = await api.get<ZZPCommitmentOverview>(`/accountant/clients/${clientId}/commitments/overview/summary`)
+    return response.data
+  },
 }
 
 // ============ Bookkeeping API ============

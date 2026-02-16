@@ -3,21 +3,25 @@ Bank Reconciliation Service
 
 Handles:
 - CSV file parsing and import
+- CAMT.053 and MT940 file parsing
 - Hash computation for idempotency
-- Match suggestion generation
+- Match suggestion generation with enhanced rules
 - Reconciliation action execution
 """
 import csv
 import hashlib
 import io
+import logging
 import re
 import uuid
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional, Tuple
 
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.models.bank import (
     BankAccount,
@@ -37,6 +41,12 @@ from app.schemas.bank import (
     ReconciliationActionEnum,
 )
 from app.services.vat.posting import VatPostingService
+from app.services.bank.parsers import (
+    BaseStatementParser,
+    ParsedTransaction,
+    CAMT053Parser,
+    MT940Parser,
+)
 
 
 class BankReconciliationService:
@@ -218,6 +228,132 @@ class BankReconciliationService:
         await self.db.flush()
         return bank_account
 
+    async def import_file(
+        self,
+        file_bytes: bytes,
+        filename: Optional[str],
+        bank_account_iban: Optional[str],
+        bank_name: Optional[str],
+    ) -> BankImportResponse:
+        """
+        Import bank transactions from any supported file format.
+        
+        Automatically detects format (CSV, CAMT.053, MT940) and uses
+        appropriate parser. Falls back to CSV if no parser matches.
+        
+        Returns counts of imported, skipped (duplicate), and failed rows.
+        """
+        # Initialize parsers
+        parsers: List[BaseStatementParser] = [
+            CAMT053Parser(),
+            MT940Parser(),
+        ]
+        
+        # Try each parser to see if it can handle the file
+        parsed_transactions: Optional[List[ParsedTransaction]] = None
+        detected_iban: Optional[str] = None
+        format_name = "CSV"
+        
+        for parser in parsers:
+            if parser.can_parse(file_bytes, filename):
+                try:
+                    parsed_transactions, detected_iban = parser.parse(file_bytes)
+                    format_name = parser.get_format_name()
+                    break
+                except Exception as e:
+                    # Parser claimed it could handle the file but failed
+                    # Try next parser
+                    logger.warning(f"Parser {parser.get_format_name()} failed: {e}")
+                    continue
+        
+        # If no parser succeeded, fall back to CSV import
+        if parsed_transactions is None:
+            return await self.import_csv(file_bytes, bank_account_iban, bank_name)
+        
+        # Use detected IBAN or provided IBAN
+        effective_iban = bank_account_iban or detected_iban
+        if not effective_iban:
+            return BankImportResponse(
+                imported_count=0,
+                skipped_duplicates_count=0,
+                total_in_file=len(parsed_transactions),
+                errors=["Geen IBAN opgegeven en niet kunnen afleiden uit het bestand."],
+                message=f"Import mislukt: IBAN ontbreekt ({format_name}).",
+                bank_account_id=None,
+            )
+        
+        # Get or create bank account
+        bank_account = await self._get_or_create_bank_account(effective_iban, bank_name)
+        
+        # Get existing hashes for duplicate detection
+        existing_hashes_result = await self.db.execute(
+            select(BankTransaction.import_hash)
+            .where(BankTransaction.administration_id == self.administration_id)
+        )
+        existing_hashes = set(row[0] for row in existing_hashes_result.fetchall())
+        
+        # Import transactions
+        imported_count = 0
+        skipped_duplicates = 0
+        errors: List[str] = []
+        
+        for idx, parsed_tx in enumerate(parsed_transactions, start=1):
+            try:
+                # Compute hash for duplicate detection
+                tx_hash = self._compute_hash(
+                    parsed_tx.booking_date,
+                    parsed_tx.amount,
+                    parsed_tx.description,
+                    reference=parsed_tx.reference,
+                    counterparty_iban=parsed_tx.counterparty_iban,
+                )
+                
+                if tx_hash in existing_hashes:
+                    skipped_duplicates += 1
+                    continue
+                
+                # Create transaction
+                transaction = BankTransaction(
+                    administration_id=self.administration_id,
+                    bank_account_id=bank_account.id,
+                    booking_date=parsed_tx.booking_date,
+                    amount=parsed_tx.amount,
+                    currency=parsed_tx.currency,
+                    counterparty_name=parsed_tx.counterparty_name,
+                    counterparty_iban=parsed_tx.counterparty_iban,
+                    description=parsed_tx.description,
+                    reference=parsed_tx.reference,
+                    import_hash=tx_hash,
+                    status=BankTransactionStatus.NEW,
+                )
+                self.db.add(transaction)
+                existing_hashes.add(tx_hash)
+                imported_count += 1
+                
+            except Exception as e:
+                errors.append(f"Rij {idx}: {str(e)}")
+        
+        await self.db.commit()
+        
+        # Build response message
+        if imported_count > 0 and len(errors) == 0:
+            message = f"{imported_count} transacties geïmporteerd ({format_name})."
+        elif imported_count > 0:
+            message = f"{imported_count} transacties geïmporteerd, {len(errors)} fouten ({format_name})."
+        elif skipped_duplicates > 0:
+            message = f"Geen nieuwe transacties. {skipped_duplicates} duplicaten overgeslagen ({format_name})."
+        else:
+            message = f"Import mislukt: geen geldige transacties gevonden ({format_name})."
+        
+        return BankImportResponse(
+            imported_count=imported_count,
+            skipped_duplicates_count=skipped_duplicates,
+            total_in_file=len(parsed_transactions),
+            errors=errors[:10],
+            message=message,
+            bank_account_id=bank_account.id,
+        )
+
     async def import_csv(
         self,
         file_bytes: bytes,
@@ -358,10 +494,12 @@ class BankReconciliationService:
         """
         Generate match suggestions for a bank transaction.
         
-        Matching rules:
-        1. Invoice number in description/reference → suggest invoice
-        2. Amount matches open invoice (±1%) → suggest invoice
-        3. Counterparty IBAN matches known party (if available) → suggest expense
+        Enhanced matching rules:
+        1. Invoice number in description/reference → very high confidence
+        2. Amount + date proximity (±7 days) → high confidence
+        3. Amount match (±1%) → medium confidence
+        4. Recurring payment detection → medium confidence
+        5. Counterparty IBAN match → lower confidence
         """
         # Get transaction
         result = await self.db.execute(
@@ -376,7 +514,7 @@ class BankReconciliationService:
         
         suggestions: List[MatchSuggestion] = []
         
-        # Rule 1: Invoice number in description/reference
+        # Rule 1: Invoice number in description/reference (VERY HIGH confidence: 90-95)
         search_text = " ".join(filter(None, [transaction.description, transaction.reference]))
         invoice_numbers = self._extract_invoice_numbers(search_text)
         if invoice_numbers:
@@ -394,13 +532,20 @@ class BankReconciliationService:
                         proposed_action="APPLY_MATCH",
                     ))
         
-        # Rule 2: Amount match for open items
+        # Rule 2: Date proximity + Amount match (HIGH confidence: 75-85)
+        date_proximity_matches = await self._match_by_date_proximity(transaction, days_tolerance=7)
+        for match in date_proximity_matches:
+            # Don't duplicate if already suggested
+            if not any(s.entity_id == match.entity_id for s in suggestions):
+                suggestions.append(match)
+        
+        # Rule 3: Amount match only (MEDIUM confidence: 60-80)
         amount_matches = await self._find_open_items_by_amount(
             abs(transaction.amount),
             tolerance_percent=1.0
         )
         for item in amount_matches:
-            # Don't duplicate if already suggested by invoice number
+            # Don't duplicate if already suggested
             if not any(s.entity_id == item.id for s in suggestions):
                 score = 80 if item.open_amount == abs(transaction.amount) else 60
                 suggestions.append(MatchSuggestion(
@@ -415,7 +560,12 @@ class BankReconciliationService:
                     proposed_action="APPLY_MATCH",
                 ))
         
-        # Rule 3: Counterparty IBAN match
+        # Rule 4: Recurring payment detection (MEDIUM confidence: 65-75)
+        recurring_suggestions = await self._detect_recurring_payments(transaction)
+        for recurring in recurring_suggestions:
+            suggestions.append(recurring)
+        
+        # Rule 5: Counterparty IBAN match (LOWER confidence: 70)
         if transaction.counterparty_iban:
             party_matches = await self._find_parties_by_iban(transaction.counterparty_iban)
             for party in party_matches:
@@ -438,6 +588,7 @@ class BankReconciliationService:
         suggestions.sort(key=lambda x: x.confidence_score, reverse=True)
         
         return transaction, suggestions[:5]  # Limit to top 5 suggestions
+
 
     def _extract_invoice_numbers(self, description: str) -> List[str]:
         """Extract potential invoice numbers from transaction description."""
@@ -483,7 +634,181 @@ class BankReconciliationService:
             .limit(5)
         )
         return list(result.scalars().all())
-
+    
+    async def _find_open_items_for_party(self, party_id: uuid.UUID) -> List[OpenItem]:
+        """Find open items for a specific party."""
+        result = await self.db.execute(
+            select(OpenItem)
+            .where(OpenItem.administration_id == self.administration_id)
+            .where(OpenItem.party_id == party_id)
+            .where(OpenItem.status.in_([OpenItemStatus.OPEN, OpenItemStatus.PARTIAL]))
+            .order_by(OpenItem.document_date.desc())
+            .limit(10)
+        )
+        return list(result.scalars().all())
+    
+    async def _detect_recurring_payments(self, transaction: BankTransaction) -> List[MatchSuggestion]:
+        """
+        Detect recurring payments based on cadence and amount.
+        
+        Looks for similar transactions from the same counterparty with
+        regular intervals (monthly, quarterly, etc.)
+        """
+        if not transaction.counterparty_iban:
+            return []
+        
+        # Find previous transactions from same counterparty
+        result = await self.db.execute(
+            select(BankTransaction)
+            .where(BankTransaction.administration_id == self.administration_id)
+            .where(BankTransaction.counterparty_iban == transaction.counterparty_iban)
+            .where(BankTransaction.id != transaction.id)
+            .where(BankTransaction.status == BankTransactionStatus.MATCHED)
+            .order_by(BankTransaction.booking_date.desc())
+            .limit(12)  # Look at up to 12 previous transactions
+        )
+        previous_txs = list(result.scalars().all())
+        
+        if len(previous_txs) < 2:
+            return []
+        
+        # Check for recurring pattern
+        # Look for similar amounts (within 5%)
+        similar_amount_txs = []
+        for tx in previous_txs:
+            tx_amount = abs(tx.amount)
+            current_amount = abs(transaction.amount)
+            
+            # Skip zero amounts to avoid division by zero
+            if tx_amount == 0 or current_amount == 0:
+                continue
+            
+            # Calculate percentage difference
+            amount_diff = abs(tx_amount - current_amount)
+            percentage_diff = amount_diff / tx_amount
+            
+            if percentage_diff < 0.05:  # Within 5%
+                similar_amount_txs.append(tx)
+        
+        if len(similar_amount_txs) < 2:
+            return []
+        
+        # Check for regular intervals (monthly = ~30 days, quarterly = ~90 days)
+        intervals = []
+        for i in range(len(similar_amount_txs) - 1):
+            days_diff = (similar_amount_txs[i].booking_date - similar_amount_txs[i+1].booking_date).days
+            intervals.append(days_diff)
+        
+        if not intervals:
+            return []
+        
+        avg_interval = sum(intervals) / len(intervals)
+        
+        # Determine cadence
+        cadence = None
+        if 25 <= avg_interval <= 35:
+            cadence = "monthly"
+            confidence = 75
+        elif 85 <= avg_interval <= 95:
+            cadence = "quarterly"
+            confidence = 70
+        elif 175 <= avg_interval <= 185:
+            cadence = "half-yearly"
+            confidence = 70
+        elif 360 <= avg_interval <= 370:
+            cadence = "yearly"
+            confidence = 65
+        
+        if not cadence:
+            return []
+        
+        # Build suggestion based on the most recent match
+        most_recent = similar_amount_txs[0]
+        counterparty_name = transaction.counterparty_name or "Unknown"
+        
+        # Only create suggestion if we have a valid matched entity
+        if not most_recent.matched_entity_id:
+            # No previous match to link to, suggest creating new expense
+            return [MatchSuggestion(
+                entity_type="EXPENSE",
+                entity_id=uuid.uuid4(),  # Placeholder for new expense creation
+                entity_reference=f"{counterparty_name} - {cadence} payment",
+                confidence_score=confidence - 10,  # Lower confidence for new expense
+                amount=abs(transaction.amount),
+                date=transaction.booking_date,
+                explanation=f"Recurring {cadence} payment detected from {counterparty_name} (€{abs(transaction.amount):.2f})",
+                proposed_action="CREATE_EXPENSE",
+            )]
+        
+        return [MatchSuggestion(
+            entity_type="EXPENSE",
+            entity_id=most_recent.matched_entity_id,
+            entity_reference=f"{counterparty_name} - {cadence} payment",
+            confidence_score=confidence,
+            amount=abs(transaction.amount),
+            date=transaction.booking_date,
+            explanation=f"Recurring {cadence} payment detected from {counterparty_name} (€{abs(transaction.amount):.2f})",
+            proposed_action="APPLY_MATCH",
+        )]
+    
+    async def _match_by_date_proximity(
+        self,
+        transaction: BankTransaction,
+        days_tolerance: int = 7
+    ) -> List[MatchSuggestion]:
+        """
+        Match transactions based on date proximity to open items.
+        
+        Looks for open items with dates within N days of the transaction.
+        Combined with amount matching for higher confidence.
+        """
+        date_from = transaction.booking_date - timedelta(days=days_tolerance)
+        date_to = transaction.booking_date + timedelta(days=days_tolerance)
+        
+        # Find open items within date range with similar amounts
+        amount_tolerance = abs(transaction.amount) * Decimal("0.01")  # 1% tolerance
+        min_amount = abs(transaction.amount) - amount_tolerance
+        max_amount = abs(transaction.amount) + amount_tolerance
+        
+        result = await self.db.execute(
+            select(OpenItem)
+            .where(OpenItem.administration_id == self.administration_id)
+            .where(OpenItem.status.in_([OpenItemStatus.OPEN, OpenItemStatus.PARTIAL]))
+            .where(OpenItem.document_date.between(date_from, date_to))
+            .where(OpenItem.open_amount.between(min_amount, max_amount))
+            .order_by(
+                # Prioritize exact date match, then closer dates
+                func.abs(
+                    func.extract('epoch', OpenItem.document_date - transaction.booking_date)
+                )
+            )
+            .limit(5)
+        )
+        items = list(result.scalars().all())
+        
+        suggestions = []
+        for item in items:
+            days_diff = abs((item.document_date - transaction.booking_date).days)
+            # Higher confidence for closer dates and exact amounts
+            confidence = 85
+            if days_diff > 3:
+                confidence -= (days_diff - 3) * 2
+            if item.open_amount != abs(transaction.amount):
+                confidence -= 5
+            
+            suggestions.append(MatchSuggestion(
+                entity_type="INVOICE" if item.item_type == "RECEIVABLE" else "EXPENSE",
+                entity_id=item.id,
+                entity_reference=item.document_number or str(item.id)[:8],
+                confidence_score=max(60, confidence),
+                amount=item.open_amount,
+                date=item.document_date,
+                explanation=f"Bedrag en datum komen overeen (±{days_diff} dagen, €{item.open_amount:.2f})",
+                proposed_action="APPLY_MATCH",
+            ))
+        
+        return suggestions
+    
     async def _find_parties_by_iban(self, iban: str) -> List[Party]:
         """Find parties by bank account IBAN."""
         normalized_iban = iban.strip().upper().replace(" ", "")

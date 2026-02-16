@@ -5,16 +5,20 @@ Models for bank statement import and transaction reconciliation:
 - BankAccount: Bank account details per administration
 - BankTransaction: Imported bank transactions with matching status
 - ReconciliationAction: Audit trail for reconciliation decisions
+- BankConnectionModel: PSD2/AIS provider connections
+- BankMatchProposal: Persistent matching proposals with confidence scores
 """
 import uuid
 from datetime import datetime, date
 from decimal import Decimal
-from sqlalchemy import String, DateTime, Date, func, ForeignKey, Text, Numeric, Enum as SQLEnum
+from sqlalchemy import String, DateTime, Date, func, ForeignKey, Text, Numeric, Enum as SQLEnum, Boolean, Integer
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+import sqlalchemy as sa
 import enum
 
 from app.core.database import Base
+
 
 
 class BankTransactionStatus(str, enum.Enum):
@@ -57,6 +61,8 @@ class BankAccount(Base):
     # Relationships
     administration = relationship("Administration", back_populates="bank_accounts")
     transactions = relationship("BankTransaction", back_populates="bank_account", cascade="all, delete-orphan")
+    psd2_connections = relationship("BankConnectionModel", back_populates="bank_account", cascade="all, delete-orphan")
+
 
 
 class BankTransaction(Base):
@@ -98,6 +104,8 @@ class BankTransaction(Base):
     administration = relationship("Administration", back_populates="bank_transactions")
     bank_account = relationship("BankAccount", back_populates="transactions")
     reconciliation_actions = relationship("ReconciliationAction", back_populates="bank_transaction", cascade="all, delete-orphan")
+    match_proposals = relationship("BankMatchProposal", back_populates="bank_transaction", cascade="all, delete-orphan")
+
 
 
 class ReconciliationAction(Base):
@@ -135,3 +143,130 @@ class ReconciliationAction(Base):
     bank_transaction = relationship("BankTransaction", back_populates="reconciliation_actions")
     administration = relationship("Administration", back_populates="reconciliation_actions")
     accountant = relationship("User", back_populates="reconciliation_actions")
+
+
+class BankConnectionStatus(str, enum.Enum):
+    """Status of PSD2/AIS bank connection."""
+    ACTIVE = "ACTIVE"              # Connection is active and can fetch data
+    EXPIRED = "EXPIRED"            # Consent expired, needs re-authentication
+    PENDING = "PENDING"            # Awaiting user consent
+    ERROR = "ERROR"                # Connection error
+    REVOKED = "REVOKED"            # User revoked consent
+
+
+class BankConnectionModel(Base):
+    """
+    PSD2/AIS Bank Connection
+    
+    Stores credentials and connection details for fetching transactions
+    via PSD2 APIs (e.g., Nordigen, TrueLayer).
+    """
+    __tablename__ = "bank_connections"
+    
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    administration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("administrations.id", ondelete="CASCADE"), nullable=False
+    )
+    bank_account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("bank_accounts.id", ondelete="CASCADE"), nullable=True
+    )
+    
+    # Provider information
+    provider_name: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g., 'nordigen', 'truelayer'
+    provider_connection_id: Mapped[str] = mapped_column(String(200), nullable=False)  # Provider's connection/requisition ID
+    institution_id: Mapped[str] = mapped_column(String(100), nullable=False)  # Bank identifier
+    institution_name: Mapped[str] = mapped_column(String(200), nullable=False)  # Human-readable bank name
+    
+    # Connection status
+    status: Mapped[BankConnectionStatus] = mapped_column(
+        SQLEnum(BankConnectionStatus), default=BankConnectionStatus.PENDING, nullable=False
+    )
+    consent_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Encrypted credentials (access and refresh tokens)
+    # In production, these should be encrypted at rest
+    access_token: Mapped[str] = mapped_column(Text, nullable=True)
+    refresh_token: Mapped[str] = mapped_column(Text, nullable=True)
+    
+    # Additional metadata
+    metadata: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    last_sync_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    administration = relationship("Administration", back_populates="bank_connections")
+    bank_account = relationship("BankAccount", back_populates="psd2_connections")
+
+
+class MatchRuleType(str, enum.Enum):
+    """Types of matching rules."""
+    INVOICE_NUMBER = "INVOICE_NUMBER"      # Match by invoice number in description
+    AMOUNT_EXACT = "AMOUNT_EXACT"          # Exact amount match
+    AMOUNT_TOLERANCE = "AMOUNT_TOLERANCE"  # Amount match with tolerance
+    IBAN_RECURRING = "IBAN_RECURRING"      # Recurring payment from same IBAN
+    DATE_PROXIMITY = "DATE_PROXIMITY"      # Date within N days
+    COMBINED = "COMBINED"                  # Multiple rules combined
+
+
+class BankMatchProposal(Base):
+    """
+    Persistent matching proposals for bank transactions.
+    
+    Stores suggested matches generated by the matching engine,
+    with confidence scores and reasoning.
+    """
+    __tablename__ = "bank_match_proposals"
+    
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    administration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("administrations.id", ondelete="CASCADE"), nullable=False
+    )
+    bank_transaction_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("bank_transactions.id", ondelete="CASCADE"), nullable=False
+    )
+    
+    # Match target
+    entity_type: Mapped[str] = mapped_column(String(30), nullable=False)  # INVOICE, EXPENSE, TRANSFER, MANUAL
+    entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    
+    # Confidence and reasoning
+    confidence_score: Mapped[int] = mapped_column(sa.Integer, nullable=False)  # 0-100
+    reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    
+    # Match details
+    matched_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=True)
+    matched_date: Mapped[date] = mapped_column(Date, nullable=True)
+    matched_reference: Mapped[str] = mapped_column(String(200), nullable=True)
+    
+    # Matching rule that generated this proposal
+    rule_type: Mapped[str] = mapped_column(String(50), nullable=True)
+    rule_config: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    
+    # Status
+    is_applied: Mapped[bool] = mapped_column(sa.Boolean, default=False, nullable=False)
+    is_dismissed: Mapped[bool] = mapped_column(sa.Boolean, default=False, nullable=False)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    
+    # Relationships
+    administration = relationship("Administration", back_populates="bank_match_proposals")
+    bank_transaction = relationship("BankTransaction", back_populates="match_proposals")
+
+

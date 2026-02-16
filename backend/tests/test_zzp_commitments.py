@@ -215,3 +215,57 @@ async def test_commitment_validation_rules(async_client, auth_headers):
         "end_date": "2026-01-01",
     })
     assert invalid_date.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_expense_from_commitment_updates_status_and_prevents_duplicate(async_client, auth_headers):
+    create = await async_client.post('/api/v1/zzp/commitments', headers=auth_headers, json={
+        "type": "subscription",
+        "name": "Canva",
+        "amount_cents": 1500,
+        "recurring_frequency": "monthly",
+        "start_date": "2026-01-01",
+        "vat_rate": 21,
+    })
+    assert create.status_code == 201
+    commitment_id = create.json()['id']
+
+    first = await async_client.post(f'/api/v1/zzp/commitments/{commitment_id}/create-expense', headers=auth_headers, json={
+        "expense_date": "2026-02-10",
+        "amount_cents": 1500,
+        "vat_rate": 21,
+        "description": "Canva februari",
+    })
+    assert first.status_code == 201
+    payload = first.json()
+    assert payload['linked_expenses_count'] == 1
+    assert payload['last_booked_date'] == '2026-02-10'
+
+    detail = await async_client.get(f'/api/v1/zzp/commitments/{commitment_id}', headers=auth_headers)
+    assert detail.status_code == 200
+    assert detail.json()['last_booked_date'] == '2026-02-10'
+
+    duplicate = await async_client.post(f'/api/v1/zzp/commitments/{commitment_id}/create-expense', headers=auth_headers, json={
+        "expense_date": "2026-02-20",
+        "amount_cents": 1500,
+        "vat_rate": 21,
+        "description": "Canva februari opnieuw",
+    })
+    assert duplicate.status_code == 409
+
+    forced = await async_client.post(f'/api/v1/zzp/commitments/{commitment_id}/create-expense', headers=auth_headers, json={
+        "expense_date": "2026-02-20",
+        "amount_cents": 1500,
+        "vat_rate": 21,
+        "description": "Canva februari opnieuw",
+        "force_duplicate": True,
+    })
+    assert forced.status_code == 201
+
+    invalid_vat = await async_client.post(f'/api/v1/zzp/commitments/{commitment_id}/create-expense', headers=auth_headers, json={
+        "expense_date": "2026-03-20",
+        "amount_cents": 1500,
+        "vat_rate": 6,
+        "description": "Invalid",
+    })
+    assert invalid_vat.status_code == 422

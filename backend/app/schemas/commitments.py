@@ -22,11 +22,13 @@ class CommitmentCreate(BaseModel):
     contract_term_months: Optional[int] = Field(None, ge=1, le=600)
     renewal_date: Optional[date] = None
     btw_rate: Optional[float] = Field(None, ge=0, le=100)
+    vat_rate: Optional[float] = Field(None, ge=0, le=21)
     payment_day: Optional[int] = Field(None, ge=1, le=28)
     provider: Optional[str] = Field(None, max_length=255)
     contract_number: Optional[str] = Field(None, max_length=255)
     notice_period_days: Optional[int] = Field(None, ge=0, le=3650)
     auto_renew: bool = True
+    auto_create_expense: bool = False
 
     @model_validator(mode="after")
     def validate_dates(self):
@@ -40,6 +42,12 @@ class CommitmentCreate(BaseModel):
             raise ValueError("Hoofdsom is verplicht voor lease en lening.")
         if self.type == "subscription" and self.recurring_frequency is None:
             raise ValueError("Frequentie is verplicht voor abonnementen.")
+        return self
+
+    @model_validator(mode="after")
+    def validate_vat_rate(self):
+        if self.vat_rate is not None and self.vat_rate not in {0, 9, 21}:
+            raise ValueError("BTW tarief moet 0, 9 of 21 zijn.")
         return self
 
 
@@ -56,11 +64,19 @@ class CommitmentUpdate(BaseModel):
     contract_term_months: Optional[int] = Field(None, ge=1, le=600)
     renewal_date: Optional[date] = None
     btw_rate: Optional[float] = Field(None, ge=0, le=100)
+    vat_rate: Optional[float] = Field(None, ge=0, le=21)
     payment_day: Optional[int] = Field(None, ge=1, le=28)
     provider: Optional[str] = Field(None, max_length=255)
     contract_number: Optional[str] = Field(None, max_length=255)
     notice_period_days: Optional[int] = Field(None, ge=0, le=3650)
     auto_renew: Optional[bool] = None
+    auto_create_expense: Optional[bool] = None
+
+    @model_validator(mode="after")
+    def validate_vat_rate(self):
+        if self.vat_rate is not None and self.vat_rate not in {0, 9, 21}:
+            raise ValueError("BTW tarief moet 0, 9 of 21 zijn.")
+        return self
 
 
 class CommitmentResponse(BaseModel):
@@ -79,11 +95,14 @@ class CommitmentResponse(BaseModel):
     renewal_date: Optional[date]
     next_due_date: Optional[date]
     btw_rate: Optional[float]
+    vat_rate: Optional[float]
     payment_day: Optional[int]
     provider: Optional[str]
     contract_number: Optional[str]
     notice_period_days: Optional[int]
     auto_renew: bool
+    last_booked_date: Optional[date]
+    auto_create_expense: bool
     paid_to_date_cents: Optional[int]
     remaining_balance_cents: Optional[int]
     computed_end_date: Optional[date]

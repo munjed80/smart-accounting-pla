@@ -184,6 +184,22 @@ async def create_expense(
     )
     
     db.add(expense)
+
+    if expense_in.commitment_id:
+        commitment_result = await db.execute(
+            select(FinancialCommitment).where(
+                FinancialCommitment.id == expense_in.commitment_id,
+                FinancialCommitment.administration_id == administration.id,
+            )
+        )
+        commitment = commitment_result.scalar_one_or_none()
+        if commitment:
+            commitment.last_booked_date = date.fromisoformat(expense_in.expense_date)
+            if commitment.vat_rate is None:
+                commitment.vat_rate = Decimal(str(expense_in.vat_rate))
+            if commitment.btw_rate is None:
+                commitment.btw_rate = Decimal(str(expense_in.vat_rate))
+
     await db.commit()
 
     try:

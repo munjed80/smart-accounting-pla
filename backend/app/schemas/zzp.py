@@ -352,6 +352,13 @@ class ExpenseCreate(BaseModel):
             raise ValueError(f"Category must be one of: {', '.join(EXPENSE_CATEGORIES)}")
         return v
 
+    @field_validator('vat_rate')
+    @classmethod
+    def validate_vat_rate(cls, v):
+        if v not in {0, 9, 21, 0.0, 9.0, 21.0}:
+            raise ValueError("VAT rate must be 0, 9, or 21")
+        return v
+
 
 class ExpenseUpdate(BaseModel):
     """Update an expense (partial)."""
@@ -383,6 +390,15 @@ class ExpenseUpdate(BaseModel):
             return v
         if v not in EXPENSE_CATEGORIES:
             raise ValueError(f"Category must be one of: {', '.join(EXPENSE_CATEGORIES)}")
+        return v
+
+    @field_validator('vat_rate')
+    @classmethod
+    def validate_vat_rate(cls, v):
+        if v is None:
+            return v
+        if v not in {0, 9, 21, 0.0, 9.0, 21.0}:
+            raise ValueError("VAT rate must be 0, 9, or 21")
         return v
 
 

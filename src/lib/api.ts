@@ -4045,11 +4045,14 @@ export interface ZZPCommitment {
   renewal_date?: string | null
   next_due_date?: string | null
   btw_rate?: number | null
+  vat_rate?: number | null
   payment_day?: number | null
   provider?: string | null
   contract_number?: string | null
   notice_period_days?: number | null
   auto_renew: boolean
+  last_booked_date?: string | null
+  auto_create_expense?: boolean
   paid_to_date_cents?: number | null
   remaining_balance_cents?: number | null
   computed_end_date?: string | null
@@ -4071,14 +4074,35 @@ export interface ZZPCommitmentCreate {
   contract_term_months?: number
   renewal_date?: string
   btw_rate?: number
+  vat_rate?: number
   payment_day?: number
   provider?: string
   contract_number?: string
   notice_period_days?: number
   auto_renew?: boolean
+  auto_create_expense?: boolean
 }
 
 export type ZZPCommitmentUpdate = Partial<ZZPCommitmentCreate>
+
+
+export interface CommitmentExpenseCreatePayload {
+  expense_date: string
+  amount_cents: number
+  vat_rate: number
+  description: string
+  notes?: string
+  force_duplicate?: boolean
+}
+
+export interface CommitmentExpenseCreateResponse {
+  expense_id: string
+  commitment_id: string
+  last_booked_date?: string | null
+  next_due_date?: string | null
+  linked_expenses_count: number
+  vat_amount_cents: number
+}
 
 export interface ZZPCommitmentListResponse {
   commitments: ZZPCommitment[]
@@ -4496,6 +4520,10 @@ export const zzpApi = {
     },
     suggestions: async (): Promise<{ suggestions: ZZPCommitmentSuggestion[] }> => {
       const response = await api.get<{ suggestions: ZZPCommitmentSuggestion[] }>('/zzp/commitments/subscriptions/suggestions')
+      return response.data
+    },
+    createExpense: async (id: string, data: CommitmentExpenseCreatePayload): Promise<CommitmentExpenseCreateResponse> => {
+      const response = await api.post<CommitmentExpenseCreateResponse>(`/zzp/commitments/${id}/create-expense`, data)
       return response.data
     },
   },

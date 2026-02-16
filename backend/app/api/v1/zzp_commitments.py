@@ -5,7 +5,8 @@ from typing import Annotated, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import and_, select
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, select, func, extract
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import CurrentUser, require_zzp
@@ -13,6 +14,9 @@ from app.core.database import get_db
 from app.models.administration import Administration, AdministrationMember
 from app.models.bank import BankTransaction
 from app.models.financial_commitment import CommitmentType, FinancialCommitment, RecurringFrequency
+from app.models.zzp import ZZPExpense
+from app.repositories.ledger_repository import LedgerRepository
+from app.services.ledger_service import LedgerPostingError, LedgerPostingService
 from app.schemas.commitments import (
     AmortizationRow,
     CommitmentAlert,
@@ -25,6 +29,15 @@ from app.schemas.commitments import (
 )
 
 router = APIRouter(prefix="/commitments")
+
+
+class CommitmentExpenseCreateRequest(BaseModel):
+    expense_date: date = Field(..., description="Expense date")
+    amount_cents: int = Field(..., gt=0)
+    vat_rate: int = Field(..., description="VAT rate (0/9/21)")
+    description: str = Field(..., min_length=1, max_length=500)
+    notes: Optional[str] = Field(None, max_length=2000)
+    force_duplicate: bool = False
 
 
 def add_months(base: date, months: int) -> date:
@@ -65,6 +78,16 @@ def compute_next_due_date(item: FinancialCommitment, today: Optional[date] = Non
     today = today or date.today()
     if item.end_date and item.end_date < today:
         return None
+
+    if item.last_booked_date:
+        if item.recurring_frequency == RecurringFrequency.YEARLY:
+            candidate = add_years(item.last_booked_date, 1)
+        else:
+            candidate = add_months(item.last_booked_date, 1)
+        if item.end_date and candidate > item.end_date:
+            return None
+        if candidate >= today:
+            return candidate
 
     if item.type == CommitmentType.SUBSCRIPTION and item.recurring_frequency == RecurringFrequency.YEARLY:
         if item.renewal_date and item.renewal_date >= today:
@@ -170,11 +193,14 @@ def to_response(item: FinancialCommitment, today: Optional[date] = None) -> Comm
         renewal_date=item.renewal_date,
         next_due_date=compute_next_due_date(item, today=today),
         btw_rate=float(item.btw_rate) if item.btw_rate is not None else None,
+        vat_rate=float(item.vat_rate) if item.vat_rate is not None else (float(item.btw_rate) if item.btw_rate is not None else None),
         payment_day=item.payment_day,
         provider=item.provider,
         contract_number=item.contract_number,
         notice_period_days=item.notice_period_days,
         auto_renew=item.auto_renew,
+        last_booked_date=item.last_booked_date,
+        auto_create_expense=item.auto_create_expense,
         paid_to_date_cents=paid_to_date_cents,
         remaining_balance_cents=remaining_balance_cents,
         computed_end_date=computed_end_date,
@@ -332,11 +358,13 @@ async def create_commitment(
         contract_term_months=payload.contract_term_months,
         renewal_date=payload.renewal_date,
         btw_rate=Decimal(str(payload.btw_rate)) if payload.btw_rate is not None else None,
+        vat_rate=Decimal(str(payload.vat_rate if payload.vat_rate is not None else payload.btw_rate)) if (payload.vat_rate is not None or payload.btw_rate is not None) else None,
         payment_day=payload.payment_day,
         provider=payload.provider,
         contract_number=payload.contract_number,
         notice_period_days=payload.notice_period_days,
         auto_renew=payload.auto_renew,
+        auto_create_expense=payload.auto_create_expense,
     )
     db.add(item)
     await db.commit()
@@ -388,16 +416,132 @@ async def patch_commitment(
     for key, value in update_data.items():
         if key == "type" and value:
             setattr(item, key, CommitmentType(value))
-        elif key in {"interest_rate", "btw_rate"} and value is not None:
+        elif key in {"interest_rate", "btw_rate", "vat_rate"} and value is not None:
             setattr(item, key, Decimal(str(value)))
         elif key == "recurring_frequency":
             setattr(item, key, RecurringFrequency(value) if value else None)
         else:
             setattr(item, key, value)
 
+    if "vat_rate" in update_data and update_data.get("vat_rate") is not None:
+        item.btw_rate = Decimal(str(update_data["vat_rate"]))
+    if "btw_rate" in update_data and update_data.get("btw_rate") is not None:
+        item.vat_rate = Decimal(str(update_data["btw_rate"]))
+
     await db.commit()
     await db.refresh(item)
     return to_response(item)
+
+
+
+
+def _compute_next_due_from_booked(item: FinancialCommitment, booked_date: date) -> Optional[date]:
+    if item.recurring_frequency == RecurringFrequency.YEARLY:
+        candidate = add_years(booked_date, 1)
+    else:
+        candidate = add_months(booked_date, 1)
+
+    if item.end_date and candidate > item.end_date:
+        return None
+    return candidate
+
+
+def _period_key(expense_date: date, frequency: Optional[RecurringFrequency]) -> tuple[int, int]:
+    if frequency == RecurringFrequency.YEARLY:
+        return expense_date.year, 0
+    return expense_date.year, expense_date.month
+
+
+def _calculate_vat_amount(amount_cents: int, vat_rate: int) -> int:
+    if vat_rate == 0:
+        return 0
+    return int(Decimal(str(amount_cents)) * Decimal(str(vat_rate)) / (Decimal('100') + Decimal(str(vat_rate))))
+
+
+@router.post('/{commitment_id}/create-expense', status_code=status.HTTP_201_CREATED)
+async def create_expense_from_commitment(
+    commitment_id: UUID,
+    payload: CommitmentExpenseCreateRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
+
+    if payload.vat_rate not in {0, 9, 21}:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_VAT_RATE", "message": "BTW tarief moet 0, 9 of 21 zijn."})
+
+    result = await db.execute(
+        select(FinancialCommitment).where(
+            FinancialCommitment.id == commitment_id,
+            FinancialCommitment.administration_id == administration.id,
+        )
+    )
+    item = result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail={"code": "COMMITMENT_NOT_FOUND", "message": "Verplichting niet gevonden."})
+
+    if compute_next_due_date(item) is None and not payload.expense_date:
+        raise HTTPException(status_code=422, detail={"code": "DATE_REQUIRED", "message": "Deze verplichting is afgelopen. Kies handmatig een datum."})
+
+    period_year, period_month = _period_key(payload.expense_date, item.recurring_frequency)
+    duplicate_query = select(ZZPExpense.id).where(ZZPExpense.commitment_id == item.id)
+    if period_month == 0:
+        duplicate_query = duplicate_query.where(extract('year', ZZPExpense.expense_date) == period_year)
+    else:
+        duplicate_query = duplicate_query.where(
+            extract('year', ZZPExpense.expense_date) == period_year,
+            extract('month', ZZPExpense.expense_date) == period_month,
+        )
+    duplicate = (await db.execute(duplicate_query.limit(1))).scalar_one_or_none()
+    if duplicate and not payload.force_duplicate:
+        raise HTTPException(status_code=409, detail={"code": "DUPLICATE_COMMITMENT_EXPENSE", "message": "Er bestaat al een uitgave voor deze periode.", "existing_expense_id": str(duplicate)})
+
+    expense = ZZPExpense(
+        administration_id=administration.id,
+        vendor=item.name,
+        description=payload.description,
+        expense_date=payload.expense_date,
+        amount_cents=payload.amount_cents,
+        vat_rate=Decimal(str(payload.vat_rate)),
+        vat_amount_cents=_calculate_vat_amount(payload.amount_cents, payload.vat_rate),
+        category='Abonnement' if item.type == CommitmentType.SUBSCRIPTION else ('Lease' if item.type == CommitmentType.LEASE else 'Lening'),
+        notes=payload.notes,
+        commitment_id=item.id,
+    )
+    db.add(expense)
+
+    item.last_booked_date = payload.expense_date
+    if item.vat_rate is None:
+        item.vat_rate = Decimal(str(payload.vat_rate))
+    if item.btw_rate is None:
+        item.btw_rate = Decimal(str(payload.vat_rate))
+
+    await db.flush()
+
+    try:
+        ledger_service = LedgerPostingService(LedgerRepository(db, administration.id))
+        await ledger_service.post_expense(expense.id)
+    except LedgerPostingError:
+        # TODO: Add explicit booking fallback once manual journal endpoint is available
+        pass
+
+    await db.commit()
+    await db.refresh(expense)
+    await db.refresh(item)
+
+    next_due_date = _compute_next_due_from_booked(item, payload.expense_date)
+
+    linked_count = await db.scalar(select(func.count(ZZPExpense.id)).where(ZZPExpense.commitment_id == item.id))
+
+    return {
+        "expense_id": str(expense.id),
+        "commitment_id": str(item.id),
+        "last_booked_date": item.last_booked_date.isoformat() if item.last_booked_date else None,
+        "next_due_date": next_due_date.isoformat() if next_due_date else None,
+        "linked_expenses_count": int(linked_count or 0),
+        "vat_amount_cents": expense.vat_amount_cents,
+    }
 
 
 @router.delete("/{commitment_id}", status_code=status.HTTP_204_NO_CONTENT)

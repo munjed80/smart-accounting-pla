@@ -31,6 +31,7 @@ from app.schemas.vat import (
     VatValidationResponse,
     VatCodeResponse,
     VatCodesListResponse,
+    SubmissionPackageRequest,
 )
 from app.services.vat import VatReportService, generate_vat_overview_pdf
 from app.services.vat.report import VatReportError, PeriodNotEligibleError
@@ -420,7 +421,7 @@ async def download_vat_report_pdf(
 )
 async def generate_btw_submission_package(
     client_id: UUID,
-    period_id: UUID,
+    request: SubmissionPackageRequest,
     current_user: Annotated[CurrentUser, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Response:
@@ -431,7 +432,7 @@ async def generate_btw_submission_package(
     try:
         # Generate submission package
         service = SubmissionPackageService(db, administration.id)
-        xml_content, filename = await service.generate_btw_package(period_id)
+        xml_content, filename = await service.generate_btw_package(request.period_id)
         
         # Return XML file
         xml_bytes = xml_content.encode('utf-8')
@@ -479,7 +480,7 @@ async def generate_btw_submission_package(
 )
 async def generate_icp_submission_package(
     client_id: UUID,
-    period_id: UUID,
+    request: SubmissionPackageRequest,
     current_user: Annotated[CurrentUser, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Response:
@@ -490,7 +491,7 @@ async def generate_icp_submission_package(
     try:
         # Generate submission package
         service = SubmissionPackageService(db, administration.id)
-        xml_content, filename = await service.generate_icp_package(period_id)
+        xml_content, filename = await service.generate_icp_package(request.period_id)
         
         # Return XML file
         xml_bytes = xml_content.encode('utf-8')

@@ -104,7 +104,11 @@ class BTWSubmissionPackageGenerator:
     
     def generate_filename(self) -> str:
         """Generate filename for BTW submission package."""
-        return f"btw-aangifte-{self.administration.name}-{self.report.period_name}-{self.report.start_date.isoformat()}.xml"
+        # Sanitize administration name for filesystem compatibility
+        safe_name = self.administration.name.replace(' ', '-').replace('/', '-')
+        # Remove any other special characters that could cause issues
+        safe_name = ''.join(c for c in safe_name if c.isalnum() or c in '-_.')
+        return f"btw-aangifte-{safe_name}-{self.report.period_name}-{self.report.start_date.isoformat()}.xml"
 
 
 class ICPSubmissionPackageGenerator:
@@ -173,7 +177,11 @@ class ICPSubmissionPackageGenerator:
     
     def generate_filename(self) -> str:
         """Generate filename for ICP submission package."""
-        return f"icp-opgaaf-{self.administration.name}-{self.report.period_name}-{self.report.start_date.isoformat()}.xml"
+        # Sanitize administration name for filesystem compatibility
+        safe_name = self.administration.name.replace(' ', '-').replace('/', '-')
+        # Remove any other special characters that could cause issues
+        safe_name = ''.join(c for c in safe_name if c.isalnum() or c in '-_.')
+        return f"icp-opgaaf-{safe_name}-{self.report.period_name}-{self.report.start_date.isoformat()}.xml"
 
 
 class SubmissionPackageService:

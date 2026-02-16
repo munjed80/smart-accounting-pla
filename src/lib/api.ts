@@ -1818,8 +1818,8 @@ export const vatApi = {
 
   downloadBtwSubmissionPackage: async (clientId: string, periodId: string): Promise<Blob> => {
     const response = await api.post(
-      `/accountant/clients/${clientId}/tax/btw/submission-package?period_id=${periodId}`,
-      {},
+      `/accountant/clients/${clientId}/tax/btw/submission-package`,
+      { period_id: periodId },
       { responseType: 'blob' }
     )
     return response.data as Blob
@@ -1827,8 +1827,8 @@ export const vatApi = {
 
   downloadIcpSubmissionPackage: async (clientId: string, periodId: string): Promise<Blob> => {
     const response = await api.post(
-      `/accountant/clients/${clientId}/tax/icp/submission-package?period_id=${periodId}`,
-      {},
+      `/accountant/clients/${clientId}/tax/icp/submission-package`,
+      { period_id: periodId },
       { responseType: 'blob' }
     )
     return response.data as Blob

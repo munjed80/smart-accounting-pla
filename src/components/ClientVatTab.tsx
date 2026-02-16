@@ -248,6 +248,7 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
                 <Button 
                   variant="outline" 
                   onClick={handleDownloadIcpSubmissionPackage}
+                  disabled={redCount > 0}
                 >
                   <Globe size={20} className="mr-2" />
                   Download ICP opgaaf (XML)

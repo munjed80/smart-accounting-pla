@@ -154,7 +154,31 @@ class TestBTWSubmissionPackageGenerator:
         generator = BTWSubmissionPackageGenerator(admin, report)
         filename = generator.generate_filename()
         
-        assert filename.startswith("btw-aangifte-Test BV-Q1 2024-2024-01-01")
+        # Name should be sanitized (spaces replaced with hyphens)
+        assert filename.startswith("btw-aangifte-Test-BV-Q1")
+        assert filename.endswith(".xml")
+    
+    def test_generate_filename_with_special_chars(self):
+        """Test BTW filename generation with special characters."""
+        admin = MockAdministration()
+        admin.name = "Test & Co / BV"
+        
+        report = BTWAangifteReport(
+            period_id=uuid.uuid4(),
+            period_name="Q1 2024",
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 3, 31),
+            generated_at=datetime.now(timezone.utc),
+        )
+        
+        generator = BTWSubmissionPackageGenerator(admin, report)
+        filename = generator.generate_filename()
+        
+        # Special characters should be removed or replaced
+        # Spaces and slashes become hyphens, & removed
+        assert "Test" in filename and "BV" in filename
+        assert "&" not in filename
+        assert "/" not in filename
         assert filename.endswith(".xml")
 
 
@@ -245,7 +269,8 @@ class TestICPSubmissionPackageGenerator:
         generator = ICPSubmissionPackageGenerator(admin, report)
         filename = generator.generate_filename()
         
-        assert filename.startswith("icp-opgaaf-Test BV-Q1 2024-2024-01-01")
+        # Name should be sanitized (spaces replaced with hyphens)
+        assert filename.startswith("icp-opgaaf-Test-BV-Q1")
         assert filename.endswith(".xml")
     
     def test_generate_xml_without_customer_name(self):

@@ -18,7 +18,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    recurring_frequency = sa.Enum('monthly', 'yearly', name='recurringfrequency')
+    recurring_frequency = postgresql.ENUM(
+        'monthly',
+        'yearly',
+        name='recurringfrequency',
+        create_type=False,
+    )
     commitment_type_enum = postgresql.ENUM(
         'lease',
         'loan',
@@ -36,7 +41,14 @@ def upgrade() -> None:
     END$$;
     """)
 
-    recurring_frequency.create(op.get_bind(), checkfirst=True)
+    op.execute("""
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'recurringfrequency') THEN
+            CREATE TYPE recurringfrequency AS ENUM ('monthly', 'yearly');
+        END IF;
+    END$$;
+    """)
 
     op.create_table(
         'financial_commitments',

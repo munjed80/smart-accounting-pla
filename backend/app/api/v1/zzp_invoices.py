@@ -887,9 +887,9 @@ Dit is een geautomatiseerd bericht van Smart Accounting Platform.
 @router.get("/invoices/suggest-price/{customer_id}")
 async def suggest_invoice_price(
     customer_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
     description: Optional[str] = Query(None, description="Service description to match"),
-    current_user: CurrentUser = Depends(),
-    db: AsyncSession = Depends(get_db),
 ):
     """
     Suggest unit price based on previous invoices for the customer.

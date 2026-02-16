@@ -225,6 +225,9 @@ class BankMatchProposal(Base):
     with confidence scores and reasoning.
     """
     __tablename__ = "bank_match_proposals"
+    __table_args__ = (
+        sa.CheckConstraint('confidence_score >= 0 AND confidence_score <= 100', name='check_confidence_score_range'),
+    )
     
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

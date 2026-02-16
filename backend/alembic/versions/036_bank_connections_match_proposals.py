@@ -103,6 +103,9 @@ def upgrade() -> None:
         sa.Index('ix_bank_match_proposals_entity', 'entity_type', 'entity_id'),
         sa.Index('ix_bank_match_proposals_confidence', 'confidence_score'),
         sa.Index('ix_bank_match_proposals_status', 'is_applied', 'is_dismissed'),
+        
+        # Constraints
+        sa.CheckConstraint('confidence_score >= 0 AND confidence_score <= 100', name='check_confidence_score_range'),
     )
 
 

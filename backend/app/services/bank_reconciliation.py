@@ -722,15 +722,29 @@ class BankReconciliationService:
         most_recent = similar_amount_txs[0]
         counterparty_name = transaction.counterparty_name or "Unknown"
         
+        # Only create suggestion if we have a valid matched entity
+        if not most_recent.matched_entity_id:
+            # No previous match to link to, suggest creating new expense
+            return [MatchSuggestion(
+                entity_type="EXPENSE",
+                entity_id=uuid.uuid4(),  # Placeholder for new expense creation
+                entity_reference=f"{counterparty_name} - {cadence} payment",
+                confidence_score=confidence - 10,  # Lower confidence for new expense
+                amount=abs(transaction.amount),
+                date=transaction.booking_date,
+                explanation=f"Recurring {cadence} payment detected from {counterparty_name} (€{abs(transaction.amount):.2f})",
+                proposed_action="CREATE_EXPENSE",
+            )]
+        
         return [MatchSuggestion(
             entity_type="EXPENSE",
-            entity_id=most_recent.matched_entity_id or uuid.uuid4(),  # Use matched entity or generate placeholder
+            entity_id=most_recent.matched_entity_id,
             entity_reference=f"{counterparty_name} - {cadence} payment",
             confidence_score=confidence,
             amount=abs(transaction.amount),
             date=transaction.booking_date,
             explanation=f"Recurring {cadence} payment detected from {counterparty_name} (€{abs(transaction.amount):.2f})",
-            proposed_action="CREATE_EXPENSE",
+            proposed_action="APPLY_MATCH",
         )]
     
     async def _match_by_date_proximity(
@@ -785,13 +799,13 @@ class BankReconciliationService:
                 confidence_score=max(60, confidence),
                 amount=item.open_amount,
                 date=item.document_date,
-                explanation=f"Bedrag en datum komen overeen (±{days_diff} days, €{item.open_amount:.2f})",
+                explanation=f"Bedrag en datum komen overeen (±{days_diff} dagen, €{item.open_amount:.2f})",
                 proposed_action="APPLY_MATCH",
             ))
         
         return suggestions
-
-
+    
+    async def _find_parties_by_iban(self, iban: str) -> List[Party]:
         """Find parties by bank account IBAN."""
         normalized_iban = iban.strip().upper().replace(" ", "")
         iban_column = None

@@ -105,11 +105,14 @@ class CAMT053Parser(BaseStatementParser):
                 elem = root.find(pattern, ns)
                 if elem is not None and elem.text:
                     return elem.text.strip()
-            except:
+            except Exception:
                 # Try without namespace
-                elem = root.find(pattern)
-                if elem is not None and elem.text:
-                    return elem.text.strip()
+                try:
+                    elem = root.find(pattern)
+                    if elem is not None and elem.text:
+                        return elem.text.strip()
+                except Exception:
+                    continue
         
         return None
     

@@ -15,10 +15,11 @@ import { createDemoCommitments } from '@/lib/commitments'
 
 const eur = (cents: number) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(cents / 100)
 const todayStr = () => new Date().toISOString().slice(0, 10)
-const isExpired = (item: ZZPCommitment) => item.end_date_status === 'ended'
+const isExpired = (item: ZZPCommitment) => item.status === 'ended' || item.end_date_status === 'ended'
+const isPaused = (item: ZZPCommitment) => item.status === 'paused'
 const errorWithStatus = (error: unknown) => axios.isAxiosError(error) && error.response?.status ? `${error.response.status}: ${parseApiError(error)}` : parseApiError(error)
 
-const defaultForm = (): ZZPCommitmentCreate => ({ type: 'subscription', name: '', amount_cents: 0, recurring_frequency: 'monthly', start_date: todayStr(), auto_renew: true, btw_rate: 21 })
+const defaultForm = (): ZZPCommitmentCreate => ({ type: 'subscription', name: '', amount_cents: 0, recurring_frequency: 'monthly', start_date: todayStr(), auto_renew: true, btw_rate: 21, status: 'active' })
 
 export const ZZPSubscriptionsPage = () => {
   const [items, setItems] = useState<ZZPCommitment[]>([])
@@ -86,16 +87,6 @@ export const ZZPSubscriptionsPage = () => {
       toast.success('Uitgave aangemaakt', { action: { label: 'Open uitgave', onClick: () => navigateTo(`/zzp/expenses#expense-${created.expense_id}`) } })
       load()
     } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 409 && selectedExpenseCommitment) {
-        const confirmed = window.confirm('Er bestaat al een uitgave voor deze periode. Toch nogmaals aanmaken?')
-        if (confirmed) {
-          const created = await zzpApi.commitments.createExpense(selectedExpenseCommitment.id, { ...payload, force_duplicate: true })
-          toast.success('Dubbele uitgave aangemaakt', { action: { label: 'Open uitgave', onClick: () => navigateTo(`/zzp/expenses#expense-${created.expense_id}`) } })
-          setSelectedExpenseCommitment(null)
-          load()
-          return
-        }
-      }
       toast.error(errorWithStatus(error))
     } finally {
       setIsCreatingExpense(false)
@@ -129,6 +120,7 @@ export const ZZPSubscriptionsPage = () => {
       <Input type='number' min='0' placeholder='Opzegtermijn (dagen)' value={form.notice_period_days || ''} onChange={e => setForm({ ...form, notice_period_days: Number(e.target.value || 0) || undefined })} />
       <Select value={form.auto_renew === false ? 'false' : 'true'} onValueChange={v => setForm({ ...form, auto_renew: v === 'true' })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value='true'>Automatisch verlengen</SelectItem><SelectItem value='false'>Niet automatisch verlengen</SelectItem></SelectContent></Select>
       <Input type='date' value={form.renewal_date || ''} onChange={e => setForm({ ...form, renewal_date: e.target.value || undefined })} />
+      <Select value={form.status || 'active'} onValueChange={(v: 'active' | 'paused' | 'ended') => setForm({ ...form, status: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value='active'>Actief</SelectItem><SelectItem value='paused'>Gepauzeerd</SelectItem><SelectItem value='ended'>Beëindigd</SelectItem></SelectContent></Select>
       <div className='md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-2 rounded border p-3 text-sm'>
         <div><p className='text-muted-foreground'>Jaarlijkse kosten</p><p className='font-medium'>{eur(yearlyCostCents)}</p></div>
         <div><p className='text-muted-foreground'>Geschatte BTW-teruggave</p><p className='font-medium'>{form.btw_rate && form.btw_rate > 0 ? eur(estimatedVatReclaimCents) : 'n.v.t.'}</p></div>
@@ -145,7 +137,7 @@ export const ZZPSubscriptionsPage = () => {
         {items.map(i => <div id={`commitment-${i.id}`} key={i.id} className='rounded-md border p-3 space-y-2'>
           <div className='flex items-center justify-between gap-2'>
             <p className='font-medium'>{i.name}</p>
-            {isExpired(i) ? <Badge variant='secondary'>Afgelopen</Badge> : null}
+            {isPaused(i) ? <Badge variant='secondary'>Gepauzeerd</Badge> : isExpired(i) ? <Badge variant='secondary'>Beëindigd</Badge> : null}
           </div>
           <p className='text-sm text-muted-foreground'>Frequentie: {i.recurring_frequency}</p>
           <p className='text-sm text-muted-foreground'>Volgende vervaldatum: {i.next_due_date || '-'}</p>
@@ -157,7 +149,7 @@ export const ZZPSubscriptionsPage = () => {
           {(expensesByCommitmentId[i.id] || []).slice(0, 2).map(exp => <p key={exp.id} className='text-xs text-muted-foreground'>• {exp.expense_date}: {eur(exp.amount_cents)}</p>)}
           <div className='flex flex-wrap gap-2'>
             <Button variant='outline' size='sm' onClick={() => editItem(i)}>Bewerk</Button>
-            <Button variant='outline' size='sm' onClick={() => setSelectedExpenseCommitment(i)}>Maak uitgave aan</Button>
+            <Button variant='outline' size='sm' disabled={isPaused(i) || isExpired(i)} onClick={() => setSelectedExpenseCommitment(i)}>Maak uitgave aan</Button>
             <Button variant='destructive' size='sm' onClick={async () => { try { await zzpApi.commitments.delete(i.id); load() } catch (error) { toast.error(errorWithStatus(error)) } }}>Verwijder</Button>
           </div>
         </div>)}
@@ -165,8 +157,8 @@ export const ZZPSubscriptionsPage = () => {
 
       <div className='hidden sm:block overflow-x-auto'>
         <Table>
-          <TableHeader><TableRow><TableHead>Naam</TableHead><TableHead>Frequentie</TableHead><TableHead>Volgende vervaldatum</TableHead><TableHead>Opzegtermijn</TableHead><TableHead>Auto-renew</TableHead><TableHead>Bedrag</TableHead><TableHead>Laatste boeking</TableHead><TableHead>Uitgaven</TableHead><TableHead /></TableRow></TableHeader><TableBody>
-            {items.map(i => <TableRow id={`commitment-${i.id}`} key={i.id}><TableCell>{i.name}</TableCell><TableCell>{i.recurring_frequency}</TableCell><TableCell><div className='flex items-center gap-2'>{i.next_due_date || '-'} {isExpired(i) ? <Badge variant='secondary'>Afgelopen</Badge> : null}</div></TableCell><TableCell>{i.notice_period_days || 0} dgn</TableCell><TableCell>{i.auto_renew ? 'Ja' : 'Nee'}</TableCell><TableCell>{eur(i.amount_cents)}</TableCell><TableCell className='text-xs text-muted-foreground'>{i.last_booked_date || '-'}</TableCell><TableCell>{(expensesByCommitmentId[i.id] || []).length}</TableCell><TableCell className='space-x-2 whitespace-nowrap'><Button variant='outline' size='sm' onClick={() => editItem(i)}>Bewerk</Button><Button variant='outline' size='sm' onClick={() => setSelectedExpenseCommitment(i)}>Maak uitgave aan</Button><Button variant='destructive' size='sm' onClick={async () => { try { await zzpApi.commitments.delete(i.id); load() } catch (error) { toast.error(errorWithStatus(error)) } }}>Verwijder</Button></TableCell></TableRow>)}
+          <TableHeader><TableRow><TableHead>Naam</TableHead><TableHead>Status</TableHead><TableHead>Frequentie</TableHead><TableHead>Volgende vervaldatum</TableHead><TableHead>Opzegtermijn</TableHead><TableHead>Auto-renew</TableHead><TableHead>Bedrag</TableHead><TableHead>Laatste boeking</TableHead><TableHead>Uitgaven</TableHead><TableHead /></TableRow></TableHeader><TableBody>
+            {items.map(i => <TableRow id={`commitment-${i.id}`} key={i.id}><TableCell>{i.name}</TableCell><TableCell>{i.status}</TableCell><TableCell>{i.recurring_frequency}</TableCell><TableCell><div className='flex items-center gap-2'>{i.next_due_date || '-'} {isPaused(i) ? <Badge variant='secondary'>Gepauzeerd</Badge> : isExpired(i) ? <Badge variant='secondary'>Beëindigd</Badge> : null}</div></TableCell><TableCell>{i.notice_period_days || 0} dgn</TableCell><TableCell>{i.auto_renew ? 'Ja' : 'Nee'}</TableCell><TableCell>{eur(i.amount_cents)}</TableCell><TableCell className='text-xs text-muted-foreground'>{i.last_booked_date || '-'}</TableCell><TableCell>{(expensesByCommitmentId[i.id] || []).length}</TableCell><TableCell className='space-x-2 whitespace-nowrap'><Button variant='outline' size='sm' onClick={() => editItem(i)}>Bewerk</Button><Button variant='outline' size='sm' disabled={isPaused(i) || isExpired(i)} onClick={() => setSelectedExpenseCommitment(i)}>Maak uitgave aan</Button><Button variant='destructive' size='sm' onClick={async () => { try { await zzpApi.commitments.delete(i.id); load() } catch (error) { toast.error(errorWithStatus(error)) } }}>Verwijder</Button></TableCell></TableRow>)}
           </TableBody></Table>
       </div>
     </CardContent></Card>

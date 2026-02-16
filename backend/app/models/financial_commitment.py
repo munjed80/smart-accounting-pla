@@ -22,6 +22,12 @@ class RecurringFrequency(str, enum.Enum):
     YEARLY = "yearly"
 
 
+class CommitmentStatus(str, enum.Enum):
+    ACTIVE = "active"
+    PAUSED = "paused"
+    ENDED = "ended"
+
+
 class FinancialCommitment(Base):
     __tablename__ = "financial_commitments"
 
@@ -48,6 +54,9 @@ class FinancialCommitment(Base):
 
     interest_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 3), nullable=True)
     recurring_frequency: Mapped[Optional[RecurringFrequency]] = mapped_column(SQLEnum(RecurringFrequency), nullable=True)
+    status: Mapped[CommitmentStatus] = mapped_column(
+        SQLEnum(CommitmentStatus), nullable=False, default=CommitmentStatus.ACTIVE, server_default=CommitmentStatus.ACTIVE.value
+    )
     btw_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
     vat_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
     last_booked_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)

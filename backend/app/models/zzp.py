@@ -393,6 +393,7 @@ class ZZPExpense(Base):
         nullable=True,
         index=True
     )
+    period_key: Mapped[Optional[str]] = mapped_column(String(16), nullable=True, index=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

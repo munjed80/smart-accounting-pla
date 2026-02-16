@@ -14,7 +14,8 @@ import { createDemoCommitments } from '@/lib/commitments'
 
 const eur = (cents: number) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(cents / 100)
 const todayStr = () => new Date().toISOString().slice(0, 10)
-const isExpired = (item: ZZPCommitment) => item.end_date_status === 'ended' || (!!item.end_date && item.end_date < todayStr() && !item.next_due_date)
+const isExpired = (item: ZZPCommitment) => item.status === 'ended' || item.end_date_status === 'ended' || (!!item.end_date && item.end_date < todayStr() && !item.next_due_date)
+const isPaused = (item: ZZPCommitment) => item.status === 'paused'
 const errorWithStatus = (error: unknown) => axios.isAxiosError(error) && error.response?.status ? `${error.response.status}: ${parseApiError(error)}` : parseApiError(error)
 
 const toMonthKey = (date: string) => date.slice(0, 7)
@@ -35,7 +36,7 @@ const estimateYearlyVatReclaim = (item: ZZPCommitment) => {
 export const ZZPCommitmentsOverviewPage = () => {
   const [typeFilter, setTypeFilter] = useState<'all' | 'lease' | 'loan' | 'subscription'>('all')
   const [frequencyFilter, setFrequencyFilter] = useState<'all' | 'monthly' | 'yearly'>('all')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'ended'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused' | 'ended'>('all')
   const [commitments, setCommitments] = useState<ZZPCommitment[]>([])
   const [allCommitments, setAllCommitments] = useState<ZZPCommitment[]>([])
   const [overview, setOverview] = useState<ZZPCommitmentOverview | null>(null)
@@ -69,7 +70,8 @@ export const ZZPCommitmentsOverviewPage = () => {
     if (frequencyFilter !== 'all' && paymentFrequency(item) !== frequencyFilter) return false
     if (statusFilter !== 'all') {
       const ended = isExpired(item)
-      if (statusFilter === 'active' && ended) return false
+      if (statusFilter === 'active' && (ended || isPaused(item))) return false
+      if (statusFilter === 'paused' && !isPaused(item)) return false
       if (statusFilter === 'ended' && !ended) return false
     }
     return true
@@ -92,6 +94,7 @@ export const ZZPCommitmentsOverviewPage = () => {
 
   const cashflowStress = useMemo(() => {
     const monthlyObligationsCents = allCommitments.reduce((total, item) => {
+      if (isPaused(item) || isExpired(item)) return total
       if (item.type === 'subscription' && item.recurring_frequency === 'yearly') return total + Math.round(item.amount_cents / 12)
       return total + (item.monthly_payment_cents || item.amount_cents)
     }, 0)
@@ -126,16 +129,6 @@ export const ZZPCommitmentsOverviewPage = () => {
       toast.success('Uitgave aangemaakt', { action: { label: 'Open uitgave', onClick: () => navigateTo(`/zzp/expenses#expense-${created.expense_id}`) } })
       load()
     } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 409 && selectedExpenseCommitment) {
-        const confirmed = window.confirm('Er bestaat al een uitgave voor deze periode. Toch nogmaals aanmaken?')
-        if (confirmed) {
-          const created = await zzpApi.commitments.createExpense(selectedExpenseCommitment.id, { ...payload, force_duplicate: true })
-          toast.success('Dubbele uitgave aangemaakt', { action: { label: 'Open uitgave', onClick: () => navigateTo(`/zzp/expenses#expense-${created.expense_id}`) } })
-          setSelectedExpenseCommitment(null)
-          load()
-          return
-        }
-      }
       toast.error(errorWithStatus(error))
     } finally {
       setIsCreatingExpense(false)
@@ -167,13 +160,33 @@ export const ZZPCommitmentsOverviewPage = () => {
           <SelectTrigger><SelectValue placeholder='Frequentie' /></SelectTrigger>
           <SelectContent><SelectItem value='all'>Alle frequenties</SelectItem><SelectItem value='monthly'>Maandelijks</SelectItem><SelectItem value='yearly'>Jaarlijks</SelectItem></SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={(v: 'all' | 'active' | 'ended') => setStatusFilter(v)}>
+        <Select value={statusFilter} onValueChange={(v: 'all' | 'active' | 'paused' | 'ended') => setStatusFilter(v)}>
           <SelectTrigger><SelectValue placeholder='Status' /></SelectTrigger>
-          <SelectContent><SelectItem value='all'>Alle statussen</SelectItem><SelectItem value='active'>Actief</SelectItem><SelectItem value='ended'>Afgelopen</SelectItem></SelectContent>
+          <SelectContent><SelectItem value='all'>Alle statussen</SelectItem><SelectItem value='active'>Actief</SelectItem><SelectItem value='paused'>Gepauzeerd</SelectItem><SelectItem value='ended'>Beëindigd</SelectItem></SelectContent>
         </Select>
       </div>
 
       {overview && <div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><Card><CardHeader><CardTitle>Maandlasten</CardTitle></CardHeader><CardContent>{eur(overview.monthly_total_cents)}</CardContent></Card><Card><CardHeader><CardTitle>Komende 30 dagen</CardTitle></CardHeader><CardContent>{eur(overview.upcoming_total_cents)}</CardContent></Card><Card><CardHeader><CardTitle>Waarschuwingen</CardTitle></CardHeader><CardContent>{overview.warning_count}</CardContent></Card></div>}
+
+      {overview && (
+        <Card>
+          <CardHeader><CardTitle>Komende 30 dagen (top 10)</CardTitle></CardHeader>
+          <CardContent className='space-y-2'>
+            {overview.upcoming.length === 0 ? <p className='text-sm text-muted-foreground'>Geen aankomende verplichtingen in de komende 30 dagen.</p> : overview.upcoming.map(item => (
+              <div key={`upcoming-${item.id}`} className='rounded border p-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                <div>
+                  <p className='font-medium text-sm'>{item.name}</p>
+                  <p className='text-xs text-muted-foreground'>Vervaldatum: {item.next_due_date || '-'}</p>
+                </div>
+                <div className='flex items-center gap-2'>
+                  <span className='text-sm font-medium'>{eur(item.monthly_payment_cents || item.amount_cents)}</span>
+                  <Button size='sm' variant='outline' disabled={isPaused(item) || isExpired(item)} onClick={() => setSelectedExpenseCommitment(item)}>Maak uitgave aan</Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card><CardHeader><CardTitle>Top 5 grootste lasten</CardTitle></CardHeader><CardContent className='space-y-2'>
         {top5Largest.length === 0 ? <p className='text-sm text-muted-foreground'>Geen lasten gevonden voor de huidige filters.</p> : top5Largest.map(item => (
@@ -195,7 +208,7 @@ export const ZZPCommitmentsOverviewPage = () => {
                 <p className="font-medium">{item.name}</p>
                 <div className="flex items-center gap-2">
                   <p className="text-xs text-muted-foreground">Volgende vervaldatum: {item.next_due_date || '-'}</p>
-                  {isExpired(item) ? <Badge variant="secondary">Afgelopen</Badge> : null}
+                  {isPaused(item) ? <Badge variant="secondary">Gepauzeerd</Badge> : isExpired(item) ? <Badge variant="secondary">Beëindigd</Badge> : null}
                 </div>
                 <p className='text-xs text-muted-foreground mt-1'>Laatste boeking: {item.last_booked_date || '-'}</p>
                 <p className='text-xs text-muted-foreground'>Gekoppelde uitgaven: {(expensesByCommitmentId[item.id] || []).length}</p>
@@ -204,7 +217,7 @@ export const ZZPCommitmentsOverviewPage = () => {
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium">{eur(item.monthly_payment_cents || item.amount_cents)}</span>
-                <Button size="sm" variant="outline" onClick={() => setSelectedExpenseCommitment(item)}>Maak uitgave aan</Button>
+                <Button size="sm" variant="outline" disabled={isPaused(item) || isExpired(item)} onClick={() => setSelectedExpenseCommitment(item)}>Maak uitgave aan</Button>
                 <Button size="sm" variant="outline" onClick={() => navigateTo(`/zzp/verplichtingen/${item.type === 'subscription' ? 'abonnementen' : 'lease-leningen'}#commitment-${item.id}`)}>Bewerk</Button>
               </div>
             </div>

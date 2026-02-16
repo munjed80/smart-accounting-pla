@@ -306,6 +306,7 @@ async def stop_work_session(
     entry_description = note if note else "Gewerkte tijd"
     
     time_entry = ZZPTimeEntry(
+        user_id=current_user.id,
         administration_id=administration.id,
         entry_date=session.started_at.date(),
         description=entry_description,

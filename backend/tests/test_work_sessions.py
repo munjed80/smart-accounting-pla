@@ -231,6 +231,62 @@ class TestWorkSessionActive:
         assert response.json() is None
 
 
+class TestWorkSessionTimeEntryEdit:
+    """Tests for editing time entries created from work sessions."""
+    
+    @pytest.mark.asyncio
+    async def test_edit_inchecken_time_entry(
+        self, 
+        async_client: AsyncClient, 
+        test_user: User,
+        test_customer,
+        db_session: AsyncSession,
+        auth_headers: dict
+    ):
+        """Time entries created from work sessions (inchecken) can be edited."""
+        # Start a work session
+        start_response = await async_client.post(
+            "/api/v1/zzp/work-sessions/start",
+            json={"note": "Development work"},
+            headers=auth_headers
+        )
+        assert start_response.status_code == 201
+        
+        # Stop the session to create a time entry
+        stop_response = await async_client.post(
+            "/api/v1/zzp/work-sessions/stop",
+            json={"break_minutes": 0},
+            headers=auth_headers
+        )
+        assert stop_response.status_code == 200
+        
+        # Get the created time entry ID
+        time_entry_id = stop_response.json()["time_entry"]["id"]
+        
+        # Edit the time entry - add customer, hourly_rate, update description
+        edit_response = await async_client.patch(
+            f"/api/v1/zzp/time-entries/{time_entry_id}",
+            json={
+                "description": "Updated development work",
+                "customer_id": str(test_customer.id),
+                "hourly_rate": 95.00,
+                "project_name": "Project Alpha"
+            },
+            headers=auth_headers
+        )
+        
+        # This should succeed (was failing before fix)
+        assert edit_response.status_code == 200
+        
+        # Verify the changes were saved
+        updated_entry = edit_response.json()
+        assert updated_entry["description"] == "Updated development work"
+        assert updated_entry["customer_id"] == str(test_customer.id)
+        assert float(updated_entry["hourly_rate"]) == 95.00
+        assert updated_entry["project_name"] == "Project Alpha"
+        assert updated_entry["user_id"] == str(test_user.id)  # Verify user_id is set
+
+
 class TestRoundToFiveMinutes:
     """Tests for the round_to_5_minutes helper function."""
     

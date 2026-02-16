@@ -30,6 +30,7 @@ from app.models.ledger import (
 )
 from app.models.accounting import VatCode, VatCategory
 from app.models.subledger import Party
+from app.services.vat.lineage import VatLineageService
 
 
 class VatReportError(Exception):
@@ -300,6 +301,11 @@ class VatReportService:
         report.anomalies = await self._validate_vat_data(period, vat_lines, vat_code_map)
         report.has_red_anomalies = any(a.severity == "RED" for a in report.anomalies)
         report.has_yellow_anomalies = any(a.severity == "YELLOW" for a in report.anomalies)
+        
+        # Populate lineage data for audit trail
+        lineage_service = VatLineageService(self.db, self.administration_id)
+        await lineage_service.populate_lineage_for_period(period, vat_codes)
+        await self.db.commit()
         
         return report
     

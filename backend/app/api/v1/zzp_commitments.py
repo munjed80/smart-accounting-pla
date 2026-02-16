@@ -1,9 +1,9 @@
+import calendar
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Annotated, Optional
 from uuid import UUID
 
-import calendar
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,6 +41,11 @@ def add_years(base: date, years: int) -> date:
     return date(target_year, base.month, day)
 
 
+def with_day(base: date, day: int) -> date:
+    max_day = calendar.monthrange(base.year, base.month)[1]
+    return date(base.year, base.month, min(day, max_day))
+
+
 async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
     result = await db.execute(
         select(Administration)
@@ -72,15 +77,83 @@ def compute_next_due_date(item: FinancialCommitment, today: Optional[date] = Non
             return None
         return next_due
 
-    next_due = item.start_date
-    while next_due < today:
-        next_due = add_months(next_due, 1)
-    if item.end_date and next_due > item.end_date:
+    anchor_day = item.payment_day or item.start_date.day
+    candidate = with_day(today, anchor_day)
+    if candidate < today:
+        candidate = with_day(add_months(today.replace(day=1), 1), anchor_day)
+
+    if candidate < item.start_date:
+        base_month = item.start_date.replace(day=1)
+        candidate = with_day(base_month, anchor_day)
+        while candidate < item.start_date:
+            candidate = with_day(add_months(candidate.replace(day=1), 1), anchor_day)
+
+    if item.end_date and candidate > item.end_date:
         return None
-    return next_due
+    return candidate
+
+
+def compute_amortization_rows(item: FinancialCommitment) -> list[AmortizationRow]:
+    if item.type not in {CommitmentType.LEASE, CommitmentType.LOAN}:
+        return []
+
+    principal = item.principal_amount_cents or item.amount_cents
+    payment = item.monthly_payment_cents or item.amount_cents
+    if principal <= 0 or payment <= 0:
+        return []
+
+    monthly_rate = float(item.interest_rate or 0) / 100 / 12
+    rows: list[AmortizationRow] = []
+    remaining = principal
+    horizon = item.contract_term_months or 120
+    due_date = compute_next_due_date(item, today=item.start_date) or item.start_date
+
+    for idx in range(1, horizon + 1):
+        interest = int(round(remaining * monthly_rate))
+        principal_part = max(0, min(payment - interest, remaining))
+        remaining = max(0, remaining - principal_part)
+
+        rows.append(
+            AmortizationRow(
+                month_index=idx,
+                due_date=due_date,
+                payment_cents=payment,
+                interest_cents=interest,
+                principal_cents=principal_part,
+                remaining_balance_cents=remaining,
+            )
+        )
+        if remaining == 0:
+            break
+        due_date = add_months(due_date, 1)
+
+    return rows
+
+
+def compute_end_date_status(target_end_date: Optional[date], today: date) -> str:
+    if not target_end_date:
+        return "unknown"
+    if target_end_date < today:
+        return "ended"
+    if (target_end_date - today).days <= 30:
+        return "ending_soon"
+    return "active"
 
 
 def to_response(item: FinancialCommitment, today: Optional[date] = None) -> CommitmentResponse:
+    today = today or date.today()
+    rows = compute_amortization_rows(item)
+    paid_to_date_cents: Optional[int] = None
+    remaining_balance_cents: Optional[int] = None
+    computed_end_date: Optional[date] = item.end_date
+
+    if rows:
+        paid_to_date_cents = sum(row.principal_cents for row in rows if row.due_date <= today)
+        last_paid_row = next((row for row in reversed(rows) if row.due_date <= today), None)
+        remaining_balance_cents = last_paid_row.remaining_balance_cents if last_paid_row else (item.principal_amount_cents or item.amount_cents)
+        if not computed_end_date:
+            computed_end_date = rows[-1].due_date
+
     return CommitmentResponse(
         id=item.id,
         administration_id=item.administration_id,
@@ -97,6 +170,15 @@ def to_response(item: FinancialCommitment, today: Optional[date] = None) -> Comm
         renewal_date=item.renewal_date,
         next_due_date=compute_next_due_date(item, today=today),
         btw_rate=float(item.btw_rate) if item.btw_rate is not None else None,
+        payment_day=item.payment_day,
+        provider=item.provider,
+        contract_number=item.contract_number,
+        notice_period_days=item.notice_period_days,
+        auto_renew=item.auto_renew,
+        paid_to_date_cents=paid_to_date_cents,
+        remaining_balance_cents=remaining_balance_cents,
+        computed_end_date=computed_end_date,
+        end_date_status=compute_end_date_status(computed_end_date, today=today),
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
@@ -250,6 +332,11 @@ async def create_commitment(
         contract_term_months=payload.contract_term_months,
         renewal_date=payload.renewal_date,
         btw_rate=Decimal(str(payload.btw_rate)) if payload.btw_rate is not None else None,
+        payment_day=payload.payment_day,
+        provider=payload.provider,
+        contract_number=payload.contract_number,
+        notice_period_days=payload.notice_period_days,
+        auto_renew=payload.auto_renew,
     )
     db.add(item)
     await db.commit()
@@ -343,37 +430,4 @@ async def amortization_schedule(commitment_id: UUID, current_user: CurrentUser, 
     item = result.scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail={"code": "COMMITMENT_NOT_FOUND", "message": "Verplichting niet gevonden."})
-    if item.type not in {CommitmentType.LEASE, CommitmentType.LOAN}:
-        return []
-
-    principal = item.principal_amount_cents or item.amount_cents
-    payment = item.monthly_payment_cents or item.amount_cents
-    if principal <= 0 or payment <= 0:
-        return []
-
-    monthly_rate = float(item.interest_rate or 0) / 100 / 12
-    rows: list[AmortizationRow] = []
-    remaining = principal
-    horizon = item.contract_term_months or 120
-    due_date = item.start_date
-
-    for idx in range(1, horizon + 1):
-        interest = int(round(remaining * monthly_rate))
-        principal_part = max(0, min(payment - interest, remaining))
-        remaining = max(0, remaining - principal_part)
-
-        rows.append(
-            AmortizationRow(
-                month_index=idx,
-                due_date=due_date,
-                payment_cents=payment,
-                interest_cents=interest,
-                principal_cents=principal_part,
-                remaining_balance_cents=remaining,
-            )
-        )
-        if remaining == 0:
-            break
-        due_date = add_months(due_date, 1)
-
-    return rows
+    return compute_amortization_rows(item)

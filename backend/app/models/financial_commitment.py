@@ -40,6 +40,11 @@ class FinancialCommitment(Base):
     end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     renewal_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     contract_term_months: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    payment_day: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    provider: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    contract_number: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    notice_period_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    auto_renew: Mapped[bool] = mapped_column(nullable=False, default=True, server_default="true")
 
     interest_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 3), nullable=True)
     recurring_frequency: Mapped[Optional[RecurringFrequency]] = mapped_column(SQLEnum(RecurringFrequency), nullable=True)

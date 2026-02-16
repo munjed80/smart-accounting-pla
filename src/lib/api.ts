@@ -4045,6 +4045,15 @@ export interface ZZPCommitment {
   renewal_date?: string | null
   next_due_date?: string | null
   btw_rate?: number | null
+  payment_day?: number | null
+  provider?: string | null
+  contract_number?: string | null
+  notice_period_days?: number | null
+  auto_renew: boolean
+  paid_to_date_cents?: number | null
+  remaining_balance_cents?: number | null
+  computed_end_date?: string | null
+  end_date_status: 'active' | 'ending_soon' | 'ended' | 'unknown'
   created_at: string
   updated_at: string
 }
@@ -4062,6 +4071,11 @@ export interface ZZPCommitmentCreate {
   contract_term_months?: number
   renewal_date?: string
   btw_rate?: number
+  payment_day?: number
+  provider?: string
+  contract_number?: string
+  notice_period_days?: number
+  auto_renew?: boolean
 }
 
 export type ZZPCommitmentUpdate = Partial<ZZPCommitmentCreate>

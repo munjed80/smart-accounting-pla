@@ -161,3 +161,68 @@ class SubmissionPackageRequest(BaseModel):
     """Request for generating submission package."""
     period_id: UUID
 
+
+# VAT Box Lineage / Drilldown Schemas
+
+class VatBoxTotalResponse(BaseModel):
+    """Response for a single VAT box total."""
+    box_code: str
+    box_name: str
+    net_amount: Decimal
+    vat_amount: Decimal
+    line_count: int
+
+    class Config:
+        from_attributes = True
+
+
+class VatBoxTotalsResponse(BaseModel):
+    """Response for all VAT box totals in a period."""
+    period_id: UUID
+    period_name: str
+    boxes: List[VatBoxTotalResponse]
+    generated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class VatBoxLineResponse(BaseModel):
+    """Response for a single VAT box lineage line."""
+    id: UUID
+    vat_box_code: str
+    net_amount: Decimal
+    vat_amount: Decimal
+    source_type: str
+    source_id: UUID
+    document_id: Optional[UUID] = None
+    journal_entry_id: UUID
+    journal_line_id: UUID
+    vat_code_id: Optional[UUID] = None
+    transaction_date: date
+    reference: Optional[str] = None
+    description: Optional[str] = None
+    party_id: Optional[UUID] = None
+    party_name: Optional[str] = None
+    party_vat_number: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class VatBoxLinesResponse(BaseModel):
+    """Response for VAT box drilldown lines."""
+    period_id: UUID
+    period_name: str
+    box_code: str
+    box_name: str
+    lines: List[VatBoxLineResponse]
+    total_count: int
+    page: int
+    page_size: int
+
+    class Config:
+        from_attributes = True
+
+

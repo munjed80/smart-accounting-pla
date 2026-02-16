@@ -32,8 +32,12 @@ from app.schemas.vat import (
     VatCodeResponse,
     VatCodesListResponse,
     SubmissionPackageRequest,
+    VatBoxTotalsResponse,
+    VatBoxTotalResponse,
+    VatBoxLinesResponse,
+    VatBoxLineResponse,
 )
-from app.services.vat import VatReportService, generate_vat_overview_pdf
+from app.services.vat import VatReportService, VatLineageService, generate_vat_overview_pdf
 from app.services.vat.report import VatReportError, PeriodNotEligibleError
 from app.services.vat.submission import SubmissionPackageService, SubmissionPackageError
 from app.api.v1.deps import CurrentUser
@@ -508,3 +512,208 @@ async def generate_icp_submission_package(
         raise HTTPException(status_code=400, detail=str(e))
     except (PeriodNotEligibleError, VatReportError) as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# VAT Box Lineage / Drilldown Endpoints
+
+@router.get(
+    "/clients/{client_id}/btw/periods/{period_id}/boxes",
+    response_model=VatBoxTotalsResponse,
+    summary="Get VAT Box Totals",
+    description="""
+    Get aggregated totals for all VAT boxes in a period.
+    
+    This endpoint provides the totals for each VAT box (rubriek) with:
+    - Net amount (turnover/base)
+    - VAT amount
+    - Number of source lines
+    
+    **Security:** Enforces consent/active-client isolation.
+    Only accessible by accountants with ACTIVE assignment to the client.
+    """,
+)
+async def get_vat_box_totals(
+    client_id: UUID,
+    period_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Get VAT box totals for a period."""
+    # Enforce consent/active-client isolation
+    await verify_accountant_access(client_id, current_user, db)
+    
+    # Get period
+    result = await db.execute(
+        select(AccountingPeriod)
+        .where(AccountingPeriod.id == period_id)
+        .where(AccountingPeriod.administration_id == client_id)
+    )
+    period = result.scalar_one_or_none()
+    
+    if not period:
+        raise HTTPException(status_code=404, detail="Period not found")
+    
+    # Get box totals from lineage service
+    lineage_service = VatLineageService(db, client_id)
+    totals_dict = await lineage_service.get_box_totals(period_id)
+    
+    # Dutch VAT box names (for reference)
+    box_names = {
+        "1a": "Leveringen/diensten belast met hoog tarief (21%)",
+        "1b": "Leveringen/diensten belast met laag tarief (9%)",
+        "1c": "Leveringen/diensten belast met ander tarief",
+        "1d": "Privégebruik",
+        "1e": "Leveringen/diensten belast met 0% of niet bij u belast",
+        "2a": "Verwerving uit landen binnen de EU (binnenlandse verlegging)",
+        "3a": "Leveringen naar landen buiten de EU",
+        "3b": "Leveringen naar/diensten in landen binnen de EU (ICP)",
+        "4a": "Verlegde btw - diensten/invoer van buiten de EU",
+        "4b": "Verlegde btw - verwervingen uit EU-landen",
+        "5a": "Verschuldigde btw (subtotaal)",
+        "5b": "Voorbelasting (aftrekbare btw)",
+        "5c": "Subtotaal (5a - 5b)",
+        "5d": "Vermindering KOR",
+        "5e": "Schatting vorige tijdvak(ken)",
+        "5f": "Schatting dit tijdvak",
+        "5g": "Totaal te betalen / te ontvangen",
+    }
+    
+    # Build response with all boxes (including empty ones)
+    boxes = []
+    for box_code in box_names.keys():
+        totals = totals_dict.get(box_code, {
+            'net_amount': Decimal("0.00"),
+            'vat_amount': Decimal("0.00"),
+            'line_count': 0,
+        })
+        boxes.append(VatBoxTotalResponse(
+            box_code=box_code,
+            box_name=box_names[box_code],
+            net_amount=totals['net_amount'],
+            vat_amount=totals['vat_amount'],
+            line_count=totals['line_count'],
+        ))
+    
+    return VatBoxTotalsResponse(
+        period_id=period.id,
+        period_name=period.name,
+        boxes=boxes,
+        generated_at=datetime.utcnow(),
+    )
+
+
+@router.get(
+    "/clients/{client_id}/btw/periods/{period_id}/boxes/{box_code}/lines",
+    response_model=VatBoxLinesResponse,
+    summary="Get VAT Box Drilldown Lines",
+    description="""
+    Get detailed drilldown lines for a specific VAT box in a period.
+    
+    This endpoint returns all source lines that contribute to a VAT box with:
+    - Source references (invoice line, expense line, journal line)
+    - Document references
+    - Journal entry and line IDs
+    - Transaction details (date, amount, description, party)
+    - Immutable timestamps for audit trail
+    
+    Supports filtering by:
+    - Source type (INVOICE_LINE, EXPENSE_LINE, JOURNAL_LINE)
+    - Date range (from_date, to_date)
+    
+    **Security:** Enforces consent/active-client isolation.
+    Only accessible by accountants with ACTIVE assignment to the client.
+    """,
+)
+async def get_vat_box_lines(
+    client_id: UUID,
+    period_id: UUID,
+    box_code: str,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(50, ge=1, le=500, description="Items per page"),
+    source_type: Optional[str] = Query(None, description="Filter by source type"),
+    from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+):
+    """Get drilldown lines for a specific VAT box."""
+    # Enforce consent/active-client isolation
+    await verify_accountant_access(client_id, current_user, db)
+    
+    # Get period
+    result = await db.execute(
+        select(AccountingPeriod)
+        .where(AccountingPeriod.id == period_id)
+        .where(AccountingPeriod.administration_id == client_id)
+    )
+    period = result.scalar_one_or_none()
+    
+    if not period:
+        raise HTTPException(status_code=404, detail="Period not found")
+    
+    # Get drilldown lines from lineage service
+    lineage_service = VatLineageService(db, client_id)
+    offset = (page - 1) * page_size
+    
+    lines, total_count = await lineage_service.get_box_lines(
+        period_id=period_id,
+        box_code=box_code,
+        limit=page_size,
+        offset=offset,
+        source_type=source_type,
+        from_date=from_date,
+        to_date=to_date,
+    )
+    
+    # Dutch VAT box names
+    box_names = {
+        "1a": "Leveringen/diensten belast met hoog tarief (21%)",
+        "1b": "Leveringen/diensten belast met laag tarief (9%)",
+        "1c": "Leveringen/diensten belast met ander tarief",
+        "1d": "Privégebruik",
+        "1e": "Leveringen/diensten belast met 0% of niet bij u belast",
+        "2a": "Verwerving uit landen binnen de EU (binnenlandse verlegging)",
+        "3a": "Leveringen naar landen buiten de EU",
+        "3b": "Leveringen naar/diensten in landen binnen de EU (ICP)",
+        "4a": "Verlegde btw - diensten/invoer van buiten de EU",
+        "4b": "Verlegde btw - verwervingen uit EU-landen",
+        "5a": "Verschuldigde btw (subtotaal)",
+        "5b": "Voorbelasting (aftrekbare btw)",
+        "5c": "Subtotaal (5a - 5b)",
+        "5d": "Vermindering KOR",
+        "5e": "Schatting vorige tijdvak(ken)",
+        "5f": "Schatting dit tijdvak",
+        "5g": "Totaal te betalen / te ontvangen",
+    }
+    
+    return VatBoxLinesResponse(
+        period_id=period.id,
+        period_name=period.name,
+        box_code=box_code,
+        box_name=box_names.get(box_code, f"Box {box_code}"),
+        lines=[
+            VatBoxLineResponse(
+                id=line.id,
+                vat_box_code=line.vat_box_code,
+                net_amount=line.net_amount,
+                vat_amount=line.vat_amount,
+                source_type=line.source_type,
+                source_id=line.source_id,
+                document_id=line.document_id,
+                journal_entry_id=line.journal_entry_id,
+                journal_line_id=line.journal_line_id,
+                vat_code_id=line.vat_code_id,
+                transaction_date=line.transaction_date,
+                reference=line.reference,
+                description=line.description,
+                party_id=line.party_id,
+                party_name=line.party_name,
+                party_vat_number=line.party_vat_number,
+                created_at=line.created_at,
+            )
+            for line in lines
+        ],
+        total_count=total_count,
+        page=page,
+        page_size=page_size,
+    )

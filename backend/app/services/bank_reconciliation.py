@@ -3,6 +3,7 @@ Bank Reconciliation Service
 
 Handles:
 - CSV file parsing and import
+- CAMT.053 and MT940 file parsing
 - Hash computation for idempotency
 - Match suggestion generation
 - Reconciliation action execution
@@ -37,6 +38,12 @@ from app.schemas.bank import (
     ReconciliationActionEnum,
 )
 from app.services.vat.posting import VatPostingService
+from app.services.bank.parsers import (
+    BaseStatementParser,
+    ParsedTransaction,
+    CAMT053Parser,
+    MT940Parser,
+)
 
 
 class BankReconciliationService:
@@ -217,6 +224,132 @@ class BankReconciliationService:
         self.db.add(bank_account)
         await self.db.flush()
         return bank_account
+
+    async def import_file(
+        self,
+        file_bytes: bytes,
+        filename: Optional[str],
+        bank_account_iban: Optional[str],
+        bank_name: Optional[str],
+    ) -> BankImportResponse:
+        """
+        Import bank transactions from any supported file format.
+        
+        Automatically detects format (CSV, CAMT.053, MT940) and uses
+        appropriate parser. Falls back to CSV if no parser matches.
+        
+        Returns counts of imported, skipped (duplicate), and failed rows.
+        """
+        # Initialize parsers
+        parsers: List[BaseStatementParser] = [
+            CAMT053Parser(),
+            MT940Parser(),
+        ]
+        
+        # Try each parser to see if it can handle the file
+        parsed_transactions: Optional[List[ParsedTransaction]] = None
+        detected_iban: Optional[str] = None
+        format_name = "CSV"
+        
+        for parser in parsers:
+            if parser.can_parse(file_bytes, filename):
+                try:
+                    parsed_transactions, detected_iban = parser.parse(file_bytes)
+                    format_name = parser.get_format_name()
+                    break
+                except Exception as e:
+                    # Parser claimed it could handle the file but failed
+                    # Try next parser
+                    print(f"Parser {parser.get_format_name()} failed: {e}")
+                    continue
+        
+        # If no parser succeeded, fall back to CSV import
+        if parsed_transactions is None:
+            return await self.import_csv(file_bytes, bank_account_iban, bank_name)
+        
+        # Use detected IBAN or provided IBAN
+        effective_iban = bank_account_iban or detected_iban
+        if not effective_iban:
+            return BankImportResponse(
+                imported_count=0,
+                skipped_duplicates_count=0,
+                total_in_file=len(parsed_transactions),
+                errors=["Geen IBAN opgegeven en niet kunnen afleiden uit het bestand."],
+                message=f"Import mislukt: IBAN ontbreekt ({format_name}).",
+                bank_account_id=None,
+            )
+        
+        # Get or create bank account
+        bank_account = await self._get_or_create_bank_account(effective_iban, bank_name)
+        
+        # Get existing hashes for duplicate detection
+        existing_hashes_result = await self.db.execute(
+            select(BankTransaction.import_hash)
+            .where(BankTransaction.administration_id == self.administration_id)
+        )
+        existing_hashes = set(row[0] for row in existing_hashes_result.fetchall())
+        
+        # Import transactions
+        imported_count = 0
+        skipped_duplicates = 0
+        errors: List[str] = []
+        
+        for idx, parsed_tx in enumerate(parsed_transactions, start=1):
+            try:
+                # Compute hash for duplicate detection
+                tx_hash = self._compute_hash(
+                    parsed_tx.booking_date,
+                    parsed_tx.amount,
+                    parsed_tx.description,
+                    reference=parsed_tx.reference,
+                    counterparty_iban=parsed_tx.counterparty_iban,
+                )
+                
+                if tx_hash in existing_hashes:
+                    skipped_duplicates += 1
+                    continue
+                
+                # Create transaction
+                transaction = BankTransaction(
+                    administration_id=self.administration_id,
+                    bank_account_id=bank_account.id,
+                    booking_date=parsed_tx.booking_date,
+                    amount=parsed_tx.amount,
+                    currency=parsed_tx.currency,
+                    counterparty_name=parsed_tx.counterparty_name,
+                    counterparty_iban=parsed_tx.counterparty_iban,
+                    description=parsed_tx.description,
+                    reference=parsed_tx.reference,
+                    import_hash=tx_hash,
+                    status=BankTransactionStatus.NEW,
+                )
+                self.db.add(transaction)
+                existing_hashes.add(tx_hash)
+                imported_count += 1
+                
+            except Exception as e:
+                errors.append(f"Rij {idx}: {str(e)}")
+        
+        await self.db.commit()
+        
+        # Build response message
+        if imported_count > 0 and len(errors) == 0:
+            message = f"{imported_count} transacties geïmporteerd ({format_name})."
+        elif imported_count > 0:
+            message = f"{imported_count} transacties geïmporteerd, {len(errors)} fouten ({format_name})."
+        elif skipped_duplicates > 0:
+            message = f"Geen nieuwe transacties. {skipped_duplicates} duplicaten overgeslagen ({format_name})."
+        else:
+            message = f"Import mislukt: geen geldige transacties gevonden ({format_name})."
+        
+        return BankImportResponse(
+            imported_count=imported_count,
+            skipped_duplicates_count=skipped_duplicates,
+            total_in_file=len(parsed_transactions),
+            errors=errors[:10],
+            message=message,
+            bank_account_id=bank_account.id,
+        )
 
     async def import_csv(
         self,

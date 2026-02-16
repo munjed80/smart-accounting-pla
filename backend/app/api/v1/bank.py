@@ -37,7 +37,7 @@ router = APIRouter()
 
 @router.post("/bank/import", response_model=BankImportResponse)
 async def import_bank_file(
-    file: Annotated[UploadFile, File(..., description="CSV-bestand")],
+    file: Annotated[UploadFile, File(..., description="Bank statement file (CSV, CAMT.053, MT940)")],
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     administration_id: UUID = Query(..., description="Administration ID"),
@@ -45,13 +45,14 @@ async def import_bank_file(
     bank_name: Optional[str] = Form(None),
 ):
     """
-    Import a bank statement CSV file.
+    Import a bank statement file.
     
-    The file is expected to be base64 encoded and contain columns for:
-    - date (booking date)
-    - amount (positive = credit, negative = debit)
-    - description
-    - optionally: counterparty name, IBAN, reference
+    Supports multiple formats:
+    - CSV files (with standard bank columns)
+    - CAMT.053 XML (ISO 20022 standard)
+    - MT940 text (SWIFT format)
+    
+    The format is automatically detected based on file content and extension.
     
     Transactions are imported idempotently using a hash of key fields.
     Duplicates are silently skipped.
@@ -60,7 +61,7 @@ async def import_bank_file(
 
     service = BankReconciliationService(db, administration_id, current_user.id)
     file_bytes = await file.read()
-    result = await service.import_csv(file_bytes, bank_account_iban, bank_name)
+    result = await service.import_file(file_bytes, file.filename, bank_account_iban, bank_name)
     return result
 
 

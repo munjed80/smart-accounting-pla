@@ -254,7 +254,7 @@ const UploadDialog = ({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv"
+              accept=".csv,.xml,.txt,.sta,.mt940"
               onChange={handleFileChange}
               className="hidden"
             />

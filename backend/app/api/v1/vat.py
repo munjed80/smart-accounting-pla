@@ -7,7 +7,7 @@ Provides accountant-only endpoints for Dutch VAT return (BTW Aangifte):
 - Validate VAT data
 - List VAT codes
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated, Optional, List
 from uuid import UUID
 from decimal import Decimal
@@ -598,7 +598,7 @@ async def get_vat_box_totals(
         period_id=period.id,
         period_name=period.name,
         boxes=boxes,
-        generated_at=datetime.utcnow(),
+        generated_at=datetime.now(timezone.utc),
     )
 
 

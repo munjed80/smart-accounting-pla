@@ -224,7 +224,7 @@ class VatLineageService:
     async def get_box_totals(
         self,
         period_id: uuid.UUID,
-    ) -> Dict[str, Dict[str, any]]:
+    ) -> Dict[str, Dict[str, Any]]:
         """
         Get aggregated totals for each VAT box in a period.
         
@@ -307,7 +307,7 @@ class VatLineageService:
     async def get_document_references(
         self,
         period_id: uuid.UUID,
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """
         Get list of all documents referenced in the lineage for a period.
         

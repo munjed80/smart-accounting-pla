@@ -62,7 +62,7 @@ def downgrade() -> None:
     op.drop_index('ix_vat_lineage_document', table_name='vat_box_lineage')
     op.drop_index('ix_vat_lineage_source', table_name='vat_box_lineage')
     op.drop_index('ix_vat_lineage_admin_period', table_name='vat_box_lineage')
-    op.create_index('ix_vat_lineage_period_box', 'vat_box_lineage', ['period_id', 'vat_box_code'])
+    op.drop_index('ix_vat_lineage_period_box', table_name='vat_box_lineage')
     
     # Drop table
     op.drop_table('vat_box_lineage')

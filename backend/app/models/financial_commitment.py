@@ -49,6 +49,9 @@ class FinancialCommitment(Base):
     interest_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 3), nullable=True)
     recurring_frequency: Mapped[Optional[RecurringFrequency]] = mapped_column(SQLEnum(RecurringFrequency), nullable=True)
     btw_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
+    vat_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
+    last_booked_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    auto_create_expense: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

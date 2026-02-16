@@ -43,8 +43,10 @@ import {
   Info,
   FileArrowDown,
   DownloadSimple,
+  CaretRight,
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
+import { BTWBoxDrilldown } from './BTWBoxDrilldown'
 
 // Types
 interface VatBox {
@@ -143,15 +145,32 @@ const SeverityBadge = ({ severity }: { severity: 'RED' | 'YELLOW' }) => {
 }
 
 // VAT Box Row component
-const VatBoxRow = ({ box, showTurnover = true }: { box: VatBox, showTurnover?: boolean }) => {
+const VatBoxRow = ({ 
+  box, 
+  showTurnover = true,
+  onClickBox 
+}: { 
+  box: VatBox, 
+  showTurnover?: boolean,
+  onClickBox?: (boxCode: string, boxName: string) => void
+}) => {
   const turnover = parseFloat(box.turnover_amount)
   const vat = parseFloat(box.vat_amount)
   const isCalculationBox = box.box_code.startsWith('5')
   const isSubtotalBox = ['5a', '5c', '5g'].includes(box.box_code)
+  const hasTransactions = box.transaction_count > 0
   
   return (
-    <TableRow className={isSubtotalBox ? 'font-semibold bg-muted/30' : ''}>
-      <TableCell className="font-mono">{box.box_code}</TableCell>
+    <TableRow 
+      className={`${isSubtotalBox ? 'font-semibold bg-muted/30' : ''} ${hasTransactions ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+      onClick={() => hasTransactions && onClickBox && onClickBox(box.box_code, box.box_name)}
+    >
+      <TableCell className="font-mono">
+        {box.box_code}
+        {hasTransactions && (
+          <CaretRight size={14} className="inline-block ml-1 text-muted-foreground" />
+        )}
+      </TableCell>
       <TableCell className="max-w-[300px]">{box.box_name}</TableCell>
       {showTurnover && (
         <TableCell className="text-right">
@@ -162,7 +181,7 @@ const VatBoxRow = ({ box, showTurnover = true }: { box: VatBox, showTurnover?: b
         {vat !== 0 ? formatCurrency(vat) : '-'}
       </TableCell>
       <TableCell className="text-right text-muted-foreground">
-        {!isCalculationBox && box.transaction_count > 0 ? box.transaction_count : '-'}
+        {!isCalculationBox && hasTransactions ? box.transaction_count : '-'}
       </TableCell>
     </TableRow>
   )
@@ -258,8 +277,18 @@ export const BTWAangiftePage = ({
 }) => {
   const [activeTab, setActiveTab] = useState('boxes')
   
+  // Drilldown state
+  const [drilldownOpen, setDrilldownOpen] = useState(false)
+  const [selectedBox, setSelectedBox] = useState<{ code: string, name: string } | null>(null)
+  
   // Use delayed loading to prevent skeleton flash
   const showLoading = useDelayedLoading(isLoading, 300, !!report)
+  
+  // Handle box click
+  const handleBoxClick = (boxCode: string, boxName: string) => {
+    setSelectedBox({ code: boxCode, name: boxName })
+    setDrilldownOpen(true)
+  }
   
   if (showLoading) {
     return (
@@ -472,7 +501,8 @@ export const BTWAangiftePage = ({
                           <VatBoxRow 
                             key={code} 
                             box={box}
-                            showTurnover={!groupName.includes('Berekening')} 
+                            showTurnover={!groupName.includes('Berekening')}
+                            onClickBox={handleBoxClick}
                           />
                         )
                       })}
@@ -625,6 +655,19 @@ export const BTWAangiftePage = ({
       <div className="text-sm text-muted-foreground text-center">
         Gegenereerd op {format(new Date(report.generated_at), 'd MMMM yyyy HH:mm')}
       </div>
+      
+      {/* Drilldown Drawer */}
+      {selectedBox && (
+        <BTWBoxDrilldown
+          open={drilldownOpen}
+          onClose={() => setDrilldownOpen(false)}
+          clientId={clientId}
+          periodId={periodId}
+          boxCode={selectedBox.code}
+          boxName={selectedBox.name}
+          onViewJournalEntry={onViewEntry}
+        />
+      )}
     </div>
   )
 }

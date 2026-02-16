@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { getErrorMessage, periodApi, vatApi, type Period, type VATAnomaly, type VATReportResponse, type ICPReportResponse } from '@/lib/api'
-import { ArrowsClockwise, CheckCircle, DownloadSimple, FileArrowDown, Warning, WarningCircle } from '@phosphor-icons/react'
+import { ArrowsClockwise, CheckCircle, DownloadSimple, FileArrowDown, Globe, Warning, WarningCircle } from '@phosphor-icons/react'
 
 const BOX_ORDER = ['1a', '1b', '1c', '1d', '2a', '3a', '3b', '3c', '4a', '4b', '5a', '5b', '5c', '5d', '5e', '5f', '5g'] as const
 
@@ -126,6 +126,30 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
     }
   }
 
+  const handleDownloadBtwSubmissionPackage = async () => {
+    if (!selectedPeriodId || !report) return
+    try {
+      setError(null)
+      const blob = await vatApi.downloadBtwSubmissionPackage(clientId, selectedPeriodId)
+      const filename = `btw-aangifte-${report.period_name}-${report.start_date}.xml`
+      downloadBlob(blob, filename)
+    } catch (err) {
+      setError(getErrorMessage(err))
+    }
+  }
+
+  const handleDownloadIcpSubmissionPackage = async () => {
+    if (!selectedPeriodId || !report) return
+    try {
+      setError(null)
+      const blob = await vatApi.downloadIcpSubmissionPackage(clientId, selectedPeriodId)
+      const filename = `icp-opgaaf-${report.period_name}-${report.start_date}.xml`
+      downloadBlob(blob, filename)
+    } catch (err) {
+      setError(getErrorMessage(err))
+    }
+  }
+
   const handleMarkReady = async () => {
     if (!selectedPeriodId) return
     try {
@@ -199,6 +223,56 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Submission Packages Section */}
+      {report && (
+        <Card className="bg-blue-500/5 border-blue-500/20">
+          <CardHeader>
+            <CardTitle>Indienbestanden (Phase A)</CardTitle>
+            <CardDescription>
+              Download XML-bestanden voor handmatige indiening bij de Belastingdienst.
+              {redCount > 0 && ' Let op: Los eerst blokkerende fouten op voordat je indient.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3">
+              <Button 
+                variant="default" 
+                onClick={handleDownloadBtwSubmissionPackage}
+                disabled={redCount > 0}
+              >
+                <FileArrowDown size={20} className="mr-2" />
+                Download BTW indienbestand (XML)
+              </Button>
+              {icpReport && icpReport.entries.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  onClick={handleDownloadIcpSubmissionPackage}
+                >
+                  <Globe size={20} className="mr-2" />
+                  Download ICP opgaaf (XML)
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                onClick={handleExportPdf}
+              >
+                <DownloadSimple size={20} className="mr-2" />
+                Download rapport (PDF)
+              </Button>
+            </div>
+            {redCount > 0 && (
+              <Alert className="mt-4 bg-red-500/10 border-red-500/40">
+                <WarningCircle className="h-4 w-4" />
+                <AlertTitle>Indienen nog niet mogelijk</AlertTitle>
+                <AlertDescription>
+                  Er zijn {redCount} blokkerende fouten. Los deze eerst op voordat je het indienbestand downloadt.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

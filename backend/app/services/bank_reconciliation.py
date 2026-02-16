@@ -631,15 +631,6 @@ class BankReconciliationService:
             .limit(5)
         )
         return list(result.scalars().all())
-
-    async def _find_parties_by_iban(self, iban: str) -> List[Party]:
-        """Find parties (suppliers/customers) by IBAN."""
-        result = await self.db.execute(
-            select(Party)
-            .where(Party.administration_id == self.administration_id)
-            .where(Party.iban == iban)
-        )
-        return list(result.scalars().all())
     
     async def _find_open_items_for_party(self, party_id: uuid.UUID) -> List[OpenItem]:
         """Find open items for a specific party."""

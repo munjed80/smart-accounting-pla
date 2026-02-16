@@ -165,14 +165,40 @@ async def update_time_entry(
             detail={"code": "TIME_ENTRY_INVOICED", "message": "Gefactureerde uren kunnen niet worden gewijzigd."},
         )
 
-    for field, value in entry_in.model_dump(exclude_unset=True).items():
-        setattr(entry, field, value)
+    # Validate customer_id if provided
+    update_data = entry_in.model_dump(exclude_unset=True)
+    if "customer_id" in update_data and update_data["customer_id"] is not None:
+        customer = await db.scalar(
+            select(ZZPCustomer).where(
+                ZZPCustomer.id == update_data["customer_id"],
+                ZZPCustomer.administration_id == administration.id,
+            )
+        )
+        if not customer:
+            raise HTTPException(status_code=404, detail={"code": "CUSTOMER_NOT_FOUND", "message": "Klant niet gevonden."})
 
-    if "hourly_rate" in entry_in.model_dump(exclude_unset=True):
+    # Apply updates
+    for field, value in update_data.items():
+        if field == "entry_date" and value is not None:
+            # Convert string date to date object
+            setattr(entry, field, date.fromisoformat(value))
+        else:
+            setattr(entry, field, value)
+
+    # Update hourly_rate_cents if hourly_rate changed
+    if "hourly_rate" in update_data:
         entry.hourly_rate_cents = _to_cents(entry.hourly_rate) if entry.hourly_rate is not None else None
 
-    await db.commit()
-    await db.refresh(entry)
+    try:
+        await db.commit()
+        await db.refresh(entry)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "UPDATE_FAILED", "message": f"Fout bij het bijwerken van uren: {str(e)}"}
+        )
+    
     return entry_to_response(entry)
 
 

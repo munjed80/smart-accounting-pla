@@ -285,6 +285,102 @@ class TestWorkSessionTimeEntryEdit:
         assert float(updated_entry["hourly_rate"]) == 95.00
         assert updated_entry["project_name"] == "Project Alpha"
         assert updated_entry["user_id"] == str(test_user.id)  # Verify user_id is set
+    
+    @pytest.mark.asyncio
+    async def test_edit_timer_entry_partial_update(
+        self, 
+        async_client: AsyncClient, 
+        test_user: User,
+        auth_headers: dict
+    ):
+        """Timer entries can be updated with partial data (only some fields)."""
+        # Start and stop a work session
+        await async_client.post(
+            "/api/v1/zzp/work-sessions/start",
+            json={"note": "Original note"},
+            headers=auth_headers
+        )
+        stop_response = await async_client.post(
+            "/api/v1/zzp/work-sessions/stop",
+            json={"break_minutes": 0},
+            headers=auth_headers
+        )
+        time_entry_id = stop_response.json()["time_entry"]["id"]
+        
+        # Update only hours field
+        edit_response = await async_client.patch(
+            f"/api/v1/zzp/time-entries/{time_entry_id}",
+            json={"hours": 2.5},
+            headers=auth_headers
+        )
+        
+        assert edit_response.status_code == 200
+        updated_entry = edit_response.json()
+        assert float(updated_entry["hours"]) == 2.5
+        assert updated_entry["description"] == "Original note"  # Other fields unchanged
+    
+    @pytest.mark.asyncio
+    async def test_edit_timer_entry_invalid_customer(
+        self, 
+        async_client: AsyncClient, 
+        auth_headers: dict
+    ):
+        """Editing timer entry with invalid customer_id returns 404."""
+        # Start and stop a work session
+        await async_client.post(
+            "/api/v1/zzp/work-sessions/start",
+            json={},
+            headers=auth_headers
+        )
+        stop_response = await async_client.post(
+            "/api/v1/zzp/work-sessions/stop",
+            json={"break_minutes": 0},
+            headers=auth_headers
+        )
+        time_entry_id = stop_response.json()["time_entry"]["id"]
+        
+        # Try to update with non-existent customer
+        fake_customer_id = str(uuid4())
+        edit_response = await async_client.patch(
+            f"/api/v1/zzp/time-entries/{time_entry_id}",
+            json={"customer_id": fake_customer_id},
+            headers=auth_headers
+        )
+        
+        assert edit_response.status_code == 404
+        assert edit_response.json()["detail"]["code"] == "CUSTOMER_NOT_FOUND"
+    
+    @pytest.mark.asyncio
+    async def test_edit_timer_entry_with_date_change(
+        self, 
+        async_client: AsyncClient, 
+        auth_headers: dict
+    ):
+        """Timer entries can have their date changed."""
+        # Start and stop a work session
+        await async_client.post(
+            "/api/v1/zzp/work-sessions/start",
+            json={},
+            headers=auth_headers
+        )
+        stop_response = await async_client.post(
+            "/api/v1/zzp/work-sessions/stop",
+            json={"break_minutes": 0},
+            headers=auth_headers
+        )
+        time_entry_id = stop_response.json()["time_entry"]["id"]
+        
+        # Change the entry date
+        new_date = "2024-01-15"
+        edit_response = await async_client.patch(
+            f"/api/v1/zzp/time-entries/{time_entry_id}",
+            json={"entry_date": new_date},
+            headers=auth_headers
+        )
+        
+        assert edit_response.status_code == 200
+        updated_entry = edit_response.json()
+        assert updated_entry["entry_date"] == new_date
 
 
 class TestRoundToFiveMinutes:

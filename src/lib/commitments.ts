@@ -16,6 +16,8 @@ export const createDemoCommitments = async (startDate: string) => {
       start_date: startDate,
       contract_term_months: 12,
       btw_rate: 21,
+      notice_period_days: 30,
+      auto_renew: true,
     },
     {
       type: 'lease',
@@ -27,6 +29,8 @@ export const createDemoCommitments = async (startDate: string) => {
       start_date: startDate,
       end_date: addYears(startDate, 4),
       btw_rate: 21,
+      notice_period_days: 30,
+      auto_renew: true,
     },
     {
       type: 'loan',

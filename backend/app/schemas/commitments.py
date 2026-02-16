@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 
 CommitmentTypeLiteral = Literal["lease", "loan", "subscription"]
 RecurringFrequencyLiteral = Literal["monthly", "yearly"]
+EndDateStatusLiteral = Literal["active", "ending_soon", "ended", "unknown"]
 
 
 class CommitmentCreate(BaseModel):
@@ -21,6 +22,11 @@ class CommitmentCreate(BaseModel):
     contract_term_months: Optional[int] = Field(None, ge=1, le=600)
     renewal_date: Optional[date] = None
     btw_rate: Optional[float] = Field(None, ge=0, le=100)
+    payment_day: Optional[int] = Field(None, ge=1, le=28)
+    provider: Optional[str] = Field(None, max_length=255)
+    contract_number: Optional[str] = Field(None, max_length=255)
+    notice_period_days: Optional[int] = Field(None, ge=0, le=3650)
+    auto_renew: bool = True
 
     @model_validator(mode="after")
     def validate_dates(self):
@@ -50,6 +56,11 @@ class CommitmentUpdate(BaseModel):
     contract_term_months: Optional[int] = Field(None, ge=1, le=600)
     renewal_date: Optional[date] = None
     btw_rate: Optional[float] = Field(None, ge=0, le=100)
+    payment_day: Optional[int] = Field(None, ge=1, le=28)
+    provider: Optional[str] = Field(None, max_length=255)
+    contract_number: Optional[str] = Field(None, max_length=255)
+    notice_period_days: Optional[int] = Field(None, ge=0, le=3650)
+    auto_renew: Optional[bool] = None
 
 
 class CommitmentResponse(BaseModel):
@@ -68,6 +79,15 @@ class CommitmentResponse(BaseModel):
     renewal_date: Optional[date]
     next_due_date: Optional[date]
     btw_rate: Optional[float]
+    payment_day: Optional[int]
+    provider: Optional[str]
+    contract_number: Optional[str]
+    notice_period_days: Optional[int]
+    auto_renew: bool
+    paid_to_date_cents: Optional[int]
+    remaining_balance_cents: Optional[int]
+    computed_end_date: Optional[date]
+    end_date_status: EndDateStatusLiteral
     created_at: datetime
     updated_at: datetime
 

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { zzpApi, ZZPCommitment, ZZPCommitmentCreate, ZZPAmortizationRow } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
 import { navigateTo } from '@/lib/navigation'
@@ -14,12 +15,12 @@ import { toast } from 'sonner'
 import { CommitmentExpenseDialog } from '@/components/CommitmentExpenseDialog'
 import { createDemoCommitments } from '@/lib/commitments'
 
-const eur = (cents: number) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(cents / 100)
+const eur = (cents?: number | null) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format((cents || 0) / 100)
 const todayStr = () => new Date().toISOString().slice(0, 10)
-const isExpired = (item: ZZPCommitment) => !!item.end_date && item.end_date < todayStr() && !item.next_due_date
+const isExpired = (item: ZZPCommitment) => item.end_date_status === 'ended'
 const errorWithStatus = (error: unknown) => axios.isAxiosError(error) && error.response?.status ? `${error.response.status}: ${parseApiError(error)}` : parseApiError(error)
 
-const emptyForm: ZZPCommitmentCreate = { type: 'loan', name: '', amount_cents: 0, start_date: todayStr() }
+const emptyForm: ZZPCommitmentCreate = { type: 'loan', name: '', amount_cents: 0, start_date: todayStr(), auto_renew: true }
 
 export const ZZPLeaseLoansPage = () => {
   const [items, setItems] = useState<ZZPCommitment[]>([])
@@ -44,7 +45,10 @@ export const ZZPLeaseLoansPage = () => {
   useEffect(() => { load() }, [])
 
   const save = async () => {
-    if (!form.name || !form.principal_amount_cents || form.amount_cents <= 0) return
+    if (!form.name || !form.principal_amount_cents || form.amount_cents <= 0) {
+      toast.error('Vul naam, hoofdsom en maandbetaling in.')
+      return
+    }
     try {
       if (editingId) await zzpApi.commitments.update(editingId, form)
       else await zzpApi.commitments.create(form)
@@ -83,9 +87,7 @@ export const ZZPLeaseLoansPage = () => {
       })
       setLastBookedOnByCommitmentId(prev => ({ ...prev, [selectedExpenseCommitment.id]: payload.expense_date }))
       setSelectedExpenseCommitment(null)
-      toast.success('Uitgave aangemaakt', {
-        action: { label: 'Open uitgave', onClick: () => navigateTo(`/zzp/expenses#expense-${created.id}`) },
-      })
+      toast.success('Uitgave aangemaakt', { action: { label: 'Open uitgave', onClick: () => navigateTo(`/zzp/expenses#expense-${created.id}`) } })
     } catch (error) {
       toast.error(errorWithStatus(error))
     } finally {
@@ -103,6 +105,12 @@ export const ZZPLeaseLoansPage = () => {
     }
   }
 
+  const fillFormFromItem = (i: ZZPCommitment) => {
+    setForm({ ...i, start_date: i.start_date.slice(0, 10), end_date: i.end_date || undefined, type: i.type as 'lease' | 'loan' })
+    setEditingId(i.id)
+    setOpen(true)
+  }
+
   return <div className='space-y-4 pb-4'>
     <div className='flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center'>
       <h1 className='text-xl sm:text-2xl font-semibold'>Lease & Leningen</h1>
@@ -118,13 +126,15 @@ export const ZZPLeaseLoansPage = () => {
             <p className='font-medium'>{i.name}</p>
             {isExpired(i) ? <Badge variant='secondary'>Afgelopen</Badge> : null}
           </div>
-          <p className='text-sm text-muted-foreground'>Type: {i.type}</p>
+          <p className='text-sm text-muted-foreground'>Provider: {i.provider || '-'}</p>
+          <p className='text-sm text-muted-foreground'>Contractnr: {i.contract_number || '-'}</p>
+          <p className='text-sm text-muted-foreground'>Betaaldag: {i.payment_day || '-'}</p>
           <p className='text-sm text-muted-foreground'>Volgende vervaldatum: {i.next_due_date || '-'}</p>
-          <p className='text-sm'>Maandbedrag: {eur(i.monthly_payment_cents || i.amount_cents)}</p>
-          <p className='text-sm'>Rente: {i.interest_rate || 0}%</p>
-          {lastBookedOnByCommitmentId[i.id] ? <p className='text-xs text-muted-foreground'>Last booked on {lastBookedOnByCommitmentId[i.id]}</p> : null}
+          <p className='text-sm'>Restschuld: {eur(i.remaining_balance_cents)}</p>
+          <p className='text-sm'>Afgelost: {eur(i.paid_to_date_cents)}</p>
+          <p className='text-sm'>Eindstatus: {i.end_date_status}</p>
           <div className='flex flex-wrap gap-2'>
-            <Button variant='outline' size='sm' onClick={() => { setForm({ ...i, start_date: i.start_date.slice(0, 10), end_date: i.end_date || undefined, type: i.type as 'lease' | 'loan' }); setEditingId(i.id); setOpen(true) }}>Bewerk</Button>
+            <Button variant='outline' size='sm' onClick={() => fillFormFromItem(i)}>Bewerk</Button>
             <Button variant='outline' size='sm' onClick={() => setSelectedExpenseCommitment(i)}>Maak uitgave aan</Button>
             <Button variant='outline' size='sm' onClick={() => showAmortization(i)}>Aflossing</Button>
             <Button variant='destructive' size='sm' onClick={async () => { try { await zzpApi.commitments.delete(i.id); load() } catch (error) { toast.error(errorWithStatus(error)) } }}>Verwijder</Button>
@@ -134,16 +144,18 @@ export const ZZPLeaseLoansPage = () => {
 
       <div className='hidden sm:block overflow-x-auto'>
         <Table>
-          <TableHeader><TableRow><TableHead>Naam</TableHead><TableHead>Type</TableHead><TableHead>Volgende vervaldatum</TableHead><TableHead>Maandbedrag</TableHead><TableHead>Rente</TableHead><TableHead>Laatste boeking</TableHead><TableHead /></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Naam</TableHead><TableHead>Provider</TableHead><TableHead>Contractnr</TableHead><TableHead>Volgende vervaldatum</TableHead><TableHead>Restschuld</TableHead><TableHead>Afgelost</TableHead><TableHead>Eindstatus</TableHead><TableHead /></TableRow></TableHeader>
           <TableBody>
             {items.map(i => <TableRow id={`commitment-${i.id}`} key={i.id}>
-              <TableCell>{i.name}</TableCell><TableCell>{i.type}</TableCell>
+              <TableCell>{i.name}</TableCell>
+              <TableCell>{i.provider || '-'}</TableCell>
+              <TableCell>{i.contract_number || '-'}</TableCell>
               <TableCell><div className='flex items-center gap-2'>{i.next_due_date || '-'} {isExpired(i) ? <Badge variant='secondary'>Afgelopen</Badge> : null}</div></TableCell>
-              <TableCell>{eur(i.monthly_payment_cents || i.amount_cents)}</TableCell>
-              <TableCell>{i.interest_rate || 0}%</TableCell>
-              <TableCell className='text-xs text-muted-foreground'>{lastBookedOnByCommitmentId[i.id] ? `Last booked on ${lastBookedOnByCommitmentId[i.id]}` : '-'}</TableCell>
+              <TableCell>{eur(i.remaining_balance_cents)}</TableCell>
+              <TableCell>{eur(i.paid_to_date_cents)}</TableCell>
+              <TableCell>{i.end_date_status}</TableCell>
               <TableCell className='space-x-2 whitespace-nowrap'>
-                <Button variant='outline' size='sm' onClick={() => { setForm({ ...i, start_date: i.start_date.slice(0, 10), end_date: i.end_date || undefined, type: i.type as 'lease' | 'loan' }); setEditingId(i.id); setOpen(true) }}>Bewerk</Button>
+                <Button variant='outline' size='sm' onClick={() => fillFormFromItem(i)}>Bewerk</Button>
                 <Button variant='outline' size='sm' onClick={() => setSelectedExpenseCommitment(i)}>Maak uitgave aan</Button>
                 <Button variant='outline' size='sm' onClick={() => showAmortization(i)}>Aflossing</Button>
                 <Button variant='destructive' size='sm' onClick={async () => { try { await zzpApi.commitments.delete(i.id); load() } catch (error) { toast.error(errorWithStatus(error)) } }}>Verwijder</Button>
@@ -154,30 +166,34 @@ export const ZZPLeaseLoansPage = () => {
       </div>
     </CardContent></Card>
 
-    {selected && <Card><CardHeader><CardTitle>Aflossingsschema: {selected.name}</CardTitle></CardHeader><CardContent className='overflow-x-auto'>
-      <Table><TableHeader><TableRow><TableHead>Maand</TableHead><TableHead>Datum</TableHead><TableHead>Rente</TableHead><TableHead>Aflossing</TableHead><TableHead>Restschuld</TableHead></TableRow></TableHeader>
-      <TableBody>{schedule.map(r => <TableRow key={r.month_index}><TableCell>{r.month_index}</TableCell><TableCell>{r.due_date}</TableCell><TableCell>{eur(r.interest_cents)}</TableCell><TableCell>{eur(r.principal_cents)}</TableCell><TableCell>{eur(r.remaining_balance_cents)}</TableCell></TableRow>)}</TableBody></Table>
+    {selected && <Card><CardHeader><CardTitle>Aflossingsschema: {selected.name}</CardTitle></CardHeader><CardContent>
+      <Accordion type='single' collapsible>
+        <AccordionItem value='amort'>
+          <AccordionTrigger>Toon aflossingsschema ({schedule.length} regels)</AccordionTrigger>
+          <AccordionContent className='overflow-x-auto'>
+            <Table><TableHeader><TableRow><TableHead>Maand</TableHead><TableHead>Datum</TableHead><TableHead>Rente</TableHead><TableHead>Aflossing</TableHead><TableHead>Restschuld</TableHead></TableRow></TableHeader>
+              <TableBody>{schedule.map(r => <TableRow key={r.month_index}><TableCell>{r.month_index}</TableCell><TableCell>{r.due_date}</TableCell><TableCell>{eur(r.interest_cents)}</TableCell><TableCell>{eur(r.principal_cents)}</TableCell><TableCell>{eur(r.remaining_balance_cents)}</TableCell></TableRow>)}</TableBody></Table>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </CardContent></Card>}
 
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditingId(null); setForm(emptyForm) } }}><DialogContent><DialogHeader><DialogTitle>{editingId ? 'Lease/Lening bewerken' : 'Lease/Lening toevoegen'}</DialogTitle></DialogHeader>
       <div className='space-y-2'>
         <Input placeholder='Naam' value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
         <Select value={form.type} onValueChange={(v: 'lease' | 'loan') => setForm({ ...form, type: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value='lease'>Lease</SelectItem><SelectItem value='loan'>Lening</SelectItem></SelectContent></Select>
-        <Input placeholder='Hoofdsom (EUR)' type='number' min='0' onChange={e => setForm({ ...form, principal_amount_cents: Math.round(Number(e.target.value || 0) * 100) })} />
-        <Input placeholder='Maandbetaling (EUR)' type='number' min='0' onChange={e => setForm({ ...form, amount_cents: Math.round(Number(e.target.value || 0) * 100), monthly_payment_cents: Math.round(Number(e.target.value || 0) * 100) })} />
-        <Input placeholder='Rente (%)' type='number' min='0' max='100' onChange={e => setForm({ ...form, interest_rate: Number(e.target.value || 0) })} />
+        <Input placeholder='Provider' value={form.provider || ''} onChange={e => setForm({ ...form, provider: e.target.value || undefined })} />
+        <Input placeholder='Contractnummer' value={form.contract_number || ''} onChange={e => setForm({ ...form, contract_number: e.target.value || undefined })} />
+        <Input placeholder='Betaaldag (1-28)' type='number' min='1' max='28' value={form.payment_day || ''} onChange={e => setForm({ ...form, payment_day: Number(e.target.value || 0) || undefined })} />
+        <Input placeholder='Hoofdsom (EUR)' type='number' min='0' value={form.principal_amount_cents ? form.principal_amount_cents / 100 : ''} onChange={e => setForm({ ...form, principal_amount_cents: Math.round(Number(e.target.value || 0) * 100) })} />
+        <Input placeholder='Maandbetaling (EUR)' type='number' min='0' value={form.amount_cents ? form.amount_cents / 100 : ''} onChange={e => setForm({ ...form, amount_cents: Math.round(Number(e.target.value || 0) * 100), monthly_payment_cents: Math.round(Number(e.target.value || 0) * 100) })} />
+        <Input placeholder='Rente (%)' type='number' min='0' max='100' value={form.interest_rate || ''} onChange={e => setForm({ ...form, interest_rate: Number(e.target.value || 0) })} />
         <Input type='date' value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} />
         <Input type='date' value={form.end_date || ''} onChange={e => setForm({ ...form, end_date: e.target.value || undefined })} />
       </div>
       <Button onClick={save}>Opslaan</Button>
     </DialogContent></Dialog>
 
-    <CommitmentExpenseDialog
-      open={!!selectedExpenseCommitment}
-      commitment={selectedExpenseCommitment}
-      isSubmitting={isCreatingExpense}
-      onOpenChange={(isOpen) => { if (!isOpen) setSelectedExpenseCommitment(null) }}
-      onConfirm={confirmCreateExpense}
-    />
+    <CommitmentExpenseDialog open={!!selectedExpenseCommitment} commitment={selectedExpenseCommitment} isSubmitting={isCreatingExpense} onOpenChange={(isOpen) => { if (!isOpen) setSelectedExpenseCommitment(null) }} onConfirm={confirmCreateExpense} />
   </div>
 }

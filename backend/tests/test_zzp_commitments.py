@@ -19,12 +19,17 @@ async def test_commitments_crud_and_next_due(async_client, auth_headers):
         "interest_rate": 5.2,
         "start_date": date.today().replace(day=1).isoformat(),
         "end_date": (date.today() + timedelta(days=365)).isoformat(),
+        "payment_day": 10,
+        "provider": "Rabobank",
+        "contract_number": "LN-123",
     }
 
     create = await async_client.post('/api/v1/zzp/commitments', headers=auth_headers, json=payload)
     assert create.status_code == 201
     item = create.json()
     assert item['next_due_date'] is not None
+    assert item['payment_day'] == 10
+    assert item['provider'] == 'Rabobank'
 
     list_resp = await async_client.get('/api/v1/zzp/commitments', headers=auth_headers)
     assert list_resp.status_code == 200
@@ -60,6 +65,8 @@ async def test_commitment_overview_alerts_and_suggestions(async_client, auth_hea
         "recurring_frequency": "yearly",
         "start_date": "2025-01-01",
         "renewal_date": (date.today() + timedelta(days=7)).isoformat(),
+        "notice_period_days": 30,
+        "auto_renew": True,
     }
     await async_client.post('/api/v1/zzp/commitments', headers=auth_headers, json=subscription_payload)
 

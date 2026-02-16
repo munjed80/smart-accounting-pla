@@ -56,14 +56,48 @@ interface MenuItem {
   icon: ReactNode
   rolesAllowed: Array<'zzp' | 'accountant' | 'admin' | 'super_admin'>
   section?: 'main' | 'secondary'
-  // Accounting concept grouping for accountants (5 core concepts)
-  accountingSection?: 'activa' | 'debiteuren' | 'crediteuren' | 'grootboek' | 'winstverlies'
+  // Accounting concept grouping for accountants (5 core concepts + workflow)
+  accountingSection?: 'workflow' | 'activa' | 'debiteuren' | 'crediteuren' | 'grootboek' | 'winstverlies'
   // Hidden from menu but code remains
   hidden?: boolean
 }
 
 // Define menu items for both roles
 const menuItems: MenuItem[] = [
+  // === WORKFLOW (Daily Tasks) ===
+  {
+    label: t('sidebar.werklijstGrootboek'),
+    tabValue: 'workqueue',
+    icon: <Stack size={20} weight="duotone" />,
+    rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
+    accountingSection: 'workflow',
+  },
+  {
+    label: t('sidebar.beoordelenGrootboek'),
+    tabValue: 'reviewqueue',
+    icon: <MagnifyingGlass size={20} weight="duotone" />,
+    rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
+    accountingSection: 'workflow',
+  },
+  {
+    label: t('sidebar.klantenDebiteuren'),
+    tabValue: 'clients',
+    icon: <UsersThree size={20} weight="duotone" />,
+    rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
+    accountingSection: 'workflow',
+  },
+  {
+    label: t('sidebar.overzichtWinstVerlies'),
+    tabValue: 'profitloss',
+    icon: <ChartLineUp size={20} weight="duotone" />,
+    rolesAllowed: ['accountant', 'admin'],
+    section: 'main',
+    accountingSection: 'workflow',
+  },
+  
   // === ACTIVA (Assets) ===
   {
     label: t('sidebar.bankActiva'),
@@ -75,14 +109,7 @@ const menuItems: MenuItem[] = [
   },
   
   // === DEBITEUREN (Receivables/Customers) ===
-  {
-    label: t('sidebar.klantenDebiteuren'),
-    tabValue: 'clients',
-    icon: <UsersThree size={20} weight="duotone" />,
-    rolesAllowed: ['accountant', 'admin'],
-    section: 'main',
-    accountingSection: 'debiteuren',
-  },
+  // (Klanten moved to Workflow section above)
   
   // === CREDITEUREN (Payables/Suppliers) ===
   {
@@ -95,22 +122,7 @@ const menuItems: MenuItem[] = [
   },
   
   // === GROOTBOEK (General Ledger) ===
-  {
-    label: t('sidebar.werklijstGrootboek'),
-    tabValue: 'workqueue',
-    icon: <Stack size={20} weight="duotone" />,
-    rolesAllowed: ['accountant', 'admin'],
-    section: 'main',
-    accountingSection: 'grootboek',
-  },
-  {
-    label: t('sidebar.beoordelenGrootboek'),
-    tabValue: 'reviewqueue',
-    icon: <MagnifyingGlass size={20} weight="duotone" />,
-    rolesAllowed: ['accountant', 'admin'],
-    section: 'main',
-    accountingSection: 'grootboek',
-  },
+  // (Werklijst and Beoordelen moved to Workflow section above)
   {
     label: 'Rekeningschema',
     tabValue: 'grootboek',
@@ -121,14 +133,7 @@ const menuItems: MenuItem[] = [
   },
   
   // === WINST & VERLIES (Profit & Loss) ===
-  {
-    label: t('sidebar.overzichtWinstVerlies'),
-    tabValue: 'profitloss',
-    icon: <ChartLineUp size={20} weight="duotone" />,
-    rolesAllowed: ['accountant', 'admin'],
-    section: 'main',
-    accountingSection: 'winstverlies',
-  },
+  // (Overzicht moved to Workflow section above)
   
   // === Secondary items (not part of 5 concepts) ===
   {
@@ -329,8 +334,13 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   )
   
   // Group items by accounting section for accountants
-  // Reordered to match real-world usage priority: Grootboek (workflow), Debiteuren, Winstverlies, Activa, Crediteuren
+  // Workflow section at top for daily tasks, followed by accounting concepts
   const accountingSections: Array<{ key: string; label: string; items: MenuItem[] }> = isAccountant ? [
+    { 
+      key: 'workflow', 
+      label: t('sidebar.sectionWorkflow'), 
+      items: visibleMenuItems.filter(i => i.accountingSection === 'workflow' && i.section !== 'secondary') 
+    },
     { 
       key: 'grootboek', 
       label: t('sidebar.sectionGrootboek'), 

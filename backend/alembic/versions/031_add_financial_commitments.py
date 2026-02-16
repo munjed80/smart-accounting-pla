@@ -19,6 +19,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     recurring_frequency = sa.Enum('monthly', 'yearly', name='recurringfrequency')
+    commitment_type_enum = postgresql.ENUM(
+        'lease',
+        'loan',
+        'subscription',
+        name='commitmenttype',
+        create_type=False,
+    )
 
     op.execute("""
     DO $$
@@ -35,7 +42,7 @@ def upgrade() -> None:
         'financial_commitments',
         sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('administration_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('administrations.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('type', sa.Enum('lease', 'loan', 'subscription', name='commitmenttype', create_type=False), nullable=False),
+        sa.Column('type', commitment_type_enum, nullable=False),
         sa.Column('name', sa.String(length=255), nullable=False),
         sa.Column('amount_cents', sa.Integer(), nullable=False, server_default='0'),
         sa.Column('monthly_payment_cents', sa.Integer(), nullable=True),

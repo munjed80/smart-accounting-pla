@@ -393,9 +393,12 @@ const InvoiceFormDialog = ({
   }, [open, invoice, preSelectedCustomerId])
 
   // Fetch price suggestion when customer changes (for new invoices or when editing)
+  // Note: We intentionally don't include 'lines' in dependencies to avoid infinite loop
+  // since we update lines inside this effect. The first line's description is read
+  // at the time the effect runs, which is sufficient for the suggestion logic.
   useEffect(() => {
     const fetchPriceSuggestion = async () => {
-      if (!customerId || !open || isReadOnly) {
+      if (!customerId || !open) {
         setPriceSuggestion(null)
         setSuggestionMessage(null)
         return
@@ -412,8 +415,8 @@ const InvoiceFormDialog = ({
           setPriceSuggestion(formattedPrice)
           setSuggestionMessage(suggestion.message)
           
-          // Auto-fill first line if it's empty
-          if (!lines[0]?.unitPrice || lines[0].unitPrice === '0,00') {
+          // Auto-fill first line if it's empty and not in read-only mode
+          if (!isReadOnly && (!lines[0]?.unitPrice || lines[0].unitPrice === '0,00')) {
             const newLines = [...lines]
             newLines[0] = { ...newLines[0], unitPrice: formattedPrice }
             setLines(newLines)
@@ -430,6 +433,7 @@ const InvoiceFormDialog = ({
     }
     
     void fetchPriceSuggestion()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId, open, isReadOnly])
 
   // Add new line

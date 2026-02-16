@@ -16,6 +16,12 @@ const todayStr = () => new Date().toISOString().slice(0, 10)
 const isExpired = (item: ZZPCommitment) => !!item.end_date && item.end_date < todayStr() && !item.next_due_date
 const errorWithStatus = (error: unknown) => axios.isAxiosError(error) && error.response?.status ? `${error.response.status}: ${parseApiError(error)}` : parseApiError(error)
 
+const addYears = (date: string, years: number) => {
+  const next = new Date(date)
+  next.setFullYear(next.getFullYear() + years)
+  return next.toISOString().slice(0, 10)
+}
+
 export const ZZPSubscriptionsPage = () => {
   const [items, setItems] = useState<ZZPCommitment[]>([])
   const [suggestions, setSuggestions] = useState<ZZPCommitmentSuggestion[]>([])
@@ -66,6 +72,49 @@ export const ZZPSubscriptionsPage = () => {
     }
   }
 
+  const addExamples = async () => {
+    const startDate = todayStr()
+    try {
+      await Promise.all([
+        zzpApi.commitments.create({
+          type: 'subscription',
+          name: 'Demo abonnement boekhoudsoftware',
+          amount_cents: 2900,
+          recurring_frequency: 'monthly',
+          start_date: startDate,
+          contract_term_months: 12,
+          btw_rate: 21,
+        }),
+        zzpApi.commitments.create({
+          type: 'lease',
+          name: 'Demo lease bedrijfsauto',
+          amount_cents: 42500,
+          monthly_payment_cents: 42500,
+          principal_amount_cents: 1800000,
+          interest_rate: 4.2,
+          start_date: startDate,
+          end_date: addYears(startDate, 4),
+          btw_rate: 21,
+        }),
+        zzpApi.commitments.create({
+          type: 'loan',
+          name: 'Demo lening bedrijfsmiddelen',
+          amount_cents: 61500,
+          monthly_payment_cents: 61500,
+          principal_amount_cents: 2500000,
+          interest_rate: 5.1,
+          start_date: startDate,
+          end_date: addYears(startDate, 3),
+          btw_rate: 0,
+        }),
+      ])
+      toast.success('Voorbeelden toegevoegd')
+      load()
+    } catch (error) {
+      toast.error(errorWithStatus(error))
+    }
+  }
+
   return <div className='space-y-4 pb-4'>
     <h1 className='text-xl sm:text-2xl font-semibold'>Abonnementen & Recurring Kosten</h1>
     <Card><CardHeader><CardTitle>Nieuw abonnement</CardTitle></CardHeader><CardContent className='grid grid-cols-1 md:grid-cols-3 gap-2'>
@@ -80,6 +129,7 @@ export const ZZPSubscriptionsPage = () => {
     </CardContent></Card>
 
     <Card><CardHeader><CardTitle>Abonnementen</CardTitle></CardHeader><CardContent className='overflow-x-auto'>
+      {items.length === 0 && <div className='mb-3'><Button variant='outline' onClick={addExamples}>Voeg voorbeelden toe</Button></div>}
       <Table><TableHeader><TableRow><TableHead>Naam</TableHead><TableHead>Frequentie</TableHead><TableHead>Volgende vervaldatum</TableHead><TableHead>Bedrag</TableHead><TableHead /></TableRow></TableHeader><TableBody>
         {items.map(i => <TableRow id={`commitment-${i.id}`} key={i.id}><TableCell>{i.name}</TableCell><TableCell>{i.recurring_frequency}</TableCell><TableCell><div className='flex items-center gap-2'>{i.next_due_date || '-'} {isExpired(i) ? <Badge variant='secondary'>Afgelopen</Badge> : null}</div></TableCell><TableCell>{eur(i.amount_cents)}</TableCell><TableCell className='space-x-2 whitespace-nowrap'><Button variant='outline' size='sm' onClick={() => { setEditingId(i.id); setForm({ ...i, type: 'subscription', recurring_frequency: (i.recurring_frequency || 'monthly') as 'monthly' | 'yearly', start_date: i.start_date.slice(0, 10), end_date: i.end_date || undefined, renewal_date: i.renewal_date || undefined }) }}>Bewerk</Button><Button variant='outline' size='sm' onClick={() => createExpense(i)}>Maak uitgave aan</Button><Button variant='destructive' size='sm' onClick={async () => { try { await zzpApi.commitments.delete(i.id); load() } catch (error) { toast.error(errorWithStatus(error)) } }}>Verwijder</Button></TableCell></TableRow>)}
       </TableBody></Table>

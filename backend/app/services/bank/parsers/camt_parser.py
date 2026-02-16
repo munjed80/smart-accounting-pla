@@ -6,12 +6,15 @@ This is the standard format used by European banks for PSD2 compliance.
 
 Namespace: urn:iso:std:iso:20022:tech:xsd:camt.053.001.0X (X = version)
 """
+import logging
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 
 from .base_parser import BaseStatementParser, ParsedTransaction
+
+logger = logging.getLogger(__name__)
 
 
 class CAMT053Parser(BaseStatementParser):
@@ -133,8 +136,7 @@ class CAMT053Parser(BaseStatementParser):
                 if transaction:
                     transactions.append(transaction)
             except Exception as e:
-                # Log but continue parsing other transactions
-                print(f"Warning: Failed to parse CAMT entry: {e}")
+                logger.warning(f"Failed to parse CAMT entry: {e}")
                 continue
         
         return transactions

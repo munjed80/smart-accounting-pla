@@ -11,6 +11,7 @@ Handles:
 import csv
 import hashlib
 import io
+import logging
 import re
 import uuid
 from datetime import datetime, date, timezone, timedelta
@@ -19,6 +20,8 @@ from typing import List, Optional, Tuple
 
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.models.bank import (
     BankAccount,
@@ -260,7 +263,7 @@ class BankReconciliationService:
                 except Exception as e:
                     # Parser claimed it could handle the file but failed
                     # Try next parser
-                    print(f"Parser {parser.get_format_name()} failed: {e}")
+                    logger.warning(f"Parser {parser.get_format_name()} failed: {e}")
                     continue
         
         # If no parser succeeded, fall back to CSV import

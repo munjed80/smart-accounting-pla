@@ -6,12 +6,15 @@ This is a legacy but widely-used format for bank statements.
 
 Format: Plain text with tags like :20:, :25:, :60F:, :61:, :86:, :62F:
 """
+import logging
 import re
 from datetime import datetime, date
 from decimal import Decimal
 from typing import List, Optional, Dict
 
 from .base_parser import BaseStatementParser, ParsedTransaction
+
+logger = logging.getLogger(__name__)
 
 
 class MT940Parser(BaseStatementParser):
@@ -121,7 +124,7 @@ class MT940Parser(BaseStatementParser):
                         if parsed:
                             transactions.append(parsed)
                     except Exception as e:
-                        print(f"Warning: Failed to parse MT940 transaction: {e}")
+                        logger.warning(f"Failed to parse MT940 transaction: {e}")
                 
                 # Start new transaction
                 current_transaction = self._parse_statement_line(line)
@@ -148,7 +151,7 @@ class MT940Parser(BaseStatementParser):
                     if parsed:
                         transactions.append(parsed)
                 except Exception as e:
-                    print(f"Warning: Failed to parse MT940 transaction: {e}")
+                    logger.warning(f"Failed to parse MT940 transaction: {e}")
                 current_transaction = None
                 current_description_lines = []
             

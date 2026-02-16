@@ -50,7 +50,7 @@ def upgrade() -> None:
             WHEN EXISTS (
                 SELECT 1 FROM financial_commitments fc
                 WHERE fc.id = zzp_expenses.commitment_id
-                  AND fc.recurring_frequency IN ('YEARLY', 'yearly')
+                  AND LOWER(fc.recurring_frequency::text) = 'yearly'
             ) THEN CONCAT(EXTRACT(YEAR FROM expense_date)::int, '-Y')
             ELSE to_char(expense_date, 'YYYY-MM')
         END

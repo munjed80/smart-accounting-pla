@@ -19,6 +19,12 @@ const errorWithStatus = (error: unknown) => {
   return parseApiError(error)
 }
 
+const addYears = (date: string, years: number) => {
+  const next = new Date(date)
+  next.setFullYear(next.getFullYear() + years)
+  return next.toISOString().slice(0, 10)
+}
+
 export const ZZPCommitmentsOverviewPage = () => {
   const [typeFilter, setTypeFilter] = useState<'all' | 'lease' | 'loan' | 'subscription'>('all')
   const [commitments, setCommitments] = useState<ZZPCommitment[]>([])
@@ -70,6 +76,49 @@ export const ZZPCommitmentsOverviewPage = () => {
     }
   }
 
+  const addExamples = async () => {
+    const startDate = todayStr()
+    try {
+      await Promise.all([
+        zzpApi.commitments.create({
+          type: 'subscription',
+          name: 'Demo abonnement boekhoudsoftware',
+          amount_cents: 2900,
+          recurring_frequency: 'monthly',
+          start_date: startDate,
+          contract_term_months: 12,
+          btw_rate: 21,
+        }),
+        zzpApi.commitments.create({
+          type: 'lease',
+          name: 'Demo lease bedrijfsauto',
+          amount_cents: 42500,
+          monthly_payment_cents: 42500,
+          principal_amount_cents: 1800000,
+          interest_rate: 4.2,
+          start_date: startDate,
+          end_date: addYears(startDate, 4),
+          btw_rate: 21,
+        }),
+        zzpApi.commitments.create({
+          type: 'loan',
+          name: 'Demo lening bedrijfsmiddelen',
+          amount_cents: 61500,
+          monthly_payment_cents: 61500,
+          principal_amount_cents: 2500000,
+          interest_rate: 5.1,
+          start_date: startDate,
+          end_date: addYears(startDate, 3),
+          btw_rate: 0,
+        }),
+      ])
+      toast.success('Voorbeelden toegevoegd')
+      load()
+    } catch (error) {
+      toast.error(errorWithStatus(error))
+    }
+  }
+
   return (
     <div className="space-y-4 pb-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -101,6 +150,7 @@ export const ZZPCommitmentsOverviewPage = () => {
 
       <Card>
         <CardHeader><CardTitle>Aankomende verplichtingen</CardTitle></CardHeader>
+        {commitments.length === 0 && <CardContent><Button variant="outline" onClick={addExamples}>Voeg voorbeelden toe</Button></CardContent>}
         <CardContent className="space-y-2">
           {(overview?.upcoming || []).map(item => (
             <div id={`commitment-${item.id}`} key={item.id} className="rounded-md border p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

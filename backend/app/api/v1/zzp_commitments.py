@@ -6,14 +6,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, select, func, extract
+from sqlalchemy import and_, select, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import CurrentUser, require_zzp
 from app.core.database import get_db
 from app.models.administration import Administration, AdministrationMember
 from app.models.bank import BankTransaction
-from app.models.financial_commitment import CommitmentType, FinancialCommitment, RecurringFrequency
+from app.models.financial_commitment import CommitmentStatus, CommitmentType, FinancialCommitment, RecurringFrequency
+from app.models.ledger import AccountingPeriod, PeriodStatus
 from app.models.zzp import ZZPExpense
 from app.repositories.ledger_repository import LedgerRepository
 from app.services.ledger_service import LedgerPostingError, LedgerPostingService
@@ -37,7 +39,6 @@ class CommitmentExpenseCreateRequest(BaseModel):
     vat_rate: int = Field(..., description="VAT rate (0/9/21)")
     description: str = Field(..., min_length=1, max_length=500)
     notes: Optional[str] = Field(None, max_length=2000)
-    force_duplicate: bool = False
 
 
 def add_months(base: date, months: int) -> date:
@@ -74,9 +75,34 @@ async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administra
     return administration
 
 
+def _normalize_status(item: FinancialCommitment, today: date) -> CommitmentStatus:
+    if item.status == CommitmentStatus.PAUSED:
+        return CommitmentStatus.PAUSED
+    if item.status == CommitmentStatus.ENDED:
+        return CommitmentStatus.ENDED
+
+    if item.end_date and item.end_date < today:
+        return CommitmentStatus.ENDED
+
+    if item.contract_term_months and item.contract_term_months > 0:
+        contract_end = add_months(item.start_date, item.contract_term_months - 1)
+        if contract_end < today:
+            return CommitmentStatus.ENDED
+
+    return CommitmentStatus.ACTIVE
+
+
+def _candidate_for_month(item: FinancialCommitment, year: int, month: int) -> date:
+    anchor_day = item.payment_day or item.start_date.day
+    return with_day(date(year, month, 1), anchor_day)
+
+
 def compute_next_due_date(item: FinancialCommitment, today: Optional[date] = None) -> Optional[date]:
     today = today or date.today()
-    if item.end_date and item.end_date < today:
+    lifecycle_status = _normalize_status(item, today)
+    if lifecycle_status == CommitmentStatus.ENDED:
+        return None
+    if lifecycle_status == CommitmentStatus.PAUSED:
         return None
 
     if item.last_booked_date:
@@ -84,35 +110,41 @@ def compute_next_due_date(item: FinancialCommitment, today: Optional[date] = Non
             candidate = add_years(item.last_booked_date, 1)
         else:
             candidate = add_months(item.last_booked_date, 1)
+
         if item.end_date and candidate > item.end_date:
             return None
         if candidate >= today:
             return candidate
 
     if item.type == CommitmentType.SUBSCRIPTION and item.recurring_frequency == RecurringFrequency.YEARLY:
-        if item.renewal_date and item.renewal_date >= today:
-            return item.renewal_date
         base = item.renewal_date or item.start_date
-        next_due = base
-        while next_due < today:
-            next_due = add_years(next_due, 1)
-        if item.end_date and next_due > item.end_date:
+        candidate = base
+        while candidate < today:
+            candidate = add_years(candidate, 1)
+        if item.end_date and candidate > item.end_date:
             return None
-        return next_due
+        return candidate
 
-    anchor_day = item.payment_day or item.start_date.day
-    candidate = with_day(today, anchor_day)
+    candidate = _candidate_for_month(item, today.year, today.month)
     if candidate < today:
-        candidate = with_day(add_months(today.replace(day=1), 1), anchor_day)
+        next_month = add_months(date(today.year, today.month, 1), 1)
+        candidate = _candidate_for_month(item, next_month.year, next_month.month)
 
     if candidate < item.start_date:
-        base_month = item.start_date.replace(day=1)
-        candidate = with_day(base_month, anchor_day)
+        base = date(item.start_date.year, item.start_date.month, 1)
+        candidate = _candidate_for_month(item, base.year, base.month)
         while candidate < item.start_date:
-            candidate = with_day(add_months(candidate.replace(day=1), 1), anchor_day)
+            base = add_months(base, 1)
+            candidate = _candidate_for_month(item, base.year, base.month)
 
     if item.end_date and candidate > item.end_date:
         return None
+
+    if item.contract_term_months and item.contract_term_months > 0:
+        contract_end = add_months(item.start_date, item.contract_term_months - 1)
+        if candidate > contract_end:
+            return None
+
     return candidate
 
 
@@ -153,7 +185,9 @@ def compute_amortization_rows(item: FinancialCommitment) -> list[AmortizationRow
     return rows
 
 
-def compute_end_date_status(target_end_date: Optional[date], today: date) -> str:
+def compute_end_date_status(target_end_date: Optional[date], today: date, status: CommitmentStatus) -> str:
+    if status == CommitmentStatus.ENDED:
+        return "ended"
     if not target_end_date:
         return "unknown"
     if target_end_date < today:
@@ -165,6 +199,7 @@ def compute_end_date_status(target_end_date: Optional[date], today: date) -> str
 
 def to_response(item: FinancialCommitment, today: Optional[date] = None) -> CommitmentResponse:
     today = today or date.today()
+    lifecycle_status = _normalize_status(item, today)
     rows = compute_amortization_rows(item)
     paid_to_date_cents: Optional[int] = None
     remaining_balance_cents: Optional[int] = None
@@ -201,10 +236,11 @@ def to_response(item: FinancialCommitment, today: Optional[date] = None) -> Comm
         auto_renew=item.auto_renew,
         last_booked_date=item.last_booked_date,
         auto_create_expense=item.auto_create_expense,
+        status=lifecycle_status.value,
         paid_to_date_cents=paid_to_date_cents,
         remaining_balance_cents=remaining_balance_cents,
         computed_end_date=computed_end_date,
-        end_date_status=compute_end_date_status(computed_end_date, today=today),
+        end_date_status=compute_end_date_status(computed_end_date, today=today, status=lifecycle_status),
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
@@ -260,15 +296,17 @@ async def commitment_overview(
     for item in items:
         due_date = compute_next_due_date(item, today=today)
         value = item.monthly_payment_cents or item.amount_cents
+        lifecycle_status = _normalize_status(item, today)
 
-        if item.type == CommitmentType.SUBSCRIPTION and item.recurring_frequency == RecurringFrequency.YEARLY:
-            monthly_total += item.amount_cents // 12
-        else:
-            monthly_total += value
+        if lifecycle_status == CommitmentStatus.ACTIVE:
+            if item.type == CommitmentType.SUBSCRIPTION and item.recurring_frequency == RecurringFrequency.YEARLY:
+                monthly_total += item.amount_cents // 12
+            else:
+                monthly_total += value
 
-        by_type[item.type.value] += value
-        if due_date and due_date <= next_30:
-            upcoming.append(item)
+            by_type[item.type.value] += value
+            if due_date and due_date <= next_30:
+                upcoming.append(item)
 
     alerts: list[CommitmentAlert] = []
     for item in items:
@@ -286,7 +324,7 @@ async def commitment_overview(
         upcoming_total_cents=sum(i.monthly_payment_cents or i.amount_cents for i in upcoming),
         warning_count=len([a for a in alerts if a.severity == "warning"]),
         by_type=by_type,
-        upcoming=[to_response(i, today=today) for i in sorted(upcoming, key=lambda x: compute_next_due_date(x, today=today) or date.max)[:8]],
+        upcoming=[to_response(i, today=today) for i in sorted(upcoming, key=lambda x: compute_next_due_date(x, today=today) or date.max)[:10]],
         alerts=alerts,
         threshold_cents=threshold_cents,
     )
@@ -365,6 +403,7 @@ async def create_commitment(
         notice_period_days=payload.notice_period_days,
         auto_renew=payload.auto_renew,
         auto_create_expense=payload.auto_create_expense,
+        status=CommitmentStatus(payload.status),
     )
     db.add(item)
     await db.commit()
@@ -420,6 +459,8 @@ async def patch_commitment(
             setattr(item, key, Decimal(str(value)))
         elif key == "recurring_frequency":
             setattr(item, key, RecurringFrequency(value) if value else None)
+        elif key == "status" and value:
+            setattr(item, key, CommitmentStatus(value))
         else:
             setattr(item, key, value)
 
@@ -436,20 +477,31 @@ async def patch_commitment(
 
 
 def _compute_next_due_from_booked(item: FinancialCommitment, booked_date: date) -> Optional[date]:
+    if _normalize_status(item, booked_date) != CommitmentStatus.ACTIVE:
+        return None
+
     if item.recurring_frequency == RecurringFrequency.YEARLY:
         candidate = add_years(booked_date, 1)
     else:
         candidate = add_months(booked_date, 1)
+        if item.payment_day:
+            candidate = with_day(candidate, item.payment_day)
 
     if item.end_date and candidate > item.end_date:
         return None
+
+    if item.contract_term_months and item.contract_term_months > 0:
+        contract_end = add_months(item.start_date, item.contract_term_months - 1)
+        if candidate > contract_end:
+            return None
+
     return candidate
 
 
-def _period_key(expense_date: date, frequency: Optional[RecurringFrequency]) -> tuple[int, int]:
+def _period_key(expense_date: date, frequency: Optional[RecurringFrequency]) -> str:
     if frequency == RecurringFrequency.YEARLY:
-        return expense_date.year, 0
-    return expense_date.year, expense_date.month
+        return f"{expense_date.year}-Y"
+    return expense_date.strftime('%Y-%m')
 
 
 def _calculate_vat_amount(amount_cents: int, vat_rate: int) -> int:
@@ -481,20 +533,42 @@ async def create_expense_from_commitment(
     if not item:
         raise HTTPException(status_code=404, detail={"code": "COMMITMENT_NOT_FOUND", "message": "Verplichting niet gevonden."})
 
-    if compute_next_due_date(item) is None and not payload.expense_date:
-        raise HTTPException(status_code=422, detail={"code": "DATE_REQUIRED", "message": "Deze verplichting is afgelopen. Kies handmatig een datum."})
+    lifecycle_status = _normalize_status(item, payload.expense_date)
+    if lifecycle_status == CommitmentStatus.PAUSED:
+        raise HTTPException(status_code=409, detail={"code": "COMMITMENT_PAUSED", "message": "Deze verplichting is gepauzeerd. Hervat de verplichting om uitgaven te maken."})
+    if lifecycle_status == CommitmentStatus.ENDED:
+        raise HTTPException(status_code=409, detail={"code": "COMMITMENT_ENDED", "message": "Deze verplichting is beëindigd en kan geen nieuwe uitgaven genereren."})
 
-    period_year, period_month = _period_key(payload.expense_date, item.recurring_frequency)
-    duplicate_query = select(ZZPExpense.id).where(ZZPExpense.commitment_id == item.id)
-    if period_month == 0:
-        duplicate_query = duplicate_query.where(extract('year', ZZPExpense.expense_date) == period_year)
-    else:
-        duplicate_query = duplicate_query.where(
-            extract('year', ZZPExpense.expense_date) == period_year,
-            extract('month', ZZPExpense.expense_date) == period_month,
+    locked_period = await db.execute(
+        select(AccountingPeriod).where(
+            AccountingPeriod.administration_id == administration.id,
+            AccountingPeriod.start_date <= payload.expense_date,
+            AccountingPeriod.end_date >= payload.expense_date,
+            AccountingPeriod.status.in_([PeriodStatus.FINALIZED, PeriodStatus.LOCKED]),
+        ).limit(1)
+    )
+    blocked_period = locked_period.scalar_one_or_none()
+    if blocked_period:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "PERIOD_LOCKED",
+                "message": f"Kan geen uitgave aanmaken in afgesloten periode: {blocked_period.name}.",
+                "period_id": str(blocked_period.id),
+                "period_name": blocked_period.name,
+            },
         )
-    duplicate = (await db.execute(duplicate_query.limit(1))).scalar_one_or_none()
-    if duplicate and not payload.force_duplicate:
+
+    period_key = _period_key(payload.expense_date, item.recurring_frequency)
+    duplicate_query = await db.execute(
+        select(ZZPExpense.id).where(
+            ZZPExpense.administration_id == administration.id,
+            ZZPExpense.commitment_id == item.id,
+            ZZPExpense.period_key == period_key,
+        ).limit(1)
+    )
+    duplicate = duplicate_query.scalar_one_or_none()
+    if duplicate:
         raise HTTPException(status_code=409, detail={"code": "DUPLICATE_COMMITMENT_EXPENSE", "message": "Er bestaat al een uitgave voor deze periode.", "existing_expense_id": str(duplicate)})
 
     expense = ZZPExpense(
@@ -508,6 +582,7 @@ async def create_expense_from_commitment(
         category='Abonnement' if item.type == CommitmentType.SUBSCRIPTION else ('Lease' if item.type == CommitmentType.LEASE else 'Lening'),
         notes=payload.notes,
         commitment_id=item.id,
+        period_key=period_key,
     )
     db.add(expense)
 
@@ -517,7 +592,11 @@ async def create_expense_from_commitment(
     if item.btw_rate is None:
         item.btw_rate = Decimal(str(payload.vat_rate))
 
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail={"code": "DUPLICATE_COMMITMENT_EXPENSE", "message": "Er bestaat al een uitgave voor deze periode."}) from exc
 
     try:
         ledger_service = LedgerPostingService(LedgerRepository(db, administration.id))

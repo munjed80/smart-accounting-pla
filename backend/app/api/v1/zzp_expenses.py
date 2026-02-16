@@ -10,12 +10,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
 from sqlalchemy import select, func, extract
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.zzp import ZZPExpense
-from app.models.financial_commitment import FinancialCommitment
+from app.models.financial_commitment import CommitmentStatus, FinancialCommitment, RecurringFrequency
 from app.models.administration import Administration, AdministrationMember
+from app.models.ledger import AccountingPeriod, PeriodStatus
 from app.schemas.zzp import (
     ExpenseCreate,
     ExpenseUpdate,
@@ -63,6 +65,13 @@ def calculate_vat_amount(amount_cents: int, vat_rate: float) -> int:
     vat_amount = int(Decimal(str(amount_cents)) * Decimal(str(vat_rate)) / (Decimal('100') + Decimal(str(vat_rate))))
     return vat_amount
 
+
+
+
+def get_period_key(expense_date: date, frequency: Optional[RecurringFrequency]) -> str:
+    if frequency == RecurringFrequency.YEARLY:
+        return f"{expense_date.year}-Y"
+    return expense_date.strftime('%Y-%m')
 
 def expense_to_response(expense: ZZPExpense) -> ExpenseResponse:
     """Convert expense model to response schema."""
@@ -156,15 +165,48 @@ async def create_expense(
     administration = await get_user_administration(current_user.id, db)
     
     commitment_id = expense_in.commitment_id
+    linked_commitment: Optional[FinancialCommitment] = None
+    expense_date_value = date.fromisoformat(expense_in.expense_date)
+
+    blocked_period = await db.execute(
+        select(AccountingPeriod).where(
+            AccountingPeriod.administration_id == administration.id,
+            AccountingPeriod.start_date <= expense_date_value,
+            AccountingPeriod.end_date >= expense_date_value,
+            AccountingPeriod.status.in_([PeriodStatus.FINALIZED, PeriodStatus.LOCKED]),
+        ).limit(1)
+    )
+    period = blocked_period.scalar_one_or_none()
+    if period:
+        raise HTTPException(status_code=409, detail={"code": "PERIOD_LOCKED", "message": f"Kan niet boeken in afgesloten periode: {period.name}"})
+
     if commitment_id:
         commitment_check = await db.execute(
-            select(FinancialCommitment.id).where(
+            select(FinancialCommitment).where(
                 FinancialCommitment.id == commitment_id,
                 FinancialCommitment.administration_id == administration.id,
             )
         )
-        if not commitment_check.scalar_one_or_none():
+        linked_commitment = commitment_check.scalar_one_or_none()
+        if not linked_commitment:
             raise HTTPException(status_code=404, detail={"code": "COMMITMENT_NOT_FOUND", "message": "Verplichting niet gevonden."})
+        if linked_commitment.status == CommitmentStatus.PAUSED:
+            raise HTTPException(status_code=409, detail={"code": "COMMITMENT_PAUSED", "message": "Deze verplichting is gepauzeerd."})
+        if linked_commitment.status == CommitmentStatus.ENDED:
+            raise HTTPException(status_code=409, detail={"code": "COMMITMENT_ENDED", "message": "Deze verplichting is beëindigd."})
+
+        period_key = get_period_key(expense_date_value, linked_commitment.recurring_frequency)
+        duplicate = await db.execute(
+            select(ZZPExpense.id).where(
+                ZZPExpense.administration_id == administration.id,
+                ZZPExpense.commitment_id == commitment_id,
+                ZZPExpense.period_key == period_key,
+            ).limit(1)
+        )
+        if duplicate.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail={"code": "DUPLICATE_COMMITMENT_EXPENSE", "message": "Er bestaat al een uitgave voor deze periode."})
+    else:
+        period_key = None
 
     # Calculate VAT amount
     vat_amount = calculate_vat_amount(expense_in.amount_cents, expense_in.vat_rate)
@@ -173,7 +215,7 @@ async def create_expense(
         administration_id=administration.id,
         vendor=expense_in.vendor,
         description=expense_in.description,
-        expense_date=date.fromisoformat(expense_in.expense_date),
+        expense_date=expense_date_value,
         amount_cents=expense_in.amount_cents,
         vat_rate=Decimal(str(expense_in.vat_rate)),
         vat_amount_cents=vat_amount,
@@ -181,26 +223,23 @@ async def create_expense(
         notes=expense_in.notes,
         attachment_url=expense_in.attachment_url,
         commitment_id=expense_in.commitment_id,
+        period_key=period_key,
     )
     
     db.add(expense)
 
-    if expense_in.commitment_id:
-        commitment_result = await db.execute(
-            select(FinancialCommitment).where(
-                FinancialCommitment.id == expense_in.commitment_id,
-                FinancialCommitment.administration_id == administration.id,
-            )
-        )
-        commitment = commitment_result.scalar_one_or_none()
-        if commitment:
-            commitment.last_booked_date = date.fromisoformat(expense_in.expense_date)
-            if commitment.vat_rate is None:
-                commitment.vat_rate = Decimal(str(expense_in.vat_rate))
-            if commitment.btw_rate is None:
-                commitment.btw_rate = Decimal(str(expense_in.vat_rate))
+    if linked_commitment:
+        linked_commitment.last_booked_date = expense_date_value
+        if linked_commitment.vat_rate is None:
+            linked_commitment.vat_rate = Decimal(str(expense_in.vat_rate))
+        if linked_commitment.btw_rate is None:
+            linked_commitment.btw_rate = Decimal(str(expense_in.vat_rate))
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail={"code": "DUPLICATE_COMMITMENT_EXPENSE", "message": "Er bestaat al een uitgave voor deze periode."}) from exc
 
     try:
         ledger_service = LedgerPostingService(LedgerRepository(db, administration.id))

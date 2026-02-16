@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, model_validator
 CommitmentTypeLiteral = Literal["lease", "loan", "subscription"]
 RecurringFrequencyLiteral = Literal["monthly", "yearly"]
 EndDateStatusLiteral = Literal["active", "ending_soon", "ended", "unknown"]
+CommitmentStatusLiteral = Literal["active", "paused", "ended"]
 
 
 class CommitmentCreate(BaseModel):
@@ -29,6 +30,7 @@ class CommitmentCreate(BaseModel):
     notice_period_days: Optional[int] = Field(None, ge=0, le=3650)
     auto_renew: bool = True
     auto_create_expense: bool = False
+    status: CommitmentStatusLiteral = "active"
 
     @model_validator(mode="after")
     def validate_dates(self):
@@ -71,6 +73,7 @@ class CommitmentUpdate(BaseModel):
     notice_period_days: Optional[int] = Field(None, ge=0, le=3650)
     auto_renew: Optional[bool] = None
     auto_create_expense: Optional[bool] = None
+    status: Optional[CommitmentStatusLiteral] = None
 
     @model_validator(mode="after")
     def validate_vat_rate(self):
@@ -103,6 +106,7 @@ class CommitmentResponse(BaseModel):
     auto_renew: bool
     last_booked_date: Optional[date]
     auto_create_expense: bool
+    status: CommitmentStatusLiteral
     paid_to_date_cents: Optional[int]
     remaining_balance_cents: Optional[int]
     computed_end_date: Optional[date]

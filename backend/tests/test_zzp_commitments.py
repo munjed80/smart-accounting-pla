@@ -3,6 +3,7 @@ from datetime import date, timedelta
 
 from app.models.administration import Administration, AdministrationMember, MemberRole
 from app.models.bank import BankAccount, BankTransaction, BankTransactionStatus
+from app.models.ledger import AccountingPeriod, PeriodStatus
 from app.models.user import User
 from app.core.roles import UserRole
 from app.core.security import create_access_token, get_password_hash
@@ -253,14 +254,35 @@ async def test_create_expense_from_commitment_updates_status_and_prevents_duplic
     })
     assert duplicate.status_code == 409
 
-    forced = await async_client.post(f'/api/v1/zzp/commitments/{commitment_id}/create-expense', headers=auth_headers, json={
-        "expense_date": "2026-02-20",
+    paused_update = await async_client.patch(
+        f'/api/v1/zzp/commitments/{commitment_id}',
+        headers=auth_headers,
+        json={"status": "paused"},
+    )
+    assert paused_update.status_code == 200
+
+    paused_create = await async_client.post(f'/api/v1/zzp/commitments/{commitment_id}/create-expense', headers=auth_headers, json={
+        "expense_date": "2026-03-01",
         "amount_cents": 1500,
         "vat_rate": 21,
-        "description": "Canva februari opnieuw",
-        "force_duplicate": True,
+        "description": "Canva maart",
     })
-    assert forced.status_code == 201
+    assert paused_create.status_code == 409
+
+    ended_update = await async_client.patch(
+        f'/api/v1/zzp/commitments/{commitment_id}',
+        headers=auth_headers,
+        json={"status": "ended"},
+    )
+    assert ended_update.status_code == 200
+
+    ended_create = await async_client.post(f'/api/v1/zzp/commitments/{commitment_id}/create-expense', headers=auth_headers, json={
+        "expense_date": "2026-04-01",
+        "amount_cents": 1500,
+        "vat_rate": 21,
+        "description": "Canva april",
+    })
+    assert ended_create.status_code == 409
 
     invalid_vat = await async_client.post(f'/api/v1/zzp/commitments/{commitment_id}/create-expense', headers=auth_headers, json={
         "expense_date": "2026-03-20",
@@ -269,3 +291,37 @@ async def test_create_expense_from_commitment_updates_status_and_prevents_duplic
         "description": "Invalid",
     })
     assert invalid_vat.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_expense_from_commitment_blocks_locked_period(async_client, auth_headers, db_session, test_administration):
+    create = await async_client.post('/api/v1/zzp/commitments', headers=auth_headers, json={
+        "type": "subscription",
+        "name": "Locked test",
+        "amount_cents": 1500,
+        "recurring_frequency": "monthly",
+        "start_date": "2026-01-01",
+    })
+    assert create.status_code == 201
+    commitment_id = create.json()['id']
+
+    period = AccountingPeriod(
+        administration_id=test_administration.id,
+        name='2026-03',
+        period_type='MONTH',
+        start_date=date(2026, 3, 1),
+        end_date=date(2026, 3, 31),
+        status=PeriodStatus.FINALIZED,
+        is_closed=True,
+    )
+    db_session.add(period)
+    await db_session.commit()
+
+    response = await async_client.post(f'/api/v1/zzp/commitments/{commitment_id}/create-expense', headers=auth_headers, json={
+        "expense_date": "2026-03-10",
+        "amount_cents": 1500,
+        "vat_rate": 21,
+        "description": "Locked month",
+    })
+    assert response.status_code == 409
+    assert response.json()['detail']['code'] == 'PERIOD_LOCKED'

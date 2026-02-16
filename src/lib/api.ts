@@ -4057,6 +4057,7 @@ export interface ZZPCommitment {
   remaining_balance_cents?: number | null
   computed_end_date?: string | null
   end_date_status: 'active' | 'ending_soon' | 'ended' | 'unknown'
+  status: 'active' | 'paused' | 'ended'
   created_at: string
   updated_at: string
 }
@@ -4081,6 +4082,7 @@ export interface ZZPCommitmentCreate {
   notice_period_days?: number
   auto_renew?: boolean
   auto_create_expense?: boolean
+  status?: 'active' | 'paused' | 'ended'
 }
 
 export type ZZPCommitmentUpdate = Partial<ZZPCommitmentCreate>
@@ -4092,7 +4094,6 @@ export interface CommitmentExpenseCreatePayload {
   vat_rate: number
   description: string
   notes?: string
-  force_duplicate?: boolean
 }
 
 export interface CommitmentExpenseCreateResponse {

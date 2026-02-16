@@ -335,10 +335,7 @@ export const ZZPTimeTrackingPage = () => {
       }
 
       if (editingEntry) {
-        const response = await zzpApi.timeEntries.update(editingEntry.id, {
-          ...payload,
-          customer_id: selectedCustomerId,
-        })
+        const response = await zzpApi.timeEntries.update(editingEntry.id, payload)
         console.info('[Uren] Update response', { status: response.status, entryId: editingEntry.id })
         if (response.status !== 200 && response.status !== 204) {
           throw new Error(`TIME_ENTRY_UPDATE_FAILED_STATUS_${response.status}`)
@@ -407,14 +404,30 @@ export const ZZPTimeTrackingPage = () => {
       } else {
         const status = rawError?.response?.status
         const responseData = rawError?.response?.data
-        const serverMessage = typeof responseData === 'string'
-          ? responseData
-          : (responseData && typeof responseData === 'object' && 'message' in responseData
-              ? String((responseData as { message?: unknown }).message)
-              : null)
-        const finalMessage = status
-          ? `Server fout (${status})${serverMessage ? `: ${serverMessage}` : `: ${String(message)}`}`
-          : String(message)
+        
+        // Extract server message from different possible structures
+        let serverMessage = ''
+        if (typeof responseData === 'string') {
+          serverMessage = responseData
+        } else if (responseData && typeof responseData === 'object') {
+          // Try to get message from detail.message or detail.detail or message
+          const detailObj = responseData as { detail?: { message?: string } | string; message?: string }
+          if (typeof detailObj.detail === 'string') {
+            serverMessage = detailObj.detail
+          } else if (detailObj.detail && typeof detailObj.detail === 'object' && detailObj.detail.message) {
+            serverMessage = detailObj.detail.message
+          } else if (detailObj.message) {
+            serverMessage = detailObj.message
+          }
+        }
+        
+        // Construct final error message with status and server details
+        const finalMessage = status && serverMessage
+          ? `Fout (${status}): ${serverMessage}`
+          : status
+            ? `Server fout (${status}): ${String(message)}`
+            : String(message)
+        
         setFormError(finalMessage)
         toast.error(finalMessage)
       }

@@ -882,3 +882,89 @@ Dit is een geautomatiseerd bericht van Smart Accounting Platform.
     invoice = result.scalar_one()
     
     return invoice_to_response(invoice)
+
+
+@router.get("/invoices/suggest-price/{customer_id}")
+async def suggest_invoice_price(
+    customer_id: UUID,
+    description: Optional[str] = Query(None, description="Service description to match"),
+    current_user: CurrentUser = Depends(),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Suggest unit price based on previous invoices for the customer.
+    
+    Logic:
+    1. If description is provided, prefer last invoice line with same description
+    2. Otherwise use the most recent invoice line for that customer
+    3. Return suggested price in cents and euros
+    """
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
+    
+    # Verify customer exists and belongs to this administration
+    customer = await db.scalar(
+        select(ZZPCustomer).where(
+            ZZPCustomer.id == customer_id,
+            ZZPCustomer.administration_id == administration.id,
+        )
+    )
+    if not customer:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "CUSTOMER_NOT_FOUND", "message": "Klant niet gevonden."}
+        )
+    
+    # Query for previous invoice lines for this customer
+    # Order by invoice issue_date descending to get most recent first
+    query = (
+        select(ZZPInvoiceLine)
+        .join(ZZPInvoice)
+        .where(
+            ZZPInvoice.customer_id == customer_id,
+            ZZPInvoice.administration_id == administration.id,
+        )
+        .order_by(ZZPInvoice.issue_date.desc(), ZZPInvoiceLine.line_number.asc())
+    )
+    
+    result = await db.execute(query)
+    all_lines = result.scalars().all()
+    
+    if not all_lines:
+        # No previous invoices for this customer
+        return {
+            "suggested_price_cents": None,
+            "suggested_price_euros": None,
+            "match_reason": "no_history",
+            "message": "Geen eerdere facturen gevonden voor deze klant"
+        }
+    
+    # If description provided, try to find matching line
+    suggested_line = None
+    match_reason = "most_recent"
+    
+    if description and description.strip():
+        normalized_description = description.strip().lower()
+        for line in all_lines:
+            if line.description.strip().lower() == normalized_description:
+                suggested_line = line
+                match_reason = "matching_description"
+                break
+    
+    # If no matching description found, use most recent
+    if not suggested_line:
+        suggested_line = all_lines[0]
+    
+    suggested_price_cents = suggested_line.unit_price_cents
+    suggested_price_euros = Decimal(suggested_price_cents) / Decimal("100")
+    
+    return {
+        "suggested_price_cents": suggested_price_cents,
+        "suggested_price_euros": float(suggested_price_euros),
+        "match_reason": match_reason,
+        "message": (
+            f"Prijs uit eerdere factuur met dezelfde omschrijving" 
+            if match_reason == "matching_description" 
+            else f"Prijs uit meest recente factuur voor deze klant"
+        )
+    }

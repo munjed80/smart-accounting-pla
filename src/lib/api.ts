@@ -1213,8 +1213,8 @@ export const accountantDossierApi = {
     return response.data
   },
 
-  getExpenses: async (clientId: string): Promise<ZZPExpenseListResponse> => {
-    const response = await api.get<ZZPExpenseListResponse>(`/accountant/clients/${clientId}/expenses`)
+  getExpenses: async (clientId: string, filters?: { commitment_id?: string }): Promise<ZZPExpenseListResponse> => {
+    const response = await api.get<ZZPExpenseListResponse>(`/accountant/clients/${clientId}/expenses`, { params: filters })
     return response.data
   },
 
@@ -1225,7 +1225,7 @@ export const accountantDossierApi = {
 
   getCommitments: async (
     clientId: string,
-    filters?: { type?: 'lease' | 'loan' | 'subscription'; status?: 'active' | 'paused' | 'ended' }
+    filters?: { type?: 'lease' | 'loan' | 'subscription'; status?: 'active' | 'paused' | 'ended'; period_key?: string }
   ): Promise<AccountantCommitmentsResponse> => {
     const response = await api.get<AccountantCommitmentsResponse>(`/accountant/clients/${clientId}/commitments`, { params: filters })
     return response.data
@@ -4110,9 +4110,11 @@ export interface ZZPCommitmentListResponse {
 
 export interface AccountantCommitmentItem extends ZZPCommitment {
   linked_expenses_count: number
+  has_expense_in_period: boolean
 }
 
 export interface AccountantCommitmentsResponse {
+  missing_this_period_count: number
   monthly_total_cents: number
   upcoming_30_days_total_cents: number
   warning_count: number

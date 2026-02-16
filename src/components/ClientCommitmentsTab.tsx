@@ -5,8 +5,10 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { accountantDossierApi, AccountantCommitmentItem } from '@/lib/api'
+import { navigateTo } from '@/lib/navigation'
 import { parseApiError } from '@/lib/utils'
 import { WarningCircle } from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
 
 interface ClientCommitmentsTabProps {
   clientId: string
@@ -24,6 +26,7 @@ export const ClientCommitmentsTab = ({ clientId }: ClientCommitmentsTabProps) =>
   const [warningCount, setWarningCount] = useState(0)
   const [cashflowStressLabel, setCashflowStressLabel] = useState('Onvoldoende data')
   const [total, setTotal] = useState(0)
+  const [missingThisPeriodCount, setMissingThisPeriodCount] = useState(0)
   const [typeFilter, setTypeFilter] = useState<'all' | 'lease' | 'loan' | 'subscription'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused' | 'ended'>('all')
 
@@ -39,9 +42,11 @@ export const ClientCommitmentsTab = ({ clientId }: ClientCommitmentsTabProps) =>
       setHasApprovedMandate(true)
 
       try {
+        const periodKey = new Date().toISOString().slice(0, 7)
         const response = await accountantDossierApi.getCommitments(clientId, {
           type: typeFilter === 'all' ? undefined : typeFilter,
           status: statusFilter === 'all' ? undefined : statusFilter,
+          period_key: periodKey,
         })
         setItems(response.commitments)
         setMonthlyTotalCents(response.monthly_total_cents)
@@ -49,6 +54,7 @@ export const ClientCommitmentsTab = ({ clientId }: ClientCommitmentsTabProps) =>
         setWarningCount(response.warning_count)
         setCashflowStressLabel(response.cashflow_stress_label)
         setTotal(response.total)
+        setMissingThisPeriodCount(response.missing_this_period_count)
       } catch (err) {
         if (axios.isAxiosError(err) && err.response?.status === 403) {
           const code = err.response?.data?.detail?.code
@@ -105,17 +111,23 @@ export const ClientCommitmentsTab = ({ clientId }: ClientCommitmentsTabProps) =>
     return (
       <Alert>
         <AlertTitle>Geen machtiging. Vraag toegang aan via Machtigingen.</AlertTitle>
+        <AlertDescription className='mt-2'>
+          <Button variant='outline' size='sm' onClick={() => navigateTo('/accountant/clients')}>
+            Naar Machtigingen
+          </Button>
+        </AlertDescription>
       </Alert>
     )
   }
 
   return (
     <div className='space-y-4'>
-      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
+      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3'>
         <Card><CardHeader><CardTitle>Maandlasten</CardTitle></CardHeader><CardContent>{eur(monthlyTotalCents)}</CardContent></Card>
         <Card><CardHeader><CardTitle>Komende 30 dagen</CardTitle></CardHeader><CardContent>{eur(upcoming30DaysTotalCents)}</CardContent></Card>
         <Card><CardHeader><CardTitle>Waarschuwingen</CardTitle></CardHeader><CardContent>{warningCount}</CardContent></Card>
         <Card><CardHeader><CardTitle>Cashflow stress</CardTitle></CardHeader><CardContent>{cashflowStressLabel}</CardContent></Card>
+        <Card><CardHeader><CardTitle>Ontbreekt deze periode</CardTitle></CardHeader><CardContent>{missingThisPeriodCount}</CardContent></Card>
       </div>
 
       <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
@@ -157,8 +169,23 @@ export const ClientCommitmentsTab = ({ clientId }: ClientCommitmentsTabProps) =>
                 <div><span className='text-muted-foreground'>Bedrag:</span> {eur(item.monthly_payment_cents || item.amount_cents)}</div>
                 <div><span className='text-muted-foreground'>Volgende:</span> {item.next_due_date || '-'}</div>
                 <div><span className='text-muted-foreground'>Laatste boeking:</span> {item.last_booked_date || '-'}</div>
-                <div><span className='text-muted-foreground'>Gekoppelde uitgaven:</span> {item.linked_expenses_count}</div>
+                <div>
+                  <span className='text-muted-foreground'>Gekoppelde uitgaven:</span> {item.linked_expenses_count}
+                  {item.linked_expenses_count > 0 && (
+                    <Button
+                      variant='link'
+                      size='sm'
+                      className='h-auto p-0 ml-2'
+                      onClick={() => navigateTo(`/accountant/clients/${clientId}/expenses?commitmentId=${item.id}`)}
+                    >
+                      Bekijk uitgaven
+                    </Button>
+                  )}
+                </div>
               </div>
+              {!item.has_expense_in_period && item.status === 'active' && (
+                <p className='text-xs text-amber-700'>Ontbreekt deze periode</p>
+              )}
             </div>
           ))}
         </CardContent>

@@ -122,6 +122,7 @@ class CommitmentListResponse(BaseModel):
 
 class AccountantCommitmentItemResponse(CommitmentResponse):
     linked_expenses_count: int = 0
+    has_expense_in_period: bool = False
 
 
 class AccountantCommitmentsResponse(BaseModel):
@@ -129,6 +130,7 @@ class AccountantCommitmentsResponse(BaseModel):
     upcoming_30_days_total_cents: int
     warning_count: int
     cashflow_stress_label: str
+    missing_this_period_count: int = 0
     commitments: list[AccountantCommitmentItemResponse]
     total: int
 

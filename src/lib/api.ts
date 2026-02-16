@@ -1223,14 +1223,11 @@ export const accountantDossierApi = {
     return response.data
   },
 
-  getCommitments: async (clientId: string, type?: 'lease' | 'loan' | 'subscription'): Promise<ZZPCommitmentListResponse> => {
-    const params = type ? { type } : undefined
-    const response = await api.get<ZZPCommitmentListResponse>(`/accountant/clients/${clientId}/commitments`, { params })
-    return response.data
-  },
-
-  getCommitmentsOverview: async (clientId: string): Promise<ZZPCommitmentOverview> => {
-    const response = await api.get<ZZPCommitmentOverview>(`/accountant/clients/${clientId}/commitments/overview/summary`)
+  getCommitments: async (
+    clientId: string,
+    filters?: { type?: 'lease' | 'loan' | 'subscription'; status?: 'active' | 'paused' | 'ended' }
+  ): Promise<AccountantCommitmentsResponse> => {
+    const response = await api.get<AccountantCommitmentsResponse>(`/accountant/clients/${clientId}/commitments`, { params: filters })
     return response.data
   },
 }
@@ -4109,6 +4106,21 @@ export interface ZZPCommitmentListResponse {
   commitments: ZZPCommitment[]
   total: number
 }
+
+
+export interface AccountantCommitmentItem extends ZZPCommitment {
+  linked_expenses_count: number
+}
+
+export interface AccountantCommitmentsResponse {
+  monthly_total_cents: number
+  upcoming_30_days_total_cents: number
+  warning_count: number
+  cashflow_stress_label: string
+  commitments: AccountantCommitmentItem[]
+  total: number
+}
+
 
 export interface ZZPCommitmentAlert {
   code: "subscription_renewal" | "lease_loan_ending" | "monthly_threshold"

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import axios from 'axios'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { accountantApi, accountantDossierApi, ZZPCommitment, ZZPCommitmentOverview } from '@/lib/api'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { accountantDossierApi, AccountantCommitmentItem } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
 import { WarningCircle } from '@phosphor-icons/react'
 
@@ -15,36 +17,48 @@ const eur = (cents: number) => new Intl.NumberFormat('nl-NL', { style: 'currency
 export const ClientCommitmentsTab = ({ clientId }: ClientCommitmentsTabProps) => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [hasApprovedMandate, setHasApprovedMandate] = useState(false)
-  const [items, setItems] = useState<ZZPCommitment[]>([])
-  const [overview, setOverview] = useState<ZZPCommitmentOverview | null>(null)
+  const [hasApprovedMandate, setHasApprovedMandate] = useState(true)
+  const [items, setItems] = useState<AccountantCommitmentItem[]>([])
+  const [monthlyTotalCents, setMonthlyTotalCents] = useState(0)
+  const [upcoming30DaysTotalCents, setUpcoming30DaysTotalCents] = useState(0)
+  const [warningCount, setWarningCount] = useState(0)
+  const [cashflowStressLabel, setCashflowStressLabel] = useState('Onvoldoende data')
+  const [total, setTotal] = useState(0)
+  const [typeFilter, setTypeFilter] = useState<'all' | 'lease' | 'loan' | 'subscription'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused' | 'ended'>('all')
 
   useEffect(() => {
     const load = async () => {
+      if (!clientId) {
+        setIsLoading(false)
+        return
+      }
+
       setIsLoading(true)
       setError(null)
+      setHasApprovedMandate(true)
 
       try {
-        const mandates = await accountantApi.getMandates()
-        const approved = mandates.mandates.some(m => m.client_user_id === clientId && m.status === 'approved')
-        setHasApprovedMandate(approved)
-
-        if (!approved) {
-          setItems([])
-          setOverview(null)
-          return
-        }
-
-        const listResp = await accountantDossierApi.getCommitments(clientId)
-        setItems(listResp.commitments)
-
-        try {
-          const overviewResp = await accountantDossierApi.getCommitmentsOverview(clientId)
-          setOverview(overviewResp)
-        } catch {
-          setOverview(null)
-        }
+        const response = await accountantDossierApi.getCommitments(clientId, {
+          type: typeFilter === 'all' ? undefined : typeFilter,
+          status: statusFilter === 'all' ? undefined : statusFilter,
+        })
+        setItems(response.commitments)
+        setMonthlyTotalCents(response.monthly_total_cents)
+        setUpcoming30DaysTotalCents(response.upcoming_30_days_total_cents)
+        setWarningCount(response.warning_count)
+        setCashflowStressLabel(response.cashflow_stress_label)
+        setTotal(response.total)
       } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 403) {
+          const code = err.response?.data?.detail?.code
+          if (code === 'MANDATE_NOT_APPROVED') {
+            setHasApprovedMandate(false)
+            setItems([])
+            setTotal(0)
+            return
+          }
+        }
         setError(parseApiError(err))
       } finally {
         setIsLoading(false)
@@ -52,22 +66,21 @@ export const ClientCommitmentsTab = ({ clientId }: ClientCommitmentsTabProps) =>
     }
 
     load()
-  }, [clientId])
+  }, [clientId, typeFilter, statusFilter])
 
-  const summary = useMemo(() => {
-    const monthlyCents = items.reduce((sum, item) => {
-      if (item.type === 'subscription' && item.recurring_frequency === 'yearly') return sum + Math.round(item.amount_cents / 12)
-      return sum + (item.monthly_payment_cents || item.amount_cents)
-    }, 0)
+  const sortedItems = useMemo(
+    () => [...items].sort((a, b) => (a.next_due_date || '9999-12-31').localeCompare(b.next_due_date || '9999-12-31')).slice(0, 10),
+    [items],
+  )
 
-    const upcomingCents = items.reduce((sum, item) => {
-      const hasUpcoming = !!item.next_due_date
-      if (!hasUpcoming) return sum
-      return sum + (item.monthly_payment_cents || item.amount_cents)
-    }, 0)
-
-    return { monthlyCents, upcomingCents }
-  }, [items])
+  if (!clientId) {
+    return (
+      <Alert>
+        <AlertTitle>Geen klant geselecteerd</AlertTitle>
+        <AlertDescription>Selecteer een klant om verplichtingen te bekijken.</AlertDescription>
+      </Alert>
+    )
+  }
 
   if (isLoading) {
     return (
@@ -91,33 +104,60 @@ export const ClientCommitmentsTab = ({ clientId }: ClientCommitmentsTabProps) =>
   if (!hasApprovedMandate) {
     return (
       <Alert>
-        <AlertTitle>Geen toegang tot verplichtingen</AlertTitle>
-        <AlertDescription>Deze sectie is zichtbaar wanneer er een goedgekeurd mandaat actief is voor deze cliënt.</AlertDescription>
+        <AlertTitle>Geen machtiging. Vraag toegang aan via Machtigingen.</AlertTitle>
       </Alert>
     )
   }
 
   return (
     <div className='space-y-4'>
-      <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
-        <Card><CardHeader><CardTitle>Totaal maandlasten</CardTitle></CardHeader><CardContent>{eur(overview?.monthly_total_cents ?? summary.monthlyCents)}</CardContent></Card>
-        <Card><CardHeader><CardTitle>Komende betalingen</CardTitle></CardHeader><CardContent>{eur(overview?.upcoming_total_cents ?? summary.upcomingCents)}</CardContent></Card>
-        <Card><CardHeader><CardTitle>Aantal verplichtingen</CardTitle></CardHeader><CardContent>{items.length}</CardContent></Card>
+      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
+        <Card><CardHeader><CardTitle>Maandlasten</CardTitle></CardHeader><CardContent>{eur(monthlyTotalCents)}</CardContent></Card>
+        <Card><CardHeader><CardTitle>Komende 30 dagen</CardTitle></CardHeader><CardContent>{eur(upcoming30DaysTotalCents)}</CardContent></Card>
+        <Card><CardHeader><CardTitle>Waarschuwingen</CardTitle></CardHeader><CardContent>{warningCount}</CardContent></Card>
+        <Card><CardHeader><CardTitle>Cashflow stress</CardTitle></CardHeader><CardContent>{cashflowStressLabel}</CardContent></Card>
+      </div>
+
+      <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+        <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as typeof typeFilter)}>
+          <SelectTrigger><SelectValue placeholder='Type filter' /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value='all'>Alle types</SelectItem>
+            <SelectItem value='subscription'>Abonnementen</SelectItem>
+            <SelectItem value='lease'>Lease</SelectItem>
+            <SelectItem value='loan'>Leningen</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
+          <SelectTrigger><SelectValue placeholder='Status filter' /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value='all'>Alle statussen</SelectItem>
+            <SelectItem value='active'>Actief</SelectItem>
+            <SelectItem value='paused'>Gepauzeerd</SelectItem>
+            <SelectItem value='ended'>Beëindigd</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Aankomende verplichtingen</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Komende verplichtingen (top 10)</CardTitle></CardHeader>
         <CardContent className='space-y-2'>
-          {items.length === 0 && <p className='text-sm text-muted-foreground'>Geen verplichtingen gevonden.</p>}
-          {items.map((item) => (
-            <div key={item.id} className='rounded-md border p-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between'>
-              <div>
-                <p className='font-medium'>{item.name}</p>
-                <p className='text-xs text-muted-foreground'>Type: {item.type} · Volgende vervaldatum: {item.next_due_date || '-'}</p>
-              </div>
-              <div className='flex items-center gap-2'>
-                <span className='text-sm font-medium'>{eur(item.monthly_payment_cents || item.amount_cents)}</span>
+          {total === 0 && <p className='text-sm text-muted-foreground'>Nog geen verplichtingen gevonden voor deze klant.</p>}
+          {sortedItems.map((item) => (
+            <div key={item.id} className='rounded-md border p-3 flex flex-col gap-2'>
+              <div className='flex items-start justify-between gap-2'>
+                <div>
+                  <p className='font-medium'>{item.name}</p>
+                  <p className='text-xs text-muted-foreground'>Type: {item.type} · Status: {item.status}</p>
+                </div>
                 <Badge variant='secondary'>Alleen lezen</Badge>
+              </div>
+              <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm'>
+                <div><span className='text-muted-foreground'>Bedrag:</span> {eur(item.monthly_payment_cents || item.amount_cents)}</div>
+                <div><span className='text-muted-foreground'>Volgende:</span> {item.next_due_date || '-'}</div>
+                <div><span className='text-muted-foreground'>Laatste boeking:</span> {item.last_booked_date || '-'}</div>
+                <div><span className='text-muted-foreground'>Gekoppelde uitgaven:</span> {item.linked_expenses_count}</div>
               </div>
             </div>
           ))}

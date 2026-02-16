@@ -31,9 +31,11 @@ from app.schemas.vat import (
     VatValidationResponse,
     VatCodeResponse,
     VatCodesListResponse,
+    SubmissionPackageRequest,
 )
 from app.services.vat import VatReportService, generate_vat_overview_pdf
 from app.services.vat.report import VatReportError, PeriodNotEligibleError
+from app.services.vat.submission import SubmissionPackageService, SubmissionPackageError
 from app.api.v1.deps import CurrentUser
 
 router = APIRouter()
@@ -391,3 +393,118 @@ async def download_vat_report_pdf(
             "Cache-Control": "no-cache, no-store, must-revalidate",
         },
     )
+
+
+@router.post(
+    "/clients/{client_id}/tax/btw/submission-package",
+    summary="Generate BTW Submission Package",
+    description="""
+    Generate a submission-ready package for BTW (VAT) return.
+    
+    **Phase A: Submission-ready package**
+    
+    Returns an XML/XBRL file in canonical format suitable for submission
+    to the Dutch Belastingdienst.
+    
+    The package includes:
+    - VAT boxes (rubrieken) with amounts
+    - Totals and calculations
+    - Audit trail reference
+    
+    **Requirements:**
+    - Period must be REVIEW, FINALIZED, or LOCKED (not OPEN)
+    - No blocking (RED) anomalies present
+    
+    **Phase B (Future):** This endpoint will be enhanced to support
+    direct submission via Digipoort connector.
+    """,
+)
+async def generate_btw_submission_package(
+    client_id: UUID,
+    request: SubmissionPackageRequest,
+    current_user: Annotated[CurrentUser, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    """Generate BTW submission package (XML/XBRL)."""
+    # Verify accountant access
+    administration = await verify_accountant_access(client_id, current_user, db)
+    
+    try:
+        # Generate submission package
+        service = SubmissionPackageService(db, administration.id)
+        xml_content, filename = await service.generate_btw_package(request.period_id)
+        
+        # Return XML file
+        xml_bytes = xml_content.encode('utf-8')
+        return Response(
+            content=xml_bytes,
+            media_type="application/xml",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(xml_bytes)),
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+            },
+        )
+    except SubmissionPackageError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except (PeriodNotEligibleError, VatReportError) as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post(
+    "/clients/{client_id}/tax/icp/submission-package",
+    summary="Generate ICP Submission Package",
+    description="""
+    Generate a submission-ready package for ICP (Intra-Community Supplies) return.
+    
+    **Phase A: Submission-ready package**
+    
+    Returns an XML file in canonical format suitable for submission
+    to the Dutch Belastingdienst.
+    
+    The package includes:
+    - ICP entries (customer VAT numbers, country codes, amounts)
+    - Totals
+    - Audit trail reference
+    
+    **Requirements:**
+    - Period must be REVIEW, FINALIZED, or LOCKED (not OPEN)
+    - At least one ICP entry must exist in the period
+    
+    **Note:** ICP submission is only required when there are
+    intra-community supplies (leveringen naar/diensten in EU landen).
+    
+    **Phase B (Future):** This endpoint will be enhanced to support
+    direct submission via Digipoort connector.
+    """,
+)
+async def generate_icp_submission_package(
+    client_id: UUID,
+    request: SubmissionPackageRequest,
+    current_user: Annotated[CurrentUser, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    """Generate ICP submission package (XML)."""
+    # Verify accountant access
+    administration = await verify_accountant_access(client_id, current_user, db)
+    
+    try:
+        # Generate submission package
+        service = SubmissionPackageService(db, administration.id)
+        xml_content, filename = await service.generate_icp_package(request.period_id)
+        
+        # Return XML file
+        xml_bytes = xml_content.encode('utf-8')
+        return Response(
+            content=xml_bytes,
+            media_type="application/xml",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(xml_bytes)),
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+            },
+        )
+    except SubmissionPackageError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except (PeriodNotEligibleError, VatReportError) as e:
+        raise HTTPException(status_code=404, detail=str(e))

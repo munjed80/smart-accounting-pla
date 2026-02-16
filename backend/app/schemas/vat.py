@@ -155,3 +155,9 @@ class VatCodesListResponse(BaseModel):
     """Response for list of VAT codes."""
     vat_codes: List[VatCodeResponse]
     total_count: int
+
+
+class SubmissionPackageRequest(BaseModel):
+    """Request for generating submission package."""
+    period_id: UUID
+

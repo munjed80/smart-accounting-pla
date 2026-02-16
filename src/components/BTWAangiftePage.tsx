@@ -41,6 +41,8 @@ import {
   Globe,
   Buildings,
   Info,
+  FileArrowDown,
+  DownloadSimple,
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 
@@ -240,6 +242,9 @@ export const BTWAangiftePage = ({
   isLoading,
   onRefresh,
   onViewEntry,
+  onDownloadSubmissionPackage,
+  onDownloadReport,
+  onDownloadIcpPackage,
 }: {
   clientId: string
   periodId: string
@@ -247,6 +252,9 @@ export const BTWAangiftePage = ({
   isLoading: boolean
   onRefresh: () => void
   onViewEntry?: (entryId: string) => void
+  onDownloadSubmissionPackage?: () => void
+  onDownloadReport?: () => void
+  onDownloadIcpPackage?: () => void
 }) => {
   const [activeTab, setActiveTab] = useState('boxes')
   
@@ -306,15 +314,38 @@ export const BTWAangiftePage = ({
               Periode: {format(new Date(report.start_date), 'd MMM yyyy')} - {format(new Date(report.end_date), 'd MMM yyyy')}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={onRefresh}>
               <ArrowsClockwise size={16} className="mr-2" />
               Vernieuwen
             </Button>
-            <Button variant="outline" size="sm">
-              <Export size={16} className="mr-2" />
-              Exporteren
-            </Button>
+            {onDownloadSubmissionPackage && (
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={onDownloadSubmissionPackage}
+                disabled={report.has_red_anomalies}
+              >
+                <FileArrowDown size={16} className="mr-2" />
+                Download indienbestand
+              </Button>
+            )}
+            {onDownloadReport && (
+              <Button variant="outline" size="sm" onClick={onDownloadReport}>
+                <DownloadSimple size={16} className="mr-2" />
+                Download rapport
+              </Button>
+            )}
+            {onDownloadIcpPackage && report.icp_entries.length > 0 && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onDownloadIcpPackage}
+              >
+                <Globe size={16} className="mr-2" />
+                Download ICP opgaaf
+              </Button>
+            )}
           </div>
         </CardHeader>
         

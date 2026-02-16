@@ -44,8 +44,8 @@ def upgrade() -> None:
         sa.Column('access_token', sa.Text, nullable=True),
         sa.Column('refresh_token', sa.Text, nullable=True),
         
-        # Metadata
-        sa.Column('metadata', JSONB, nullable=True),
+        # Connection metadata
+        sa.Column('connection_metadata', JSONB, nullable=True),
         
         # Timestamps
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),

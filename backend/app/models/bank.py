@@ -190,8 +190,8 @@ class BankConnectionModel(Base):
     access_token: Mapped[str] = mapped_column(Text, nullable=True)
     refresh_token: Mapped[str] = mapped_column(Text, nullable=True)
     
-    # Additional metadata
-    metadata: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    # Additional connection metadata
+    connection_metadata: Mapped[dict] = mapped_column(JSONB, nullable=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

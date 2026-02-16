@@ -36,7 +36,7 @@ class BankConnection:
     consent_expires_at: Optional[date] = None
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
-    metadata: Dict[str, Any] = None  # Provider-specific metadata
+    connection_metadata: Dict[str, Any] = None  # Provider-specific metadata
 
 
 @dataclass

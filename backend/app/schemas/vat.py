@@ -313,7 +313,7 @@ class PrepareSubmissionResponse(BaseModel):
 
 class QueueSubmissionRequest(BaseModel):
     """Request to queue a submission for Digipoort."""
-    cert_ref: Optional[str] = Field(None, description="Optional certificate reference")
+    certificate_id: UUID = Field(..., description="ID of PKIoverheid certificate to use for signing")
 
 
 class QueueSubmissionResponse(BaseModel):

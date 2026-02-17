@@ -5,7 +5,7 @@ This module provides the core audit logging functionality with sanitization
 and safe error handling to ensure audit logging failures don't break business logic.
 """
 import logging
-from typing import Optional
+from typing import Optional, Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,7 +46,7 @@ MASK_KEYS = {
 }
 
 
-def sanitize_value(value: any) -> any:
+def sanitize_value(value: Any) -> Any:
     """
     Sanitize a single value (recursive for nested structures).
     

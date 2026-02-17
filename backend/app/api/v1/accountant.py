@@ -604,7 +604,7 @@ async def get_work_queue_summary(
     doc_items = [
         DocumentReviewItem(
             id=doc.id,
-            date=doc.invoice_date.date() if doc.invoice_date else None,
+            date=doc.invoice_date.date() if doc.invoice_date and hasattr(doc.invoice_date, 'date') else doc.invoice_date,
             type="Invoice" if doc.supplier_name else "Document",
             status=doc.status.value,
             vendor_customer=doc.supplier_name,

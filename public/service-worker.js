@@ -1,14 +1,17 @@
-const CACHE_VERSION = 'v1'
-const APP_CACHE = `smart-accounting-${CACHE_VERSION}`
-const API_CACHE = `smart-accounting-api-${CACHE_VERSION}`
+const CACHE_VERSION = 'v2'
+const APP_SHELL_CACHE = `smart-accounting-shell-${CACHE_VERSION}`
 const STATIC_CACHE = `smart-accounting-static-${CACHE_VERSION}`
 const OFFLINE_URL = '/offline.html'
 
 const PRECACHE_URLS = [
   '/',
   '/index.html',
+  '/login',
+  '/register',
+  '/forgot-password',
   '/manifest.json',
   '/manifest.webmanifest',
+  '/icon.svg',
   '/icon-192x192.png',
   '/icon-512x512.png',
   '/icon-192x192-maskable.png',
@@ -37,31 +40,54 @@ const OFFLINE_DOCUMENT = `<!doctype html>
   </body>
 </html>`
 
-const isSafeApiRequest = (request, url) => {
-  if (request.method !== 'GET') return false
-  if (!url.pathname.startsWith('/api/')) return false
+const isStaticAssetRequest = (request, url) => {
+  if (url.origin !== self.location.origin) return false
 
-  const hasAuthHeader = request.headers.has('authorization')
-  const hasCookie = request.headers.has('cookie')
-  const isAuthEndpoint = /^\/api\/(auth|login|logout|token|session)/.test(url.pathname)
+  if (['script', 'style', 'image', 'font'].includes(request.destination)) {
+    return true
+  }
 
-  return !hasAuthHeader && !hasCookie && !isAuthEndpoint
+  return /\.(?:js|css|png|jpg|jpeg|gif|svg|webp|ico|woff2?|ttf)$/i.test(url.pathname)
+}
+
+const shouldBypassCaching = (request, url) => {
+  if (request.method !== 'GET') return true
+  if (url.pathname.startsWith('/api/')) return true
+  if (request.headers.has('authorization')) return true
+
+  return false
 }
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
-      const cache = await caches.open(APP_CACHE)
-      await cache.addAll(PRECACHE_URLS)
+      const shellCache = await caches.open(APP_SHELL_CACHE)
+      await shellCache.addAll(PRECACHE_URLS)
 
-      const indexResponse = await fetch('/index.html', { cache: 'no-store' })
-      await cache.put('/index.html', indexResponse.clone())
+      try {
+        const indexResponse = await fetch('/index.html', { cache: 'no-store' })
+        await shellCache.put('/index.html', indexResponse.clone())
 
-      const html = await indexResponse.text()
-      const assetPaths = Array.from(html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g), (match) => match[1])
+        const html = await indexResponse.text()
+        const assetPaths = Array.from(html.matchAll(/(?:src|href)="(\/assets\/[^\"]+)"/g), (match) => match[1])
 
-      if (assetPaths.length > 0) {
-        await cache.addAll(Array.from(new Set(assetPaths)))
+        if (assetPaths.length > 0) {
+          const staticCache = await caches.open(STATIC_CACHE)
+          await Promise.all(
+            Array.from(new Set(assetPaths)).map(async (assetPath) => {
+              try {
+                const assetResponse = await fetch(assetPath, { cache: 'no-store' })
+                if (assetResponse.ok) {
+                  await staticCache.put(assetPath, assetResponse)
+                }
+              } catch {
+                // Ignore individual asset pre-cache failures.
+              }
+            }),
+          )
+        }
+      } catch {
+        // Installation should continue even if network is temporarily unavailable.
       }
 
       self.skipWaiting()
@@ -72,7 +98,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      const expectedCaches = new Set([APP_CACHE, API_CACHE, STATIC_CACHE])
+      const expectedCaches = new Set([APP_SHELL_CACHE, STATIC_CACHE])
       const cacheNames = await caches.keys()
 
       await Promise.all(
@@ -89,7 +115,6 @@ self.addEventListener('activate', (event) => {
   )
 })
 
-
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting()
@@ -98,23 +123,22 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const { request } = event
+  const url = new URL(request.url)
 
-  if (request.method !== 'GET') {
+  if (shouldBypassCaching(request, url)) {
     return
   }
-
-  const url = new URL(request.url)
 
   if (request.mode === 'navigate') {
     event.respondWith(
       (async () => {
         try {
           const networkResponse = await fetch(request)
-          const cache = await caches.open(APP_CACHE)
-          cache.put('/index.html', networkResponse.clone())
+          const cache = await caches.open(APP_SHELL_CACHE)
+          await cache.put('/index.html', networkResponse.clone())
           return networkResponse
         } catch {
-          const cache = await caches.open(APP_CACHE)
+          const cache = await caches.open(APP_SHELL_CACHE)
           const cachedIndex = await cache.match('/index.html')
           if (cachedIndex) {
             return cachedIndex
@@ -136,35 +160,7 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  if (url.origin === self.location.origin && isSafeApiRequest(request, url)) {
-    event.respondWith(
-      (async () => {
-        const cache = await caches.open(API_CACHE)
-
-        try {
-          const networkResponse = await fetch(request)
-          if (networkResponse.ok) {
-            cache.put(request, networkResponse.clone())
-          }
-          return networkResponse
-        } catch {
-          const cachedResponse = await cache.match(request)
-          if (cachedResponse) {
-            return cachedResponse
-          }
-
-          return new Response(JSON.stringify({ error: 'Offline and no cached API response available.' }), {
-            headers: { 'Content-Type': 'application/json' },
-            status: 503,
-          })
-        }
-      })(),
-    )
-
-    return
-  }
-
-  if (url.origin === self.location.origin) {
+  if (isStaticAssetRequest(request, url)) {
     event.respondWith(
       (async () => {
         const cache = await caches.open(STATIC_CACHE)
@@ -175,9 +171,8 @@ self.addEventListener('fetch', (event) => {
         }
 
         const networkResponse = await fetch(request)
-
-        if (networkResponse.ok && ['style', 'script', 'font', 'image'].includes(request.destination)) {
-          cache.put(request, networkResponse.clone())
+        if (networkResponse.ok) {
+          await cache.put(request, networkResponse.clone())
         }
 
         return networkResponse

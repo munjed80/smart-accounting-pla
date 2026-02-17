@@ -53,15 +53,25 @@ async def test_engine():
 
 
 @pytest_asyncio.fixture(scope="function")
-async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
-    """Create a database session for tests."""
-    async_session = async_sessionmaker(
+async def test_session_maker(test_engine):
+    """Create a test session maker with audit hooks registered."""
+    session_maker = async_sessionmaker(
         test_engine,
         class_=AsyncSession,
         expire_on_commit=False,
     )
     
-    async with async_session() as session:
+    # Register audit hooks for this session maker
+    from app.audit.session_hooks import register_audit_hooks
+    register_audit_hooks(session_maker)
+    
+    return session_maker
+
+
+@pytest_asyncio.fixture(scope="function")
+async def db_session(test_session_maker) -> AsyncGenerator[AsyncSession, None]:
+    """Create a database session for tests."""
+    async with test_session_maker() as session:
         yield session
 
 

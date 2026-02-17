@@ -7,6 +7,7 @@ when they are created, updated, or deleted.
 import logging
 from typing import Dict, Type, Any, Optional
 from uuid import UUID
+from decimal import Decimal
 
 from sqlalchemy import event, inspect
 from sqlalchemy.orm import Session
@@ -106,22 +107,43 @@ def get_changed_attributes(instance: Any) -> Dict[str, tuple]:
             # Get new value (from current attribute)
             new_value = getattr(instance, attr.key, None)
             
-            # Convert UUID and datetime objects to strings for JSON serialization
-            if old_value is not None:
-                if isinstance(old_value, UUID):
-                    old_value = str(old_value)
-                elif hasattr(old_value, "isoformat"):
-                    old_value = old_value.isoformat()
-            
-            if new_value is not None:
-                if isinstance(new_value, UUID):
-                    new_value = str(new_value)
-                elif hasattr(new_value, "isoformat"):
-                    new_value = new_value.isoformat()
+            # Convert to JSON-serializable types
+            old_value = _serialize_value(old_value)
+            new_value = _serialize_value(new_value)
             
             changes[attr.key] = (old_value, new_value)
     
     return changes
+
+
+def _serialize_value(value: Any) -> Any:
+    """
+    Convert a value to a JSON-serializable format.
+    
+    Args:
+        value: The value to serialize
+        
+    Returns:
+        JSON-serializable value
+    """
+    if value is None:
+        return None
+    elif isinstance(value, UUID):
+        return str(value)
+    elif isinstance(value, Decimal):
+        return float(value)
+    elif hasattr(value, "isoformat"):
+        # datetime, date, time objects
+        return value.isoformat()
+    elif isinstance(value, bytes):
+        # Binary data
+        return f"<binary data {len(value)} bytes>"
+    elif isinstance(value, (list, tuple)):
+        return [_serialize_value(item) for item in value]
+    elif isinstance(value, dict):
+        return {k: _serialize_value(v) for k, v in value.items()}
+    else:
+        return value
 
 
 def get_current_attributes(instance: Any, exclude_large_fields: bool = True) -> Dict[str, Any]:
@@ -142,28 +164,21 @@ def get_current_attributes(instance: Any, exclude_large_fields: bool = True) -> 
     
     for attr in insp.mapper.column_attrs:
         value = getattr(instance, attr.key, None)
-        
         # Convert to JSON-serializable types
-        if value is not None:
-            if isinstance(value, UUID):
-                value = str(value)
-            elif hasattr(value, "isoformat"):
-                value = value.isoformat()
-            elif isinstance(value, bytes):
-                # Don't include binary data
-                value = f"<binary data {len(value)} bytes>"
-        
-        attributes[attr.key] = value
+        attributes[attr.key] = _serialize_value(value)
     
     return attributes
 
 
-async def handle_after_flush(session: Session, flush_context) -> None:
+def handle_after_flush(session: Session, flush_context) -> None:
     """
     SQLAlchemy event handler for after_flush.
     
     This is called after changes are flushed to the database but before commit.
     We collect all new, dirty, and deleted instances and log them to audit_log.
+    
+    Note: This is a synchronous event handler for compatibility with SQLAlchemy's
+    event system, even when using AsyncSession.
     
     Args:
         session: The SQLAlchemy session
@@ -356,9 +371,25 @@ def register_audit_hooks(session_factory) -> None:
     Args:
         session_factory: The SQLAlchemy session factory (async_sessionmaker)
     """
+    # For async sessions, we need to listen to the sync_session_class
+    # AsyncSession wraps a regular Session for sync operations
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import Session as SyncSession
+    
+    session_class = session_factory.class_
+    
+    if issubclass(session_class, AsyncSession):
+        # For AsyncSession, register on its sync_session_class
+        target = session_class.sync_session_class
+        logger.info(f"Registering audit hooks on AsyncSession's sync class: {target}")
+    else:
+        # For regular Session, register directly
+        target = session_class
+        logger.info(f"Registering audit hooks on Session class: {target}")
+    
     # Register after_flush event
     # Note: We use 'after_flush' instead of 'after_flush_postexec' because
     # we need to add audit log entries to the same session/transaction
-    event.listen(session_factory.class_, "after_flush", handle_after_flush)
+    event.listen(target, "after_flush", handle_after_flush)
     
-    logger.info("Audit logging session hooks registered")
+    logger.info(f"Audit logging session hooks registered successfully")

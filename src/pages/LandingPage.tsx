@@ -1,386 +1,336 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { navigateTo } from '@/lib/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
-  CheckCircle, 
-  FileText, 
-  Calculator, 
-  Clock, 
-  Receipt,
-  CreditCard,
-  ListChecks,
-  ShieldCheck,
+import {
   ArrowRight,
+  CheckCircle,
+  FileText,
+  Clock,
+  Landmark,
+  ShieldCheck,
+  Smartphone,
+  Users,
+  FolderLock,
+  FileSignature,
+  BellRing,
+  KeyRound,
+  Workflow,
+  SearchCheck,
+  Scale,
+  Lock,
+  Euro,
+  WifiOff,
+  Download,
   Menu,
   X,
-  Lock,
-  Users,
-  FileSignature,
-  FolderLock
 } from 'lucide-react'
 
-// FeatureCard Component
-interface FeatureCardProps {
+interface AudienceFeature {
   icon: React.ReactNode
+  label: string
+}
+
+interface AudienceTab {
+  id: 'zzp' | 'accountants' | 'partners'
   title: string
   description: string
+  ctaLabel: string
+  ctaAction: () => void
+  features: AudienceFeature[]
 }
 
-const FeatureCard = ({ icon, title, description }: FeatureCardProps) => {
-  return (
-    <Card className="h-full border border-primary/10 bg-gradient-to-br from-background to-primary/5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl">
-      <CardHeader>
-        <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-accent-secondary-7/50">
-          {icon}
-        </div>
-        <CardTitle className="text-lg">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <CardDescription className="text-sm">{description}</CardDescription>
-      </CardContent>
-    </Card>
-  )
-}
-
-// TrustCard Component
-interface TrustCardProps {
-  icon: React.ReactNode
-  title: string
-}
-
-const TrustCard = ({ icon, title }: TrustCardProps) => {
-  return (
-    <div className="flex items-center gap-3 rounded-lg border border-border bg-background p-4">
-      <div className="flex-shrink-0 text-accent-secondary-10">
-        {icon}
-      </div>
-      <span className="text-sm font-medium">{title}</span>
-    </div>
-  )
+const scrollToSection = (id: string) => {
+  const section = document.getElementById(id)
+  if (section) {
+    section.scrollIntoView({ behavior: 'smooth' })
+  }
 }
 
 export const LandingPage = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [activeAudience, setActiveAudience] = useState<'zzp' | 'accountants' | 'partners'>('zzp')
+
+  useEffect(() => {
+    document.title = 'Smart Accounting voor ZZP en accountants | PWA boekhouden met compliance'
+
+    const ensureMetaDescription = () => {
+      let tag = document.querySelector('meta[name="description"]')
+      if (!tag) {
+        tag = document.createElement('meta')
+        tag.setAttribute('name', 'description')
+        document.head.appendChild(tag)
+      }
+      tag.setAttribute(
+        'content',
+        'Smart Accounting helpt ZZP’ers en accountants met auditbare boekhouding, PWA mobiel werken, PKI-ondertekende BTW-submissies en transparante prijzen vanaf €6,95 per maand.',
+      )
+    }
+
+    ensureMetaDescription()
+  }, [])
+
+  const audienceTabs: AudienceTab[] = useMemo(
+    () => [
+      {
+        id: 'zzp',
+        title: 'Voor ZZP',
+        description: 'Snel starten met complete boekhouding en realtime inzicht in je administratie.',
+        ctaLabel: 'Start trial',
+        ctaAction: () => navigateTo('/login'),
+        features: [
+          { icon: <Clock className="h-5 w-5" />, label: 'Urenregistratie' },
+          { icon: <FileText className="h-5 w-5" />, label: 'Facturen & Automatische BTW' },
+          { icon: <Landmark className="h-5 w-5" />, label: 'Bankmatch + Reconciliatie' },
+          { icon: <SearchCheck className="h-5 w-5" />, label: 'Audit trail en BTW audit logs' },
+          { icon: <Smartphone className="h-5 w-5" />, label: 'PWA mobile experience' },
+        ],
+      },
+      {
+        id: 'accountants',
+        title: 'Voor Accountants',
+        description: 'Controle over meerdere dossiers met tools voor kwaliteit, snelheid en compliance.',
+        ctaLabel: 'Contact us',
+        ctaAction: () => scrollToSection('contact'),
+        features: [
+          { icon: <Users className="h-5 w-5" />, label: 'Multi-client hub' },
+          { icon: <FolderLock className="h-5 w-5" />, label: 'Periode locking' },
+          { icon: <FileSignature className="h-5 w-5" />, label: 'PKI-signing BTW submissions' },
+          { icon: <BellRing className="h-5 w-5" />, label: 'Werk Queue + Alerts' },
+          { icon: <KeyRound className="h-5 w-5" />, label: 'Rollen & Machtigingen' },
+        ],
+      },
+      {
+        id: 'partners',
+        title: 'Voor Partners',
+        description: 'Bouw mee aan een open ecosysteem rond betrouwbare financiële workflows.',
+        ctaLabel: 'Become partner',
+        ctaAction: () => scrollToSection('contact'),
+        features: [
+          { icon: <Workflow className="h-5 w-5" />, label: 'Bankkoppeling roadmap' },
+          { icon: <FileText className="h-5 w-5" />, label: 'Open API support' },
+          { icon: <Users className="h-5 w-5" />, label: 'Integratie partners' },
+        ],
+      },
+    ],
+    [],
+  )
+
+  const activeTab = audienceTabs.find((tab) => tab.id === activeAudience) ?? audienceTabs[0]
 
   const navigation = [
-    { name: 'ZZP', href: '#zzp' },
-    { name: 'Accountants', href: '#accountant' },
+    { name: 'Doelgroepen', href: '#doelgroepen' },
+    { name: 'PWA', href: '#pwa' },
     { name: 'Prijzen', href: '#prijzen' },
+    { name: 'Security', href: '#security' },
   ]
 
-  const zzpFeatures = [
-    {
-      icon: <FileText className="h-8 w-8" />,
-      title: 'Facturen maken en versturen',
-      description: 'Professionele facturen aanmaken en direct versturen naar klanten.'
-    },
-    {
-      icon: <Clock className="h-8 w-8" />,
-      title: 'Urenregistratie',
-      description: 'Eenvoudig uren bijhouden per project en klant.'
-    },
-    {
-      icon: <Receipt className="h-8 w-8" />,
-      title: 'Uitgaven beheren',
-      description: 'Scan bonnetjes en beheer je zakelijke uitgaven.'
-    },
-    {
-      icon: <CreditCard className="h-8 w-8" />,
-      title: 'Bankaflettering met slimme match',
-      description: 'Automatische bankaflettering met intelligente match voorstellen.'
-    },
-    {
-      icon: <Calculator className="h-8 w-8" />,
-      title: 'BTW aangifte met herkomst per rubriek',
-      description: 'Volledige BTW lifecycle met onderbouwing per aangifteregel.'
-    },
-    {
-      icon: <FileSignature className="h-8 w-8" />,
-      title: 'Verplichtingen (lease, abonnementen)',
-      description: 'Beheer terugkerende verplichtingen zoals lease en abonnementen.'
-    }
-  ]
-
-  const accountantFeatures = [
-    {
-      icon: <ListChecks className="h-8 w-8" />,
-      title: 'Werkoverzicht per klant',
-      description: 'Centraal werkoverzicht voor alle klanten met prioriteiten.'
-    },
-    {
-      icon: <Calculator className="h-8 w-8" />,
-      title: 'BTW lifecycle + ondertekening',
-      description: 'Volledige BTW flow met PKI ondertekening voor officiële indiening.'
-    },
-    {
-      icon: <ShieldCheck className="h-8 w-8" />,
-      title: 'Volledige audittrail',
-      description: 'Alle wijzigingen worden gelogd met drilldown mogelijkheden.'
-    },
-    {
-      icon: <FolderLock className="h-8 w-8" />,
-      title: 'Periodevergrendeling',
-      description: 'Vergrendel periodes na afronding voor data integriteit.'
-    },
-    {
-      icon: <Users className="h-8 w-8" />,
-      title: 'Multi-client overzicht',
-      description: 'Beheer meerdere klanten vanuit één centraal dashboard.'
-    }
-  ]
-
-  const trustFeatures = [
-    {
-      icon: <Lock className="h-5 w-5" />,
-      title: 'Gegevens blijven in Nederland/EU'
-    },
-    {
-      icon: <ShieldCheck className="h-5 w-5" />,
-      title: 'Rolgebaseerde toegang (machtigingen)'
-    },
-    {
-      icon: <FileSignature className="h-5 w-5" />,
-      title: 'Ondertekende aangiftes'
-    },
-    {
-      icon: <CheckCircle className="h-5 w-5" />,
-      title: 'Geen advertenties'
-    }
+  const usps = [
+    { icon: <SearchCheck className="h-5 w-5" />, title: 'Auditability', text: 'Volledige herkomst en controleerbare mutaties per boeking.' },
+    { icon: <Scale className="h-5 w-5" />, title: 'Compliance', text: 'BTW-processen met PKI-signing en period lock-ondersteuning.' },
+    { icon: <ShieldCheck className="h-5 w-5" />, title: 'Security-first', text: 'Toegangsbeheer, logging en veilige standaardinstellingen.' },
+    { icon: <Smartphone className="h-5 w-5" />, title: 'Mobile-ready', text: 'PWA-ervaring op mobiel en desktop, inclusief offline flow.' },
+    { icon: <Euro className="h-5 w-5" />, title: 'Transparent pricing', text: 'Duidelijk tarief voor ZZP vanaf €6,95 per maand.' },
   ]
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <span className="text-xl font-bold text-primary">Smart Accounting</span>
-            </div>
-            
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
-              {navigation.map((item) => (
-                <a
-                  key={item.name}
-                  href={item.href}
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {item.name}
-                </a>
-              ))}
-              <Button variant="ghost" onClick={() => navigateTo('/login')}>
-                Inloggen
-              </Button>
-            </div>
+      <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <span className="text-xl font-bold text-primary">Smart Accounting</span>
 
-            {/* Mobile menu button */}
-            <div className="md:hidden">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              >
-                {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-              </Button>
-            </div>
+          <div className="hidden items-center space-x-8 md:flex">
+            {navigation.map((item) => (
+              <a key={item.name} href={item.href} className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                {item.name}
+              </a>
+            ))}
+            <Button variant="ghost" onClick={() => navigateTo('/login')}>
+              Inloggen
+            </Button>
+          </div>
+
+          <div className="md:hidden">
+            <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen((open) => !open)}>
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </Button>
           </div>
         </div>
 
-        {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-border">
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              {navigation.map((item) => (
-                <a
-                  key={item.name}
-                  href={item.href}
-                  className="block px-3 py-2 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-md"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {item.name}
-                </a>
-              ))}
-              <div className="px-3 py-2">
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setMobileMenuOpen(false)
-                    navigateTo('/login')
-                  }}
-                >
-                  Inloggen
-                </Button>
-              </div>
-            </div>
+          <div className="border-t border-border px-2 pb-3 pt-2 md:hidden">
+            {navigation.map((item) => (
+              <a
+                key={item.name}
+                href={item.href}
+                className="block rounded-md px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {item.name}
+              </a>
+            ))}
           </div>
         )}
       </nav>
 
-      {/* Hero Section */}
       <section className="relative overflow-hidden border-b border-primary/10">
-        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/20 via-background to-secondary/10" />
-        <div className="absolute -top-24 left-1/2 -z-10 h-72 w-72 -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-32">
-          <div className="text-center">
-            <span className="inline-flex items-center rounded-full border border-accent-secondary-7 bg-accent-secondary-3 px-4 py-1 text-sm font-medium text-accent-secondary-11 shadow-sm shadow-accent-secondary-9/20">
-              Professioneel boekhouden voor ZZP en accountant
-            </span>
-            <h1 className="mt-6 text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-foreground mb-6">
-              Boekhouden zonder gedoe.
-              <span className="text-primary block mt-2">Volledige controle voor ZZP en accountant.</span>
-            </h1>
-            <div className="mt-6 text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto space-y-2">
-              <p>• BTW aangifte met volledige herkomst</p>
-              <p>• Bankaflettering met slimme voorstellen</p>
-              <p>• Audittrail en periodevergrendeling</p>
-              <p>• Klaar voor officiële indiening</p>
-            </div>
-            
-            {/* CTAs */}
-            <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-              <Button 
-                size="lg" 
-                className="text-lg px-8 py-6"
-                onClick={() => navigateTo('/login')}
-              >
-                Start voor €6,95 per maand
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline"
-                className="text-lg px-8 py-6 border-accent-secondary-7 text-accent-secondary-11 hover:bg-accent-secondary-3 hover:border-accent-secondary-8"
-                onClick={() => {
-                  const contactSection = document.getElementById('contact')
-                  if (contactSection) {
-                    contactSection.scrollIntoView({ behavior: 'smooth' })
-                  }
-                }}
-              >
-                Ik ben accountant
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
+        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/15 via-background to-emerald-700/10" />
+        <div className="mx-auto max-w-7xl px-4 py-20 text-center sm:px-6 sm:py-28 lg:px-8">
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">Smart Accounting voor ZZP’ers en accountants</h1>
+          <p className="mx-auto mt-6 max-w-3xl text-base text-muted-foreground sm:text-lg">
+            Boekhouden dat werkt met jou — volledig, toegankelijk en klaar voor compliance.
+          </p>
+          <p className="mx-auto mt-5 max-w-4xl text-sm text-muted-foreground sm:text-base">
+            Minder handmatig werk dan traditionele pakketten zoals SnelStart, met focus op auditbaarheid, samenwerking en mobile-first gebruik.
+          </p>
 
-      {/* Voor ZZP Section */}
-      <section id="zzp" className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4 pb-2 inline-block border-b-2 border-accent-secondary-7">Voor ZZP</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {zzpFeatures.map((feature, index) => (
-              <FeatureCard key={index} {...feature} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Voor Accountants Section */}
-      <section id="accountant" className="py-20 bg-gradient-to-b from-muted/40 to-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4 pb-2 inline-block border-b-2 border-accent-secondary-7">Voor accountants</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {accountantFeatures.map((feature, index) => (
-              <FeatureCard key={index} {...feature} />
-            ))}
-          </div>
-          <div className="text-center">
-            <Button 
+          <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
+            <Button size="lg" className="px-8 py-6 text-lg" onClick={() => navigateTo('/login')}>
+              Start voor €6,95 / maand
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+            <Button
               size="lg"
               variant="outline"
-              className="border-accent-secondary-7 text-accent-secondary-11 hover:bg-accent-secondary-3 hover:border-accent-secondary-8"
+              className="border-emerald-700 text-emerald-700 hover:bg-emerald-700/10"
               onClick={() => {
-                const contactSection = document.getElementById('contact')
-                if (contactSection) {
-                  contactSection.scrollIntoView({ behavior: 'smooth' })
-                }
+                setActiveAudience('accountants')
+                scrollToSection('doelgroepen')
               }}
             >
-              Neem contact op
+              Ik ben accountant
             </Button>
           </div>
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="prijzen" className="py-20 bg-gradient-to-b from-primary/5 to-muted/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Eenvoudige prijs</h2>
+      <section id="doelgroepen" className="py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <h2 className="text-center text-3xl font-bold sm:text-4xl">Kies jouw route</h2>
+          <div className="mt-10 grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/30 p-3 md:grid-cols-3">
+            {audienceTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveAudience(tab.id)}
+                className={`rounded-lg px-4 py-3 text-left text-sm font-semibold transition ${
+                  activeAudience === tab.id ? 'bg-primary text-primary-foreground shadow' : 'bg-background text-foreground hover:bg-muted'
+                }`}
+              >
+                {tab.title}
+              </button>
+            ))}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* ZZP Plan */}
-            <Card className="border border-primary/50 bg-gradient-to-b from-primary/10 to-background shadow-xl">
+
+          <Card className="mt-6 border-primary/20">
+            <CardHeader>
+              <CardTitle>{activeTab.title}</CardTitle>
+              <CardDescription>{activeTab.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {activeTab.features.map((feature) => (
+                  <li key={feature.label} className="flex items-center gap-3 rounded-lg border border-border bg-background p-4">
+                    <span className="text-emerald-700">{feature.icon}</span>
+                    <span className="text-sm font-medium">{feature.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+            <CardFooter>
+              <Button className="bg-emerald-700 hover:bg-emerald-800" onClick={activeTab.ctaAction}>
+                {activeTab.ctaLabel}
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      </section>
+
+      <section className="bg-muted/40 py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <h2 className="text-center text-3xl font-bold sm:text-4xl">Waarom Smart Accounting</h2>
+          <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+            {usps.map((usp) => (
+              <Card key={usp.title} className="border-border/80">
+                <CardHeader>
+                  <div className="mb-2 text-emerald-700">{usp.icon}</div>
+                  <CardTitle className="text-base">{usp.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription>{usp.text}</CardDescription>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="pwa" className="py-20">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-8 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
+          <div>
+            <h2 className="text-3xl font-bold sm:text-4xl">PWA feature showcase</h2>
+            <ul className="mt-6 space-y-4">
+              <li className="flex items-start gap-3"><Download className="mt-0.5 h-5 w-5 text-emerald-700" />Install on iOS/Android</li>
+              <li className="flex items-start gap-3"><WifiOff className="mt-0.5 h-5 w-5 text-emerald-700" />Works offline</li>
+              <li className="flex items-start gap-3"><Smartphone className="mt-0.5 h-5 w-5 text-emerald-700" />Push / update experience</li>
+            </ul>
+          </div>
+          <Card className="border-primary/20 bg-gradient-to-br from-primary/10 via-background to-emerald-700/10">
+            <CardHeader>
+              <CardTitle>Altijd bereikbaar, ook onderweg</CardTitle>
+              <CardDescription>Gebruik Smart Accounting als app-ervaring zonder appstore-frictie.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>• Installeer direct vanaf browser op mobiel en desktop.</p>
+              <p>• Bekijk cijfers en werk taken af terwijl je offline bent.</p>
+              <p>• Ontvang updates en meldingen zonder handmatig beheer.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section id="prijzen" className="bg-gradient-to-b from-primary/5 to-muted/30 py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <h2 className="text-center text-3xl font-bold sm:text-4xl">Pricing</h2>
+          <div className="mx-auto mt-10 grid max-w-4xl grid-cols-1 gap-8 md:grid-cols-2">
+            <Card className="border-primary/50 shadow-xl">
               <CardHeader className="text-center">
-                <CardTitle className="text-2xl">ZZP Plan</CardTitle>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold">€6,95</span>
-                  <span className="text-muted-foreground"> per maand</span>
+                <CardTitle className="text-2xl">ZZP</CardTitle>
+                <div>
+                  <span className="text-5xl font-extrabold text-primary">€6,95</span>
+                  <span className="text-muted-foreground"> / maand</span>
                 </div>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-3">
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-accent-secondary-10 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm">Onbeperkt facturen</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-accent-secondary-10 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm">BTW aangifte</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-accent-secondary-10 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm">Bankaflettering</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-accent-secondary-10 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm">Audittrail</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-accent-secondary-10 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm">PWA toegang</span>
-                  </li>
+                <ul className="space-y-3 text-sm">
+                  {['Urenregistratie', 'Facturen & Automatische BTW', 'Bankmatch + Reconciliatie', 'Audit trail', 'PWA toegang'].map((item) => (
+                    <li key={item} className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-emerald-700" /> {item}
+                    </li>
+                  ))}
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button 
-                  className="w-full" 
-                  onClick={() => navigateTo('/login')}
-                >
-                  Start nu
-                </Button>
+                <Button className="w-full" onClick={() => navigateTo('/login')}>Start voor €6,95</Button>
               </CardFooter>
             </Card>
 
-            {/* Accountant Plan */}
-            <Card className="border border-accent-secondary-6 bg-background/95">
+            <Card className="border-emerald-700/40 bg-background">
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl">Accountant</CardTitle>
+                <p className="text-3xl font-bold text-emerald-700">Contact</p>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Accountants werken gratis samen met hun klanten. Neem contact op voor samenwerking.
-                </p>
+              <CardContent>
+                <ul className="space-y-3 text-sm">
+                  {['Multi-client hub', 'Periode locking', 'PKI-signing BTW submissions', 'Werk Queue + Alerts', 'Rollen & Machtigingen'].map((item) => (
+                    <li key={item} className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-emerald-700" /> {item}
+                    </li>
+                  ))}
+                </ul>
               </CardContent>
               <CardFooter>
-                <Button 
-                  className="w-full border-accent-secondary-7 text-accent-secondary-11 hover:bg-accent-secondary-3"
-                  variant="outline"
-                  onClick={() => {
-                    const contactSection = document.getElementById('contact')
-                    if (contactSection) {
-                      contactSection.scrollIntoView({ behavior: 'smooth' })
-                    }
-                  }}
-                >
+                <Button variant="outline" className="w-full border-emerald-700 text-emerald-700 hover:bg-emerald-700/10" onClick={() => scrollToSection('contact')}>
                   Contact us
                 </Button>
               </CardFooter>
@@ -389,71 +339,35 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* Trust Section */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {trustFeatures.map((feature, index) => (
-              <TrustCard key={index} {...feature} />
+      <section id="security" className="py-20">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+          <h2 className="text-center text-3xl font-bold sm:text-4xl">Trust & Security</h2>
+          <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {[
+              { icon: <Lock className="h-5 w-5" />, title: 'EU hosting' },
+              { icon: <KeyRound className="h-5 w-5" />, title: 'Role-based access' },
+              { icon: <FileSignature className="h-5 w-5" />, title: 'PKI signing' },
+              { icon: <ShieldCheck className="h-5 w-5" />, title: 'Audit logs' },
+            ].map((item) => (
+              <div key={item.title} className="flex items-center gap-3 rounded-lg border border-border bg-background p-4 text-sm font-medium">
+                <span className="text-emerald-700">{item.icon}</span>
+                {item.title}
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Footer */}
       <footer id="contact" className="border-t border-border bg-muted/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <span className="text-xl font-bold text-primary">Smart Accounting</span>
-              <p className="mt-4 text-sm text-muted-foreground">
-                Professioneel boekhoudplatform voor ZZP'ers en accountants.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Links</h3>
-              <ul className="space-y-2">
-                <li>
-                  <Button 
-                    variant="link" 
-                    className="text-sm p-0 h-auto text-muted-foreground hover:text-foreground"
-                    onClick={() => navigateTo('/login')}
-                  >
-                    Inloggen
-                  </Button>
-                </li>
-                <li>
-                  <a href="#" className="text-sm text-muted-foreground hover:text-foreground">
-                    Privacy
-                  </a>
-                </li>
-                <li>
-                  <a href="mailto:info@smartaccounting.nl" className="text-sm text-muted-foreground hover:text-foreground">
-                    Contact
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="text-sm text-muted-foreground hover:text-foreground">
-                    Algemene voorwaarden
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Contact</h3>
-              <p className="text-sm text-muted-foreground">
-                Voor vragen en samenwerking:
-              </p>
-              <a href="mailto:info@smartaccounting.nl" className="text-sm text-primary hover:underline">
-                info@smartaccounting.nl
-              </a>
-            </div>
+        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
+          <div>
+            <span className="text-xl font-bold text-primary">Smart Accounting</span>
+            <p className="mt-3 text-sm text-muted-foreground">Boekhouding voor ZZP, accountants en integratiepartners.</p>
           </div>
-          <div className="mt-8 pt-8 border-t border-border">
-            <p className="text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Smart Accounting Platform. Alle rechten voorbehouden.
-            </p>
-          </div>
+          <a href="mailto:info@smartaccounting.nl" className="text-sm text-muted-foreground hover:text-foreground">Contact</a>
+          <a href="#" className="text-sm text-muted-foreground hover:text-foreground">Privacy</a>
+          <a href="#" className="text-sm text-muted-foreground hover:text-foreground">TOS</a>
+          <a href="#" className="text-sm text-muted-foreground hover:text-foreground">Docs</a>
         </div>
       </footer>
     </div>

@@ -93,4 +93,4 @@ class WorkQueueSummaryResponse(BaseModel):
     vat_actions: VATActionsSection
     reminders: RemindersSection
     integrity_warnings: IntegrityWarningsSection
-    generated_at: datetime = Field(default_factory=lambda: datetime.now())
+    generated_at: datetime

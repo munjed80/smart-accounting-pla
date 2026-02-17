@@ -44,6 +44,7 @@ def verify_orm_mappings() -> None:
         ZZPPayment, ZZPPaymentAllocation,
         FinancialCommitment,
         Plan, Subscription, AdminAuditLog,
+        AuditLog,
     )
     
     # This will raise InvalidRequestError if any relationships are misconfigured
@@ -183,6 +184,10 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-Selected-Client-Id"],
     expose_headers=["Content-Disposition", "Content-Length"],  # Expose headers for mobile PDF download
 )
+
+# Audit middleware - added after CORS to capture request context
+from app.audit.middleware import AuditMiddleware
+app.add_middleware(AuditMiddleware)
 
 
 @app.exception_handler(Exception)

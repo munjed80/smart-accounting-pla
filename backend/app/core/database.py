@@ -33,6 +33,10 @@ async_session_maker = async_sessionmaker(
     expire_on_commit=False,
 )
 
+# Register audit logging hooks
+from app.audit.session_hooks import register_audit_hooks
+register_audit_hooks(async_session_maker)
+
 
 class Base(DeclarativeBase):
     pass

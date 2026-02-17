@@ -64,28 +64,34 @@ def upgrade() -> None:
     )
     
     # Create indexes for optimal query performance
+    # 
     # Composite index for tenant-based time-series queries (most common pattern)
+    # DESC ordering on created_at enables efficient "recent activity" queries
+    # Note: Using sa.text() for DESC as SQLAlchemy doesn't support desc() in create_index
     op.create_index(
         'ix_audit_log_client_created',
         'audit_log',
         ['client_id', sa.text('created_at DESC')],
     )
     
-    # Composite index for entity lookups
+    # Composite index for entity lookups (e.g., "show all changes to invoice X")
     op.create_index(
         'ix_audit_log_entity',
         'audit_log',
         ['entity_type', 'entity_id'],
     )
     
-    # Index for user activity tracking
+    # Index for user activity tracking (e.g., "what did user Y change?")
     op.create_index(
         'ix_audit_log_user',
         'audit_log',
         ['user_id'],
     )
     
-    # Index for time-based queries
+    # Separate created_at index for admin/cross-tenant queries
+    # While ix_audit_log_client_created covers tenant-scoped time queries,
+    # this index supports efficient cross-tenant administrative queries
+    # (e.g., system-wide activity monitoring, compliance reporting)
     op.create_index(
         'ix_audit_log_created_at',
         'audit_log',

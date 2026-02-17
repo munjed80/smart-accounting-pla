@@ -36,6 +36,10 @@ from app.schemas.vat import (
     VatBoxTotalResponse,
     VatBoxLinesResponse,
     VatBoxLineResponse,
+    CreateVatSubmissionRequest,
+    MarkSubmittedRequest,
+    VatSubmissionResponse,
+    VatSubmissionListResponse,
 )
 from app.services.vat import VatReportService, VatLineageService, generate_vat_overview_pdf
 from app.services.vat.report import VatReportError, PeriodNotEligibleError
@@ -430,6 +434,9 @@ async def generate_btw_submission_package(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Response:
     """Generate BTW submission package (XML/XBRL)."""
+    from app.models.vat_submission import VatSubmission
+    import uuid as uuid_module
+    
     # Verify accountant access
     administration = await verify_accountant_access(client_id, current_user, db)
     
@@ -437,6 +444,19 @@ async def generate_btw_submission_package(
         # Generate submission package
         service = SubmissionPackageService(db, administration.id)
         xml_content, filename = await service.generate_btw_package(request.period_id)
+        
+        # Create submission record
+        submission = VatSubmission(
+            id=uuid_module.uuid4(),
+            administration_id=client_id,
+            period_id=request.period_id,
+            submission_type="BTW",
+            created_by=current_user.id,
+            method="PACKAGE",
+            status="DRAFT",
+        )
+        db.add(submission)
+        await db.commit()
         
         # Return XML file
         xml_bytes = xml_content.encode('utf-8')
@@ -489,6 +509,9 @@ async def generate_icp_submission_package(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Response:
     """Generate ICP submission package (XML)."""
+    from app.models.vat_submission import VatSubmission
+    import uuid as uuid_module
+    
     # Verify accountant access
     administration = await verify_accountant_access(client_id, current_user, db)
     
@@ -496,6 +519,19 @@ async def generate_icp_submission_package(
         # Generate submission package
         service = SubmissionPackageService(db, administration.id)
         xml_content, filename = await service.generate_icp_package(request.period_id)
+        
+        # Create submission record
+        submission = VatSubmission(
+            id=uuid_module.uuid4(),
+            administration_id=client_id,
+            period_id=request.period_id,
+            submission_type="ICP",
+            created_by=current_user.id,
+            method="PACKAGE",
+            status="DRAFT",
+        )
+        db.add(submission)
+        await db.commit()
         
         # Return XML file
         xml_bytes = xml_content.encode('utf-8')
@@ -766,3 +802,214 @@ async def download_evidence_pack(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate evidence pack: {str(e)}")
+
+
+# VAT Submission Tracking Endpoints
+
+@router.get(
+    "/clients/{client_id}/vat/submissions",
+    response_model='VatSubmissionListResponse',
+    summary="List VAT Submissions",
+    description="""
+    List all VAT submission records for a client.
+    
+    Returns submission history including:
+    - Submission type (BTW or ICP)
+    - Status (DRAFT, SUBMITTED, CONFIRMED, REJECTED)
+    - Creation and submission timestamps
+    - Reference text and attachments
+    
+    **Security:** Enforces consent/active-client isolation.
+    Only accessible by accountants with ACTIVE assignment to the client.
+    """,
+)
+async def list_vat_submissions(
+    client_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    period_id: Optional[UUID] = Query(None, description="Filter by period"),
+    submission_type: Optional[str] = Query(None, description="Filter by type (BTW or ICP)"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+):
+    """List VAT submissions for a client."""
+    from app.models.vat_submission import VatSubmission
+    from app.schemas.vat import VatSubmissionListResponse, VatSubmissionResponse
+    
+    # Enforce consent/active-client isolation
+    await verify_accountant_access(client_id, current_user, db)
+    
+    # Build query
+    query = select(VatSubmission).where(VatSubmission.administration_id == client_id)
+    
+    if period_id:
+        query = query.where(VatSubmission.period_id == period_id)
+    if submission_type:
+        query = query.where(VatSubmission.submission_type == submission_type)
+    if status:
+        query = query.where(VatSubmission.status == status)
+    
+    query = query.order_by(VatSubmission.created_at.desc())
+    
+    result = await db.execute(query)
+    submissions = list(result.scalars().all())
+    
+    return VatSubmissionListResponse(
+        submissions=[
+            VatSubmissionResponse(
+                id=s.id,
+                administration_id=s.administration_id,
+                period_id=s.period_id,
+                submission_type=s.submission_type,
+                created_at=s.created_at,
+                created_by=s.created_by,
+                method=s.method,
+                status=s.status,
+                reference_text=s.reference_text,
+                attachment_url=s.attachment_url,
+                submitted_at=s.submitted_at,
+                updated_at=s.updated_at,
+            )
+            for s in submissions
+        ],
+        total_count=len(submissions),
+    )
+
+
+@router.post(
+    "/clients/{client_id}/vat/submissions",
+    response_model='VatSubmissionResponse',
+    summary="Create VAT Submission Record",
+    description="""
+    Create a new VAT submission record when generating a submission package.
+    
+    This endpoint creates a DRAFT submission record that tracks:
+    - When the package was generated
+    - Who generated it
+    - What period it covers
+    
+    **Security:** Enforces consent/active-client isolation.
+    Only accessible by accountants with ACTIVE assignment to the client.
+    """,
+)
+async def create_vat_submission(
+    client_id: UUID,
+    request: 'CreateVatSubmissionRequest',
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Create a new VAT submission record."""
+    from app.models.vat_submission import VatSubmission
+    from app.schemas.vat import CreateVatSubmissionRequest, VatSubmissionResponse
+    import uuid
+    
+    # Enforce consent/active-client isolation
+    await verify_accountant_access(client_id, current_user, db)
+    
+    # Verify period exists
+    result = await db.execute(
+        select(AccountingPeriod)
+        .where(AccountingPeriod.id == request.period_id)
+        .where(AccountingPeriod.administration_id == client_id)
+    )
+    period = result.scalar_one_or_none()
+    
+    if not period:
+        raise HTTPException(status_code=404, detail="Period not found")
+    
+    # Create submission record
+    submission = VatSubmission(
+        id=uuid.uuid4(),
+        administration_id=client_id,
+        period_id=request.period_id,
+        submission_type=request.submission_type.value,
+        created_by=current_user.id,
+        method=request.method.value,
+        status="DRAFT",
+    )
+    
+    db.add(submission)
+    await db.commit()
+    await db.refresh(submission)
+    
+    return VatSubmissionResponse(
+        id=submission.id,
+        administration_id=submission.administration_id,
+        period_id=submission.period_id,
+        submission_type=submission.submission_type,
+        created_at=submission.created_at,
+        created_by=submission.created_by,
+        method=submission.method,
+        status=submission.status,
+        reference_text=submission.reference_text,
+        attachment_url=submission.attachment_url,
+        submitted_at=submission.submitted_at,
+        updated_at=submission.updated_at,
+    )
+
+
+@router.post(
+    "/clients/{client_id}/vat/submissions/{submission_id}/mark-submitted",
+    response_model='VatSubmissionResponse',
+    summary="Mark Submission as Submitted",
+    description="""
+    Mark a VAT submission as submitted to the tax authority.
+    
+    This endpoint updates the submission status to SUBMITTED and records:
+    - Reference text (e.g., "Submitted via portal on DATE")
+    - Optional attachment URL for proof/receipt
+    - Submission timestamp
+    
+    **Security:** Enforces consent/active-client isolation.
+    Only accessible by accountants with ACTIVE assignment to the client.
+    """,
+)
+async def mark_submission_submitted(
+    client_id: UUID,
+    submission_id: UUID,
+    request: 'MarkSubmittedRequest',
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Mark a submission as submitted."""
+    from app.models.vat_submission import VatSubmission
+    from app.schemas.vat import MarkSubmittedRequest, VatSubmissionResponse
+    
+    # Enforce consent/active-client isolation
+    await verify_accountant_access(client_id, current_user, db)
+    
+    # Get submission
+    result = await db.execute(
+        select(VatSubmission)
+        .where(VatSubmission.id == submission_id)
+        .where(VatSubmission.administration_id == client_id)
+    )
+    submission = result.scalar_one_or_none()
+    
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
+    # Update submission
+    submission.status = "SUBMITTED"
+    submission.reference_text = request.reference_text
+    submission.attachment_url = request.attachment_url
+    submission.submitted_at = datetime.now(timezone.utc)
+    submission.updated_at = datetime.now(timezone.utc)
+    
+    await db.commit()
+    await db.refresh(submission)
+    
+    return VatSubmissionResponse(
+        id=submission.id,
+        administration_id=submission.administration_id,
+        period_id=submission.period_id,
+        submission_type=submission.submission_type,
+        created_at=submission.created_at,
+        created_by=submission.created_by,
+        method=submission.method,
+        status=submission.status,
+        reference_text=submission.reference_text,
+        attachment_url=submission.attachment_url,
+        submitted_at=submission.submitted_at,
+        updated_at=submission.updated_at,
+    )
+

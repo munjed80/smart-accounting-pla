@@ -181,10 +181,26 @@ class TestAlembicMigration:
     
     def test_migration_has_upgrade_function(self):
         """Test that migration has upgrade function."""
-        from alembic.versions import _042_add_digipoort_fields
-        assert hasattr(_042_add_digipoort_fields, 'upgrade')
+        import importlib.util
+        import os
+        migration_path = os.path.join(
+            os.path.dirname(__file__),
+            '../alembic/versions/042_add_digipoort_fields.py'
+        )
+        spec = importlib.util.spec_from_file_location("migration_042", migration_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert hasattr(module, 'upgrade')
     
     def test_migration_has_downgrade_function(self):
         """Test that migration has downgrade function."""
-        from alembic.versions import _042_add_digipoort_fields
-        assert hasattr(_042_add_digipoort_fields, 'downgrade')
+        import importlib.util
+        import os
+        migration_path = os.path.join(
+            os.path.dirname(__file__),
+            '../alembic/versions/042_add_digipoort_fields.py'
+        )
+        spec = importlib.util.spec_from_file_location("migration_042", migration_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert hasattr(module, 'downgrade')

@@ -236,6 +236,7 @@ class VatSubmissionStatus(str, Enum):
     SUBMITTED = "SUBMITTED"
     RECEIVED = "RECEIVED"
     ACCEPTED = "ACCEPTED"
+    CONFIRMED = "CONFIRMED"  # Backward compatibility (alias for ACCEPTED)
     REJECTED = "REJECTED"
     FAILED = "FAILED"
 

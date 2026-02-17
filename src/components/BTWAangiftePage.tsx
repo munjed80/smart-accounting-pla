@@ -109,6 +109,15 @@ interface BTWAangifteReport {
   total_icp_supplies: string
 }
 
+interface SubmissionStatus {
+  submission_id: string
+  status: string
+  validation_errors: string[]
+  payload_hash: string
+  correlation_id?: string
+  error_message?: string
+}
+
 // Dutch VAT box display order and grouping
 const VAT_BOX_GROUPS = {
   "Binnenlandse prestaties": ["1a", "1b", "1c", "1d", "1e"],
@@ -283,6 +292,11 @@ export const BTWAangiftePage = ({
   const [drilldownOpen, setDrilldownOpen] = useState(false)
   const [selectedBox, setSelectedBox] = useState<{ code: string, name: string } | null>(null)
   
+  // Submission state
+  const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus | null>(null)
+  const [isPreparingSubmission, setIsPreparingSubmission] = useState(false)
+  const [isQueuingSubmission, setIsQueuingSubmission] = useState(false)
+  
   // Use delayed loading to prevent skeleton flash
   const showLoading = useDelayedLoading(isLoading, 300, !!report)
   
@@ -290,6 +304,69 @@ export const BTWAangiftePage = ({
   const handleBoxClick = (boxCode: string, boxName: string) => {
     setSelectedBox({ code: boxCode, name: boxName })
     setDrilldownOpen(true)
+  }
+  
+  // Handle prepare submission
+  const handlePrepareSubmission = async (kind: 'VAT' | 'ICP' = 'VAT') => {
+    setIsPreparingSubmission(true)
+    try {
+      const response = await fetch(
+        `/api/accountant/clients/${clientId}/vat/${periodId}/submit/prepare`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify({ kind }),
+        }
+      )
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Failed to prepare submission')
+      }
+      
+      const data = await response.json()
+      setSubmissionStatus(data)
+    } catch (error) {
+      console.error('Failed to prepare submission:', error)
+      alert('Fout bij het voorbereiden van de aangifte. Probeer het opnieuw.')
+    } finally {
+      setIsPreparingSubmission(false)
+    }
+  }
+  
+  // Handle queue submission
+  const handleQueueSubmission = async () => {
+    if (!submissionStatus) return
+    
+    setIsQueuingSubmission(true)
+    try {
+      const response = await fetch(
+        `/api/accountant/clients/${clientId}/vat/submissions/${submissionStatus.submission_id}/queue`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      )
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Failed to queue submission')
+      }
+      
+      const data = await response.json()
+      setSubmissionStatus({ ...submissionStatus, ...data })
+    } catch (error) {
+      console.error('Failed to queue submission:', error)
+      alert('Fout bij het in wachtrij zetten van de aangifte. Probeer het opnieuw.')
+    } finally {
+      setIsQueuingSubmission(false)
+    }
   }
   
   if (showLoading) {
@@ -662,6 +739,140 @@ export const BTWAangiftePage = ({
           </Card>
         </TabsContent>
       </Tabs>
+      
+      {/* Submission Section (Digipoort-ready) */}
+      {!report.has_red_anomalies && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Export size={20} weight="duotone" />
+              Indienen via Digipoort
+            </CardTitle>
+            <CardDescription>
+              Bereid de aangifte voor en zet deze in de wachtrij voor automatische indiening
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Prepare button */}
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => handlePrepareSubmission('VAT')}
+                disabled={isPreparingSubmission || report.has_red_anomalies}
+                variant="default"
+              >
+                <FileArrowDown size={16} className="mr-2" />
+                {isPreparingSubmission ? 'Voorbereiden...' : 'Voorbereiden'}
+              </Button>
+              
+              {report.icp_entries.length > 0 && (
+                <Button
+                  onClick={() => handlePrepareSubmission('ICP')}
+                  disabled={isPreparingSubmission || report.has_red_anomalies}
+                  variant="outline"
+                >
+                  <Globe size={16} className="mr-2" />
+                  {isPreparingSubmission ? 'ICP Voorbereiden...' : 'ICP Voorbereiden'}
+                </Button>
+              )}
+            </div>
+            
+            {/* Status display */}
+            {submissionStatus && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant={
+                    submissionStatus.status === 'DRAFT' ? 'secondary' :
+                    submissionStatus.status === 'QUEUED' ? 'default' :
+                    submissionStatus.status === 'FAILED' ? 'destructive' :
+                    'outline'
+                  }>
+                    {submissionStatus.status === 'DRAFT' && 'Concept'}
+                    {submissionStatus.status === 'QUEUED' && 'In wachtrij'}
+                    {submissionStatus.status === 'SUBMITTED' && 'Ingediend'}
+                    {submissionStatus.status === 'RECEIVED' && 'Ontvangen'}
+                    {submissionStatus.status === 'ACCEPTED' && 'Geaccepteerd'}
+                    {submissionStatus.status === 'REJECTED' && 'Afgekeurd'}
+                    {submissionStatus.status === 'FAILED' && 'Mislukt'}
+                  </Badge>
+                  
+                  {submissionStatus.payload_hash && (
+                    <code className="text-xs bg-muted px-2 py-1 rounded">
+                      Hash: {submissionStatus.payload_hash.substring(0, 8)}...
+                    </code>
+                  )}
+                </div>
+                
+                {/* Validation errors */}
+                {submissionStatus.validation_errors.length > 0 && (
+                  <Alert className="bg-amber-500/10 border-amber-500/40">
+                    <Warning className="h-4 w-4" />
+                    <AlertTitle>Validatie waarschuwingen</AlertTitle>
+                    <AlertDescription>
+                      <ul className="list-disc list-inside mt-2 space-y-1">
+                        {submissionStatus.validation_errors.map((error, idx) => (
+                          <li key={idx} className="text-sm">{error}</li>
+                        ))}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {/* Queue button */}
+                {submissionStatus.status === 'DRAFT' && submissionStatus.validation_errors.length === 0 && (
+                  <Button
+                    onClick={handleQueueSubmission}
+                    disabled={isQueuingSubmission}
+                    variant="default"
+                    className="w-full sm:w-auto"
+                  >
+                    <CheckCircle size={16} className="mr-2" />
+                    {isQueuingSubmission ? 'In wachtrij zetten...' : 'In wachtrij zetten'}
+                  </Button>
+                )}
+                
+                {/* Queued status */}
+                {submissionStatus.status === 'QUEUED' && (
+                  <Alert className="bg-blue-500/10 border-blue-500/40">
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertTitle>In wachtrij</AlertTitle>
+                    <AlertDescription>
+                      De aangifte staat in de wachtrij voor automatische indiening via Digipoort.
+                      {submissionStatus.correlation_id && (
+                        <div className="mt-2 text-xs">
+                          Tracking ID: {submissionStatus.correlation_id}
+                        </div>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {/* Error display */}
+                {submissionStatus.error_message && (
+                  <Alert className="bg-red-500/10 border-red-500/40">
+                    <WarningCircle className="h-4 w-4" />
+                    <AlertTitle>Fout</AlertTitle>
+                    <AlertDescription>
+                      {submissionStatus.error_message}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
+            
+            {/* Info about Phase B */}
+            {!submissionStatus && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>Digipoort integratie (Fase B)</AlertTitle>
+                <AlertDescription>
+                  Deze functie bereidt de aangifte voor automatische indiening via Digipoort voor.
+                  De daadwerkelijke indiening volgt in Fase B van de implementatie.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
       
       {/* Footer with generation info */}
       <div className="text-sm text-muted-foreground text-center">

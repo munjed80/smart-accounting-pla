@@ -23,9 +23,12 @@ class VatSubmission(Base):
     
     Status Flow:
     - DRAFT: Package generated, not yet submitted
-    - SUBMITTED: Manually marked as submitted to tax authority
-    - CONFIRMED: Confirmed/accepted by tax authority (future: automated via Digipoort)
+    - QUEUED: Ready for submission via Digipoort (Phase B)
+    - SUBMITTED: Manually marked as submitted to tax authority OR sent via Digipoort
+    - RECEIVED: Received by Digipoort (Phase B)
+    - ACCEPTED: Accepted by tax authority (future: automated via Digipoort)
     - REJECTED: Rejected by tax authority (future: automated via Digipoort)
+    - FAILED: Submission failed (technical error)
     """
     __tablename__ = "vat_submissions"
 
@@ -64,11 +67,21 @@ class VatSubmission(Base):
     # Submission status
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="DRAFT"
-    )  # DRAFT, SUBMITTED, CONFIRMED, REJECTED
+    )  # DRAFT, QUEUED, SUBMITTED, RECEIVED, ACCEPTED, REJECTED, FAILED
     
     # Reference and evidence
     reference_text: Mapped[str] = mapped_column(Text, nullable=True)  # e.g., "Submitted via portal on DATE"
     attachment_url: Mapped[str] = mapped_column(String(500), nullable=True)  # optional proof upload
+    
+    # Digipoort-specific fields (Phase B)
+    payload_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)  # SHA256 hash of payload
+    payload_xml: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Generated XML payload
+    signed_xml: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Signed XML for submission
+    digipoort_message_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Digipoort tracking ID
+    correlation_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Internal correlation ID
+    last_status_check_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    error_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Error code if failed
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Error details if failed
     
     # Connector response data (for storing API responses from Digipoort, etc.)
     connector_response: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)

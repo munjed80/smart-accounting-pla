@@ -6,6 +6,9 @@ Pydantic schemas for:
 - Bank transaction queries
 - Match suggestions
 - Reconciliation actions
+- Matching engine proposals
+- Rules engine
+- Transaction splits
 """
 from datetime import datetime, date as Date
 from typing import Optional, List, Dict, Any
@@ -31,6 +34,15 @@ class MatchedTypeEnum(str, Enum):
     EXPENSE = "EXPENSE"
     TRANSFER = "TRANSFER"
     MANUAL = "MANUAL"
+    COMMITMENT = "COMMITMENT"
+
+
+class ProposalStatusEnum(str, Enum):
+    """Status of a match proposal."""
+    SUGGESTED = "suggested"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
 
 
 class ReconciliationActionEnum(str, Enum):
@@ -158,3 +170,141 @@ class ReconciliationActionsListResponse(BaseModel):
     """Response for listing reconciliation actions (audit export)."""
     actions: List[ReconciliationActionResponse]
     total_count: int
+
+
+# ============ Matching Engine Schemas ============
+
+class GenerateProposalsRequest(BaseModel):
+    """Request to generate matching proposals."""
+    date_from: Optional[Date] = Field(None, description="Start date for filtering transactions")
+    date_to: Optional[Date] = Field(None, description="End date for filtering transactions")
+    transaction_id: Optional[UUID] = Field(None, description="Specific transaction ID (optional)")
+    limit_per_transaction: int = Field(5, ge=1, le=20, description="Max proposals per transaction")
+
+
+class GenerateProposalsResponse(BaseModel):
+    """Response after generating proposals."""
+    transactions_processed: int
+    proposals_generated: int
+    message: str
+
+
+class MatchProposalResponse(BaseModel):
+    """Match proposal details."""
+    id: UUID
+    bank_transaction_id: UUID
+    entity_type: str
+    entity_id: UUID
+    confidence_score: int = Field(..., ge=0, le=100)
+    reason: str
+    matched_amount: Optional[Decimal] = None
+    matched_date: Optional[Date] = None
+    matched_reference: Optional[str] = None
+    status: ProposalStatusEnum
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class ProposalsListResponse(BaseModel):
+    """List of proposals for a transaction."""
+    transaction_id: UUID
+    proposals: List[MatchProposalResponse]
+    total_count: int
+
+
+class AcceptProposalResponse(BaseModel):
+    """Response after accepting a proposal."""
+    status: str
+    message: str
+    transaction_id: Optional[UUID] = None
+    matched_entity_type: Optional[str] = None
+    matched_entity_id: Optional[UUID] = None
+
+
+class RejectProposalResponse(BaseModel):
+    """Response after rejecting a proposal."""
+    status: str
+    message: str
+
+
+class UnmatchResponse(BaseModel):
+    """Response after unmatching a transaction."""
+    status: str
+    message: str
+
+
+# ============ Split Transaction Schemas ============
+
+class SplitTransactionRequest(BaseModel):
+    """Request to split a transaction."""
+    splits: List[Dict[str, Any]] = Field(..., description="List of splits with amount and description")
+
+
+class SplitTransactionResponse(BaseModel):
+    """Response after splitting a transaction."""
+    status: str
+    message: str
+    splits_count: int
+
+
+class TransactionSplitResponse(BaseModel):
+    """Details of a transaction split."""
+    id: UUID
+    transaction_id: UUID
+    split_index: int
+    amount: Decimal
+    description: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# ============ Rules Engine Schemas ============
+
+class BankMatchRuleRequest(BaseModel):
+    """Request to create or update a matching rule."""
+    name: Optional[str] = Field(None, description="Rule name")
+    enabled: bool = Field(True, description="Whether rule is enabled")
+    priority: int = Field(100, ge=0, le=1000, description="Rule priority (higher = first)")
+    conditions: Dict[str, Any] = Field(..., description="Match conditions (JSONB)")
+    action: Dict[str, Any] = Field(..., description="Action to take (JSONB)")
+
+
+class BankMatchRuleResponse(BaseModel):
+    """Match rule details."""
+    id: UUID
+    client_id: UUID
+    name: Optional[str] = None
+    enabled: bool
+    priority: int
+    conditions: Dict[str, Any]
+    action: Dict[str, Any]
+    created_by_user_id: Optional[UUID] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class MatchRulesListResponse(BaseModel):
+    """List of matching rules."""
+    rules: List[BankMatchRuleResponse]
+    total_count: int
+
+
+# ============ KPI Schemas ============
+
+class BankReconciliationKPI(BaseModel):
+    """KPI metrics for bank reconciliation."""
+    total_transactions: int
+    matched_count: int
+    unmatched_count: int
+    ignored_count: int
+    needs_review_count: int
+    matched_percentage: float
+    total_inflow: Decimal
+    total_outflow: Decimal
+    period_days: int = Field(30, description="Period for KPI calculation")
+

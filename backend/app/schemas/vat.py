@@ -206,6 +206,7 @@ class VatBoxLineResponse(BaseModel):
     party_name: Optional[str] = None
     party_vat_number: Optional[str] = None
     created_at: datetime
+    mapping_reason: Optional[str] = None
 
     class Config:
         from_attributes = True

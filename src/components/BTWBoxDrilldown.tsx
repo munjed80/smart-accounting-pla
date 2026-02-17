@@ -64,6 +64,7 @@ interface VatBoxLine {
   party_name?: string
   party_vat_number?: string
   created_at: string
+  mapping_reason?: string
 }
 
 interface VatBoxLinesData {
@@ -358,6 +359,11 @@ export const BTWBoxDrilldown = ({
                             <div className="truncate">{line.description || '-'}</div>
                             {line.reference && (
                               <div className="text-xs text-muted-foreground">{line.reference}</div>
+                            )}
+                            {line.mapping_reason && (
+                              <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                {line.mapping_reason}
+                              </div>
                             )}
                           </TableCell>
                           <TableCell>

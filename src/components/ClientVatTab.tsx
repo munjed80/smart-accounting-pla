@@ -7,7 +7,9 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { getErrorMessage, periodApi, vatApi, type Period, type VATAnomaly, type VATReportResponse, type ICPReportResponse } from '@/lib/api'
-import { ArrowsClockwise, CheckCircle, DownloadSimple, FileArrowDown, Globe, Warning, WarningCircle } from '@phosphor-icons/react'
+import { ArrowsClockwise, CheckCircle, DownloadSimple, FileArrowDown, Globe, Warning, WarningCircle, Eye } from '@phosphor-icons/react'
+import { BTWBoxDrilldown } from './BTWBoxDrilldown'
+import { VATSubmissionHistory } from './VATSubmissionHistory'
 
 const BOX_ORDER = ['1a', '1b', '1c', '1d', '2a', '3a', '3b', '3c', '4a', '4b', '5a', '5b', '5c', '5d', '5e', '5f', '5g'] as const
 
@@ -41,6 +43,11 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
   const [isMarkingReady, setIsMarkingReady] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  
+  // Drilldown state
+  const [drilldownOpen, setDrilldownOpen] = useState(false)
+  const [drilldownBoxCode, setDrilldownBoxCode] = useState<string>('')
+  const [drilldownBoxName, setDrilldownBoxName] = useState<string>('')
 
   const loadPeriods = async () => {
     try {
@@ -288,17 +295,36 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
                   <TableHead>Omschrijving</TableHead>
                   <TableHead className="text-right">Omzet</TableHead>
                   <TableHead className="text-right">BTW</TableHead>
+                  <TableHead className="text-center">Actie</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {BOX_ORDER.map((code) => {
                   const box = report?.boxes[code]
+                  const hasData = box && (Number(box.turnover_amount) !== 0 || Number(box.vat_amount) !== 0)
+                  
                   return (
                     <TableRow key={code}>
                       <TableCell className="font-mono">{code}</TableCell>
                       <TableCell>{box?.box_name || '—'}</TableCell>
                       <TableCell className="text-right">{formatMoney(box?.turnover_amount || 0)}</TableCell>
                       <TableCell className="text-right">{formatMoney(box?.vat_amount || 0)}</TableCell>
+                      <TableCell className="text-center">
+                        {hasData && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setDrilldownBoxCode(code)
+                              setDrilldownBoxName(box?.box_name || `Box ${code}`)
+                              setDrilldownOpen(true)
+                            }}
+                          >
+                            <Eye size={16} className="mr-2" />
+                            Bekijk herkomst
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   )
                 })}
@@ -362,6 +388,27 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
           ))}
         </CardContent>
       </Card>
+
+      {/* Submission History */}
+      {selectedPeriodId && (
+        <VATSubmissionHistory 
+          clientId={clientId}
+          periodId={selectedPeriodId}
+          onRefresh={() => loadReport(selectedPeriodId)}
+        />
+      )}
+
+      {/* BTW Box Drilldown Drawer */}
+      {drilldownOpen && selectedPeriodId && (
+        <BTWBoxDrilldown
+          open={drilldownOpen}
+          onClose={() => setDrilldownOpen(false)}
+          clientId={clientId}
+          periodId={selectedPeriodId}
+          boxCode={drilldownBoxCode}
+          boxName={drilldownBoxName}
+        />
+      )}
     </div>
   )
 }

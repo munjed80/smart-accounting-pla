@@ -1785,6 +1785,26 @@ export interface VATValidationResponse {
   message: string
 }
 
+export interface VATSubmission {
+  id: string
+  administration_id: string
+  period_id: string
+  submission_type: 'BTW' | 'ICP'
+  created_at: string
+  created_by: string
+  method: 'PACKAGE' | 'DIGIPOORT'
+  status: 'DRAFT' | 'SUBMITTED' | 'CONFIRMED' | 'REJECTED'
+  reference_text?: string
+  attachment_url?: string
+  submitted_at?: string
+  updated_at: string
+}
+
+export interface VATSubmissionListResponse {
+  submissions: VATSubmission[]
+  total_count: number
+}
+
 export const vatApi = {
   getReport: async (clientId: string, periodId: string): Promise<VATReportResponse> => {
     const response = await api.get<VATReportResponse>(
@@ -1832,6 +1852,23 @@ export const vatApi = {
       { responseType: 'blob' }
     )
     return response.data as Blob
+  },
+
+  listSubmissions: async (clientId: string, periodId?: string): Promise<VATSubmissionListResponse> => {
+    const params = periodId ? { period_id: periodId } : {}
+    const response = await api.get<VATSubmissionListResponse>(
+      `/accountant/clients/${clientId}/vat/submissions`,
+      { params }
+    )
+    return response.data
+  },
+
+  markSubmitted: async (clientId: string, submissionId: string, referenceText: string, attachmentUrl?: string): Promise<VATSubmission> => {
+    const response = await api.post<VATSubmission>(
+      `/accountant/clients/${clientId}/vat/submissions/${submissionId}/mark-submitted`,
+      { reference_text: referenceText, attachment_url: attachmentUrl }
+    )
+    return response.data
   },
 }
 

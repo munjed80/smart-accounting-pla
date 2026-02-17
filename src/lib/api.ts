@@ -1143,6 +1143,40 @@ export interface AuditLogListResponse {
   total_count: number
 }
 
+// ============ Comprehensive Audit Log Types ============
+
+export interface ComprehensiveAuditLogEntry {
+  id: string
+  client_id: string
+  entity_type: string
+  entity_id: string
+  action: string
+  user_id: string | null
+  user_role: string
+  old_value: Record<string, unknown> | null
+  new_value: Record<string, unknown> | null
+  ip_address: string | null
+  created_at: string
+}
+
+export interface ComprehensiveAuditLogListResponse {
+  entries: ComprehensiveAuditLogEntry[]
+  total_count: number
+  page: number
+  page_size: number
+}
+
+export interface ComprehensiveAuditLogFilters {
+  date_from?: string
+  date_to?: string
+  entity_type?: string
+  entity_id?: string
+  action?: string
+  user_role?: string
+  page?: number
+  page_size?: number
+}
+
 // Core Ledger API
 export const ledgerApi = {
   getClientOverview: async (clientId: string): Promise<LedgerClientOverview> => {
@@ -2908,6 +2942,20 @@ export const accountantApi = {
 
   revokeMandate: async (mandateId: string): Promise<MandateActionResponse> => {
     const response = await api.delete<MandateActionResponse>(`/accountant/mandates/${mandateId}`)
+    return response.data
+  },
+
+  /**
+   * Get comprehensive audit logs for a client with filters
+   */
+  getClientAuditLogs: async (
+    clientId: string, 
+    filters?: ComprehensiveAuditLogFilters
+  ): Promise<ComprehensiveAuditLogListResponse> => {
+    const response = await api.get<ComprehensiveAuditLogListResponse>(
+      `/accountant/clients/${clientId}/audit/logs`,
+      { params: filters }
+    )
     return response.data
   },
 }

@@ -1814,6 +1814,26 @@ export const nl = {
     performedAt: "Uitgevoerd op",
     notes: "Opmerkingen",
     
+    // Filters
+    filterByAction: "Filter op actie",
+    filterByEntity: "Filter op type",
+    allActions: "Alle acties",
+    allEntities: "Alle types",
+    dateFrom: "Datum vanaf",
+    dateTo: "Datum tot",
+    entityId: "Entiteit ID",
+    userRole: "Gebruikersrol",
+    allRoles: "Alle rollen",
+    entityTypeLabel: "Entiteit type",
+    allTypes: "Alle types",
+    clearFilters: "Wis filters",
+    viewChanges: "Bekijk wijzigingen",
+    oldValue: "Oude waarde",
+    newValue: "Nieuwe waarde",
+    totalItems: "Totaal items",
+    page: "Pagina",
+    of: "van",
+    
     // Action labels
     actions: {
       CREATE: "Aangemaakt",
@@ -1828,6 +1848,17 @@ export const nl = {
       REVIEW_START: "Controle gestart",
       FINALIZE: "Afgerond",
       LOCK: "Vergrendeld",
+      create: "aangemaakt",
+      update: "bijgewerkt",
+      delete: "verwijderd",
+      validate: "gevalideerd",
+      finalize: "gefinaliseerd",
+      post: "geboekt",
+      reverse: "teruggeboekt",
+      lock_period: "periode vergrendeld",
+      unlock_period: "periode ontgrendeld",
+      start_review: "review gestart",
+      finalize_period: "periode gefinaliseerd",
     },
     
     // Entity types
@@ -1835,13 +1866,10 @@ export const nl = {
       journal_entry: "Journaalpost",
       period: "Periode",
       document: "Document",
+      invoice: "Factuur",
+      expense: "Uitgave",
+      vat_submission: "BTW aangifte",
     },
-    
-    // Filters
-    filterByAction: "Filter op actie",
-    filterByEntity: "Filter op type",
-    allActions: "Alle acties",
-    allEntities: "Alle types",
   },
 
   // Issues (Validation Engine)

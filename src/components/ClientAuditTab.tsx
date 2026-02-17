@@ -1,9 +1,11 @@
 /**
  * Client Audit Tab
  * 
- * Displays audit log for the client with:
- * - Timeline of all bookkeeping actions
- * - Filter by action type and entity type
+ * Displays comprehensive audit log for the client with:
+ * - Timeline of all actions across all entities
+ * - Filters: date range, action type, entity type, entity ID, user role
+ * - Diff view (old_value/new_value) collapsible
+ * - Mobile-friendly cards
  * 
  * All UI text is Dutch (nl.ts).
  */
@@ -14,6 +16,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -21,10 +25,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { 
-  bookkeepingApi, 
-  AuditLogEntry,
-  AuditLogAction,
+  accountantApi, 
+  ComprehensiveAuditLogEntry,
+  ComprehensiveAuditLogFilters,
   getErrorMessage 
 } from '@/lib/api'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
@@ -41,6 +50,8 @@ import {
   Stamp,
   Warning,
   User,
+  CaretDown,
+  CaretRight,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 
@@ -140,34 +151,82 @@ const ActionBadge = ({ action }: { action: string }) => {
   )
 }
 
-const ALL_ACTIONS: AuditLogAction[] = [
-  'CREATE', 'UPDATE', 'POST', 'DELETE', 'REVERSE',
-  'LOCK_PERIOD', 'UNLOCK_PERIOD', 'START_REVIEW', 'FINALIZE_PERIOD'
+const ALL_ACTIONS: string[] = [
+  'create', 'update', 'delete', 'validate', 'finalize', 'post', 'reverse',
+  'lock_period', 'unlock_period', 'start_review', 'finalize_period'
 ]
 
+const USER_ROLES = ['zzp', 'accountant', 'system', 'admin']
+
 export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
-  const [entries, setEntries] = useState<AuditLogEntry[]>([])
+  const [entries, setEntries] = useState<ComprehensiveAuditLogEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionFilter, setActionFilter] = useState<string>('ALL')
   const [entityFilter, setEntityFilter] = useState<string>('ALL')
+  const [userRoleFilter, setUserRoleFilter] = useState<string>('ALL')
+  const [dateFrom, setDateFrom] = useState<string>('')
+  const [dateTo, setDateTo] = useState<string>('')
+  const [entityIdFilter, setEntityIdFilter] = useState<string>('')
   const [totalCount, setTotalCount] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize] = useState(50)
+  const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set())
   const showSkeleton = useDelayedLoading(isLoading, 300, entries.length > 0)
+
+  // Check for URL parameters on mount to pre-filter
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const entityId = params.get('entity_id')
+    const entityType = params.get('entity_type')
+    
+    if (entityId) {
+      setEntityIdFilter(entityId)
+    }
+    if (entityType) {
+      setEntityFilter(entityType)
+    }
+  }, [])
+
+  const toggleExpanded = (entryId: string) => {
+    setExpandedEntries(prev => {
+      const next = new Set(prev)
+      if (next.has(entryId)) {
+        next.delete(entryId)
+      } else {
+        next.add(entryId)
+      }
+      return next
+    })
+  }
 
   const fetchEntries = async () => {
     try {
       setIsLoading(true)
       setError(null)
       
-      const options: { action?: string; entityType?: string; limit: number } = { limit: 100 }
+      const filters: ComprehensiveAuditLogFilters = { page, page_size: pageSize }
+      
       if (actionFilter !== 'ALL') {
-        options.action = actionFilter
+        filters.action = actionFilter
       }
       if (entityFilter !== 'ALL') {
-        options.entityType = entityFilter
+        filters.entity_type = entityFilter
+      }
+      if (userRoleFilter !== 'ALL') {
+        filters.user_role = userRoleFilter
+      }
+      if (dateFrom) {
+        filters.date_from = dateFrom
+      }
+      if (dateTo) {
+        filters.date_to = dateTo
+      }
+      if (entityIdFilter.trim()) {
+        filters.entity_id = entityIdFilter.trim()
       }
       
-      const response = await bookkeepingApi.listAuditLog(clientId, options)
+      const response = await accountantApi.getClientAuditLogs(clientId, filters)
       setEntries(response.entries)
       setTotalCount(response.total_count)
     } catch (err) {
@@ -181,7 +240,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
     if (clientId) {
       fetchEntries()
     }
-  }, [clientId, actionFilter, entityFilter])
+  }, [clientId, actionFilter, entityFilter, userRoleFilter, dateFrom, dateTo, entityIdFilter, page])
 
   if (showSkeleton) {
     return (
@@ -225,7 +284,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
   return (
     <Card className="bg-card/80 backdrop-blur-sm">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <CardTitle className="flex items-center gap-2">
               <ClockCounterClockwise size={24} weight="duotone" className="text-primary" />
@@ -235,10 +294,46 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
               {t('audit.subtitle')}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-3">
-            <Select value={actionFilter} onValueChange={setActionFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder={t('audit.filterByAction')} />
+        </div>
+
+        {/* Filters */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
+          {/* Date From */}
+          <div className="space-y-2">
+            <Label htmlFor="date-from" className="text-xs">{t('audit.dateFrom')}</Label>
+            <Input
+              id="date-from"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => {
+                setDateFrom(e.target.value)
+                setPage(1)
+              }}
+              className="text-sm"
+            />
+          </div>
+
+          {/* Date To */}
+          <div className="space-y-2">
+            <Label htmlFor="date-to" className="text-xs">{t('audit.dateTo')}</Label>
+            <Input
+              id="date-to"
+              type="date"
+              value={dateTo}
+              onChange={(e) => {
+                setDateTo(e.target.value)
+                setPage(1)
+              }}
+              className="text-sm"
+            />
+          </div>
+
+          {/* Action Filter */}
+          <div className="space-y-2">
+            <Label className="text-xs">{t('audit.action')}</Label>
+            <Select value={actionFilter} onValueChange={(val) => { setActionFilter(val); setPage(1) }}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('audit.allActions')} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">{t('audit.allActions')}</SelectItem>
@@ -249,17 +344,78 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={entityFilter} onValueChange={setEntityFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder={t('audit.filterByEntity')} />
+          </div>
+
+          {/* Entity Type Filter */}
+          <div className="space-y-2">
+            <Label className="text-xs">{t('audit.entityTypeLabel')}</Label>
+            <Select value={entityFilter} onValueChange={(val) => { setEntityFilter(val); setPage(1) }}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('audit.allTypes')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">{t('audit.allEntities')}</SelectItem>
+                <SelectItem value="ALL">{t('audit.allTypes')}</SelectItem>
+                <SelectItem value="invoice">{t('audit.entityTypes.invoice')}</SelectItem>
+                <SelectItem value="expense">{t('audit.entityTypes.expense')}</SelectItem>
                 <SelectItem value="journal_entry">{t('audit.entityTypes.journal_entry')}</SelectItem>
                 <SelectItem value="period">{t('audit.entityTypes.period')}</SelectItem>
                 <SelectItem value="document">{t('audit.entityTypes.document')}</SelectItem>
+                <SelectItem value="vat_submission">{t('audit.entityTypes.vat_submission')}</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* User Role Filter */}
+          <div className="space-y-2">
+            <Label className="text-xs">{t('audit.userRole')}</Label>
+            <Select value={userRoleFilter} onValueChange={(val) => { setUserRoleFilter(val); setPage(1) }}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('audit.allRoles')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">{t('audit.allRoles')}</SelectItem>
+                {USER_ROLES.map((role) => (
+                  <SelectItem key={role} value={role}>
+                    {role}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Entity ID Filter */}
+          <div className="space-y-2">
+            <Label htmlFor="entity-id" className="text-xs">{t('audit.entityId')}</Label>
+            <Input
+              id="entity-id"
+              placeholder="UUID filter..."
+              value={entityIdFilter}
+              onChange={(e) => {
+                setEntityIdFilter(e.target.value)
+                setPage(1)
+              }}
+              className="text-sm font-mono"
+            />
+          </div>
+
+          {/* Clear Filters Button */}
+          <div className="space-y-2 flex items-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setActionFilter('ALL')
+                setEntityFilter('ALL')
+                setUserRoleFilter('ALL')
+                setDateFrom('')
+                setDateTo('')
+                setEntityIdFilter('')
+                setPage(1)
+              }}
+              className="w-full"
+            >
+              {t('audit.clearFilters')}
+            </Button>
           </div>
         </div>
       </CardHeader>
@@ -277,67 +433,113 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
             {/* Timeline */}
             <div className="relative">
               {/* Vertical line */}
-              <div className="absolute left-5 top-0 bottom-0 w-px bg-border" />
+              <div className="absolute left-5 top-0 bottom-0 w-px bg-border hidden sm:block" />
               
-              {entries.map((entry, index) => (
-                <div key={entry.id} className="relative flex gap-4 pb-6">
-                  {/* Timeline dot */}
-                  <div className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background border-2 border-border">
-                    <ActionIcon action={entry.action} />
-                  </div>
-                  
-                  {/* Content */}
-                  <div className="flex-1 pt-1">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <ActionBadge action={entry.action} />
-                          {entry.entity_type && (
-                            <Badge variant="outline" className="text-xs">
-                              {t(`audit.entityTypes.${entry.entity_type}` as any) || entry.entity_type}
-                            </Badge>
-                          )}
-                        </div>
-                        {entry.entity_description && (
-                          <p className="text-sm font-medium">{entry.entity_description}</p>
-                        )}
-                        {entry.actor_name && (
-                          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                            <User size={14} />
-                            {entry.actor_name}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-muted-foreground">
-                          {formatRelativeTime(entry.created_at)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDateTime(entry.created_at)}
-                        </p>
-                      </div>
+              {entries.map((entry) => {
+                const isExpanded = expandedEntries.has(entry.id)
+                const hasDiff = entry.old_value || entry.new_value
+                
+                return (
+                  <div key={entry.id} className="relative flex gap-4 pb-6">
+                    {/* Timeline dot - hidden on mobile for cleaner view */}
+                    <div className="relative z-10 hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background border-2 border-border">
+                      <ActionIcon action={entry.action} />
                     </div>
                     
-                    {/* Payload preview (if present) */}
-                    {entry.payload && Object.keys(entry.payload).length > 0 && (
-                      <div className="mt-2 p-2 bg-muted/50 rounded text-xs font-mono text-muted-foreground">
-                        {Object.entries(entry.payload).map(([key, value]) => (
-                          <div key={key}>
-                            <span className="font-semibold">{key}:</span> {String(value)}
+                    {/* Content - full width on mobile */}
+                    <div className="flex-1 pt-1 sm:pt-0">
+                      <Card className="border-l-4 border-l-primary/20">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between flex-wrap gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <ActionBadge action={entry.action} />
+                                {entry.entity_type && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {entry.entity_type}
+                                  </Badge>
+                                )}
+                                <Badge variant="outline" className="text-xs">
+                                  {entry.user_role}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground truncate" title={entry.entity_id}>
+                                ID: {entry.entity_id}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-medium text-muted-foreground">
+                                {formatRelativeTime(entry.created_at)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatDateTime(entry.created_at)}
+                              </p>
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                          
+                          {/* Diff view (collapsible) */}
+                          {hasDiff && (
+                            <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(entry.id)}>
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="mt-2 w-full justify-start gap-2">
+                                  {isExpanded ? <CaretDown size={16} /> : <CaretRight size={16} />}
+                                  {t('audit.viewChanges')}
+                                </Button>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="mt-2 space-y-2">
+                                {entry.old_value && (
+                                  <div className="p-3 bg-red-500/10 rounded border border-red-500/20">
+                                    <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-2">{t('audit.oldValue')}:</p>
+                                    <pre className="text-xs font-mono text-muted-foreground overflow-x-auto">
+                                      {JSON.stringify(entry.old_value, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
+                                {entry.new_value && (
+                                  <div className="p-3 bg-green-500/10 rounded border border-green-500/20">
+                                    <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-2">{t('audit.newValue')}:</p>
+                                    <pre className="text-xs font-mono text-muted-foreground overflow-x-auto">
+                                      {JSON.stringify(entry.new_value, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
+                              </CollapsibleContent>
+                            </Collapsible>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
         
-        {totalCount > entries.length && (
-          <div className="mt-4 text-center text-sm text-muted-foreground">
-            {entries.length} {t('common.showingOf')} {totalCount} {t('common.showing')}
+        {/* Pagination */}
+        {totalCount > pageSize && (
+          <div className="mt-6 flex items-center justify-between flex-wrap gap-4">
+            <div className="text-sm text-muted-foreground">
+              {t('audit.totalItems')} {totalCount} • {t('audit.page')} {page} {t('audit.of')} {Math.ceil(totalCount / pageSize)}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page === 1}
+                onClick={() => setPage(page - 1)}
+              >
+                {t('common.previous')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= Math.ceil(totalCount / pageSize)}
+                onClick={() => setPage(page + 1)}
+              >
+                {t('common.next')}
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>

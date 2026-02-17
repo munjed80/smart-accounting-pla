@@ -21,6 +21,7 @@ from app.models.document import Document, DocumentStatus
 from app.models.ledger import JournalEntry, JournalEntryStatus
 from app.models.subledger import OpenItem, OpenItemStatus
 from app.models.issues import ClientIssue, IssueSeverity, ValidationRun
+from app.models.audit_log import AuditLog
 from app.schemas.issues import (
     ClientOverviewResponse,
     ClientIssueResponse,
@@ -37,6 +38,10 @@ from app.schemas.reports import (
     PnLSectionResponse,
     SubledgerReportResponse,
     OpenItemResponse,
+)
+from app.schemas.audit import (
+    ComprehensiveAuditLogEntry,
+    ComprehensiveAuditLogListResponse,
 )
 from app.services.validation import ConsistencyEngine
 from app.services.reports import ReportService
@@ -418,4 +423,119 @@ async def get_accounts_payable(
         total_paid=report.total_paid,
         total_open=report.total_open,
         overdue_amount=report.overdue_amount,
+    )
+
+
+# ============ Comprehensive Audit Log Endpoints ============
+
+@router.get("/clients/{client_id}/audit/logs", response_model=ComprehensiveAuditLogListResponse)
+async def get_client_audit_logs(
+    client_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    date_from: Optional[date] = Query(None, description="Filter by date from (inclusive)"),
+    date_to: Optional[date] = Query(None, description="Filter by date to (inclusive)"),
+    entity_type: Optional[str] = Query(None, description="Filter by entity type (e.g., 'invoice', 'expense')"),
+    entity_id: Optional[UUID] = Query(None, description="Filter by specific entity ID"),
+    action: Optional[str] = Query(None, description="Filter by action (e.g., 'create', 'update', 'delete')"),
+    user_role: Optional[str] = Query(None, description="Filter by user role (e.g., 'zzp', 'accountant', 'system')"),
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(50, ge=1, le=100, description="Results per page"),
+):
+    """
+    Get comprehensive audit log entries for a client.
+    
+    This endpoint provides full audit trail with old_value/new_value diffs
+    for all entity changes in the system.
+    
+    Enforces machtiging/consent via require_assigned_client.
+    
+    Security:
+    - Tenant isolation via client_id filter
+    - Never leaks cross-client data
+    - Requires active client assignment
+    
+    Filters:
+    - date_from/date_to: Date range filter
+    - entity_type: Type of entity (invoice, expense, journal_entry, etc.)
+    - entity_id: Specific entity UUID
+    - action: Action performed (create, update, delete, validate, finalize)
+    - user_role: Role of user who performed action (zzp, accountant, system)
+    """
+    # Enforce authorization and consent
+    await require_assigned_client(client_id, current_user, db)
+    
+    # Build base query with tenant isolation
+    query = (
+        select(AuditLog)
+        .where(AuditLog.client_id == client_id)
+        .order_by(AuditLog.created_at.desc())
+    )
+    
+    # Apply filters
+    if date_from:
+        query = query.where(func.date(AuditLog.created_at) >= date_from)
+    
+    if date_to:
+        query = query.where(func.date(AuditLog.created_at) <= date_to)
+    
+    if entity_type:
+        query = query.where(AuditLog.entity_type == entity_type)
+    
+    if entity_id:
+        query = query.where(AuditLog.entity_id == entity_id)
+    
+    if action:
+        query = query.where(AuditLog.action == action)
+    
+    if user_role:
+        query = query.where(AuditLog.user_role == user_role)
+    
+    # Get total count for pagination
+    count_query = select(func.count(AuditLog.id)).where(AuditLog.client_id == client_id)
+    
+    if date_from:
+        count_query = count_query.where(func.date(AuditLog.created_at) >= date_from)
+    if date_to:
+        count_query = count_query.where(func.date(AuditLog.created_at) <= date_to)
+    if entity_type:
+        count_query = count_query.where(AuditLog.entity_type == entity_type)
+    if entity_id:
+        count_query = count_query.where(AuditLog.entity_id == entity_id)
+    if action:
+        count_query = count_query.where(AuditLog.action == action)
+    if user_role:
+        count_query = count_query.where(AuditLog.user_role == user_role)
+    
+    count_result = await db.execute(count_query)
+    total_count = count_result.scalar() or 0
+    
+    # Apply pagination
+    offset = (page - 1) * page_size
+    query = query.limit(page_size).offset(offset)
+    
+    # Execute query
+    result = await db.execute(query)
+    entries = result.scalars().all()
+    
+    return ComprehensiveAuditLogListResponse(
+        entries=[
+            ComprehensiveAuditLogEntry(
+                id=entry.id,
+                client_id=entry.client_id,
+                entity_type=entry.entity_type,
+                entity_id=entry.entity_id,
+                action=entry.action,
+                user_id=entry.user_id,
+                user_role=entry.user_role,
+                old_value=entry.old_value,
+                new_value=entry.new_value,
+                ip_address=entry.ip_address,
+                created_at=entry.created_at,
+            )
+            for entry in entries
+        ],
+        total_count=total_count,
+        page=page,
+        page_size=page_size,
     )

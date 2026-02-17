@@ -31,7 +31,7 @@ from app.models.bank import (
     ReconciliationActionType,
 )
 from app.models.subledger import OpenItem, OpenItemStatus
-from app.models.financial_commitment import FinancialCommitment, CommitmentCadence
+from app.models.financial_commitment import FinancialCommitment, RecurringFrequency, CommitmentStatus
 from app.models.audit_log import AuditLog
 
 logger = logging.getLogger(__name__)
@@ -341,8 +341,8 @@ class BankMatchingEngine:
         query = (
             select(FinancialCommitment)
             .where(
-                FinancialCommitment.client_id == self.client_id,
-                FinancialCommitment.is_active,
+                FinancialCommitment.administration_id == self.client_id,
+                FinancialCommitment.status == CommitmentStatus.ACTIVE,
             )
         )
         
@@ -353,39 +353,42 @@ class BankMatchingEngine:
             confidence = 0
             reasons = []
             
-            # Check amount match
-            if commitment.amount:
-                amount_diff = abs(abs(transaction.amount) - abs(commitment.amount))
+            # Check amount match (convert from cents to Decimal)
+            if commitment.amount_cents:
+                commitment_amount = Decimal(commitment.amount_cents) / 100
+                amount_diff = abs(abs(transaction.amount) - commitment_amount)
                 if amount_diff <= self.AMOUNT_TOLERANCE_FIXED:
                     confidence += 35
                     reasons.append(f"Bedrag komt overeen met abonnement")
             
             # Check vendor name similarity
-            if commitment.vendor_name and transaction.counterparty_name:
+            if commitment.provider and transaction.counterparty_name:
                 similarity = self._string_similarity(
-                    commitment.vendor_name.upper(),
+                    commitment.provider.upper(),
                     transaction.counterparty_name.upper()
                 )
                 if similarity > 0.7:
                     confidence += 30
-                    reasons.append(f"Leverancier lijkt op '{commitment.vendor_name}'")
+                    reasons.append(f"Leverancier lijkt op '{commitment.provider}'")
                 elif similarity > 0.5:
                     confidence += 15
             
-            # Check cadence (monthly/yearly recurring)
-            if commitment.cadence in [CommitmentCadence.MONTHLY, CommitmentCadence.YEARLY]:
+            # Check recurring frequency (monthly/yearly recurring)
+            if commitment.recurring_frequency in [RecurringFrequency.MONTHLY, RecurringFrequency.YEARLY]:
                 confidence += 10
-                cadence_text = "maandelijks" if commitment.cadence == CommitmentCadence.MONTHLY else "jaarlijks"
+                cadence_text = "maandelijks" if commitment.recurring_frequency == RecurringFrequency.MONTHLY else "jaarlijks"
                 reasons.append(f"Terugkerende betaling ({cadence_text})")
             
             if confidence >= 30:
                 reason_text = " + ".join(reasons) if reasons else "Terugkerende betaling"
+                # Convert amount back to Decimal for proposal
+                matched_amount = Decimal(commitment.amount_cents) / 100 if commitment.amount_cents else None
                 proposals.append({
                     "entity_type": "commitment",
                     "entity_id": commitment.id,
                     "confidence_score": min(confidence, 85),
                     "reason": reason_text[:255],
-                    "matched_amount": commitment.amount,
+                    "matched_amount": matched_amount,
                     "rule_type": "IBAN_RECURRING",
                 })
         

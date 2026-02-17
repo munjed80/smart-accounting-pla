@@ -9,7 +9,7 @@
  * - Dutch-first UI
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -1190,11 +1190,17 @@ export const BankReconciliationPage = () => {
     }
   }, [activeClientId, loadKPI])
 
+  // Memoize transaction IDs to prevent unnecessary proposal loads
+  const transactionIds = useMemo(
+    () => transactions.map(t => t.id).join(','),
+    [transactions]
+  )
+
   useEffect(() => {
     if (activeClientId && transactions.length > 0) {
       loadAllProposals()
     }
-  }, [activeClientId, transactions.length, loadAllProposals])
+  }, [activeClientId, transactionIds, loadAllProposals])
 
   if (!activeClientId) {
     return (

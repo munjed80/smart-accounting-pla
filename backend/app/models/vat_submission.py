@@ -86,6 +86,11 @@ class VatSubmission(Base):
     # Connector response data (for storing API responses from Digipoort, etc.)
     connector_response: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     
+    # Certificate used for signing (Phase B - PKIoverheid)
+    certificate_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("certificates.id", ondelete="SET NULL"), nullable=True
+    )
+    
     # Submission timestamp
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     
@@ -98,6 +103,7 @@ class VatSubmission(Base):
     administration = relationship("Administration")
     period = relationship("AccountingPeriod")
     created_by_user = relationship("User")
+    certificate = relationship("Certificate", back_populates="vat_submissions")
 
     # Indexes for efficient querying
     __table_args__ = (

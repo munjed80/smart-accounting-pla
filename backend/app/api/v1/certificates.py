@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.api.v1.deps import CurrentUser, require_assigned_client
-from app.models.user import UserRole
+from app.core.roles import UserRole
 from app.schemas.certificate import (
     CertificateRegisterRequest,
     CertificateRegisterResponse,
@@ -33,7 +33,7 @@ router = APIRouter()
 
 def require_accountant(current_user: CurrentUser) -> None:
     """Ensure current user is an accountant."""
-    if current_user.role not in [UserRole.ACCOUNTANT, UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+    if current_user.role not in [UserRole.ACCOUNTANT.value, UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only accountants can manage certificates"

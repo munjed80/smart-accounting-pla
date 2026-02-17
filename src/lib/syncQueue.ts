@@ -66,7 +66,7 @@ export const addToSyncQueue = async (item: Omit<SyncQueueItem, 'id' | 'timestamp
   }
 
   const db = await openDB()
-  const id = `sync-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  const id = `sync-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
   
   const queueItem: SyncQueueItem = {
     id,

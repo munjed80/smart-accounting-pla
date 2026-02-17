@@ -31,7 +31,7 @@ const FeatureCard = ({ icon, title, description }: FeatureCardProps) => {
   return (
     <Card className="h-full border border-primary/10 bg-gradient-to-br from-background to-primary/5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl">
       <CardHeader>
-        <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
+        <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-accent-secondary-7/50">
           {icon}
         </div>
         <CardTitle className="text-lg">{title}</CardTitle>
@@ -52,7 +52,7 @@ interface TrustCardProps {
 const TrustCard = ({ icon, title }: TrustCardProps) => {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border bg-background p-4">
-      <div className="flex-shrink-0 text-primary">
+      <div className="flex-shrink-0 text-accent-secondary-10">
         {icon}
       </div>
       <span className="text-sm font-medium">{title}</span>
@@ -225,7 +225,10 @@ export const LandingPage = () => {
         <div className="absolute -top-24 left-1/2 -z-10 h-72 w-72 -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-32">
           <div className="text-center">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-foreground mb-6">
+            <span className="inline-flex items-center rounded-full border border-accent-secondary-7 bg-accent-secondary-3 px-4 py-1 text-sm font-medium text-accent-secondary-11 shadow-sm shadow-accent-secondary-9/20">
+              Professioneel boekhouden voor ZZP en accountant
+            </span>
+            <h1 className="mt-6 text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-foreground mb-6">
               Boekhouden zonder gedoe.
               <span className="text-primary block mt-2">Volledige controle voor ZZP en accountant.</span>
             </h1>
@@ -249,7 +252,7 @@ export const LandingPage = () => {
               <Button 
                 size="lg" 
                 variant="outline"
-                className="text-lg px-8 py-6"
+                className="text-lg px-8 py-6 border-accent-secondary-7 text-accent-secondary-11 hover:bg-accent-secondary-3 hover:border-accent-secondary-8"
                 onClick={() => {
                   const contactSection = document.getElementById('contact')
                   if (contactSection) {
@@ -268,7 +271,7 @@ export const LandingPage = () => {
       <section id="zzp" className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Voor ZZP</h2>
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4 pb-2 inline-block border-b-2 border-accent-secondary-7">Voor ZZP</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {zzpFeatures.map((feature, index) => (
@@ -282,7 +285,7 @@ export const LandingPage = () => {
       <section id="accountant" className="py-20 bg-gradient-to-b from-muted/40 to-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Voor accountants</h2>
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4 pb-2 inline-block border-b-2 border-accent-secondary-7">Voor accountants</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
             {accountantFeatures.map((feature, index) => (
@@ -293,6 +296,7 @@ export const LandingPage = () => {
             <Button 
               size="lg"
               variant="outline"
+              className="border-accent-secondary-7 text-accent-secondary-11 hover:bg-accent-secondary-3 hover:border-accent-secondary-8"
               onClick={() => {
                 const contactSection = document.getElementById('contact')
                 if (contactSection) {
@@ -325,23 +329,23 @@ export const LandingPage = () => {
               <CardContent>
                 <ul className="space-y-3">
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                    <CheckCircle className="h-5 w-5 text-accent-secondary-10 mt-0.5 flex-shrink-0" />
                     <span className="text-sm">Onbeperkt facturen</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                    <CheckCircle className="h-5 w-5 text-accent-secondary-10 mt-0.5 flex-shrink-0" />
                     <span className="text-sm">BTW aangifte</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                    <CheckCircle className="h-5 w-5 text-accent-secondary-10 mt-0.5 flex-shrink-0" />
                     <span className="text-sm">Bankaflettering</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                    <CheckCircle className="h-5 w-5 text-accent-secondary-10 mt-0.5 flex-shrink-0" />
                     <span className="text-sm">Audittrail</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                    <CheckCircle className="h-5 w-5 text-accent-secondary-10 mt-0.5 flex-shrink-0" />
                     <span className="text-sm">PWA toegang</span>
                   </li>
                 </ul>
@@ -357,7 +361,7 @@ export const LandingPage = () => {
             </Card>
 
             {/* Accountant Plan */}
-            <Card className="border border-border bg-background/95">
+            <Card className="border border-accent-secondary-6 bg-background/95">
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl">Accountant</CardTitle>
               </CardHeader>
@@ -368,7 +372,7 @@ export const LandingPage = () => {
               </CardContent>
               <CardFooter>
                 <Button 
-                  className="w-full"
+                  className="w-full border-accent-secondary-7 text-accent-secondary-11 hover:bg-accent-secondary-3"
                   variant="outline"
                   onClick={() => {
                     const contactSection = document.getElementById('contact')

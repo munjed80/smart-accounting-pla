@@ -276,7 +276,7 @@ const TransactionRow = ({
   isProcessing?: boolean
 }) => {
   const numAmount = typeof transaction.amount === 'string' ? parseFloat(transaction.amount) : transaction.amount
-  const hasProposal = topProposal && topProposal.status === 'PENDING'
+  const hasProposal = topProposal && topProposal.status === 'suggested'
   const isMatched = transaction.status === 'MATCHED'
   
   return (
@@ -906,16 +906,16 @@ const ProposalsDrawer = ({
         <div className="mt-6 space-y-3">
           {sortedProposals.length > 0 ? (
             sortedProposals.map((proposal) => (
-              <Card key={proposal.id} className={proposal.status !== 'PENDING' ? 'opacity-60' : ''}>
+              <Card key={proposal.id} className={proposal.status !== 'suggested' ? 'opacity-60' : ''}>
                 <CardContent className="p-4">
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
                           <ConfidenceBadge score={proposal.confidence_score} />
-                          {proposal.status !== 'PENDING' && (
+                          {proposal.status !== 'suggested' && (
                             <Badge variant="outline">
-                              {proposal.status === 'ACCEPTED' ? 'Geaccepteerd' : 'Afgewezen'}
+                              {proposal.status === 'accepted' ? 'Geaccepteerd' : 'Afgewezen'}
                             </Badge>
                           )}
                         </div>
@@ -936,7 +936,7 @@ const ProposalsDrawer = ({
                       </div>
                     </div>
 
-                    {proposal.status === 'PENDING' && (
+                    {proposal.status === 'suggested' && (
                       <div className="flex gap-2">
                         <Button 
                           size="sm" 
@@ -1308,7 +1308,7 @@ export const BankReconciliationPage = () => {
               <div className="divide-y transition-opacity duration-200" style={{ opacity: isLoading ? 0.5 : 1 }}>
                 {transactions.map((transaction) => {
                   const proposals = proposalsMap[transaction.id] || []
-                  const topProposal = proposals.find(p => p.status === 'PENDING') || null
+                  const topProposal = proposals.find(p => p.status === 'suggested') || null
                   
                   return (
                     <TransactionRow

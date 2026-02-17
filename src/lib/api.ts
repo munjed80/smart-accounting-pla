@@ -3349,7 +3349,7 @@ export interface MatchProposal {
   date: string
   reason: string
   proposed_action: ReconciliationAction
-  status: 'PENDING' | 'ACCEPTED' | 'REJECTED'
+  status: 'suggested' | 'accepted' | 'rejected' | 'expired'
   created_at: string
 }
 

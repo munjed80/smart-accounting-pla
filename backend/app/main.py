@@ -135,6 +135,7 @@ async def lifespan(app: FastAPI):
     - Verify ORM mappings to fail fast if models are misconfigured
     - Verify database enum values match Python enums
     - Log enum values and router status for diagnostics
+    - Register audit logging hooks
     
     Shutdown:
     - Cleanup resources if needed
@@ -159,6 +160,13 @@ async def lifespan(app: FastAPI):
     
     # Log enum and router status for production diagnostics
     log_enum_and_router_status()
+    
+    # Register audit logging hooks
+    from app.audit.session_hooks import register_audit_hooks
+    from app.core.database import async_session_maker
+    register_audit_hooks(async_session_maker)
+    logger.info("Audit logging hooks registered")
+    
     logger.info("Application startup completed successfully")
 
     yield

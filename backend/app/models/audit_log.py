@@ -7,7 +7,7 @@ across the system with full tenant isolation and comprehensive metadata.
 The audit_log table was created by migration 039_audit_log_engine.
 """
 from datetime import datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import Column, String, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID, JSONB
@@ -35,7 +35,7 @@ class AuditLog(Base):
     id: Mapped[UUID] = mapped_column(
         PostgreSQLUUID(as_uuid=True),
         primary_key=True,
-        server_default=func.gen_random_uuid(),
+        default=uuid4,
         nullable=False
     )
     

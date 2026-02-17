@@ -40,6 +40,11 @@ from app.schemas.vat import (
     MarkSubmittedRequest,
     VatSubmissionResponse,
     VatSubmissionListResponse,
+    PrepareSubmissionRequest,
+    PrepareSubmissionResponse,
+    QueueSubmissionRequest,
+    QueueSubmissionResponse,
+    VatSubmissionType,
 )
 from app.services.vat import VatReportService, VatLineageService, generate_vat_overview_pdf
 from app.services.vat.report import VatReportError, PeriodNotEligibleError
@@ -1329,3 +1334,186 @@ async def submit_icp_via_connector(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Submission failed: {str(e)}")
+
+
+# Digipoort-Ready Submission Endpoints
+
+@router.post(
+    "/clients/{client_id}/vat/{period_id}/submit/prepare",
+    response_model=PrepareSubmissionResponse,
+    summary="Prepare VAT/ICP Submission",
+    description="""
+    Prepare a VAT or ICP submission for Digipoort.
+    
+    This endpoint:
+    - Generates the XML payload
+    - Validates the payload
+    - Creates/updates a DRAFT submission record
+    - Returns validation errors if any
+    
+    **Phase B Integration**: This is the foundation for automated Digipoort submission.
+    Currently prepares the submission without making external API calls.
+    """,
+)
+async def prepare_vat_submission(
+    client_id: UUID,
+    period_id: UUID,
+    request: PrepareSubmissionRequest,
+    current_user: Annotated[CurrentUser, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Prepare VAT/ICP submission - generate and validate payload."""
+    from app.services.vat_submission_service import VatSubmissionService, VatSubmissionError
+    from app.api.v1.deps import require_assigned_client
+    
+    # Verify accountant access with consent
+    await require_assigned_client(client_id, current_user, db, required_scope="reports")
+    
+    try:
+        service = VatSubmissionService(db, client_id)
+        submission, validation_errors = await service.create_draft_submission(
+            period_id=period_id,
+            kind=request.kind.value,
+            user_id=current_user.id,
+            validate=True,
+        )
+        
+        return PrepareSubmissionResponse(
+            submission_id=submission.id,
+            status=submission.status,
+            validation_errors=validation_errors,
+            payload_hash=submission.payload_hash or "",
+        )
+        
+    except VatSubmissionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post(
+    "/clients/{client_id}/vat/submissions/{submission_id}/queue",
+    response_model=QueueSubmissionResponse,
+    summary="Queue Submission for Digipoort",
+    description="""
+    Queue a DRAFT submission for Digipoort submission.
+    
+    This endpoint:
+    - Validates the submission is in DRAFT status
+    - Validates the payload
+    - Signs the payload (placeholder for Phase B)
+    - Moves status to QUEUED
+    
+    **Phase B Integration**: In Phase B, this will trigger actual Digipoort submission.
+    """,
+)
+async def queue_vat_submission(
+    client_id: UUID,
+    submission_id: UUID,
+    request: QueueSubmissionRequest,
+    current_user: Annotated[CurrentUser, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Queue a submission for Digipoort."""
+    from app.services.vat_submission_service import VatSubmissionService, VatSubmissionError
+    from app.api.v1.deps import require_assigned_client
+    
+    # Verify accountant access with consent
+    await require_assigned_client(client_id, current_user, db, required_scope="reports")
+    
+    try:
+        service = VatSubmissionService(db, client_id)
+        submission = await service.queue_submission(
+            submission_id=submission_id,
+            cert_ref=request.cert_ref,
+        )
+        
+        return QueueSubmissionResponse(
+            submission_id=submission.id,
+            status=submission.status,
+            correlation_id=submission.correlation_id,
+        )
+        
+    except VatSubmissionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get(
+    "/clients/{client_id}/vat/submissions",
+    response_model=VatSubmissionListResponse,
+    summary="List VAT/ICP Submissions",
+    description="""
+    List all VAT/ICP submissions for a client.
+    
+    Filter by period and/or submission type (kind).
+    Results are ordered by created_at DESC (newest first).
+    """,
+)
+async def list_vat_submissions(
+    client_id: UUID,
+    current_user: Annotated[CurrentUser, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    period_id: Optional[UUID] = Query(None, description="Filter by period"),
+    kind: Optional[str] = Query(None, description="Filter by submission type (VAT or ICP)"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+):
+    """List VAT/ICP submissions for a client."""
+    from app.models.vat_submission import VatSubmission
+    from app.api.v1.deps import require_assigned_client
+    from sqlalchemy import desc, func
+    
+    # Verify accountant access with consent
+    await require_assigned_client(client_id, current_user, db, required_scope="reports")
+    
+    # Build query
+    query = select(VatSubmission).where(
+        VatSubmission.administration_id == client_id
+    )
+    
+    if period_id:
+        query = query.where(VatSubmission.period_id == period_id)
+    
+    if kind:
+        if kind not in ["VAT", "ICP"]:
+            raise HTTPException(status_code=400, detail="Invalid kind. Must be VAT or ICP")
+        query = query.where(VatSubmission.submission_type == kind)
+    
+    # Count total
+    count_query = select(func.count()).select_from(query.subquery())
+    count_result = await db.execute(count_query)
+    total_count = count_result.scalar()
+    
+    # Apply ordering and pagination
+    query = query.order_by(desc(VatSubmission.created_at))
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    
+    # Execute query
+    result = await db.execute(query)
+    submissions = list(result.scalars().all())
+    
+    return VatSubmissionListResponse(
+        submissions=[
+            VatSubmissionResponse(
+                id=s.id,
+                administration_id=s.administration_id,
+                period_id=s.period_id,
+                submission_type=s.submission_type,
+                created_at=s.created_at,
+                created_by=s.created_by,
+                method=s.method,
+                status=s.status,
+                reference_text=s.reference_text,
+                attachment_url=s.attachment_url,
+                payload_hash=s.payload_hash,
+                digipoort_message_id=s.digipoort_message_id,
+                correlation_id=s.correlation_id,
+                last_status_check_at=s.last_status_check_at,
+                error_code=s.error_code,
+                error_message=s.error_message,
+                connector_response=s.connector_response,
+                submitted_at=s.submitted_at,
+                updated_at=s.updated_at,
+            )
+            for s in submissions
+        ],
+        total_count=total_count or 0,
+    )

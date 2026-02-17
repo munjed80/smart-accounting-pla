@@ -232,9 +232,12 @@ class VatBoxLinesResponse(BaseModel):
 class VatSubmissionStatus(str, Enum):
     """VAT submission status."""
     DRAFT = "DRAFT"
+    QUEUED = "QUEUED"
     SUBMITTED = "SUBMITTED"
-    CONFIRMED = "CONFIRMED"
+    RECEIVED = "RECEIVED"
+    ACCEPTED = "ACCEPTED"
     REJECTED = "REJECTED"
+    FAILED = "FAILED"
 
 
 class VatSubmissionMethod(str, Enum):
@@ -261,6 +264,12 @@ class VatSubmissionResponse(BaseModel):
     status: str
     reference_text: Optional[str] = None
     attachment_url: Optional[str] = None
+    payload_hash: Optional[str] = None
+    digipoort_message_id: Optional[str] = None
+    correlation_id: Optional[str] = None
+    last_status_check_at: Optional[datetime] = None
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
     connector_response: Optional[Dict[str, Any]] = None
     submitted_at: Optional[datetime] = None
     updated_at: datetime
@@ -286,5 +295,30 @@ class MarkSubmittedRequest(BaseModel):
     """Request to mark a submission as submitted."""
     reference_text: str = Field(..., min_length=1, description="Reference text (e.g., 'Submitted via portal on DATE')")
     attachment_url: Optional[str] = Field(None, description="Optional URL to proof/receipt")
+
+
+class PrepareSubmissionRequest(BaseModel):
+    """Request to prepare a VAT/ICP submission."""
+    kind: VatSubmissionType = VatSubmissionType.BTW
+
+
+class PrepareSubmissionResponse(BaseModel):
+    """Response for prepare submission endpoint."""
+    submission_id: UUID
+    status: str
+    validation_errors: List[str]
+    payload_hash: str
+
+
+class QueueSubmissionRequest(BaseModel):
+    """Request to queue a submission for Digipoort."""
+    cert_ref: Optional[str] = Field(None, description="Optional certificate reference")
+
+
+class QueueSubmissionResponse(BaseModel):
+    """Response for queue submission endpoint."""
+    submission_id: UUID
+    status: str
+    correlation_id: Optional[str] = None
 
 

@@ -33,6 +33,7 @@ import {
 import { 
   accountantApi, 
   ComprehensiveAuditLogEntry,
+  ComprehensiveAuditLogFilters,
   getErrorMessage 
 } from '@/lib/api'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
@@ -204,7 +205,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
       setIsLoading(true)
       setError(null)
       
-      const filters: any = { page, page_size: pageSize }
+      const filters: ComprehensiveAuditLogFilters = { page, page_size: pageSize }
       
       if (actionFilter !== 'ALL') {
         filters.action = actionFilter
@@ -299,7 +300,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
           {/* Date From */}
           <div className="space-y-2">
-            <Label htmlFor="date-from" className="text-xs">Datum vanaf</Label>
+            <Label htmlFor="date-from" className="text-xs">{t('audit.dateFrom')}</Label>
             <Input
               id="date-from"
               type="date"
@@ -314,7 +315,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
 
           {/* Date To */}
           <div className="space-y-2">
-            <Label htmlFor="date-to" className="text-xs">Datum tot</Label>
+            <Label htmlFor="date-to" className="text-xs">{t('audit.dateTo')}</Label>
             <Input
               id="date-to"
               type="date"
@@ -329,16 +330,16 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
 
           {/* Action Filter */}
           <div className="space-y-2">
-            <Label className="text-xs">Actie</Label>
+            <Label className="text-xs">{t('audit.action')}</Label>
             <Select value={actionFilter} onValueChange={(val) => { setActionFilter(val); setPage(1) }}>
               <SelectTrigger>
-                <SelectValue placeholder="Alle acties" />
+                <SelectValue placeholder={t('audit.allActions')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">Alle acties</SelectItem>
+                <SelectItem value="ALL">{t('audit.allActions')}</SelectItem>
                 {ALL_ACTIONS.map((action) => (
                   <SelectItem key={action} value={action}>
-                    {action}
+                    {t(`audit.actions.${action}` as any) || action}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -347,32 +348,32 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
 
           {/* Entity Type Filter */}
           <div className="space-y-2">
-            <Label className="text-xs">Entiteit type</Label>
+            <Label className="text-xs">{t('audit.entityTypeLabel')}</Label>
             <Select value={entityFilter} onValueChange={(val) => { setEntityFilter(val); setPage(1) }}>
               <SelectTrigger>
-                <SelectValue placeholder="Alle types" />
+                <SelectValue placeholder={t('audit.allTypes')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">Alle types</SelectItem>
-                <SelectItem value="invoice">Factuur</SelectItem>
-                <SelectItem value="expense">Uitgave</SelectItem>
-                <SelectItem value="journal_entry">Boeking</SelectItem>
-                <SelectItem value="period">Periode</SelectItem>
-                <SelectItem value="document">Document</SelectItem>
-                <SelectItem value="vat_submission">BTW aangifte</SelectItem>
+                <SelectItem value="ALL">{t('audit.allTypes')}</SelectItem>
+                <SelectItem value="invoice">{t('audit.entityTypes.invoice')}</SelectItem>
+                <SelectItem value="expense">{t('audit.entityTypes.expense')}</SelectItem>
+                <SelectItem value="journal_entry">{t('audit.entityTypes.journal_entry')}</SelectItem>
+                <SelectItem value="period">{t('audit.entityTypes.period')}</SelectItem>
+                <SelectItem value="document">{t('audit.entityTypes.document')}</SelectItem>
+                <SelectItem value="vat_submission">{t('audit.entityTypes.vat_submission')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* User Role Filter */}
           <div className="space-y-2">
-            <Label className="text-xs">Gebruikersrol</Label>
+            <Label className="text-xs">{t('audit.userRole')}</Label>
             <Select value={userRoleFilter} onValueChange={(val) => { setUserRoleFilter(val); setPage(1) }}>
               <SelectTrigger>
-                <SelectValue placeholder="Alle rollen" />
+                <SelectValue placeholder={t('audit.allRoles')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">Alle rollen</SelectItem>
+                <SelectItem value="ALL">{t('audit.allRoles')}</SelectItem>
                 {USER_ROLES.map((role) => (
                   <SelectItem key={role} value={role}>
                     {role}
@@ -384,7 +385,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
 
           {/* Entity ID Filter */}
           <div className="space-y-2">
-            <Label htmlFor="entity-id" className="text-xs">Entiteit ID</Label>
+            <Label htmlFor="entity-id" className="text-xs">{t('audit.entityId')}</Label>
             <Input
               id="entity-id"
               placeholder="UUID filter..."
@@ -413,7 +414,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
               }}
               className="w-full"
             >
-              Wis filters
+              {t('audit.clearFilters')}
             </Button>
           </div>
         </div>
@@ -482,13 +483,13 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
                               <CollapsibleTrigger asChild>
                                 <Button variant="ghost" size="sm" className="mt-2 w-full justify-start gap-2">
                                   {isExpanded ? <CaretDown size={16} /> : <CaretRight size={16} />}
-                                  Bekijk wijzigingen
+                                  {t('audit.viewChanges')}
                                 </Button>
                               </CollapsibleTrigger>
                               <CollapsibleContent className="mt-2 space-y-2">
                                 {entry.old_value && (
                                   <div className="p-3 bg-red-500/10 rounded border border-red-500/20">
-                                    <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-2">Oude waarde:</p>
+                                    <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-2">{t('audit.oldValue')}:</p>
                                     <pre className="text-xs font-mono text-muted-foreground overflow-x-auto">
                                       {JSON.stringify(entry.old_value, null, 2)}
                                     </pre>
@@ -496,7 +497,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
                                 )}
                                 {entry.new_value && (
                                   <div className="p-3 bg-green-500/10 rounded border border-green-500/20">
-                                    <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-2">Nieuwe waarde:</p>
+                                    <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-2">{t('audit.newValue')}:</p>
                                     <pre className="text-xs font-mono text-muted-foreground overflow-x-auto">
                                       {JSON.stringify(entry.new_value, null, 2)}
                                     </pre>
@@ -519,7 +520,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
         {totalCount > pageSize && (
           <div className="mt-6 flex items-center justify-between flex-wrap gap-4">
             <div className="text-sm text-muted-foreground">
-              Totaal {totalCount} items • Pagina {page} van {Math.ceil(totalCount / pageSize)}
+              {t('audit.totalItems')} {totalCount} • {t('audit.page')} {page} {t('audit.of')} {Math.ceil(totalCount / pageSize)}
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -528,7 +529,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
                 disabled={page === 1}
                 onClick={() => setPage(page - 1)}
               >
-                Vorige
+                {t('common.previous')}
               </Button>
               <Button
                 variant="outline"
@@ -536,7 +537,7 @@ export const ClientAuditTab = ({ clientId }: ClientAuditTabProps) => {
                 disabled={page >= Math.ceil(totalCount / pageSize)}
                 onClick={() => setPage(page + 1)}
               >
-                Volgende
+                {t('common.next')}
               </Button>
             </div>
           </div>

@@ -6,8 +6,9 @@ Tracks VAT/BTW submission history and status.
 import uuid
 from datetime import datetime
 from sqlalchemy import String, DateTime, Text, func, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import Optional
 
 from app.core.database import Base
 
@@ -68,6 +69,9 @@ class VatSubmission(Base):
     # Reference and evidence
     reference_text: Mapped[str] = mapped_column(Text, nullable=True)  # e.g., "Submitted via portal on DATE"
     attachment_url: Mapped[str] = mapped_column(String(500), nullable=True)  # optional proof upload
+    
+    # Connector response data (for storing API responses from Digipoort, etc.)
+    connector_response: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     
     # Submission timestamp
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)

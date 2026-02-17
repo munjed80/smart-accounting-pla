@@ -261,6 +261,7 @@ class VatSubmissionResponse(BaseModel):
     status: str
     reference_text: Optional[str] = None
     attachment_url: Optional[str] = None
+    connector_response: Optional[Dict[str, Any]] = None
     submitted_at: Optional[datetime] = None
     updated_at: datetime
 

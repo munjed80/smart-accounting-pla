@@ -6,7 +6,7 @@ Populates and queries the VAT box lineage table for audit trail and drilldown re
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 from sqlalchemy import select, delete, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload

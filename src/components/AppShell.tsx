@@ -8,7 +8,6 @@ import { getApiBaseUrl } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Sheet, 
   SheetContent, 
@@ -48,7 +47,10 @@ import {
   CurrencyEur,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
-import { InstallButton } from '@/components/InstallButton'
+import { PwaInstallCard } from '@/components/PwaInstallCard'
+import { SwUpdateBanner } from '@/components/SwUpdateBanner'
+import { useInstallPrompt } from '@/pwa/useInstallPrompt'
+import { useServiceWorkerUpdate } from '@/pwa/useServiceWorkerUpdate'
 
 // Menu item configuration with role-based access
 interface MenuItem {
@@ -305,6 +307,9 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
   const isSuperAdmin = user?.role === 'super_admin'
   const isZZP = user?.role === 'zzp'
+
+  const { canInstall, showIosHelper, promptInstall, dismiss: dismissInstallCard } = useInstallPrompt()
+  const { updateAvailable, applyUpdate, dismiss: dismissUpdateBanner } = useServiceWorkerUpdate()
   
   // Protection: Close sidebar on route changes
   useCloseOverlayOnRouteChange(() => setSidebarOpen(false))
@@ -638,7 +643,6 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
 
             {/* Right: Role Badge + Logout */}
             <div className="flex items-center gap-2 sm:gap-4">
-              {isZZP && <InstallButton />}
               <Badge variant="outline" className="capitalize text-xs sm:text-sm">
                 {user?.role === 'zzp' ? t('roles.zzp') : user?.role === 'accountant' ? t('roles.accountant') : user?.role}
               </Badge>
@@ -693,6 +697,20 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
           )}
         </div>
       </header>
+
+      <PwaInstallCard
+        canInstall={canInstall}
+        showIosHelper={showIosHelper}
+        onInstall={() => void promptInstall()}
+        onDismiss={dismissInstallCard}
+      />
+
+      <SwUpdateBanner
+        visible={updateAvailable}
+        onApply={applyUpdate}
+        onDismiss={dismissUpdateBanner}
+        isZzp={Boolean(isZZP)}
+      />
 
       {/* Mobile Drawer / Sheet */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>

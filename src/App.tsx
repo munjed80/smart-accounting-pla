@@ -39,7 +39,6 @@ import { SupportPage } from '@/components/SupportPage'
 import { AdminDashboard } from '@/components/AdminDashboard'
 import { AppShell } from '@/components/AppShell'
 import { DashboardErrorBoundary } from '@/components/DashboardErrorBoundary'
-import { PWAUpdatePrompt } from '@/components/PWAUpdatePrompt'
 import { administrationApi, accountantClientApi } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { pathToTab, tabToPath } from '@/lib/routing'
@@ -671,14 +670,11 @@ const queryClient = new QueryClient({
 })
 
 function App() {
-  const isPwaEnabled = import.meta.env.PROD && import.meta.env.VITE_ENABLE_PWA === 'true'
-
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ActiveClientProvider>
           <AppContent />
-          {isPwaEnabled ? <PWAUpdatePrompt /> : null}
         </ActiveClientProvider>
       </AuthProvider>
     </QueryClientProvider>

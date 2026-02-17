@@ -4,19 +4,15 @@ const isProduction = import.meta.env.PROD
 const pwaEnabled = import.meta.env.VITE_ENABLE_PWA === 'true'
 
 export const registerServiceWorker = async (): Promise<void> => {
-  if (!isProduction || !pwaEnabled) {
-    return
-  }
-
-  if (!('serviceWorker' in navigator)) {
+  if (!isProduction || !pwaEnabled || !('serviceWorker' in navigator)) {
     return
   }
 
   try {
-    const registrations = await navigator.serviceWorker.getRegistrations()
-    const hasTargetRegistration = registrations.some((registration) => registration.active?.scriptURL.endsWith(SW_URL))
+    const existingRegistration = await navigator.serviceWorker.getRegistration('/')
 
-    if (hasTargetRegistration) {
+    if (existingRegistration?.active?.scriptURL.endsWith(SW_URL)) {
+      await existingRegistration.update()
       return
     }
 

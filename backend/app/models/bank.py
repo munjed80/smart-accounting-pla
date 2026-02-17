@@ -105,6 +105,7 @@ class BankTransaction(Base):
     bank_account = relationship("BankAccount", back_populates="transactions")
     reconciliation_actions = relationship("ReconciliationAction", back_populates="bank_transaction", cascade="all, delete-orphan")
     match_proposals = relationship("BankMatchProposal", back_populates="bank_transaction", cascade="all, delete-orphan")
+    splits = relationship("BankTransactionSplit", back_populates="bank_transaction", cascade="all, delete-orphan")
 
 
 
@@ -217,6 +218,14 @@ class MatchRuleType(str, enum.Enum):
     COMBINED = "COMBINED"                  # Multiple rules combined
 
 
+class ProposalStatus(str, enum.Enum):
+    """Status of a match proposal."""
+    SUGGESTED = "suggested"      # Newly generated proposal
+    ACCEPTED = "accepted"        # User accepted the proposal
+    REJECTED = "rejected"        # User rejected the proposal
+    EXPIRED = "expired"          # Proposal is outdated/superseded
+
+
 class BankMatchProposal(Base):
     """
     Persistent matching proposals for bank transactions.
@@ -259,6 +268,9 @@ class BankMatchProposal(Base):
     # Status
     is_applied: Mapped[bool] = mapped_column(sa.Boolean, default=False, nullable=False)
     is_dismissed: Mapped[bool] = mapped_column(sa.Boolean, default=False, nullable=False)
+    status: Mapped[ProposalStatus] = mapped_column(
+        SQLEnum(ProposalStatus), default=ProposalStatus.SUGGESTED, nullable=False
+    )
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -271,5 +283,71 @@ class BankMatchProposal(Base):
     # Relationships
     administration = relationship("Administration", back_populates="bank_match_proposals")
     bank_transaction = relationship("BankTransaction", back_populates="match_proposals")
+
+
+class BankMatchRule(Base):
+    """
+    Bank matching rules for intelligent transaction matching.
+    
+    Supports both manual rules created by accountants and learned rules
+    from accepted matches. Rules can auto-accept matches or boost confidence.
+    """
+    __tablename__ = "bank_match_rules"
+    
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("administrations.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
+    
+    # Conditions (JSONB for flexibility)
+    # Example: {"iban":"NL...","contains":"ADYEN","min_amount":10,"max_amount":500}
+    conditions: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    
+    # Action (JSONB for flexibility)
+    # Example: {"auto_accept":true,"target_type":"expense","expense_category_id":"..."}
+    action: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    
+    # Audit fields
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    
+    # Relationships
+    administration = relationship("Administration", back_populates="bank_match_rules")
+
+
+class BankTransactionSplit(Base):
+    """
+    Split transaction for partial matching.
+    
+    Allows a single bank transaction to be matched to multiple targets.
+    The sum of all splits must equal the original transaction amount.
+    """
+    __tablename__ = "bank_transaction_splits"
+    
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("administrations.id", ondelete="CASCADE"), nullable=False
+    )
+    transaction_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("bank_transactions.id", ondelete="CASCADE"), nullable=False
+    )
+    split_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=True)
+    
+    # Relationships
+    administration = relationship("Administration", back_populates="bank_transaction_splits")
+    bank_transaction = relationship("BankTransaction", back_populates="splits")
 
 

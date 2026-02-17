@@ -17,7 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models.bank import BankTransaction, BankTransactionStatus, ReconciliationAction
+from app.models.bank import (
+    BankTransaction,
+    BankTransactionStatus,
+    BankMatchProposal,
+    BankMatchRule,
+    BankTransactionSplit,
+    ReconciliationAction,
+)
 from app.schemas.bank import (
     BankImportResponse,
     BankTransactionResponse,
@@ -28,8 +35,22 @@ from app.schemas.bank import (
     ApplyActionResponse,
     ReconciliationActionsListResponse,
     ReconciliationActionResponse,
+    GenerateProposalsRequest,
+    GenerateProposalsResponse,
+    MatchProposalResponse,
+    ProposalsListResponse,
+    AcceptProposalResponse,
+    RejectProposalResponse,
+    UnmatchResponse,
+    SplitTransactionRequest,
+    SplitTransactionResponse,
+    BankMatchRuleRequest,
+    BankMatchRuleResponse,
+    MatchRulesListResponse,
+    BankReconciliationKPI,
 )
 from app.services.bank_reconciliation import BankReconciliationService
+from app.services.bank_matching_engine import BankMatchingEngine
 from app.api.v1.deps import CurrentUser, require_assigned_accountant_client
 
 router = APIRouter()
@@ -326,4 +347,418 @@ async def list_reconciliation_actions(
             for a in actions
         ],
         total_count=total_count,
+    )
+
+
+# ============ Matching Engine Endpoints ============
+
+@router.post("/accountant/clients/{client_id}/bank/proposals/generate", response_model=GenerateProposalsResponse)
+async def generate_proposals(
+    client_id: UUID,
+    request: GenerateProposalsRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Generate intelligent matching proposals for unmatched transactions.
+    
+    Analyzes transactions and creates proposals with confidence scores
+    based on amount matching, reference matching, and pattern recognition.
+    
+    Requires: Active Machtiging (consent) for the client.
+    """
+    await require_assigned_accountant_client(client_id, current_user, db)
+    
+    engine = BankMatchingEngine(db, client_id, current_user.id)
+    result = await engine.generate_proposals(
+        transaction_id=request.transaction_id,
+        date_from=request.date_from,
+        date_to=request.date_to,
+        limit_per_transaction=request.limit_per_transaction,
+    )
+    
+    return GenerateProposalsResponse(
+        transactions_processed=result["transactions_processed"],
+        proposals_generated=result["proposals_generated"],
+        message=f"{result['proposals_generated']} voorstellen gegenereerd voor {result['transactions_processed']} transacties"
+    )
+
+
+@router.get("/accountant/clients/{client_id}/bank/transactions/{tx_id}/proposals", response_model=ProposalsListResponse)
+async def get_transaction_proposals(
+    client_id: UUID,
+    tx_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Get all matching proposals for a transaction.
+    
+    Returns proposals sorted by confidence score.
+    
+    Requires: Active Machtiging (consent) for the client.
+    """
+    await require_assigned_accountant_client(client_id, current_user, db)
+    
+    # Verify transaction belongs to this client
+    tx_result = await db.execute(
+        select(BankTransaction).where(
+            BankTransaction.id == tx_id,
+            BankTransaction.administration_id == client_id,
+        )
+    )
+    transaction = tx_result.scalar_one_or_none()
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    # Get proposals
+    query = (
+        select(BankMatchProposal)
+        .where(BankMatchProposal.bank_transaction_id == tx_id)
+        .order_by(BankMatchProposal.confidence_score.desc())
+    )
+    
+    result = await db.execute(query)
+    proposals = result.scalars().all()
+    
+    return ProposalsListResponse(
+        transaction_id=tx_id,
+        proposals=[MatchProposalResponse.from_orm(p) for p in proposals],
+        total_count=len(proposals),
+    )
+
+
+@router.post("/accountant/clients/{client_id}/bank/proposals/{proposal_id}/accept", response_model=AcceptProposalResponse)
+async def accept_proposal(
+    client_id: UUID,
+    proposal_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Accept a matching proposal.
+    
+    Marks the transaction as matched and creates audit trail.
+    Idempotent: if already matched to same target, returns success.
+    
+    Requires: Active Machtiging (consent) for the client.
+    """
+    await require_assigned_accountant_client(client_id, current_user, db)
+    
+    # Get proposal to find transaction
+    proposal_result = await db.execute(
+        select(BankMatchProposal).where(
+            BankMatchProposal.id == proposal_id,
+            BankMatchProposal.administration_id == client_id,
+        )
+    )
+    proposal = proposal_result.scalar_one_or_none()
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    
+    engine = BankMatchingEngine(db, client_id, current_user.id)
+    result = await engine.accept_proposal(proposal.bank_transaction_id, proposal_id)
+    
+    return AcceptProposalResponse(**result)
+
+
+@router.post("/accountant/clients/{client_id}/bank/proposals/{proposal_id}/reject", response_model=RejectProposalResponse)
+async def reject_proposal(
+    client_id: UUID,
+    proposal_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Reject a matching proposal.
+    
+    Marks proposal as rejected. Transaction remains unmatched.
+    Creates audit trail entry.
+    
+    Requires: Active Machtiging (consent) for the client.
+    """
+    await require_assigned_accountant_client(client_id, current_user, db)
+    
+    # Get proposal to find transaction
+    proposal_result = await db.execute(
+        select(BankMatchProposal).where(
+            BankMatchProposal.id == proposal_id,
+            BankMatchProposal.administration_id == client_id,
+        )
+    )
+    proposal = proposal_result.scalar_one_or_none()
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    
+    engine = BankMatchingEngine(db, client_id, current_user.id)
+    result = await engine.reject_proposal(proposal.bank_transaction_id, proposal_id)
+    
+    return RejectProposalResponse(**result)
+
+
+@router.post("/accountant/clients/{client_id}/bank/transactions/{tx_id}/unmatch", response_model=UnmatchResponse)
+async def unmatch_transaction(
+    client_id: UUID,
+    tx_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Unmatch a previously matched transaction.
+    
+    Reverts transaction to unmatched state. Safe undo with audit trail.
+    Keeps history of the previous match.
+    
+    Requires: Active Machtiging (consent) for the client.
+    """
+    await require_assigned_accountant_client(client_id, current_user, db)
+    
+    # Verify transaction belongs to this client
+    tx_result = await db.execute(
+        select(BankTransaction).where(
+            BankTransaction.id == tx_id,
+            BankTransaction.administration_id == client_id,
+        )
+    )
+    transaction = tx_result.scalar_one_or_none()
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    engine = BankMatchingEngine(db, client_id, current_user.id)
+    result = await engine.unmatch_transaction(tx_id)
+    
+    return UnmatchResponse(**result)
+
+
+@router.post("/accountant/clients/{client_id}/bank/transactions/{tx_id}/split", response_model=SplitTransactionResponse)
+async def split_transaction(
+    client_id: UUID,
+    tx_id: UUID,
+    request: SplitTransactionRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Split a transaction into multiple parts.
+    
+    Allows matching one bank transaction to multiple targets.
+    Validates that sum of splits equals transaction amount.
+    
+    Requires: Active Machtiging (consent) for the client.
+    """
+    await require_assigned_accountant_client(client_id, current_user, db)
+    
+    # Verify transaction belongs to this client
+    tx_result = await db.execute(
+        select(BankTransaction).where(
+            BankTransaction.id == tx_id,
+            BankTransaction.administration_id == client_id,
+        )
+    )
+    transaction = tx_result.scalar_one_or_none()
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    engine = BankMatchingEngine(db, client_id, current_user.id)
+    result = await engine.split_transaction(tx_id, request.splits)
+    
+    return SplitTransactionResponse(**result)
+
+
+# ============ Rules Engine Endpoints ============
+
+@router.get("/accountant/clients/{client_id}/bank/rules", response_model=MatchRulesListResponse)
+async def list_match_rules(
+    client_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    List all matching rules for a client.
+    
+    Returns rules sorted by priority (descending).
+    
+    Requires: Active Machtiging (consent) for the client.
+    """
+    await require_assigned_accountant_client(client_id, current_user, db)
+    
+    query = (
+        select(BankMatchRule)
+        .where(BankMatchRule.client_id == client_id)
+        .order_by(BankMatchRule.priority.desc(), BankMatchRule.created_at.desc())
+    )
+    
+    result = await db.execute(query)
+    rules = result.scalars().all()
+    
+    return MatchRulesListResponse(
+        rules=[BankMatchRuleResponse.from_orm(r) for r in rules],
+        total_count=len(rules),
+    )
+
+
+@router.post("/accountant/clients/{client_id}/bank/rules", response_model=BankMatchRuleResponse)
+async def create_match_rule(
+    client_id: UUID,
+    request: BankMatchRuleRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Create a new matching rule.
+    
+    Rules are applied to transactions in priority order.
+    Can auto-accept matches or boost confidence scores.
+    
+    Requires: Active Machtiging (consent) for the client.
+    """
+    await require_assigned_accountant_client(client_id, current_user, db)
+    
+    rule = BankMatchRule(
+        client_id=client_id,
+        name=request.name,
+        enabled=request.enabled,
+        priority=request.priority,
+        conditions=request.conditions,
+        action=request.action,
+        created_by_user_id=current_user.id,
+    )
+    
+    db.add(rule)
+    await db.commit()
+    await db.refresh(rule)
+    
+    return BankMatchRuleResponse.from_orm(rule)
+
+
+@router.patch("/accountant/clients/{client_id}/bank/rules/{rule_id}", response_model=BankMatchRuleResponse)
+async def update_match_rule(
+    client_id: UUID,
+    rule_id: UUID,
+    request: BankMatchRuleRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Update an existing matching rule.
+    
+    Requires: Active Machtiging (consent) for the client.
+    """
+    await require_assigned_accountant_client(client_id, current_user, db)
+    
+    # Get rule
+    rule_result = await db.execute(
+        select(BankMatchRule).where(
+            BankMatchRule.id == rule_id,
+            BankMatchRule.client_id == client_id,
+        )
+    )
+    rule = rule_result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    
+    # Update fields
+    rule.name = request.name
+    rule.enabled = request.enabled
+    rule.priority = request.priority
+    rule.conditions = request.conditions
+    rule.action = request.action
+    
+    await db.commit()
+    await db.refresh(rule)
+    
+    return BankMatchRuleResponse.from_orm(rule)
+
+
+@router.delete("/accountant/clients/{client_id}/bank/rules/{rule_id}")
+async def delete_match_rule(
+    client_id: UUID,
+    rule_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Delete a matching rule.
+    
+    Requires: Active Machtiging (consent) for the client.
+    """
+    await require_assigned_accountant_client(client_id, current_user, db)
+    
+    # Get rule
+    rule_result = await db.execute(
+        select(BankMatchRule).where(
+            BankMatchRule.id == rule_id,
+            BankMatchRule.client_id == client_id,
+        )
+    )
+    rule = rule_result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    
+    await db.delete(rule)
+    await db.commit()
+    
+    return {"status": "success", "message": "Rule deleted"}
+
+
+# ============ KPI Endpoints ============
+
+@router.get("/accountant/clients/{client_id}/bank/kpi", response_model=BankReconciliationKPI)
+async def get_reconciliation_kpi(
+    client_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    period_days: int = Query(30, ge=1, le=365, description="Period in days for KPI calculation"),
+):
+    """
+    Get bank reconciliation KPI metrics.
+    
+    Returns statistics for the specified period:
+    - Match percentage
+    - Transaction counts by status
+    - Total inflow/outflow
+    
+    Requires: Active Machtiging (consent) for the client.
+    """
+    await require_assigned_accountant_client(client_id, current_user, db)
+    
+    from datetime import datetime, timedelta
+    from decimal import Decimal
+    
+    # Calculate date range
+    end_date = datetime.utcnow().date()
+    start_date = end_date - timedelta(days=period_days)
+    
+    # Query transactions in period
+    query = select(BankTransaction).where(
+        BankTransaction.administration_id == client_id,
+        BankTransaction.booking_date >= start_date,
+        BankTransaction.booking_date <= end_date,
+    )
+    
+    result = await db.execute(query)
+    transactions = result.scalars().all()
+    
+    # Calculate KPIs
+    total = len(transactions)
+    matched = sum(1 for t in transactions if t.status == BankTransactionStatus.MATCHED)
+    unmatched = sum(1 for t in transactions if t.status == BankTransactionStatus.NEW)
+    ignored = sum(1 for t in transactions if t.status == BankTransactionStatus.IGNORED)
+    needs_review = sum(1 for t in transactions if t.status == BankTransactionStatus.NEEDS_REVIEW)
+    
+    matched_pct = (matched / total * 100) if total > 0 else 0.0
+    
+    inflow = sum(t.amount for t in transactions if t.amount > 0)
+    outflow = sum(abs(t.amount) for t in transactions if t.amount < 0)
+    
+    return BankReconciliationKPI(
+        total_transactions=total,
+        matched_count=matched,
+        unmatched_count=unmatched,
+        ignored_count=ignored,
+        needs_review_count=needs_review,
+        matched_percentage=round(matched_pct, 1),
+        total_inflow=inflow,
+        total_outflow=outflow,
+        period_days=period_days,
     )

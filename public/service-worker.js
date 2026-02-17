@@ -3,6 +3,10 @@ const APP_SHELL_CACHE = `smart-accounting-shell-${CACHE_VERSION}`
 const STATIC_CACHE = `smart-accounting-static-${CACHE_VERSION}`
 const OFFLINE_URL = '/offline.html'
 
+// Feature flags (set at build time or via postMessage)
+let BG_SYNC_ENABLED = false
+let PUSH_ENABLED = false
+
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -119,6 +123,12 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting()
   }
+  
+  // Handle feature flag updates
+  if (event.data && event.data.type === 'SET_FEATURES') {
+    BG_SYNC_ENABLED = event.data.bgSync === true
+    PUSH_ENABLED = event.data.push === true
+  }
 })
 
 self.addEventListener('fetch', (event) => {
@@ -177,6 +187,127 @@ self.addEventListener('fetch', (event) => {
 
         return networkResponse
       })(),
+    )
+  }
+})
+
+// Background Sync Event (optional, feature-flagged)
+self.addEventListener('sync', (event) => {
+  if (!BG_SYNC_ENABLED) {
+    return
+  }
+
+  if (event.tag === 'sync-queue') {
+    event.waitUntil(
+      (async () => {
+        try {
+          // Open IndexedDB and get queued items
+          const db = await new Promise((resolve, reject) => {
+            const request = indexedDB.open('smart-accounting-sync', 1)
+            request.onsuccess = () => resolve(request.result)
+            request.onerror = () => reject(request.error)
+          })
+
+          const transaction = db.transaction(['sync-queue'], 'readonly')
+          const store = transaction.objectStore('sync-queue')
+          const items = await new Promise((resolve, reject) => {
+            const request = store.getAll()
+            request.onsuccess = () => resolve(request.result || [])
+            request.onerror = () => reject(request.error)
+          })
+
+          // Process each item sequentially
+          for (const item of items) {
+            try {
+              const response = await fetch(item.url, {
+                method: item.method,
+                headers: item.headers,
+                body: JSON.stringify(item.payload),
+              })
+
+              if (response.ok) {
+                // Success - remove from queue
+                const writeTransaction = db.transaction(['sync-queue'], 'readwrite')
+                const writeStore = writeTransaction.objectStore('sync-queue')
+                writeStore.delete(item.id)
+              } else if (response.status === 409) {
+                // Conflict - stop and notify user
+                self.registration.showNotification('Synchronisatiefout', {
+                  body: `Conflict bij synchroniseren van ${item.type}. Controleer handmatig.`,
+                  icon: '/icon-192x192.png',
+                  tag: 'sync-error',
+                })
+                break
+              } else {
+                // Other error - increment retry count
+                const writeTransaction = db.transaction(['sync-queue'], 'readwrite')
+                const writeStore = writeTransaction.objectStore('sync-queue')
+                item.retries += 1
+                if (item.retries < 3) {
+                  writeStore.put(item)
+                } else {
+                  // Max retries - remove and notify
+                  writeStore.delete(item.id)
+                  self.registration.showNotification('Synchronisatiefout', {
+                    body: `Kan ${item.type} niet synchroniseren na 3 pogingen.`,
+                    icon: '/icon-192x192.png',
+                    tag: 'sync-error',
+                  })
+                }
+              }
+            } catch (error) {
+              // Network error - will retry on next sync
+              console.error('Sync error:', error)
+            }
+          }
+
+          db.close()
+        } catch (error) {
+          console.error('Background sync failed:', error)
+        }
+      })(),
+    )
+  }
+})
+
+// Push Event (optional, feature-flagged)
+self.addEventListener('push', (event) => {
+  if (!PUSH_ENABLED) {
+    return
+  }
+
+  let data = {}
+  if (event.data) {
+    try {
+      data = event.data.json()
+    } catch {
+      data = { title: 'Melding', body: event.data.text() }
+    }
+  }
+
+  const title = data.title || 'Smart Accounting'
+  const options = {
+    body: data.body || 'U heeft een nieuwe melding',
+    icon: '/icon-192x192.png',
+    badge: '/icon-192x192.png',
+    tag: data.tag || 'notification',
+    data: data.url ? { url: data.url } : undefined,
+  }
+
+  event.waitUntil(self.registration.showNotification(title, options))
+})
+
+// Notification Click Event
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+
+  if (event.notification.data?.url) {
+    event.waitUntil(
+      clients.openWindow(event.notification.data.url),
+    )
+  } else {
+    event.waitUntil(
+      clients.openWindow('/'),
     )
   }
 })

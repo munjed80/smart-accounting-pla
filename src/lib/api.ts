@@ -3326,6 +3326,54 @@ export interface ReconciliationActionsListResponse {
   total_count: number
 }
 
+// ============ Bank Matching Engine Types ============
+
+export interface BankKPI {
+  matched_percentage: number
+  unmatched_count: number
+  total_inflow: string | number
+  total_outflow: string | number
+  period_days: number
+  total_transactions: number
+  matched_count: number
+}
+
+export interface MatchProposal {
+  id: string
+  transaction_id: string
+  entity_type: MatchedType
+  entity_id: string
+  entity_reference: string
+  confidence_score: number
+  amount: string | number
+  date: string
+  reason: string
+  proposed_action: ReconciliationAction
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED'
+  created_at: string
+}
+
+export interface MatchProposalListResponse {
+  proposals: MatchProposal[]
+  transaction_id: string
+}
+
+export interface GenerateProposalsResponse {
+  generated_count: number
+  message: string
+}
+
+export interface ProposalActionResponse {
+  proposal: MatchProposal
+  transaction: BankTransaction
+  message: string
+}
+
+export interface UnmatchResponse {
+  transaction: BankTransaction
+  message: string
+}
+
 // ============ Bank Reconciliation API ============
 
 export const bankReconciliationApi = {
@@ -3401,6 +3449,51 @@ export const bankReconciliationApi = {
     if (options?.page) params.page = options.page
     if (options?.pageSize) params.page_size = options.pageSize
     const response = await api.get<ReconciliationActionsListResponse>('/accountant/bank/actions', { params })
+    return response.data
+  },
+
+  // ============ Matching Engine Endpoints ============
+
+  getKPI: async (clientId: string): Promise<BankKPI> => {
+    const response = await api.get<BankKPI>(`/accountant/clients/${clientId}/bank/kpi`)
+    return response.data
+  },
+
+  generateProposals: async (clientId: string): Promise<GenerateProposalsResponse> => {
+    const response = await api.post<GenerateProposalsResponse>(
+      `/accountant/clients/${clientId}/bank/proposals/generate`
+    )
+    return response.data
+  },
+
+  getTransactionProposals: async (
+    clientId: string,
+    transactionId: string
+  ): Promise<MatchProposalListResponse> => {
+    const response = await api.get<MatchProposalListResponse>(
+      `/accountant/clients/${clientId}/bank/transactions/${transactionId}/proposals`
+    )
+    return response.data
+  },
+
+  acceptProposal: async (clientId: string, proposalId: string): Promise<ProposalActionResponse> => {
+    const response = await api.post<ProposalActionResponse>(
+      `/accountant/clients/${clientId}/bank/proposals/${proposalId}/accept`
+    )
+    return response.data
+  },
+
+  rejectProposal: async (clientId: string, proposalId: string): Promise<ProposalActionResponse> => {
+    const response = await api.post<ProposalActionResponse>(
+      `/accountant/clients/${clientId}/bank/proposals/${proposalId}/reject`
+    )
+    return response.data
+  },
+
+  unmatchTransaction: async (clientId: string, transactionId: string): Promise<UnmatchResponse> => {
+    const response = await api.post<UnmatchResponse>(
+      `/accountant/clients/${clientId}/bank/transactions/${transactionId}/unmatch`
+    )
     return response.data
   },
 }

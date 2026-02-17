@@ -1198,9 +1198,15 @@ export const BankReconciliationPage = () => {
 
   useEffect(() => {
     if (activeClientId && transactions.length > 0) {
-      loadAllProposals()
+      // Only load proposals if we don't already have them
+      const needsProposals = transactions.some(
+        tx => tx.status === 'NEW' && !proposalsMap[tx.id]
+      )
+      if (needsProposals) {
+        loadAllProposals()
+      }
     }
-  }, [activeClientId, transactionIds, loadAllProposals])
+  }, [activeClientId, transactionIds])
 
   if (!activeClientId) {
     return (

@@ -16,7 +16,7 @@ from decimal import Decimal
 from difflib import SequenceMatcher
 from typing import List, Optional, Tuple, Dict, Any
 
-from sqlalchemy import select, func, or_, and_
+from sqlalchemy import select, func, or_, and_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.bank import (
@@ -342,7 +342,7 @@ class BankMatchingEngine:
             select(FinancialCommitment)
             .where(
                 FinancialCommitment.client_id == self.client_id,
-                FinancialCommitment.is_active == True,
+                FinancialCommitment.is_active,
             )
         )
         
@@ -652,9 +652,9 @@ class BankMatchingEngine:
         
         # Delete existing splits
         await self.db.execute(
-            select(BankTransactionSplit).where(
+            delete(BankTransactionSplit).where(
                 BankTransactionSplit.transaction_id == transaction_id
-            ).delete()
+            )
         )
         
         # Create new splits
@@ -704,7 +704,7 @@ class BankMatchingEngine:
             select(BankMatchRule)
             .where(
                 BankMatchRule.client_id == self.client_id,
-                BankMatchRule.enabled == True,
+                BankMatchRule.enabled,
             )
             .order_by(BankMatchRule.priority.desc())
         )

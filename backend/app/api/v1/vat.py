@@ -1423,7 +1423,7 @@ async def queue_vat_submission(
         service = VatSubmissionService(db, client_id)
         submission = await service.queue_submission(
             submission_id=submission_id,
-            cert_ref=request.cert_ref,
+            certificate_id=request.certificate_id,
         )
         
         return QueueSubmissionResponse(

@@ -251,28 +251,52 @@ class VatSubmissionService:
         
         return errors
     
-    def sign_payload(self, xml: str, cert_ref: Optional[str] = None) -> str:
+    async def sign_payload(
+        self, 
+        xml: str, 
+        certificate_id: Optional[uuid.UUID] = None
+    ) -> Tuple[str, dict]:
         """
-        Sign XML payload for submission.
+        Sign XML payload for submission with PKIoverheid certificate.
         
-        PLACEHOLDER implementation for Phase B.
-        Currently returns unsigned XML.
-        
-        TODO: Implement proper XML signing with PKIoverheid certificate:
-        - Load certificate from secure storage
-        - Create XML signature (XMLDSig)
-        - Embed signature in payload
+        Implements actual XML signing using the SigningService.
         
         Args:
             xml: The XML payload to sign
-            cert_ref: Reference to certificate in secure storage
+            certificate_id: ID of certificate to use for signing
         
         Returns:
-            Signed XML string
+            Tuple of (signed_xml, signature_info)
+            
+        Raises:
+            VatSubmissionError: If signing fails or certificate not found
         """
-        # TODO: Implement actual signing in Phase B
-        # For now, just return the original XML
-        return xml
+        if not certificate_id:
+            raise VatSubmissionError(
+                "Certificate ID is required for signing. "
+                "Please register a PKIoverheid certificate first."
+            )
+        
+        try:
+            from app.services.signing_service import SigningService, SigningError
+            from app.services.certificate_service import CertificateError
+            
+            # Use signing service to sign the XML
+            signing_service = SigningService(self.db)
+            signed_xml, signature_info = await signing_service.sign_xml(
+                xml_content=xml,
+                certificate_id=certificate_id,
+                administration_id=self.administration_id,
+            )
+            
+            return signed_xml, signature_info
+        
+        except CertificateError as e:
+            raise VatSubmissionError(f"Certificate error: {str(e)}")
+        except SigningError as e:
+            raise VatSubmissionError(f"Signing error: {str(e)}")
+        except Exception as e:
+            raise VatSubmissionError(f"Failed to sign payload: {str(e)}")
     
     async def create_draft_submission(
         self,
@@ -351,17 +375,17 @@ class VatSubmissionService:
     async def queue_submission(
         self,
         submission_id: uuid.UUID,
-        cert_ref: Optional[str] = None
+        certificate_id: Optional[uuid.UUID] = None
     ) -> VatSubmission:
         """
         Queue a draft submission for Digipoort submission.
         
-        Signs the payload and moves status to QUEUED.
+        Signs the payload with PKIoverheid certificate and moves status to QUEUED.
         Actual submission will happen in Phase B.
         
         Args:
             submission_id: The submission UUID
-            cert_ref: Optional certificate reference for signing
+            certificate_id: Certificate ID to use for signing
         
         Returns:
             Updated VatSubmission
@@ -391,8 +415,11 @@ class VatSubmissionService:
         if validation_errors:
             raise VatSubmissionError(f"Payload validation failed: {', '.join(validation_errors)}")
         
-        # Sign payload (placeholder for now)
-        signed_xml = self.sign_payload(submission.payload_xml, cert_ref)
+        # Sign payload with PKIoverheid certificate
+        signed_xml, signature_info = await self.sign_payload(
+            submission.payload_xml, 
+            certificate_id
+        )
         
         # Generate correlation ID for tracking
         correlation_id = str(uuid.uuid4())
@@ -400,8 +427,14 @@ class VatSubmissionService:
         # Update submission
         submission.signed_xml = signed_xml
         submission.correlation_id = correlation_id
+        submission.certificate_id = certificate_id
         submission.status = "QUEUED"
         submission.updated_at = datetime.now(timezone.utc)
+        
+        # Store signature info in connector_response for audit trail
+        if not submission.connector_response:
+            submission.connector_response = {}
+        submission.connector_response['signature_info'] = signature_info
         
         await self.db.commit()
         await self.db.refresh(submission)

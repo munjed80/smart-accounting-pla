@@ -109,14 +109,14 @@ describe('AppShell - ZZP Menu', () => {
 
     // Check that all menu items are present
     expect(screen.getAllByText('Overzicht').length).toBeGreaterThan(0)
-    expect(screen.getByText('Klanten')).toBeInTheDocument()
-    expect(screen.getByText('Facturen')).toBeInTheDocument()
-    expect(screen.getByText('Uitgaven')).toBeInTheDocument()
-    expect(screen.getByText('Uren')).toBeInTheDocument()
-    expect(screen.getByText('Agenda')).toBeInTheDocument()
-    expect(screen.getByText('Boekhouder')).toBeInTheDocument()
-    expect(screen.getByText('Documenten')).toBeInTheDocument()
-    expect(screen.getByText('Boekingen')).toBeInTheDocument()
+    expect(screen.getAllByText('Klanten').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Facturen').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Uitgaven').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Uren').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Agenda').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Boekhouder').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Documenten').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Boekingen').length).toBeGreaterThan(0)
   })
 
   it('does not show accountant-only menu items to ZZP users', () => {

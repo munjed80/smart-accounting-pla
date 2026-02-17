@@ -51,6 +51,7 @@ import { NotFoundError, NetworkError, UnauthorizedError, ValidationError, Server
 // In DEV mode: Allow fallback to localhost for development convenience
 // In PROD mode: VITE_API_URL must be set and must NOT point to localhost
 const isDev = import.meta.env.DEV
+const OFFLINE_SIMULATION_QUERY = 'offline'
 const envApiUrl = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) as string | undefined
 
 // Store raw API URL for diagnostics (before any normalization)
@@ -246,9 +247,79 @@ export const api = axios.create({
   withCredentials: true,
 })
 
+const API_OFFLINE_EVENT = 'smart-accounting:api-offline-status'
+
+export interface ApiOfflineStatus {
+  isOffline: boolean
+  message: string
+}
+
+type ApiOfflineListener = (status: ApiOfflineStatus) => void
+
+let offlineStatus: ApiOfflineStatus = {
+  isOffline: false,
+  message: '',
+}
+
+let lastFailedRequest: InternalAxiosRequestConfig | null = null
+
+const emitOfflineStatus = (status: ApiOfflineStatus) => {
+  offlineStatus = status
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent<ApiOfflineStatus>(API_OFFLINE_EVENT, { detail: status }))
+  }
+}
+
+const isOfflineError = (error: AxiosError) => {
+  if (!error.response) return true
+  return error.response.status === 503 || error.response.status === 504
+}
+
+const isOfflineSimulationEnabled = () => {
+  if (!isDev || typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get(OFFLINE_SIMULATION_QUERY) === '1'
+}
+
+export const subscribeApiOfflineStatus = (listener: ApiOfflineListener) => {
+  listener(offlineStatus)
+
+  if (typeof window === 'undefined') {
+    return () => undefined
+  }
+
+  const handler = (event: Event) => {
+    const customEvent = event as CustomEvent<ApiOfflineStatus>
+    listener(customEvent.detail)
+  }
+
+  window.addEventListener(API_OFFLINE_EVENT, handler as EventListener)
+
+  return () => {
+    window.removeEventListener(API_OFFLINE_EVENT, handler as EventListener)
+  }
+}
+
+export const clearApiOfflineStatus = () => {
+  emitOfflineStatus({ isOffline: false, message: '' })
+}
+
+export const retryLastFailedApiRequest = async () => {
+  if (!lastFailedRequest) {
+    return false
+  }
+
+  await api.request(lastFailedRequest)
+  clearApiOfflineStatus()
+  return true
+}
+
 // Add request interceptor to fail fast if API is misconfigured
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    if (isOfflineSimulationEnabled()) {
+      return Promise.reject(new AxiosError('Simulated offline mode (?offline=1)', 'ERR_NETWORK', config))
+    }
+
     const token = localStorage.getItem('access_token')
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
@@ -280,6 +351,10 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => {
+    if (offlineStatus.isOffline) {
+      clearApiOfflineStatus()
+    }
+
     // DEBUG: Log successful response (only in DEV mode to avoid exposing info in production)
     if (isDev) {
       console.log('[API Response]', response.status, response.config.url)
@@ -296,6 +371,14 @@ api.interceptors.response.use(
     }
     
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
+
+    if (isOfflineError(error)) {
+      lastFailedRequest = originalRequest
+      emitOfflineStatus({
+        isOffline: true,
+        message: 'Offline of verbinding weggevallen',
+      })
+    }
 
     // Convert axios errors to typed errors for better handling
     let typedError: Error = error

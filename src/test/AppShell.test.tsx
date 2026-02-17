@@ -58,6 +58,8 @@ vi.mock('../hooks/usePreventBodyScrollLock', () => ({
 // Mock API
 vi.mock('../lib/api', () => ({
   getApiBaseUrl: vi.fn(() => 'http://localhost:8000/api/v1'),
+  subscribeApiOfflineStatus: vi.fn(() => () => undefined),
+  retryLastFailedApiRequest: vi.fn(async () => false),
 }))
 
 describe('AppShell - ZZP Menu', () => {

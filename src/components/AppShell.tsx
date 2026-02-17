@@ -51,6 +51,7 @@ import { PwaInstallCard } from '@/components/PwaInstallCard'
 import { SwUpdateBanner } from '@/components/SwUpdateBanner'
 import { useInstallPrompt } from '@/pwa/useInstallPrompt'
 import { useServiceWorkerUpdate } from '@/pwa/useServiceWorkerUpdate'
+import { OfflineBanner } from '@/components/OfflineBanner'
 
 // Menu item configuration with role-based access
 interface MenuItem {
@@ -697,6 +698,8 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
           )}
         </div>
       </header>
+
+      <OfflineBanner />
 
       <PwaInstallCard
         canInstall={canInstall}

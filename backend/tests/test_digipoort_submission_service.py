@@ -154,17 +154,8 @@ class TestPayloadValidation:
         errors = service.validate_payload(valid_xml)
         assert len(errors) == 0
     
-    def test_sign_payload_placeholder(self):
-        """Test that sign_payload returns unsigned XML (placeholder)."""
-        from app.services.vat_submission_service import VatSubmissionService
-        
-        service = VatSubmissionService(None, None)
-        
-        xml = "<test>xml</test>"
-        signed_xml = service.sign_payload(xml)
-        
-        # In placeholder implementation, should return original XML
-        assert signed_xml == xml
+    # Note: test_sign_payload_placeholder removed - signing functionality is now
+    # implemented with real PKIoverheid certificates and tested in test_signing_service.py
 
 
 class TestAlembicMigration:

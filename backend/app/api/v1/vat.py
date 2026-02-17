@@ -92,6 +92,9 @@ def generate_mapping_reason(
     """
     Generate a human-readable explanation for why a transaction maps to a specific VAT box.
     
+    Uses VAT code category and box_mapping metadata to provide accurate, maintainable
+    explanations without relying on code name parsing.
+    
     Args:
         vat_code: The VAT code used for the transaction
         box_code: The target box code (e.g., "1a", "3b", "5b")
@@ -105,37 +108,53 @@ def generate_mapping_reason(
     rate = float(vat_code.rate)
     category = vat_code.category.value if hasattr(vat_code.category, 'value') else str(vat_code.category)
     
-    # Check which box type this is
-    turnover_box = box_mapping.get("turnover_box")
-    vat_box = box_mapping.get("vat_box")
-    deductible_box = box_mapping.get("deductible_box")
+    # Domestic turnover boxes (1a-1e) - based on rate and category
+    if box_code in ["1a", "1b", "1c"]:
+        if category == "SALES":
+            return f"Binnenlandse omzet {rate}% → rubriek {box_code}"
+        return f"Omzet ander tarief ({rate}%) → rubriek {box_code}"
     
-    # Build reason based on box and VAT code properties
-    if box_code == "1a":
-        return f"Binnenlandse omzet {rate}% → rubriek 1a"
-    elif box_code == "1b":
-        return f"Binnenlandse omzet {rate}% → rubriek 1b"
-    elif box_code == "1c":
-        return f"Binnenlandse omzet ander tarief ({rate}%) → rubriek 1c"
-    elif box_code == "1d":
+    if box_code == "1d":
         return f"Privégebruik → rubriek 1d"
-    elif box_code == "1e":
+    
+    if box_code == "1e":
         return f"Omzet 0% of niet belast → rubriek 1e"
-    elif box_code == "2a":
+    
+    # Domestic reverse charge (2a)
+    if box_code == "2a":
         return f"Binnenlandse verlegging → rubriek 2a"
-    elif box_code == "3a":
+    
+    # Export/EU turnover boxes (3a-3b)
+    if box_code == "3a":
         return f"Levering buiten EU → rubriek 3a"
-    elif box_code == "3b":
+    
+    if box_code == "3b":
         return f"ICP levering binnen EU → rubriek 3b"
-    elif box_code == "4a":
-        if "IMPORT" in vat_code.code.upper() or "NON_EU" in vat_code.code.upper():
-            return f"Verlegde BTW - invoer buiten EU → rubriek 4a"
-        return f"Verlegde BTW - diensten buiten EU → rubriek 4a"
-    elif box_code == "4b":
-        return f"EU-verwerving → rubriek 4b"
-    elif box_code == "5a":
+    
+    # Reverse charge boxes (4a-4b) - use category to distinguish
+    if box_code == "4a":
+        # Check if this is in the vat_box (output VAT) or turnover
+        if category == "REVERSE_CHARGE":
+            return f"Verlegde BTW diensten buiten EU → rubriek 4a"
+        return f"Verlegde BTW - invoer/diensten buiten EU → rubriek 4a"
+    
+    if box_code == "4b":
+        if category == "INTRA_EU":
+            return f"EU-verwerving → rubriek 4b"
+        return f"Verlegde BTW EU-verwerving → rubriek 4b"
+    
+    # Calculation boxes (5a, 5c, 5g)
+    if box_code == "5a":
         return f"Verschuldigde BTW (berekend) → rubriek 5a"
-    elif box_code == "5b":
+    
+    if box_code == "5c":
+        return f"Subtotaal (5a - 5b) → rubriek 5c"
+    
+    if box_code == "5g":
+        return f"Te betalen/ontvangen → rubriek 5g"
+    
+    # Input VAT / deductible box (5b) - use category to explain context
+    if box_code == "5b":
         if category == "PURCHASES":
             return f"Voorbelasting {rate}% → rubriek 5b"
         elif category == "REVERSE_CHARGE":
@@ -143,12 +162,8 @@ def generate_mapping_reason(
         elif category == "INTRA_EU":
             return f"Aftrekbare BTW EU-verwerving → rubriek 5b"
         return f"Voorbelasting → rubriek 5b"
-    elif box_code == "5c":
-        return f"Subtotaal (5a - 5b) → rubriek 5c"
-    elif box_code == "5g":
-        return f"Te betalen/ontvangen → rubriek 5g"
     
-    # Fallback
+    # Fallback for any other boxes
     return f"BTW-code {vat_code.code} ({rate}%) → rubriek {box_code}"
 
 

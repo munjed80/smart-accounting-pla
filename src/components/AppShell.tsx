@@ -48,6 +48,7 @@ import {
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 import { PwaInstallCard } from '@/components/PwaInstallCard'
+import { IOSInstallModal } from '@/components/IOSInstallModal'
 import { SwUpdateBanner } from '@/components/SwUpdateBanner'
 import { useInstallPrompt } from '@/pwa/useInstallPrompt'
 import { useServiceWorkerUpdate } from '@/pwa/useServiceWorkerUpdate'
@@ -701,9 +702,15 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
 
       <OfflineBanner />
 
+      {isZZP && (
+        <IOSInstallModal
+          open={showIosHelper}
+          onSkip={dismissInstallCard}
+        />
+      )}
+
       <PwaInstallCard
         canInstall={canInstall}
-        showIosHelper={showIosHelper}
         onInstall={() => void promptInstall()}
         onDismiss={dismissInstallCard}
       />

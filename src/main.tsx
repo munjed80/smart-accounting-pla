@@ -4,6 +4,7 @@ import { ErrorBoundary } from 'react-error-boundary'
 import App from './App.tsx'
 import { ErrorFallback } from './ErrorFallback.tsx'
 import { reportRuntimeError } from './lib/runtimeDiagnostics.ts'
+import { registerServiceWorker } from './serviceWorkerRegistration.ts'
 
 import './main.css'
 import './styles/theme.css'
@@ -38,6 +39,8 @@ window.addEventListener('unhandledrejection', (event) => {
     timestamp: new Date().toISOString(),
   })
 })
+
+void registerServiceWorker()
 
 createRoot(document.getElementById('root')!).render(
   <ErrorBoundary FallbackComponent={ErrorFallback}>

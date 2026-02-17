@@ -1,42 +1,66 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ArrowClockwise, X } from '@phosphor-icons/react'
-import { useRegisterSW } from 'virtual:pwa-register/react'
 
 export const PWAUpdatePrompt = () => {
   const [showUpdate, setShowUpdate] = useState(false)
-
-  const {
-    offlineReady: [offlineReady, setOfflineReady],
-    needRefresh: [needRefresh, setNeedRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
-    onRegistered(r) {
-      console.log('SW Registered:', r)
-    },
-    onRegisterError(error) {
-      console.error('SW registration error:', error)
-    },
-  })
+  const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null)
 
   useEffect(() => {
-    if (needRefresh) {
-      setShowUpdate(true)
+    if (!import.meta.env.PROD || import.meta.env.VITE_ENABLE_PWA !== 'true') {
+      return
     }
-  }, [needRefresh])
+
+    if (!('serviceWorker' in navigator)) {
+      return
+    }
+
+    let cancelled = false
+
+    const subscribeToRegistration = async () => {
+      const registration = await navigator.serviceWorker.getRegistration('/')
+      if (!registration || cancelled) {
+        return
+      }
+
+      if (registration.waiting) {
+        setWaitingWorker(registration.waiting)
+        setShowUpdate(true)
+      }
+
+      registration.addEventListener('updatefound', () => {
+        const installing = registration.installing
+        if (!installing) {
+          return
+        }
+
+        installing.addEventListener('statechange', () => {
+          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+            setWaitingWorker(registration.waiting ?? null)
+            setShowUpdate(true)
+          }
+        })
+      })
+    }
+
+    void subscribeToRegistration()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleUpdate = () => {
-    updateServiceWorker(true)
+    waitingWorker?.postMessage({ type: 'SKIP_WAITING' })
+    window.location.reload()
   }
 
   const handleDismiss = () => {
     setShowUpdate(false)
-    setNeedRefresh(false)
-    setOfflineReady(false)
   }
 
-  if (!showUpdate && !offlineReady) {
+  if (!showUpdate) {
     return null
   }
 
@@ -46,29 +70,21 @@ export const PWAUpdatePrompt = () => {
         <ArrowClockwise size={20} className="text-primary flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <AlertDescription className="text-sm">
-            {needRefresh ? (
-              <>
-                <p className="font-semibold mb-1">Nieuwe versie beschikbaar</p>
-                <p className="text-xs text-muted-foreground">
-                  Klik op herladen om bij te werken
-                </p>
-              </>
-            ) : (
-              <p className="font-semibold">App is klaar voor offline gebruik</p>
-            )}
+            <p className="font-semibold mb-1">Nieuwe versie beschikbaar</p>
+            <p className="text-xs text-muted-foreground">
+              Klik op herladen om bij te werken
+            </p>
           </AlertDescription>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {needRefresh && (
-            <Button
-              variant="default"
-              size="sm"
-              className="h-8 text-xs"
-              onClick={handleUpdate}
-            >
-              Herladen
-            </Button>
-          )}
+          <Button
+            variant="default"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={handleUpdate}
+          >
+            Herladen
+          </Button>
           <Button
             variant="ghost"
             size="icon"

@@ -131,7 +131,9 @@ def _serialize_value(value: Any) -> Any:
     elif isinstance(value, UUID):
         return str(value)
     elif isinstance(value, Decimal):
-        return float(value)
+        # Convert Decimal to string to preserve exact precision
+        # This is important for financial amounts in audit logs
+        return str(value)
     elif hasattr(value, "isoformat"):
         # datetime, date, time objects
         return value.isoformat()

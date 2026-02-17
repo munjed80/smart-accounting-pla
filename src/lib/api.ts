@@ -3349,7 +3349,8 @@ export interface MatchProposal {
   date: string
   reason: string
   proposed_action: ReconciliationAction
-  status: 'PENDING' | 'ACCEPTED' | 'REJECTED'
+  // Status lifecycle: 'suggested' (initial proposal), 'accepted' (user approved), 'rejected' (user declined), 'expired' (no longer valid)
+  status: 'suggested' | 'accepted' | 'rejected' | 'expired'
   created_at: string
 }
 

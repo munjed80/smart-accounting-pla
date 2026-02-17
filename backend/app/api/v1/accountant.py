@@ -22,6 +22,11 @@ from app.models.ledger import JournalEntry, JournalEntryStatus
 from app.models.subledger import OpenItem, OpenItemStatus
 from app.models.issues import ClientIssue, IssueSeverity, ValidationRun
 from app.models.audit_log import AuditLog
+from app.models.bank import BankTransaction, BankTransactionStatus
+from app.models.alerts import Alert, AlertSeverity
+from app.models.vat_submission import VatSubmission
+from app.models.zzp import ZZPInvoice, InvoiceStatus
+from app.models.ledger import AccountingPeriod, PeriodStatus
 from app.schemas.issues import (
     ClientOverviewResponse,
     ClientIssueResponse,
@@ -42,6 +47,18 @@ from app.schemas.reports import (
 from app.schemas.audit import (
     ComprehensiveAuditLogEntry,
     ComprehensiveAuditLogListResponse,
+)
+from app.schemas.work_queue_summary import (
+    WorkQueueSummaryResponse,
+    DocumentReviewSection,
+    DocumentReviewItem,
+    BankReconciliationSection,
+    BankTransactionItem,
+    VATActionsSection,
+    RemindersSection,
+    OverdueInvoiceItem,
+    IntegrityWarningsSection,
+    IntegrityWarningItem,
 )
 from app.services.validation import ConsistencyEngine
 from app.services.reports import ReportService
@@ -538,4 +555,228 @@ async def get_client_audit_logs(
         total_count=total_count,
         page=page,
         page_size=page_size,
+    )
+
+
+@router.get("/clients/{client_id}/work-queue/summary", response_model=WorkQueueSummaryResponse)
+async def get_work_queue_summary(
+    client_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Get work queue summary for a specific client.
+    
+    Returns aggregated counts and top items across 5 sections:
+    - Document review (documents needing review)
+    - Bank reconciliation (unmatched transactions from last 30 days)
+    - VAT actions (period status and action counts)
+    - Reminders/overdue (overdue invoices)
+    - Integrity warnings (active alerts)
+    
+    Each section includes deep links to relevant pages.
+    
+    Requires:
+    - Accountant role
+    - Active client assignment
+    """
+    # Verify access
+    administration = await require_assigned_client(client_id, current_user, db)
+    
+    # === DOCUMENT REVIEW SECTION ===
+    # Get documents needing review
+    docs_query = select(Document).where(
+        Document.administration_id == client_id,
+        Document.status == DocumentStatus.NEEDS_REVIEW
+    ).order_by(Document.created_at.desc()).limit(10)
+    
+    docs_count_query = select(func.count(Document.id)).where(
+        Document.administration_id == client_id,
+        Document.status == DocumentStatus.NEEDS_REVIEW
+    )
+    
+    docs_result = await db.execute(docs_query)
+    docs_count_result = await db.execute(docs_count_query)
+    
+    documents = docs_result.scalars().all()
+    documents_count = docs_count_result.scalar() or 0
+    
+    doc_items = [
+        DocumentReviewItem(
+            id=doc.id,
+            date=doc.invoice_date.date() if doc.invoice_date else None,
+            type="Invoice" if doc.supplier_name else "Document",
+            status=doc.status.value,
+            vendor_customer=doc.supplier_name,
+            amount=doc.total_amount,
+            link=f"/accountant/review-queue?document_id={doc.id}"
+        )
+        for doc in documents
+    ]
+    
+    document_review = DocumentReviewSection(
+        count=documents_count,
+        top_items=doc_items
+    )
+    
+    # === BANK RECONCILIATION SECTION ===
+    # Get unmatched bank transactions from last 30 days
+    thirty_days_ago = date.today() - timedelta(days=30)
+    
+    bank_query = select(BankTransaction).where(
+        BankTransaction.administration_id == client_id,
+        BankTransaction.status == BankTransactionStatus.NEW,
+        BankTransaction.booking_date >= thirty_days_ago
+    ).order_by(BankTransaction.booking_date.desc()).limit(10)
+    
+    bank_count_query = select(func.count(BankTransaction.id)).where(
+        BankTransaction.administration_id == client_id,
+        BankTransaction.status == BankTransactionStatus.NEW,
+        BankTransaction.booking_date >= thirty_days_ago
+    )
+    
+    bank_result = await db.execute(bank_query)
+    bank_count_result = await db.execute(bank_count_query)
+    
+    bank_txs = bank_result.scalars().all()
+    bank_count = bank_count_result.scalar() or 0
+    
+    bank_items = [
+        BankTransactionItem(
+            id=tx.id,
+            date=tx.booking_date,
+            description=tx.description,
+            amount=tx.amount,
+            confidence_best_proposal=None,  # Would come from matching proposals if implemented
+            link=f"/accountant/clients/{client_id}/bank-reconciliation?tx_id={tx.id}"
+        )
+        for tx in bank_txs
+    ]
+    
+    bank_reconciliation = BankReconciliationSection(
+        count=bank_count,
+        top_items=bank_items
+    )
+    
+    # === VAT ACTIONS SECTION ===
+    # Get current period and count periods needing action
+    current_period_query = select(AccountingPeriod).where(
+        AccountingPeriod.administration_id == client_id
+    ).order_by(AccountingPeriod.start_date.desc()).limit(1)
+    
+    current_period_result = await db.execute(current_period_query)
+    current_period = current_period_result.scalar_one_or_none()
+    
+    # Count periods that need action:
+    # - READY but not yet submitted (status = OPEN or REVIEW)
+    # - Have VAT submissions in DRAFT or QUEUED status
+    periods_needing_action_query = select(func.count(AccountingPeriod.id.distinct())).select_from(
+        AccountingPeriod
+    ).outerjoin(
+        VatSubmission, VatSubmission.period_id == AccountingPeriod.id
+    ).where(
+        AccountingPeriod.administration_id == client_id,
+        (
+            (AccountingPeriod.status.in_([PeriodStatus.OPEN, PeriodStatus.REVIEW])) |
+            (VatSubmission.status.in_(["DRAFT", "QUEUED"]))
+        )
+    )
+    
+    periods_count_result = await db.execute(periods_needing_action_query)
+    periods_needing_action = periods_count_result.scalar() or 0
+    
+    vat_actions = VATActionsSection(
+        current_period_status=current_period.status.value if current_period else None,
+        periods_needing_action_count=periods_needing_action,
+        btw_link=f"/accountant/clients/{client_id}/vat"
+    )
+    
+    # === REMINDERS / OVERDUE SECTION ===
+    # Get overdue invoices
+    today = date.today()
+    
+    overdue_query = select(ZZPInvoice).where(
+        ZZPInvoice.administration_id == client_id,
+        ZZPInvoice.status.in_([InvoiceStatus.SENT, InvoiceStatus.OVERDUE]),
+        ZZPInvoice.due_date < today
+    ).order_by(ZZPInvoice.due_date.asc()).limit(10)
+    
+    overdue_count_query = select(func.count(ZZPInvoice.id)).where(
+        ZZPInvoice.administration_id == client_id,
+        ZZPInvoice.status.in_([InvoiceStatus.SENT, InvoiceStatus.OVERDUE]),
+        ZZPInvoice.due_date < today
+    )
+    
+    overdue_result = await db.execute(overdue_query)
+    overdue_count_result = await db.execute(overdue_count_query)
+    
+    overdue_invoices = overdue_result.scalars().all()
+    overdue_count = overdue_count_result.scalar() or 0
+    
+    # Load customer names for invoices
+    overdue_items = []
+    for invoice in overdue_invoices:
+        # Get customer name
+        customer_name = invoice.customer_name or "Unknown Customer"
+        
+        overdue_items.append(
+            OverdueInvoiceItem(
+                id=invoice.id,
+                customer=customer_name,
+                due_date=invoice.due_date,
+                amount=invoice.total_amount,
+                link=f"/accountant/clients/{client_id}/invoices/{invoice.id}"
+            )
+        )
+    
+    reminders = RemindersSection(
+        count=overdue_count,
+        top_items=overdue_items
+    )
+    
+    # === INTEGRITY WARNINGS SECTION ===
+    # Get active alerts
+    alerts_query = select(Alert).where(
+        Alert.administration_id == client_id,
+        Alert.resolved_at.is_(None)
+    ).order_by(
+        # Order by severity: CRITICAL first, then WARNING, then INFO
+        Alert.severity.desc(),
+        Alert.created_at.desc()
+    ).limit(10)
+    
+    alerts_count_query = select(func.count(Alert.id)).where(
+        Alert.administration_id == client_id,
+        Alert.resolved_at.is_(None)
+    )
+    
+    alerts_result = await db.execute(alerts_query)
+    alerts_count_result = await db.execute(alerts_count_query)
+    
+    alerts = alerts_result.scalars().all()
+    alerts_count = alerts_count_result.scalar() or 0
+    
+    alert_items = [
+        IntegrityWarningItem(
+            id=alert.id,
+            severity=alert.severity.value,
+            message=alert.message,
+            link=f"/accountant/clients/{client_id}/alerts/{alert.id}"
+        )
+        for alert in alerts
+    ]
+    
+    integrity_warnings = IntegrityWarningsSection(
+        count=alerts_count,
+        top_items=alert_items
+    )
+    
+    # Return complete response
+    return WorkQueueSummaryResponse(
+        document_review=document_review,
+        bank_reconciliation=bank_reconciliation,
+        vat_actions=vat_actions,
+        reminders=reminders,
+        integrity_warnings=integrity_warnings,
+        generated_at=datetime.now(timezone.utc)
     )

@@ -2,21 +2,21 @@
  * Accountant Review Queue Page
  * 
  * Main review queue page for accountants with Dutch UI.
- * Shows:
- * - Tabs: Rode issues, Te beoordelen, BTW binnenkort, Achterstand documenten
- * - EmptyState when no client selected
- * - Uses existing AccountantWorkQueue and ReviewQueue components
- * - Handles PENDING_APPROVAL and ACCESS_REVOKED errors from backend
+ * Shows the work queue summary with:
+ * - Documents needing review
+ * - Bank reconciliation items
+ * - VAT actions
+ * - Reminders/overdue invoices
+ * - Integrity warnings
+ * 
+ * Handles PENDING_APPROVAL and ACCESS_REVOKED errors from backend
  */
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { EmptyState } from '@/components/EmptyState'
-import { ReviewQueue } from '@/components/ReviewQueue'
+import { WorkQueueSummary } from '@/components/WorkQueueSummary'
 import { ClientAccessError, parseClientAccessError } from '@/components/ClientAccessError'
 import { useAuth } from '@/lib/AuthContext'
 import { useActiveClient } from '@/lib/ActiveClientContext'
@@ -24,12 +24,7 @@ import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { accountantClientApi, AccountantClientListItem, getErrorMessage } from '@/lib/api'
 import { 
   WarningCircle,
-  CheckCircle,
-  Stack,
-  Calendar,
-  ClockCountdown,
   UsersThree,
-  ArrowsClockwise,
 } from '@phosphor-icons/react'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
@@ -40,9 +35,6 @@ export const AccountantReviewQueuePage = () => {
   
   // Client details state
   const [selectedClient, setSelectedClient] = useState<AccountantClientListItem | null>(null)
-  
-  // Active tab
-  const [activeTab, setActiveTab] = useState<'red' | 'review' | 'vat' | 'backlog'>('review')
   
   // Loading and error state
   const [isLoading, setIsLoading] = useState(true)
@@ -182,140 +174,13 @@ export const AccountantReviewQueuePage = () => {
           </Alert>
         )}
         
-        {/* Issue counts summary */}
-        {selectedClient && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <Card className={`bg-card/80 backdrop-blur-sm ${selectedClient.open_red_count > 0 ? 'border-red-500/40' : ''}`}>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${selectedClient.open_red_count > 0 ? 'bg-red-500/10 text-red-600' : 'bg-muted text-muted-foreground'}`}>
-                    <WarningCircle size={20} weight="fill" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{selectedClient.open_red_count}</p>
-                    <p className="text-xs text-muted-foreground">{t('reviewQueue.redIssues')}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-card/80 backdrop-blur-sm">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${selectedClient.open_yellow_count > 0 ? 'bg-amber-500/10 text-amber-600' : 'bg-muted text-muted-foreground'}`}>
-                    <Stack size={20} weight="fill" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{selectedClient.open_yellow_count}</p>
-                    <p className="text-xs text-muted-foreground">{t('reviewQueue.toReview')}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-card/80 backdrop-blur-sm">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-muted text-muted-foreground">
-                    <Calendar size={20} weight="fill" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">—</p>
-                    <p className="text-xs text-muted-foreground">{t('reviewQueue.vatSoon')}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-card/80 backdrop-blur-sm">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-muted text-muted-foreground">
-                    <ClockCountdown size={20} weight="fill" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">—</p>
-                    <p className="text-xs text-muted-foreground">{t('reviewQueue.documentBacklog')}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        {/* Work Queue Summary */}
+        {activeClient && (
+          <WorkQueueSummary 
+            clientId={activeClient.administrationId}
+            clientName={activeClient.name || activeClient.email}
+          />
         )}
-        
-        {/* Tabs */}
-        <Card className="bg-card/80 backdrop-blur-sm">
-          <CardHeader className="pb-0">
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="red" className="text-red-600">
-                  <WarningCircle size={16} className="mr-1" />
-                  {t('reviewQueue.redIssues')}
-                  {selectedClient && selectedClient.open_red_count > 0 && (
-                    <Badge variant="destructive" className="ml-2 text-xs">
-                      {selectedClient.open_red_count}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="review">
-                  <Stack size={16} className="mr-1" />
-                  {t('reviewQueue.toReview')}
-                </TabsTrigger>
-                <TabsTrigger value="vat">
-                  <Calendar size={16} className="mr-1" />
-                  {t('reviewQueue.vatSoon')}
-                </TabsTrigger>
-                <TabsTrigger value="backlog">
-                  <ClockCountdown size={16} className="mr-1" />
-                  {t('reviewQueue.documentBacklog')}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardHeader>
-          <CardContent className="pt-6 transition-opacity duration-200">
-            {showLoading ? (
-              <div className="text-center py-12">
-                <ArrowsClockwise size={32} className="mx-auto mb-4 animate-spin text-primary" />
-                <p className="text-muted-foreground">{t('common.loading')}</p>
-              </div>
-            ) : activeClient ? (
-              <>
-                {activeTab === 'review' && (
-                  <ReviewQueue
-                    clientId={activeClient.administrationId}
-                    clientName={activeClient.name || activeClient.email}
-                  />
-                )}
-                {activeTab === 'red' && (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <CheckCircle size={48} className="mx-auto mb-4 opacity-50 text-green-500" />
-                    <p className="text-lg font-medium">{t('reviewQueue.noItems')}</p>
-                  </div>
-                )}
-                {activeTab === 'vat' && (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <CheckCircle size={48} className="mx-auto mb-4 opacity-50 text-green-500" />
-                    <p className="text-lg font-medium">{t('reviewQueue.noItems')}</p>
-                  </div>
-                )}
-                {activeTab === 'backlog' && (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <CheckCircle size={48} className="mx-auto mb-4 opacity-50 text-green-500" />
-                    <p className="text-lg font-medium">{t('reviewQueue.noItems')}</p>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                <UsersThree size={48} className="mx-auto mb-4 opacity-50" />
-                <p>{t('clientSwitcher.selectClientFirst')}</p>
-                <Button variant="outline" className="mt-4" onClick={handleGoToClients}>
-                  {t('clientSwitcher.goToClients')}
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </div>
   )

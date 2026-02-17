@@ -13,7 +13,8 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:backend:smoke": "bash scripts/backend-smoke.sh",
-        "check:all": "npm run lint && npm test && npm run test:backend:smoke"
+        "check:all": "npm run lint && npm test && npm run test:backend:smoke",
+        "lighthouse:pwa": "echo 'Install lighthouse CLI: npm install -g lighthouse' && echo 'Then run: lighthouse <YOUR_DEPLOYED_URL> --only-categories=pwa --view'"
     },
     "dependencies": {
         "@github/spark": ">=0.43.1 <1",

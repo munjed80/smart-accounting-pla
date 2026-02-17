@@ -39,10 +39,14 @@ import {
   Globe,
   Bank,
   IdentificationCard,
+  GitBranch,
+  BellRinging,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
+import { APP_VERSION_SHORT, getBuildDate, GIT_COMMIT_HASH, PACKAGE_VERSION_ONLY, IS_PROD } from '@/lib/version'
+import { usePushNotifications, isPushEnabled } from '@/hooks/usePushNotifications'
 
 export const SettingsPage = () => {
   const { user } = useAuth()
@@ -52,6 +56,9 @@ export const SettingsPage = () => {
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  
+  // Push notifications hook
+  const pushNotifications = usePushNotifications()
   
   // Business profile state (for ZZP users) - MUST be declared before useDelayedLoading
   const [businessProfile, setBusinessProfile] = useState<ZZPBusinessProfile | null>(null)
@@ -727,6 +734,36 @@ export const SettingsPage = () => {
                     }
                   />
                 </div>
+                
+                {/* Push Notifications (optional, feature-flagged) */}
+                {isPushEnabled() && (
+                  <>
+                    <Separator />
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="pushNotifications" className="flex items-center gap-2">
+                          <BellRinging size={16} />
+                          Meldingen inschakelen
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Ontvang pushmeldingen voor belangrijke updates
+                        </p>
+                        {!pushNotifications.isSupported && (
+                          <Badge variant="destructive" className="text-xs mt-1">
+                            Niet ondersteund in deze browser
+                          </Badge>
+                        )}
+                      </div>
+                      <Switch
+                        id="pushNotifications"
+                        checked={pushNotifications.isSubscribed}
+                        onCheckedChange={pushNotifications.toggle}
+                        disabled={!pushNotifications.isSupported || pushNotifications.isLoading}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="flex justify-end pt-4">
@@ -846,6 +883,69 @@ export const SettingsPage = () => {
                 <Info size={16} />
                 <AlertDescription>
                   De export bevat alle gegevens in je huidige administratie. Bewaar de export veilig.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+
+          {/* About & Version Info */}
+          <Card className="bg-card/80 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Info size={20} weight="duotone" />
+                Over deze applicatie
+              </CardTitle>
+              <CardDescription>
+                Versie-informatie en systeemdetails
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-muted-foreground">Versie</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="font-mono text-xs">
+                      {PACKAGE_VERSION_ONLY}
+                    </Badge>
+                  </div>
+                </div>
+                
+                {IS_PROD && GIT_COMMIT_HASH !== 'dev' && (
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                      <GitBranch size={14} />
+                      Build
+                    </span>
+                    <Badge variant="outline" className="font-mono text-xs">
+                      {GIT_COMMIT_HASH}
+                    </Badge>
+                  </div>
+                )}
+                
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-muted-foreground">Laatste build</span>
+                  <span className="text-sm font-medium">
+                    {getBuildDate()}
+                  </span>
+                </div>
+
+                {!IS_PROD && (
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-sm text-muted-foreground">Modus</span>
+                    <Badge variant="destructive" className="text-xs">
+                      Development
+                    </Badge>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              <Alert>
+                <Info size={16} />
+                <AlertDescription className="text-xs">
+                  <strong>Smart Accounting Platform</strong> — Professioneel boekhoudplatform voor ZZP'ers en accountants. 
+                  {IS_PROD && ' Volledige versie: '}{IS_PROD && <code className="text-xs bg-muted px-1 py-0.5 rounded">{APP_VERSION_SHORT}</code>}
                 </AlertDescription>
               </Alert>
             </CardContent>

@@ -808,7 +808,7 @@ async def download_evidence_pack(
 
 @router.get(
     "/clients/{client_id}/vat/submissions",
-    response_model='VatSubmissionListResponse',
+    response_model=VatSubmissionListResponse,
     summary="List VAT Submissions",
     description="""
     List all VAT submission records for a client.
@@ -833,7 +833,6 @@ async def list_vat_submissions(
 ):
     """List VAT submissions for a client."""
     from app.models.vat_submission import VatSubmission
-    from app.schemas.vat import VatSubmissionListResponse, VatSubmissionResponse
     
     # Enforce consent/active-client isolation
     await verify_accountant_access(client_id, current_user, db)
@@ -877,7 +876,7 @@ async def list_vat_submissions(
 
 @router.post(
     "/clients/{client_id}/vat/submissions",
-    response_model='VatSubmissionResponse',
+    response_model=VatSubmissionResponse,
     summary="Create VAT Submission Record",
     description="""
     Create a new VAT submission record when generating a submission package.
@@ -893,13 +892,12 @@ async def list_vat_submissions(
 )
 async def create_vat_submission(
     client_id: UUID,
-    request: 'CreateVatSubmissionRequest',
+    request: CreateVatSubmissionRequest,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Create a new VAT submission record."""
     from app.models.vat_submission import VatSubmission
-    from app.schemas.vat import CreateVatSubmissionRequest, VatSubmissionResponse
     import uuid
     
     # Enforce consent/active-client isolation
@@ -949,7 +947,7 @@ async def create_vat_submission(
 
 @router.post(
     "/clients/{client_id}/vat/submissions/{submission_id}/mark-submitted",
-    response_model='VatSubmissionResponse',
+    response_model=VatSubmissionResponse,
     summary="Mark Submission as Submitted",
     description="""
     Mark a VAT submission as submitted to the tax authority.
@@ -966,13 +964,12 @@ async def create_vat_submission(
 async def mark_submission_submitted(
     client_id: UUID,
     submission_id: UUID,
-    request: 'MarkSubmittedRequest',
+    request: MarkSubmittedRequest,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Mark a submission as submitted."""
     from app.models.vat_submission import VatSubmission
-    from app.schemas.vat import MarkSubmittedRequest, VatSubmissionResponse
     
     # Enforce consent/active-client isolation
     await verify_accountant_access(client_id, current_user, db)

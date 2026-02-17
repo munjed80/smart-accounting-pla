@@ -1109,3 +1109,223 @@ async def mark_submission_submitted(
         updated_at=submission.updated_at,
     )
 
+
+
+@router.post(
+    "/clients/{client_id}/tax/btw/submit",
+    response_model=VatSubmissionResponse,
+    summary="Submit BTW via Connector",
+    description="""
+    Submit BTW (VAT) declaration using the configured submission connector.
+    
+    This endpoint:
+    1. Validates that the period is in READY_FOR_FILING status
+    2. Generates the BTW submission package (XML)
+    3. Submits via the configured connector (Package-only or Digipoort)
+    4. Creates a submission record with reference and status
+    
+    **Connector Modes:**
+    - PACKAGE_ONLY (default): Stores XML locally, returns status=DRAFT
+    - DIGIPOORT (if enabled): Submits to Digipoort API, returns actual status
+    
+    **Permissions:** Requires accountant access to the client and period must be READY_FOR_FILING.
+    
+    **Returns:** submission_id, reference, status
+    """,
+)
+async def submit_btw_via_connector(
+    client_id: UUID,
+    request: SubmissionPackageRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Submit BTW via configured connector."""
+    from app.models.vat_submission import VatSubmission
+    from app.services.tax_submission_connector import get_tax_connector
+    import uuid as uuid_module
+    
+    # Verify accountant access
+    administration = await verify_accountant_access(client_id, current_user, db)
+    
+    # Verify period is READY_FOR_FILING
+    result = await db.execute(
+        select(AccountingPeriod)
+        .where(AccountingPeriod.id == request.period_id)
+        .where(AccountingPeriod.administration_id == client_id)
+    )
+    period = result.scalar_one_or_none()
+    
+    if not period:
+        raise HTTPException(status_code=404, detail="Period not found")
+    
+    if period.status != ModelPeriodStatus.READY_FOR_FILING:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Period must be in READY_FOR_FILING status to submit. Current status: {period.status.value}"
+        )
+    
+    try:
+        # Generate submission package
+        service = SubmissionPackageService(db, administration.id)
+        xml_content, filename = await service.generate_btw_package(request.period_id)
+        
+        # Create submission record
+        submission_id = uuid_module.uuid4()
+        
+        # Get connector and submit
+        connector = get_tax_connector()
+        result = await connector.submit_btw(
+            xml_content=xml_content,
+            administration_id=client_id,
+            period_id=request.period_id,
+            submission_id=submission_id,
+        )
+        
+        # Create submission record with connector result
+        submission = VatSubmission(
+            id=submission_id,
+            administration_id=client_id,
+            period_id=request.period_id,
+            submission_type="BTW",
+            created_by=current_user.id,
+            method="DIGIPOORT" if connector.mode == "DIGIPOORT" else "PACKAGE",
+            status=result.status.value,
+            reference_text=result.reference,
+            connector_response=result.response_data,
+            submitted_at=result.timestamp if result.status.value != "DRAFT" else None,
+        )
+        
+        db.add(submission)
+        await db.commit()
+        await db.refresh(submission)
+        
+        return VatSubmissionResponse(
+            id=submission.id,
+            administration_id=submission.administration_id,
+            period_id=submission.period_id,
+            submission_type=submission.submission_type,
+            created_at=submission.created_at,
+            created_by=submission.created_by,
+            method=submission.method,
+            status=submission.status,
+            reference_text=submission.reference_text,
+            attachment_url=submission.attachment_url,
+            connector_response=submission.connector_response,
+            submitted_at=submission.submitted_at,
+            updated_at=submission.updated_at,
+        )
+        
+    except SubmissionPackageError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Submission failed: {str(e)}")
+
+
+@router.post(
+    "/clients/{client_id}/tax/icp/submit",
+    response_model=VatSubmissionResponse,
+    summary="Submit ICP via Connector",
+    description="""
+    Submit ICP (Intra-Community supplies) declaration using the configured submission connector.
+    
+    This endpoint:
+    1. Validates that the period is in READY_FOR_FILING status
+    2. Generates the ICP submission package (XML)
+    3. Submits via the configured connector (Package-only or Digipoort)
+    4. Creates a submission record with reference and status
+    
+    **Connector Modes:**
+    - PACKAGE_ONLY (default): Stores XML locally, returns status=DRAFT
+    - DIGIPOORT (if enabled): Submits to Digipoort API, returns actual status
+    
+    **Permissions:** Requires accountant access to the client and period must be READY_FOR_FILING.
+    
+    **Returns:** submission_id, reference, status
+    """,
+)
+async def submit_icp_via_connector(
+    client_id: UUID,
+    request: SubmissionPackageRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Submit ICP via configured connector."""
+    from app.models.vat_submission import VatSubmission
+    from app.services.tax_submission_connector import get_tax_connector
+    import uuid as uuid_module
+    
+    # Verify accountant access
+    administration = await verify_accountant_access(client_id, current_user, db)
+    
+    # Verify period is READY_FOR_FILING
+    result = await db.execute(
+        select(AccountingPeriod)
+        .where(AccountingPeriod.id == request.period_id)
+        .where(AccountingPeriod.administration_id == client_id)
+    )
+    period = result.scalar_one_or_none()
+    
+    if not period:
+        raise HTTPException(status_code=404, detail="Period not found")
+    
+    if period.status != ModelPeriodStatus.READY_FOR_FILING:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Period must be in READY_FOR_FILING status to submit. Current status: {period.status.value}"
+        )
+    
+    try:
+        # Generate submission package
+        service = SubmissionPackageService(db, administration.id)
+        xml_content, filename = await service.generate_icp_package(request.period_id)
+        
+        # Create submission record
+        submission_id = uuid_module.uuid4()
+        
+        # Get connector and submit
+        connector = get_tax_connector()
+        result = await connector.submit_icp(
+            xml_content=xml_content,
+            administration_id=client_id,
+            period_id=request.period_id,
+            submission_id=submission_id,
+        )
+        
+        # Create submission record with connector result
+        submission = VatSubmission(
+            id=submission_id,
+            administration_id=client_id,
+            period_id=request.period_id,
+            submission_type="ICP",
+            created_by=current_user.id,
+            method="DIGIPOORT" if connector.mode == "DIGIPOORT" else "PACKAGE",
+            status=result.status.value,
+            reference_text=result.reference,
+            connector_response=result.response_data,
+            submitted_at=result.timestamp if result.status.value != "DRAFT" else None,
+        )
+        
+        db.add(submission)
+        await db.commit()
+        await db.refresh(submission)
+        
+        return VatSubmissionResponse(
+            id=submission.id,
+            administration_id=submission.administration_id,
+            period_id=submission.period_id,
+            submission_type=submission.submission_type,
+            created_at=submission.created_at,
+            created_by=submission.created_by,
+            method=submission.method,
+            status=submission.status,
+            reference_text=submission.reference_text,
+            attachment_url=submission.attachment_url,
+            connector_response=submission.connector_response,
+            submitted_at=submission.submitted_at,
+            updated_at=submission.updated_at,
+        )
+        
+    except SubmissionPackageError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Submission failed: {str(e)}")

@@ -71,6 +71,18 @@ class Settings(BaseSettings):
         """Parse ADMIN_WHITELIST string into a list of whitelisted admin emails."""
         return [email.strip().lower() for email in self.ADMIN_WHITELIST.split(",") if email.strip()]
     
+    # Digipoort tax submission connector (optional)
+    DIGIPOORT_ENABLED: Optional[str] = None  # Set to "true" to enable Digipoort mode
+    DIGIPOORT_ENDPOINT: Optional[str] = None  # Digipoort API endpoint URL
+    DIGIPOORT_CLIENT_ID: Optional[str] = None  # Client ID for Digipoort authentication
+    DIGIPOORT_CLIENT_SECRET: Optional[str] = None  # Client secret for Digipoort
+    DIGIPOORT_CERT_PATH: Optional[str] = None  # Path to client certificate (if required)
+    
+    @property
+    def digipoort_enabled(self) -> bool:
+        """Check if Digipoort submission is enabled."""
+        return bool(self.DIGIPOORT_ENABLED and str(self.DIGIPOORT_ENABLED).lower() == 'true')
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

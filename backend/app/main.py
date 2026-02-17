@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.core.database import engine
-from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta, zzp_customers, zzp_profile, zzp_invoices, zzp_expenses, zzp_time, zzp_calendar, zzp_work_sessions, zzp_bank, zzp_insights, zzp_quotes, zzp_dashboard, bookkeeping, client_data, zzp_payments, zzp_ledger, zzp_commitments
+from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta, zzp_customers, zzp_profile, zzp_invoices, zzp_expenses, zzp_time, zzp_calendar, zzp_work_sessions, zzp_bank, zzp_insights, zzp_quotes, zzp_dashboard, bookkeeping, client_data, zzp_payments, zzp_ledger, zzp_commitments, certificates
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,7 @@ def verify_orm_mappings() -> None:
         FinancialCommitment,
         Plan, Subscription, AdminAuditLog,
         AuditLog,
+        Certificate,
     )
     
     # This will raise InvalidRequestError if any relationships are misconfigured
@@ -230,6 +231,7 @@ api_v1_router.include_router(accountant.router, prefix="/accountant", tags=["acc
 api_v1_router.include_router(decisions.router, prefix="/accountant", tags=["decision-engine"])
 api_v1_router.include_router(periods.router, prefix="/accountant", tags=["period-control"])
 api_v1_router.include_router(vat.router, prefix="/accountant", tags=["vat-btw-filing"])
+api_v1_router.include_router(certificates.router, prefix="/accountant", tags=["pki-certificates"])
 api_v1_router.include_router(review_queue.router, prefix="/accountant", tags=["document-review-queue"])
 api_v1_router.include_router(accountant_dashboard.router, prefix="/accountant", tags=["accountant-master-dashboard"])
 api_v1_router.include_router(work_queue.router, prefix="/accountant", tags=["work-queue-reminders-evidence"])

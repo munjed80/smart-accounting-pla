@@ -62,6 +62,7 @@ from app.models.payment import (
 )
 from app.models.vat_lineage import VatBoxLineage
 from app.models.vat_submission import VatSubmission
+from app.models.certificate import Certificate
 from app.models.audit_log import AuditLog
 
 __all__ = [
@@ -136,5 +137,6 @@ __all__ = [
     "AdminAuditLog",
     "VatBoxLineage",
     "VatSubmission",
+    "Certificate",
     "AuditLog",
 ]

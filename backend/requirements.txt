@@ -18,6 +18,9 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.1.2
 
+# Cryptography for PKI certificate handling
+cryptography==42.0.8
+
 # Validation and utilities
 pydantic==2.6.1
 pydantic-settings==2.1.0

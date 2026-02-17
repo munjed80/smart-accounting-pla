@@ -106,7 +106,7 @@ export const LandingPage = () => {
     {
       icon: <ListChecks className="h-8 w-8" />,
       title: 'Werkoverzicht per klant',
-      description: 'Centraal werkoverz voor alle klanten met prioriteiten.'
+      description: 'Centraal werkoverzicht voor alle klanten met prioriteiten.'
     },
     {
       icon: <Calculator className="h-8 w-8" />,

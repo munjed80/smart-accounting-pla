@@ -99,9 +99,10 @@ export const WorkQueueSummary = ({ clientId, clientName }: WorkQueueSummaryProps
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '—'
     try {
-      return format(new Date(dateStr), 'dd MMM yyyy', { locale: nl })
+      const dateObj = typeof dateStr === 'string' ? new Date(dateStr) : dateStr
+      return format(dateObj, 'dd MMM yyyy', { locale: nl })
     } catch {
-      return dateStr
+      return String(dateStr)
     }
   }
 

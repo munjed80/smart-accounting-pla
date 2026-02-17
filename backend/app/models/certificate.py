@@ -95,11 +95,13 @@ class Certificate(Base):
     
     def is_valid(self) -> bool:
         """Check if certificate is currently valid."""
-        now = datetime.now(self.valid_from.tzinfo)
+        from datetime import timezone as tz
+        now = datetime.now(tz.utc)
         return self.valid_from <= now <= self.valid_to and self.is_active
     
     def days_until_expiry(self) -> int:
         """Calculate days until certificate expires."""
-        now = datetime.now(self.valid_to.tzinfo)
+        from datetime import timezone as tz
+        now = datetime.now(tz.utc)
         delta = self.valid_to - now
         return delta.days

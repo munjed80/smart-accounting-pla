@@ -311,7 +311,7 @@ export const BTWAangiftePage = ({
     setIsPreparingSubmission(true)
     try {
       const response = await fetch(
-        `/api/accountant/clients/${clientId}/vat/${periodId}/submit/prepare?kind=${kind}`,
+        `/api/accountant/clients/${clientId}/vat/${periodId}/submit/prepare`,
         {
           method: 'POST',
           headers: {
@@ -351,7 +351,6 @@ export const BTWAangiftePage = ({
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
-          body: JSON.stringify({}),
         }
       )
       

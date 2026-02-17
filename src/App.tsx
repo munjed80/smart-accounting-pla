@@ -39,7 +39,6 @@ import { SupportPage } from '@/components/SupportPage'
 import { AdminDashboard } from '@/components/AdminDashboard'
 import { AppShell } from '@/components/AppShell'
 import { DashboardErrorBoundary } from '@/components/DashboardErrorBoundary'
-import { PWAInstallPrompt } from '@/components/PWAInstallPrompt'
 import { PWAUpdatePrompt } from '@/components/PWAUpdatePrompt'
 import { administrationApi, accountantClientApi } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
@@ -679,7 +678,6 @@ function App() {
       <AuthProvider>
         <ActiveClientProvider>
           <AppContent />
-          {isPwaEnabled ? <PWAInstallPrompt /> : null}
           {isPwaEnabled ? <PWAUpdatePrompt /> : null}
         </ActiveClientProvider>
       </AuthProvider>

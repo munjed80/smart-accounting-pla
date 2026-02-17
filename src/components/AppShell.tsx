@@ -48,6 +48,7 @@ import {
   CurrencyEur,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
+import { InstallButton } from '@/components/InstallButton'
 
 // Menu item configuration with role-based access
 interface MenuItem {
@@ -303,6 +304,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
 
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
   const isSuperAdmin = user?.role === 'super_admin'
+  const isZZP = user?.role === 'zzp'
   
   // Protection: Close sidebar on route changes
   useCloseOverlayOnRouteChange(() => setSidebarOpen(false))
@@ -367,6 +369,9 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
       items: visibleMenuItems.filter(i => i.accountingSection === 'crediteuren' && i.section !== 'secondary') 
     },
   ].filter(section => section.items.length > 0) : []
+
+  const mobileBottomNavItems = visibleMenuItems
+    .filter((item) => item.section !== 'secondary' && ['dashboard', 'customers', 'invoices', 'expenses', 'time'].includes(item.tabValue))
 
   // Handle logout: use centralized logout from AuthContext and redirect
   const handleLogout = () => {
@@ -577,7 +582,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   )
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Top Header - Always visible */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-sm">
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
@@ -633,6 +638,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
 
             {/* Right: Role Badge + Logout */}
             <div className="flex items-center gap-2 sm:gap-4">
+              {isZZP && <InstallButton />}
               <Badge variant="outline" className="capitalize text-xs sm:text-sm">
                 {user?.role === 'zzp' ? t('roles.zzp') : user?.role === 'accountant' ? t('roles.accountant') : user?.role}
               </Badge>
@@ -692,7 +698,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent 
           side="left" 
-          className="w-[280px] sm:w-[320px] p-0 overflow-hidden"
+          className="w-full max-w-[320px] p-0 overflow-hidden"
           style={{ zIndex: 100 }}
         >
           <SheetHeader className="sr-only">
@@ -720,9 +726,31 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
       </div>
 
       {/* Mobile/Tablet Content - No sidebar offset */}
-      <main className="lg:hidden">
+      <main className={isZZP ? 'lg:hidden pb-20' : 'lg:hidden'}>
         {children}
       </main>
+
+      {isZZP && mobileBottomNavItems.length > 0 && (
+        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-sm lg:hidden" aria-label="Mobiele navigatie">
+          <ul className="grid grid-cols-5">
+            {mobileBottomNavItems.map((item) => {
+              const isActive = activeTab === item.tabValue
+              return (
+                <li key={item.tabValue}>
+                  <button
+                    onClick={() => handleMenuClick(item)}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`flex w-full flex-col items-center justify-center gap-1 py-2 text-[11px] ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
+                  >
+                    {item.icon}
+                    <span className="truncate max-w-[72px]">{item.label}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </nav>
+      )}
     </div>
   )
 }

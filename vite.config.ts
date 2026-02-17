@@ -8,6 +8,7 @@ import createIconImportProxy from "@github/spark/vitePhosphorIconProxyPlugin";
 import { resolve } from 'path'
 
 const projectRoot = process.env.PROJECT_ROOT || import.meta.dirname
+const appVersion = process.env.npm_package_version || '1'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -20,6 +21,7 @@ export default defineConfig({
     sparkPlugin() as PluginOption,
     VitePWA({
       registerType: 'autoUpdate',
+      manifestFilename: 'manifest.webmanifest',
       devOptions: {
         enabled: false, // Disable SW in development to avoid conflicts
       },
@@ -58,23 +60,44 @@ export default defineConfig({
         ],
       },
       workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
         // Cache navigation requests (app shell)
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api/, /^\/auth/],
         
         // Include offline fallback page in precache
         additionalManifestEntries: [
-          { url: '/offline.html', revision: '1' }
+          { url: '/offline.html', revision: appVersion }
         ],
         
         // Runtime caching strategies
         runtimeCaching: [
           {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: `navigation-${appVersion}`,
+              networkTimeoutSeconds: 5,
+              precacheFallback: {
+                fallbackURL: '/offline.html',
+              },
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 7,
+              },
+            },
+          },
+          {
             // Cache app shell and static assets
-            urlPattern: /^https:\/\/.*\.(js|css|woff|woff2|ttf|otf)$/,
+            urlPattern: ({ request, url }) =>
+              request.method === 'GET' &&
+              ['script', 'style', 'font'].includes(request.destination) &&
+              url.origin === self.location.origin,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'static-resources',
+              cacheName: `static-resources-${appVersion}`,
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
@@ -82,12 +105,19 @@ export default defineConfig({
             },
           },
           {
-            // NetworkFirst for API calls - fresh data preferred
-            // DO NOT cache auth tokens or sensitive data
-            urlPattern: /^https:\/\/.*\/api\/.*/,
+            // NetworkFirst for public GET API calls only
+            // Skip authenticated requests entirely
+            urlPattern: ({ request, url }) => {
+              if (request.method !== 'GET') return false
+              if (!url.pathname.startsWith('/api/')) return false
+
+              const hasAuthHeader = request.headers.has('authorization')
+              const isAuthEndpoint = /^\/api\/(auth|login|logout|token|session)/.test(url.pathname)
+              return !hasAuthHeader && !isAuthEndpoint
+            },
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'api-cache',
+              cacheName: `public-api-cache-${appVersion}`,
               networkTimeoutSeconds: 10,
               expiration: {
                 maxEntries: 50,
@@ -100,10 +130,13 @@ export default defineConfig({
           },
           {
             // Cache images
-            urlPattern: /^https:\/\/.*\.(png|jpg|jpeg|svg|gif|webp)$/,
+            urlPattern: ({ request, url }) =>
+              request.method === 'GET' &&
+              request.destination === 'image' &&
+              url.origin === self.location.origin,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'images',
+              cacheName: `images-${appVersion}`,
               expiration: {
                 maxEntries: 60,
                 maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days

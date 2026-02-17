@@ -69,7 +69,7 @@ self.addEventListener('install', (event) => {
         await shellCache.put('/index.html', indexResponse.clone())
 
         const html = await indexResponse.text()
-        const assetPaths = Array.from(html.matchAll(/(?:src|href)="(\/assets\/[^\"]+)"/g), (match) => match[1])
+        const assetPaths = Array.from(html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g), (match) => match[1])
 
         if (assetPaths.length > 0) {
           const staticCache = await caches.open(STATIC_CACHE)

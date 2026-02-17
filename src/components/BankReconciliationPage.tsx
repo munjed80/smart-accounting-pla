@@ -42,6 +42,8 @@ import {
   BankTransactionStatus,
   MatchSuggestion,
   ApplyActionRequest,
+  BankKPI,
+  MatchProposal,
   getErrorMessage 
 } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
@@ -64,6 +66,13 @@ import {
   CaretDown,
   Bank,
   Info,
+  TrendUp,
+  ArrowUp,
+  ArrowDown,
+  Sparkle,
+  ThumbsUp,
+  ThumbsDown,
+  ArrowCounterClockwise,
 } from '@phosphor-icons/react'
 
 // Status badge colors
@@ -129,24 +138,155 @@ const AmountDisplay = ({ amount }: { amount: number | string }) => {
   )
 }
 
+// KPI Strip Component
+const KPIStrip = ({ 
+  kpi, 
+  isLoading,
+  onGenerateProposals,
+  isGeneratingProposals,
+}: { 
+  kpi: BankKPI | null
+  isLoading: boolean
+  onGenerateProposals: () => void
+  isGeneratingProposals: boolean
+}) => {
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!kpi) return null
+
+  const matchedPercentage = kpi.matched_percentage || 0
+  const unmatchedCount = kpi.unmatched_count || 0
+  const totalInflow = typeof kpi.total_inflow === 'string' ? parseFloat(kpi.total_inflow) : kpi.total_inflow
+  const totalOutflow = typeof kpi.total_outflow === 'string' ? parseFloat(kpi.total_outflow) : kpi.total_outflow
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {/* Matched Percentage */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <TrendUp size={16} />
+              <span>Gematcht (30d)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-bold">{matchedPercentage.toFixed(0)}%</span>
+              <Badge 
+                variant="secondary" 
+                className={matchedPercentage >= 80 ? 'bg-green-500/20 text-green-700' : matchedPercentage >= 60 ? 'bg-amber-500/20 text-amber-700' : 'bg-red-500/20 text-red-700'}
+              >
+                {matchedPercentage >= 80 ? 'Goed' : matchedPercentage >= 60 ? 'Matig' : 'Laag'}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Unmatched Count */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Warning size={16} />
+              <span>Ongematcht</span>
+            </div>
+            <div className="text-2xl font-bold">{unmatchedCount}</div>
+          </div>
+
+          {/* Total Inflow */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <ArrowUp size={16} />
+              <span>Instroom</span>
+            </div>
+            <div className="text-xl font-bold font-mono text-green-600 dark:text-green-400">
+              {totalInflow.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR' })}
+            </div>
+          </div>
+
+          {/* Total Outflow */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <ArrowDown size={16} />
+              <span>Uitstroom</span>
+            </div>
+            <div className="text-xl font-bold font-mono text-red-600 dark:text-red-400">
+              {totalOutflow.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR' })}
+            </div>
+          </div>
+
+          {/* Generate Proposals Button */}
+          <div className="flex items-end">
+            <Button 
+              onClick={onGenerateProposals}
+              disabled={isGeneratingProposals}
+              className="w-full"
+            >
+              <Sparkle size={16} className="mr-2" weight="fill" />
+              {isGeneratingProposals ? 'Genereren...' : 'Genereer voorstellen'}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Confidence Badge Component
+const ConfidenceBadge = ({ score }: { score: number }) => {
+  const getBadgeStyle = (score: number) => {
+    if (score >= 80) return 'bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/40'
+    if (score >= 60) return 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/40'
+    return 'bg-gray-500/20 text-gray-700 dark:text-gray-400 border-gray-500/40'
+  }
+
+  return (
+    <Badge variant="outline" className={`font-mono ${getBadgeStyle(score)}`}>
+      {score}%
+    </Badge>
+  )
+}
+
 // Transaction row component
 const TransactionRow = ({ 
   transaction, 
   onClick,
   isSelected,
+  topProposal,
+  onQuickMatch,
+  onViewAllProposals,
+  onUndo,
+  isProcessing,
 }: { 
   transaction: BankTransaction
   onClick: () => void
   isSelected: boolean
+  topProposal?: MatchProposal | null
+  onQuickMatch?: () => void
+  onViewAllProposals?: () => void
+  onUndo?: () => void
+  isProcessing?: boolean
 }) => {
   const numAmount = typeof transaction.amount === 'string' ? parseFloat(transaction.amount) : transaction.amount
+  const hasProposal = topProposal && topProposal.status === 'PENDING'
+  const isMatched = transaction.status === 'MATCHED'
   
   return (
     <div 
-      className={`p-4 border-b hover:bg-muted/50 cursor-pointer transition-colors ${isSelected ? 'bg-muted' : ''}`}
-      onClick={onClick}
+      className={`p-4 border-b hover:bg-muted/50 transition-colors ${isSelected ? 'bg-muted' : ''}`}
     >
-      <div className="flex items-center justify-between gap-4">
+      <div 
+        className="flex items-center justify-between gap-4 cursor-pointer"
+        onClick={onClick}
+      >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm text-muted-foreground">
@@ -171,6 +311,57 @@ const TransactionRow = ({
         </div>
         <CaretDown size={20} className="text-muted-foreground rotate-[-90deg]" />
       </div>
+
+      {/* Proposal Quick Actions */}
+      {hasProposal && (
+        <div className="mt-3 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-start gap-3">
+            <Sparkle size={20} className="text-primary flex-shrink-0 mt-0.5" weight="fill" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-medium">Voorstel:</span>
+                <ConfidenceBadge score={topProposal.confidence_score} />
+              </div>
+              <p className="text-sm font-medium">{topProposal.entity_reference}</p>
+              <p className="text-xs text-muted-foreground mt-1">{topProposal.reason}</p>
+              
+              <div className="flex gap-2 mt-2">
+                <Button 
+                  size="sm" 
+                  onClick={onQuickMatch}
+                  disabled={isProcessing}
+                >
+                  <CheckCircle size={16} className="mr-1" weight="fill" />
+                  Match
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={onViewAllProposals}
+                  disabled={isProcessing}
+                >
+                  Andere voorstellen
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Undo for matched transactions */}
+      {isMatched && onUndo && (
+        <div className="mt-3 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
+          <Button 
+            size="sm" 
+            variant="outline"
+            onClick={onUndo}
+            disabled={isProcessing}
+          >
+            <ArrowCounterClockwise size={16} className="mr-1" />
+            Undo match
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -639,6 +830,154 @@ const TransactionDrawer = ({
   )
 }
 
+// Proposals drawer component
+const ProposalsDrawer = ({ 
+  transaction, 
+  proposals,
+  isOpen, 
+  onClose,
+  clientId,
+  onProposalAccepted,
+  onProposalRejected,
+}: { 
+  transaction: BankTransaction | null
+  proposals: MatchProposal[]
+  isOpen: boolean
+  onClose: () => void
+  clientId: string
+  onProposalAccepted: () => void
+  onProposalRejected: () => void
+}) => {
+  const [processingProposalId, setProcessingProposalId] = useState<string | null>(null)
+
+  const handleAcceptProposal = async (proposalId: string) => {
+    setProcessingProposalId(proposalId)
+    try {
+      const response = await bankReconciliationApi.acceptProposal(clientId, proposalId)
+      toast.success('Voorstel geaccepteerd', {
+        description: response.message
+      })
+      onProposalAccepted()
+      onClose()
+    } catch (error) {
+      toast.error('Fout bij accepteren voorstel', {
+        description: getErrorMessage(error)
+      })
+    } finally {
+      setProcessingProposalId(null)
+    }
+  }
+
+  const handleRejectProposal = async (proposalId: string) => {
+    setProcessingProposalId(proposalId)
+    try {
+      const response = await bankReconciliationApi.rejectProposal(clientId, proposalId)
+      toast.success('Voorstel afgewezen', {
+        description: response.message
+      })
+      onProposalRejected()
+    } catch (error) {
+      toast.error('Fout bij afwijzen voorstel', {
+        description: getErrorMessage(error)
+      })
+    } finally {
+      setProcessingProposalId(null)
+    }
+  }
+
+  if (!transaction) return null
+
+  const sortedProposals = [...proposals].sort((a, b) => b.confidence_score - a.confidence_score)
+  const numAmount = typeof transaction.amount === 'string' ? parseFloat(transaction.amount) : transaction.amount
+
+  return (
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent className="sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <Sparkle size={20} weight="fill" />
+            Alle voorstellen
+          </SheetTitle>
+          <SheetDescription>
+            {transaction.counterparty_name || t('common.unknown')} • <AmountDisplay amount={numAmount} />
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="mt-6 space-y-3">
+          {sortedProposals.length > 0 ? (
+            sortedProposals.map((proposal) => (
+              <Card key={proposal.id} className={proposal.status !== 'PENDING' ? 'opacity-60' : ''}>
+                <CardContent className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <ConfidenceBadge score={proposal.confidence_score} />
+                          {proposal.status !== 'PENDING' && (
+                            <Badge variant="outline">
+                              {proposal.status === 'ACCEPTED' ? 'Geaccepteerd' : 'Afgewezen'}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="font-medium">{proposal.entity_reference}</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {proposal.reason}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
+                          <span>
+                            {format(new Date(proposal.date), 'd MMM yyyy', { locale: nlLocale })}
+                          </span>
+                          <span className="font-mono">
+                            {typeof proposal.amount === 'string' 
+                              ? parseFloat(proposal.amount).toLocaleString('nl-NL', { style: 'currency', currency: 'EUR' })
+                              : proposal.amount.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR' })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {proposal.status === 'PENDING' && (
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => handleAcceptProposal(proposal.id)}
+                          disabled={processingProposalId !== null}
+                        >
+                          <ThumbsUp size={16} className="mr-1" weight="fill" />
+                          Accepteren
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => handleRejectProposal(proposal.id)}
+                          disabled={processingProposalId !== null}
+                        >
+                          <ThumbsDown size={16} className="mr-1" weight="fill" />
+                          Afwijzen
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card className="bg-muted/50">
+              <CardContent className="p-6 text-center text-muted-foreground">
+                <Info size={32} className="mx-auto mb-2" />
+                <p className="text-sm">Geen voorstellen beschikbaar</p>
+                <p className="text-xs mt-1">Genereer eerst voorstellen via de knop bovenaan</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
 // Main page component
 export const BankReconciliationPage = () => {
   const { activeClientId, activeClientName } = useActiveClient()
@@ -654,6 +993,15 @@ export const BankReconciliationPage = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 50
   const showLoading = useDelayedLoading(isLoading, 300, !!transactions.length)
+
+  // Matching engine state
+  const [kpi, setKPI] = useState<BankKPI | null>(null)
+  const [isLoadingKPI, setIsLoadingKPI] = useState(false)
+  const [isGeneratingProposals, setIsGeneratingProposals] = useState(false)
+  const [proposalsMap, setProposalsMap] = useState<Record<string, MatchProposal[]>>({})
+  const [isProposalsDrawerOpen, setIsProposalsDrawerOpen] = useState(false)
+  const [selectedTransactionForProposals, setSelectedTransactionForProposals] = useState<BankTransaction | null>(null)
+  const [processingTransactionId, setProcessingTransactionId] = useState<string | null>(null)
 
   const loadTransactions = useCallback(async (reset: boolean = true, pageOverride?: number) => {
     if (!activeClientId) return
@@ -719,7 +1067,134 @@ export const BankReconciliationPage = () => {
 
   const handleImportSuccess = () => {
     loadTransactions(true)
+    loadKPI()
   }
+
+  // Load KPI data
+  const loadKPI = useCallback(async () => {
+    if (!activeClientId) return
+    
+    setIsLoadingKPI(true)
+    try {
+      const response = await bankReconciliationApi.getKPI(activeClientId)
+      setKPI(response)
+    } catch (error) {
+      console.error('Failed to load KPI:', error)
+    } finally {
+      setIsLoadingKPI(false)
+    }
+  }, [activeClientId])
+
+  // Load proposals for a transaction
+  const loadProposalsForTransaction = useCallback(async (transactionId: string) => {
+    if (!activeClientId) return
+    
+    try {
+      const response = await bankReconciliationApi.getTransactionProposals(activeClientId, transactionId)
+      setProposalsMap(prev => ({
+        ...prev,
+        [transactionId]: response.proposals
+      }))
+    } catch (error) {
+      console.error('Failed to load proposals:', error)
+    }
+  }, [activeClientId])
+
+  // Load proposals for all visible transactions
+  const loadAllProposals = useCallback(async () => {
+    if (!activeClientId || transactions.length === 0) return
+    
+    const newTransactionIds = transactions
+      .filter(tx => tx.status === 'NEW' && !proposalsMap[tx.id])
+      .map(tx => tx.id)
+    
+    await Promise.all(
+      newTransactionIds.map(txId => loadProposalsForTransaction(txId))
+    )
+  }, [activeClientId, transactions, proposalsMap, loadProposalsForTransaction])
+
+  // Generate proposals
+  const handleGenerateProposals = async () => {
+    if (!activeClientId) return
+    
+    setIsGeneratingProposals(true)
+    try {
+      const response = await bankReconciliationApi.generateProposals(activeClientId)
+      toast.success('Voorstellen gegenereerd', {
+        description: response.message
+      })
+      await loadTransactions(true)
+      await loadAllProposals()
+      await loadKPI()
+    } catch (error) {
+      toast.error('Fout bij genereren voorstellen', {
+        description: getErrorMessage(error)
+      })
+    } finally {
+      setIsGeneratingProposals(false)
+    }
+  }
+
+  // Quick match handler
+  const handleQuickMatch = async (transaction: BankTransaction, proposalId: string) => {
+    if (!activeClientId) return
+    
+    setProcessingTransactionId(transaction.id)
+    try {
+      const response = await bankReconciliationApi.acceptProposal(activeClientId, proposalId)
+      toast.success('Match succesvol', {
+        description: response.message
+      })
+      await loadTransactions(true)
+      await loadKPI()
+    } catch (error) {
+      toast.error('Fout bij matchen', {
+        description: getErrorMessage(error)
+      })
+    } finally {
+      setProcessingTransactionId(null)
+    }
+  }
+
+  // Undo match handler
+  const handleUndoMatch = async (transaction: BankTransaction) => {
+    if (!activeClientId) return
+    
+    setProcessingTransactionId(transaction.id)
+    try {
+      const response = await bankReconciliationApi.unmatchTransaction(activeClientId, transaction.id)
+      toast.success('Match ongedaan gemaakt', {
+        description: response.message
+      })
+      await loadTransactions(true)
+      await loadKPI()
+    } catch (error) {
+      toast.error('Fout bij ongedaan maken', {
+        description: getErrorMessage(error)
+      })
+    } finally {
+      setProcessingTransactionId(null)
+    }
+  }
+
+  // Open proposals drawer
+  const handleViewAllProposals = (transaction: BankTransaction) => {
+    setSelectedTransactionForProposals(transaction)
+    setIsProposalsDrawerOpen(true)
+  }
+
+  // Load KPI and proposals on mount and when transactions change
+  useEffect(() => {
+    if (activeClientId) {
+      loadKPI()
+    }
+  }, [activeClientId, loadKPI])
+
+  useEffect(() => {
+    if (activeClientId && transactions.length > 0) {
+      loadAllProposals()
+    }
+  }, [activeClientId, transactions.length, loadAllProposals])
 
   if (!activeClientId) {
     return (
@@ -753,6 +1228,14 @@ export const BankReconciliationPage = () => {
           {t('bank.import')}
         </Button>
       </div>
+
+      {/* KPI Strip */}
+      <KPIStrip
+        kpi={kpi}
+        isLoading={isLoadingKPI}
+        onGenerateProposals={handleGenerateProposals}
+        isGeneratingProposals={isGeneratingProposals}
+      />
 
       {/* Filters */}
       <Card>
@@ -811,14 +1294,24 @@ export const BankReconciliationPage = () => {
           ) : transactions.length > 0 ? (
             <>
               <div className="divide-y transition-opacity duration-200" style={{ opacity: isLoading ? 0.5 : 1 }}>
-                {transactions.map((transaction) => (
-                  <TransactionRow
-                    key={transaction.id}
-                    transaction={transaction}
-                    onClick={() => handleTransactionClick(transaction)}
-                    isSelected={selectedTransaction?.id === transaction.id}
-                  />
-                ))}
+                {transactions.map((transaction) => {
+                  const proposals = proposalsMap[transaction.id] || []
+                  const topProposal = proposals.find(p => p.status === 'PENDING') || null
+                  
+                  return (
+                    <TransactionRow
+                      key={transaction.id}
+                      transaction={transaction}
+                      onClick={() => handleTransactionClick(transaction)}
+                      isSelected={selectedTransaction?.id === transaction.id}
+                      topProposal={topProposal}
+                      onQuickMatch={() => topProposal && handleQuickMatch(transaction, topProposal.id)}
+                      onViewAllProposals={() => handleViewAllProposals(transaction)}
+                      onUndo={transaction.status === 'MATCHED' ? () => handleUndoMatch(transaction) : undefined}
+                      isProcessing={processingTransactionId === transaction.id}
+                    />
+                  )
+                })}
               </div>
               {hasMore && (
                 <div className="p-4 text-center">
@@ -866,6 +1359,27 @@ export const BankReconciliationPage = () => {
           setSelectedTransaction(null)
         }}
         onActionApplied={handleActionApplied}
+      />
+
+      {/* Proposals drawer */}
+      <ProposalsDrawer
+        transaction={selectedTransactionForProposals}
+        proposals={selectedTransactionForProposals ? (proposalsMap[selectedTransactionForProposals.id] || []) : []}
+        isOpen={isProposalsDrawerOpen}
+        clientId={activeClientId}
+        onClose={() => {
+          setIsProposalsDrawerOpen(false)
+          setSelectedTransactionForProposals(null)
+        }}
+        onProposalAccepted={async () => {
+          await loadTransactions(true)
+          await loadKPI()
+        }}
+        onProposalRejected={async () => {
+          if (selectedTransactionForProposals) {
+            await loadProposalsForTransaction(selectedTransactionForProposals.id)
+          }
+        }}
       />
     </div>
   )

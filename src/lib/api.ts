@@ -3050,6 +3050,85 @@ export const accountantClientApi = {
   removeAssignment: async (assignmentId: string): Promise<void> => {
     await api.delete(`/accountant/assignments/${assignmentId}`)
   },
+
+  /**
+   * Get work queue summary for a specific client
+   */
+  getWorkQueueSummary: async (clientId: string): Promise<WorkQueueSummaryResponse> => {
+    const response = await api.get<WorkQueueSummaryResponse>(`/accountant/clients/${clientId}/work-queue/summary`)
+    return response.data
+  },
+}
+
+// ============ Work Queue Summary Types ============
+
+export interface DocumentReviewItem {
+  id: string
+  date: string | null
+  type: string
+  status: string
+  vendor_customer: string | null
+  amount: number | null
+  link: string
+}
+
+export interface DocumentReviewSection {
+  count: number
+  top_items: DocumentReviewItem[]
+}
+
+export interface BankTransactionItem {
+  id: string
+  date: string
+  description: string
+  amount: number
+  confidence_best_proposal: number | null
+  link: string
+}
+
+export interface BankReconciliationSection {
+  count: number
+  top_items: BankTransactionItem[]
+}
+
+export interface VATActionsSection {
+  current_period_status: string | null
+  periods_needing_action_count: number
+  btw_link: string
+}
+
+export interface OverdueInvoiceItem {
+  id: string
+  customer: string
+  due_date: string
+  amount: number
+  link: string
+}
+
+export interface RemindersSection {
+  count: number
+  top_items: OverdueInvoiceItem[]
+}
+
+export interface IntegrityWarningItem {
+  id: string
+  severity: string
+  message: string
+  link: string
+}
+
+export interface IntegrityWarningsSection {
+  count: number
+  top_items: IntegrityWarningItem[]
+}
+
+export interface WorkQueueSummaryResponse {
+  document_review: DocumentReviewSection
+  bank_reconciliation: BankReconciliationSection
+  vat_actions: VATActionsSection
+  reminders: RemindersSection
+  integrity_warnings: IntegrityWarningsSection
+  generated_at: string
 }
 
 // ============ Work Queue Types ============

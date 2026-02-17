@@ -10,6 +10,7 @@ import { getErrorMessage, periodApi, vatApi, type Period, type VATAnomaly, type 
 import { ArrowsClockwise, CheckCircle, DownloadSimple, FileArrowDown, Globe, Warning, WarningCircle, Eye } from '@phosphor-icons/react'
 import { BTWBoxDrilldown } from './BTWBoxDrilldown'
 import { VATSubmissionHistory } from './VATSubmissionHistory'
+import { navigateTo } from '@/lib/navigation'
 
 const BOX_ORDER = ['1a', '1b', '1c', '1d', '2a', '3a', '3b', '3c', '4a', '4b', '5a', '5b', '5c', '5d', '5e', '5f', '5g'] as const
 
@@ -407,6 +408,14 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
           periodId={selectedPeriodId}
           boxCode={drilldownBoxCode}
           boxName={drilldownBoxName}
+          onViewAudit={(entityId, entityType) => {
+            // Navigate to audit tab with filters for this entity
+            // First close the drilldown
+            setDrilldownOpen(false)
+            // Then navigate to audit tab
+            // The audit tab will need to support URL parameters for pre-filtering
+            navigateTo(`/accountant/clients/${clientId}/audit?entity_id=${entityId}&entity_type=${entityType}`)
+          }}
         />
       )}
     </div>

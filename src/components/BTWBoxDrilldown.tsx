@@ -42,6 +42,7 @@ import {
   FileText,
   Receipt,
   BookOpen,
+  ClockCounterClockwise,
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 
@@ -87,6 +88,7 @@ interface BTWBoxDrilldownProps {
   boxName: string
   onViewDocument?: (documentId: string) => void
   onViewJournalEntry?: (entryId: string) => void
+  onViewAudit?: (entityId: string, entityType: string) => void
 }
 
 const formatCurrency = (amount: string | number) => {
@@ -118,6 +120,7 @@ export const BTWBoxDrilldown = ({
   boxName,
   onViewDocument,
   onViewJournalEntry,
+  onViewAudit,
 }: BTWBoxDrilldownProps) => {
   const [data, setData] = useState<VatBoxLinesData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -387,6 +390,7 @@ export const BTWBoxDrilldown = ({
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => onViewDocument(line.document_id!)}
+                                  title="Bekijk document"
                                 >
                                   <FileText size={16} />
                                 </Button>
@@ -396,8 +400,19 @@ export const BTWBoxDrilldown = ({
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => onViewJournalEntry(line.journal_entry_id)}
+                                  title="Bekijk boeking"
                                 >
                                   <BookOpen size={16} />
+                                </Button>
+                              )}
+                              {onViewAudit && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => onViewAudit(line.source_id, line.source_type)}
+                                  title="Bekijk audit trail"
+                                >
+                                  <ClockCounterClockwise size={16} />
                                 </Button>
                               )}
                             </div>

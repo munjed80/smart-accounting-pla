@@ -83,8 +83,9 @@ class TestAuditLogging:
                 .where(AuditLog.entity_type == "invoice")
                 .where(AuditLog.entity_id == invoice.id)
                 .where(AuditLog.action == "create")
+                .order_by(AuditLog.created_at.desc())
             )
-            audit_entry = result.scalar_one_or_none()
+            audit_entry = result.scalars().first()
             
             assert audit_entry is not None
             assert audit_entry.client_id == admin.id
@@ -382,7 +383,7 @@ class TestAuditLogging:
                 select(AuditLog)
                 .where(AuditLog.entity_type == "audit_log")
             )
-            recursive_audit = result.scalar_one_or_none()
+            recursive_audit = result.scalars().first()
             
             assert recursive_audit is None, "Audit log should not log itself"
             

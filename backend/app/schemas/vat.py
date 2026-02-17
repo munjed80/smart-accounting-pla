@@ -226,3 +226,63 @@ class VatBoxLinesResponse(BaseModel):
         from_attributes = True
 
 
+# VAT Submission Tracking Schemas
+
+class VatSubmissionStatus(str, Enum):
+    """VAT submission status."""
+    DRAFT = "DRAFT"
+    SUBMITTED = "SUBMITTED"
+    CONFIRMED = "CONFIRMED"
+    REJECTED = "REJECTED"
+
+
+class VatSubmissionMethod(str, Enum):
+    """VAT submission method."""
+    PACKAGE = "PACKAGE"  # Manual package download
+    DIGIPOORT = "DIGIPOORT"  # Automated via Digipoort (future)
+
+
+class VatSubmissionType(str, Enum):
+    """VAT submission type."""
+    BTW = "BTW"  # BTW/VAT return
+    ICP = "ICP"  # Intra-Community supplies
+
+
+class VatSubmissionResponse(BaseModel):
+    """Response for a VAT submission."""
+    id: UUID
+    administration_id: UUID
+    period_id: UUID
+    submission_type: str
+    created_at: datetime
+    created_by: UUID
+    method: str
+    status: str
+    reference_text: Optional[str] = None
+    attachment_url: Optional[str] = None
+    submitted_at: Optional[datetime] = None
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class VatSubmissionListResponse(BaseModel):
+    """Response for list of VAT submissions."""
+    submissions: List[VatSubmissionResponse]
+    total_count: int
+
+
+class CreateVatSubmissionRequest(BaseModel):
+    """Request to create a VAT submission."""
+    period_id: UUID
+    submission_type: VatSubmissionType = VatSubmissionType.BTW
+    method: VatSubmissionMethod = VatSubmissionMethod.PACKAGE
+
+
+class MarkSubmittedRequest(BaseModel):
+    """Request to mark a submission as submitted."""
+    reference_text: str = Field(..., min_length=1, description="Reference text (e.g., 'Submitted via portal on DATE')")
+    attachment_url: Optional[str] = Field(None, description="Optional URL to proof/receipt")
+
+

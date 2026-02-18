@@ -42,6 +42,18 @@ export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallM
       return <>Je abonnement is geannuleerd. Heractiveer om <strong>{featureNameNL}</strong> opnieuw te gebruiken.</>
     }
 
+    if (subscriptionStatus === 'TRIALING') {
+      return <>Je proefperiode loopt bijna af. Activeer je abonnement om <strong>{featureNameNL}</strong> zonder onderbreking te blijven gebruiken.</>
+    }
+
+    if (subscriptionStatus === 'ACTIVE') {
+      return <>Je abonnement is actief, maar deze actie vereist een actuele betaalstatus. Probeer opnieuw na synchronisatie.</>
+    }
+
+    if (subscriptionStatus === 'SCHEDULED') {
+      return <>Je abonnement staat gepland. Zodra de eerste betaling is verwerkt, is <strong>{featureNameNL}</strong> beschikbaar.</>
+    }
+
     if (subscriptionStatus === 'EXPIRED' || entitlements?.in_trial === false) {
       return <>Je proefperiode is afgelopen. Activeer een abonnement om <strong>{featureNameNL}</strong> te blijven gebruiken.</>
     }

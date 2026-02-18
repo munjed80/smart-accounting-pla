@@ -785,6 +785,20 @@ class MollieSubscriptionService:
         await db.commit()
         
         return {"status": "processed"}
+
+    @staticmethod
+    def _parse_mollie_datetime(value: Optional[str]) -> Optional[datetime]:
+        """Parse Mollie datetime/date values into timezone-aware UTC datetimes."""
+        if not value:
+            return None
+        try:
+            parsed = dateutil_parser.parse(value)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
+        except Exception as exc:
+            logger.warning("Failed to parse Mollie datetime value '%s': %s", value, exc)
+            return None
     
     async def _process_payment_webhook(
         self,
@@ -816,13 +830,20 @@ class MollieSubscriptionService:
         # Update subscription status based on payment status
         if status == "paid":
             subscription.status = SubscriptionStatus.ACTIVE
-            
-            # Set current period (if available in payment data)
-            # Note: Mollie doesn't return period in payment data directly
-            # We'll rely on subscription webhooks for period updates
-            
+
+            paid_at = self._parse_mollie_datetime(payment_data.get("paidAt"))
+            if paid_at:
+                subscription.current_period_start = paid_at
+
+            period_end = (
+                self._parse_mollie_datetime(payment_data.get("nextPaymentDate"))
+                or self._parse_mollie_datetime(payment_data.get("currentPeriodEnd"))
+            )
+            if period_end:
+                subscription.current_period_end = period_end
+
             logger.info(f"Payment paid, activated subscription {subscription.id}")
-            
+
             # Audit log
             audit = AuditLog(
                 client_id=subscription.administration_id,
@@ -834,6 +855,8 @@ class MollieSubscriptionService:
                 new_value={
                     "mollie_payment_id": payment_id,
                     "status": status,
+                    "current_period_start": subscription.current_period_start.isoformat() if subscription.current_period_start else None,
+                    "current_period_end": subscription.current_period_end.isoformat() if subscription.current_period_end else None,
                 }
             )
             db.add(audit)
@@ -901,8 +924,18 @@ class MollieSubscriptionService:
         # Map Mollie status to our status
         if status == "active":
             subscription.status = SubscriptionStatus.ACTIVE
+            subscription.cancel_at_period_end = False
+
+            period_start = self._parse_mollie_datetime(subscription_data.get("startDate") or subscription_data.get("currentPeriodStart"))
+            if period_start:
+                subscription.current_period_start = period_start
+
+            period_end = self._parse_mollie_datetime(subscription_data.get("nextPaymentDate") or subscription_data.get("currentPeriodEnd"))
+            if period_end:
+                subscription.current_period_end = period_end
+
             logger.info(f"Subscription activated: {subscription.id}")
-            
+
             # Audit log
             audit = AuditLog(
                 client_id=subscription.administration_id,
@@ -914,36 +947,30 @@ class MollieSubscriptionService:
                 new_value={
                     "mollie_subscription_id": mollie_sub_id,
                     "status": status,
+                    "current_period_start": subscription.current_period_start.isoformat() if subscription.current_period_start else None,
+                    "current_period_end": subscription.current_period_end.isoformat() if subscription.current_period_end else None,
                 }
             )
             db.add(audit)
         
         elif status in ["canceled", "suspended", "completed"]:
-            # Keep ACTIVE until period end when cancellation was requested.
-            period_end = None
-            for field in ("nextPaymentDate", "currentPeriodEnd", "canceledAt"):
-                value = subscription_data.get(field)
-                if not value:
-                    continue
-                try:
-                    parsed = dateutil_parser.parse(value)
-                    if parsed.tzinfo is None:
-                        parsed = parsed.replace(tzinfo=timezone.utc)
-                    period_end = parsed
-                    break
-                except Exception as e:
-                    logger.warning(f"Failed to parse {field}: {e}")
-
+            period_end = (
+                self._parse_mollie_datetime(subscription_data.get("nextPaymentDate"))
+                or self._parse_mollie_datetime(subscription_data.get("currentPeriodEnd"))
+                or self._parse_mollie_datetime(subscription_data.get("canceledAt"))
+            )
             if period_end:
                 subscription.current_period_end = period_end
 
             now = datetime.now(timezone.utc)
-            if subscription.cancel_at_period_end and subscription.current_period_end and now < subscription.current_period_end:
+            if subscription.current_period_end and now < subscription.current_period_end:
                 subscription.status = SubscriptionStatus.ACTIVE
+                subscription.cancel_at_period_end = True
                 logger.info("Cancellation pending period end, keeping ACTIVE for subscription %s", subscription.id)
                 action = "SUBSCRIPTION_CANCEL_REQUESTED"
             else:
                 subscription.status = SubscriptionStatus.CANCELED
+                subscription.cancel_at_period_end = False
                 logger.info(f"Subscription ended: {subscription.id}, status={status}")
                 action = "SUBSCRIPTION_CANCELED"
 
@@ -958,6 +985,7 @@ class MollieSubscriptionService:
                 new_value={
                     "mollie_subscription_id": mollie_sub_id,
                     "status": status,
+                    "cancel_at_period_end": subscription.cancel_at_period_end,
                     "current_period_end": subscription.current_period_end.isoformat() if subscription.current_period_end else None,
                 }
             )

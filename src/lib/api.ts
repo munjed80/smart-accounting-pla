@@ -5204,7 +5204,7 @@ export interface SubscriptionResponse {
   provider: string | null
   provider_subscription_id: string | null
   scheduled: boolean
-  next_payment_date: string | null
+  next_payment_date?: string | null
   // Entitlement flags
   is_paid: boolean
   in_trial: boolean
@@ -5234,7 +5234,7 @@ export interface ActivateSubscriptionResponse {
   in_trial: boolean
   trial_end_at: string | null
   scheduled: boolean
-  next_payment_date: string | null
+  next_payment_date?: string | null
   provider_subscription_id: string | null
 }
 
@@ -5252,7 +5252,7 @@ export interface ReactivateSubscriptionResponse {
     status: string
     cancel_at_period_end: boolean
     scheduled: boolean
-  next_payment_date: string | null
+    next_payment_date?: string | null
     provider_subscription_id: string | null
     trial_end_at?: string | null
   }

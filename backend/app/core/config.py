@@ -89,6 +89,16 @@ class Settings(BaseSettings):
         """Check if Digipoort is in sandbox mode (no real network calls)."""
         return str(self.DIGIPOORT_SANDBOX_MODE).lower() != 'false'
     
+    # Mollie payment integration (optional)
+    MOLLIE_API_KEY: Optional[str] = None  # Mollie API key (test_xxx or live_xxx)
+    MOLLIE_WEBHOOK_SECRET: Optional[str] = None  # Webhook secret for verification
+    APP_PUBLIC_URL: Optional[str] = None  # Public URL for webhooks (e.g., https://yourdomain.com)
+    
+    @property
+    def mollie_enabled(self) -> bool:
+        """Check if Mollie integration is enabled."""
+        return bool(self.MOLLIE_API_KEY and self.MOLLIE_API_KEY.strip())
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

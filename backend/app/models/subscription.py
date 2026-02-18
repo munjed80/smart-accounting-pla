@@ -93,3 +93,21 @@ class AdminAuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     actor = relationship("User", back_populates="admin_audit_entries")
+
+
+class WebhookEvent(Base):
+    """
+    Track webhook events for idempotency.
+    
+    Ensures we don't process the same webhook event multiple times.
+    """
+    __tablename__ = "webhook_events"
+    
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False, index=True)  # "mollie"
+    event_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)  # Provider's event ID
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g., "payment.paid", "subscription.canceled"
+    resource_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)  # Payment/subscription ID
+    processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    payload: Mapped[str | None] = mapped_column(String(5000), nullable=True)  # JSON payload (for debugging)
+

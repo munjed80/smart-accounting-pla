@@ -19,6 +19,8 @@ from app.schemas.subscription import (
     EntitlementResponse,
     StartTrialRequest,
     StartTrialResponse,
+    ActivateSubscriptionResponse,
+    CancelSubscriptionResponse,
 )
 from sqlalchemy import select
 
@@ -66,6 +68,16 @@ async def get_my_subscription(
     # Compute entitlements
     entitlements = await subscription_service.compute_entitlements(db, administration_id)
     
+    # Determine if scheduled (subscription created but trial still active)
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    scheduled = bool(
+        subscription.provider_subscription_id and
+        subscription.status == SubscriptionStatus.TRIALING and
+        subscription.trial_end_at and
+        now < subscription.trial_end_at
+    )
+    
     # Build response
     return SubscriptionResponse(
         id=subscription.id,
@@ -79,6 +91,9 @@ async def get_my_subscription(
         cancel_at_period_end=subscription.cancel_at_period_end,
         created_at=subscription.created_at,
         updated_at=subscription.updated_at,
+        provider=subscription.provider,
+        provider_subscription_id=subscription.provider_subscription_id,
+        scheduled=scheduled,
         is_paid=entitlements.is_paid,
         in_trial=entitlements.in_trial,
         can_use_pro_features=entitlements.can_use_pro_features,
@@ -164,3 +179,127 @@ async def get_entitlements(
         status=entitlements.status,
         plan_code=entitlements.plan_code,
     )
+
+
+@router.post("/me/subscription/activate", response_model=ActivateSubscriptionResponse)
+async def activate_subscription(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Activate Mollie subscription for the current user.
+    
+    Creates a scheduled subscription that starts after the trial period.
+    Idempotent - returns existing subscription status if already activated.
+    
+    Returns:
+        ActivateSubscriptionResponse with status and scheduled flag
+    """
+    from app.services.mollie_subscription_service import mollie_subscription_service
+    from app.integrations.mollie.client import MollieError
+    
+    # Get user's primary administration
+    result = await db.execute(
+        select(AdministrationMember)
+        .where(AdministrationMember.user_id == current_user.id)
+        .order_by(AdministrationMember.created_at.asc())
+    )
+    member = result.scalar_one_or_none()
+    
+    if not member:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "NO_ADMINISTRATION", "message": "User has no administration"}
+        )
+    
+    try:
+        result = await mollie_subscription_service.activate_subscription(
+            db=db,
+            user=current_user,
+            administration_id=member.administration_id,
+        )
+        
+        return ActivateSubscriptionResponse(**result)
+    
+    except MollieError as e:
+        logger.error(f"Mollie error activating subscription: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "MOLLIE_ERROR",
+                "message": f"Failed to activate subscription: {str(e)}"
+            }
+        )
+    except Exception as e:
+        logger.exception(f"Error activating subscription: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "ACTIVATION_ERROR",
+                "message": "Failed to activate subscription"
+            }
+        )
+
+
+@router.post("/me/subscription/cancel", response_model=CancelSubscriptionResponse)
+async def cancel_subscription(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Cancel Mollie subscription at period end.
+    
+    The subscription will remain active until the end of the current billing period.
+    
+    Returns:
+        CancelSubscriptionResponse with cancellation status
+    """
+    from app.services.mollie_subscription_service import mollie_subscription_service
+    from app.integrations.mollie.client import MollieError
+    
+    # Get user's primary administration
+    result = await db.execute(
+        select(AdministrationMember)
+        .where(AdministrationMember.user_id == current_user.id)
+        .order_by(AdministrationMember.created_at.asc())
+    )
+    member = result.scalar_one_or_none()
+    
+    if not member:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "NO_ADMINISTRATION", "message": "User has no administration"}
+        )
+    
+    try:
+        result = await mollie_subscription_service.cancel_subscription(
+            db=db,
+            user=current_user,
+            administration_id=member.administration_id,
+        )
+        
+        return CancelSubscriptionResponse(**result)
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_REQUEST", "message": str(e)}
+        )
+    except MollieError as e:
+        logger.error(f"Mollie error canceling subscription: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "MOLLIE_ERROR",
+                "message": f"Failed to cancel subscription: {str(e)}"
+            }
+        )
+    except Exception as e:
+        logger.exception(f"Error canceling subscription: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "CANCELLATION_ERROR",
+                "message": "Failed to cancel subscription"
+            }
+        )

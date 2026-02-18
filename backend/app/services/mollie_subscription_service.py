@@ -16,6 +16,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from dateutil import parser as dateutil_parser
 
 from app.core.config import settings
 from app.models.subscription import Subscription, SubscriptionStatus, WebhookEvent
@@ -517,8 +518,6 @@ class MollieSubscriptionService:
         subscription_data: Dict[str, Any],
     ) -> None:
         """Process subscription webhook data"""
-        from dateutil import parser
-        
         mollie_sub_id = subscription_data.get("id")
         status = subscription_data.get("status")
         
@@ -541,7 +540,7 @@ class MollieSubscriptionService:
         if next_payment_date:
             try:
                 # Parse ISO date string to datetime (Mollie uses dates in YYYY-MM-DD format)
-                next_payment_dt = parser.parse(next_payment_date)
+                next_payment_dt = dateutil_parser.parse(next_payment_date)
                 # Ensure timezone-aware
                 if next_payment_dt.tzinfo is None:
                     next_payment_dt = next_payment_dt.replace(tzinfo=timezone.utc)

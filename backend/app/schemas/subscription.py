@@ -23,6 +23,7 @@ class SubscriptionResponse(BaseModel):
     provider: Optional[str] = None
     provider_subscription_id: Optional[str] = None
     scheduled: bool = Field(default=False, description="Whether subscription is scheduled to start after trial")
+    next_payment_date: Optional[datetime] = Field(None, description="Next payment date (best effort)")
     
     # Entitlement flags
     is_paid: bool = Field(description="Whether subscription is paid (ACTIVE status)")
@@ -73,3 +74,11 @@ class CancelSubscriptionResponse(BaseModel):
     status: str = Field(description="Subscription status")
     cancel_at_period_end: bool = Field(description="Whether subscription cancels at period end")
     current_period_end: Optional[str] = Field(None, description="Current billing period end date (ISO format)")
+    subscription: Optional[dict] = Field(None, description="Updated subscription data")
+    message_nl: Optional[str] = Field(None, description="Dutch message describing the cancellation")
+
+
+class ReactivateSubscriptionResponse(BaseModel):
+    """Response schema for reactivating a subscription"""
+    subscription: dict = Field(description="Updated subscription data")
+    message_nl: Optional[str] = Field(None, description="Dutch message describing the reactivation")

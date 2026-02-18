@@ -89,7 +89,7 @@ export const AdminDashboard = () => {
                   <WarningCircle size={20} weight="duotone" />
                   <AlertTitle>Overzicht kon niet geladen worden</AlertTitle>
                   <AlertDescription>
-                    <p className="mb-3">Er is een fout opgetreden bij het laden van de systeemoverzicht. Controleer je internetverbinding en probeer het opnieuw.</p>
+                    <p className="mb-3">Er is een fout opgetreden bij het laden van het systeemoverzicht. Controleer je internetverbinding en probeer het opnieuw.</p>
                     <Button 
                       variant="outline" 
                       size="sm"

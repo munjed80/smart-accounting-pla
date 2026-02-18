@@ -77,6 +77,13 @@ export const AccountantReviewQueuePage = () => {
     }
   }
   
+  const handleRetry = () => {
+    setError(null)
+    if (activeClient) {
+      fetchClientDetails(activeClient.administrationId)
+    }
+  }
+  
   // Navigate to clients page to select a client
   const handleGoToClients = () => {
     navigateTo('/accountant/clients')
@@ -176,12 +183,7 @@ export const AccountantReviewQueuePage = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setError(null)
-                  if (activeClient) {
-                    fetchClientDetails(activeClient.administrationId)
-                  }
-                }}
+                onClick={handleRetry}
                 className="shrink-0"
               >
                 <ArrowClockwise size={16} className="mr-2" />

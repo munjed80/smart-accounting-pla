@@ -633,7 +633,7 @@ async def export_client_expenses_csv(
             expense.description or '',
             expense.category or '',
             f"{expense.amount_cents / 100:.2f}",
-            f"{float(expense.vat_rate):.1f}",
+            f"{expense.vat_rate:.1f}",
             f"{expense.vat_amount_cents / 100:.2f}",
             expense.notes or '',
         ])
@@ -711,7 +711,7 @@ async def export_client_hours_csv(
             entry.entry_date.isoformat() if entry.entry_date else '',
             entry.description or '',
             entry.project_name or '',
-            f"{float(entry.hours):.2f}",
+            f"{entry.hours:.2f}",
             f"{entry.hourly_rate_cents / 100:.2f}" if entry.hourly_rate_cents else '',
             'Ja' if entry.billable else 'Nee',
             'Ja' if entry.is_invoiced else 'Nee',

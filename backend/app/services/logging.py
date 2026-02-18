@@ -40,6 +40,7 @@ class LogEntityType(str, Enum):
     ISSUE = "issue"
     ALERT = "alert"
     SYSTEM = "system"
+    DIGIPOORT = "digipoort"  # Digipoort submission events
 
 
 class StructuredLogger:
@@ -493,6 +494,133 @@ class StructuredLogger:
             limit=limit
         )
         self._log(entry, LogSeverity.WARN)
+    
+    # Digipoort events
+    def digipoort_queued(
+        self,
+        submission_id: UUID,
+        client_id: UUID,
+        period_id: UUID,
+        correlation_id: str,
+        submission_type: str,
+        user_id: Optional[UUID] = None
+    ):
+        """Log Digipoort submission queued event."""
+        entry = self._create_log_entry(
+            event="digipoort.queued",
+            severity=LogSeverity.INFO,
+            entity_type=LogEntityType.DIGIPOORT,
+            entity_id=submission_id,
+            client_id=client_id,
+            period_id=period_id,
+            user_id=user_id,
+            message=f"Digipoort submission queued: {submission_type}",
+            correlation_id=correlation_id,
+            submission_type=submission_type
+        )
+        self._log(entry, LogSeverity.INFO)
+    
+    def digipoort_sent(
+        self,
+        submission_id: UUID,
+        client_id: UUID,
+        period_id: UUID,
+        correlation_id: str,
+        message_id: str,
+        submission_type: str,
+        sandbox_mode: bool = True
+    ):
+        """Log Digipoort submission sent event."""
+        entry = self._create_log_entry(
+            event="digipoort.sent",
+            severity=LogSeverity.INFO,
+            entity_type=LogEntityType.DIGIPOORT,
+            entity_id=submission_id,
+            client_id=client_id,
+            period_id=period_id,
+            message=f"Digipoort submission sent: {submission_type}" + (" (sandbox)" if sandbox_mode else ""),
+            correlation_id=correlation_id,
+            message_id=message_id,
+            submission_type=submission_type,
+            sandbox_mode=sandbox_mode
+        )
+        self._log(entry, LogSeverity.INFO)
+    
+    def digipoort_accepted(
+        self,
+        submission_id: UUID,
+        client_id: UUID,
+        period_id: UUID,
+        correlation_id: str,
+        message_id: str,
+        submission_type: str
+    ):
+        """Log Digipoort submission accepted event."""
+        entry = self._create_log_entry(
+            event="digipoort.accepted",
+            severity=LogSeverity.INFO,
+            entity_type=LogEntityType.DIGIPOORT,
+            entity_id=submission_id,
+            client_id=client_id,
+            period_id=period_id,
+            message=f"Digipoort submission accepted: {submission_type}",
+            correlation_id=correlation_id,
+            message_id=message_id,
+            submission_type=submission_type
+        )
+        self._log(entry, LogSeverity.INFO)
+    
+    def digipoort_rejected(
+        self,
+        submission_id: UUID,
+        client_id: UUID,
+        period_id: UUID,
+        correlation_id: str,
+        message_id: Optional[str],
+        submission_type: str,
+        error_code: Optional[str] = None,
+        error_message: Optional[str] = None
+    ):
+        """Log Digipoort submission rejected event."""
+        entry = self._create_log_entry(
+            event="digipoort.rejected",
+            severity=LogSeverity.ERROR,
+            entity_type=LogEntityType.DIGIPOORT,
+            entity_id=submission_id,
+            client_id=client_id,
+            period_id=period_id,
+            message=f"Digipoort submission rejected: {submission_type}",
+            correlation_id=correlation_id,
+            message_id=message_id,
+            submission_type=submission_type,
+            error_code=error_code,
+            error_message=error_message
+        )
+        self._log(entry, LogSeverity.ERROR)
+    
+    def digipoort_error(
+        self,
+        submission_id: UUID,
+        client_id: UUID,
+        period_id: UUID,
+        correlation_id: str,
+        submission_type: str,
+        error: str
+    ):
+        """Log Digipoort submission error event."""
+        entry = self._create_log_entry(
+            event="digipoort.error",
+            severity=LogSeverity.ERROR,
+            entity_type=LogEntityType.DIGIPOORT,
+            entity_id=submission_id,
+            client_id=client_id,
+            period_id=period_id,
+            message=f"Digipoort submission error: {submission_type}",
+            correlation_id=correlation_id,
+            submission_type=submission_type,
+            error=error
+        )
+        self._log(entry, LogSeverity.ERROR)
 
 
 # Global logger instance

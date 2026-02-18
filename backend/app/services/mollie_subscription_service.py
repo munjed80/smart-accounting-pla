@@ -337,6 +337,7 @@ class MollieSubscriptionService:
         return {
             "status": subscription.status.value,
             "cancel_at_period_end": True,
+            "current_period_end": subscription.current_period_end.isoformat() if subscription.current_period_end else None,
         }
     
     async def process_webhook(
@@ -516,6 +517,8 @@ class MollieSubscriptionService:
         subscription_data: Dict[str, Any],
     ) -> None:
         """Process subscription webhook data"""
+        from dateutil import parser
+        
         mollie_sub_id = subscription_data.get("id")
         status = subscription_data.get("status")
         
@@ -531,6 +534,21 @@ class MollieSubscriptionService:
         if not subscription:
             logger.error(f"Subscription not found for webhook: {mollie_sub_id}")
             return
+        
+        # Extract period information from Mollie data if available
+        # Mollie may provide nextPaymentDate which indicates current_period_end
+        next_payment_date = subscription_data.get("nextPaymentDate")
+        if next_payment_date:
+            try:
+                # Parse ISO date string to datetime (Mollie uses dates in YYYY-MM-DD format)
+                next_payment_dt = parser.parse(next_payment_date)
+                # Ensure timezone-aware
+                if next_payment_dt.tzinfo is None:
+                    next_payment_dt = next_payment_dt.replace(tzinfo=timezone.utc)
+                subscription.current_period_end = next_payment_dt
+                logger.info(f"Updated current_period_end to {next_payment_dt} for subscription {subscription.id}")
+            except Exception as e:
+                logger.warning(f"Failed to parse nextPaymentDate from Mollie: {e}")
         
         # Map Mollie status to our status
         if status == "active":
@@ -548,6 +566,7 @@ class MollieSubscriptionService:
                 new_value={
                     "mollie_subscription_id": mollie_sub_id,
                     "status": status,
+                    "current_period_end": subscription.current_period_end.isoformat() if subscription.current_period_end else None,
                 }
             )
             db.add(audit)

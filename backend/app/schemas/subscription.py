@@ -72,3 +72,4 @@ class CancelSubscriptionResponse(BaseModel):
     """Response schema for canceling a subscription"""
     status: str = Field(description="Subscription status")
     cancel_at_period_end: bool = Field(description="Whether subscription cancels at period end")
+    current_period_end: Optional[str] = Field(None, description="Current billing period end date (ISO format)")

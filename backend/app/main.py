@@ -73,6 +73,52 @@ def log_enum_and_router_status() -> None:
     )
 
 
+def verify_payment_config() -> None:
+    """
+    Verify payment provider configuration at startup.
+    
+    Logs warnings if Mollie environment variables are missing.
+    Fails fast in production if critical configuration is missing.
+    
+    Raises:
+        RuntimeError: In production mode if critical payment config is missing
+    """
+    is_production = settings.ENV == "production"
+    missing_vars = []
+    
+    # Check Mollie configuration
+    if not settings.MOLLIE_API_KEY:
+        logger.warning("MOLLIE_API_KEY not configured - Mollie integration disabled")
+        missing_vars.append("MOLLIE_API_KEY")
+    
+    if not settings.MOLLIE_WEBHOOK_SECRET:
+        logger.warning("MOLLIE_WEBHOOK_SECRET not configured - webhook verification disabled")
+        missing_vars.append("MOLLIE_WEBHOOK_SECRET")
+    
+    if not settings.APP_PUBLIC_URL:
+        logger.warning("APP_PUBLIC_URL not configured - webhooks may not work correctly")
+        missing_vars.append("APP_PUBLIC_URL")
+    
+    # In production, fail fast if critical config is missing
+    if is_production and missing_vars:
+        error_msg = (
+            f"Production environment requires payment configuration. "
+            f"Missing variables: {', '.join(missing_vars)}. "
+            f"Set these in your environment or .env file."
+        )
+        logger.critical(error_msg)
+        raise RuntimeError(error_msg)
+    
+    # Log success if all configured
+    if not missing_vars:
+        logger.info("Payment configuration verified: Mollie integration enabled")
+    elif not is_production:
+        logger.info(
+            f"Payment configuration incomplete (OK in {settings.ENV} mode). "
+            f"Missing: {', '.join(missing_vars)}"
+        )
+
+
 async def verify_database_enums() -> None:
     """
     Verify that database enum values match the required Python enum values.
@@ -161,6 +207,13 @@ async def lifespan(app: FastAPI):
     
     # Log enum and router status for production diagnostics
     log_enum_and_router_status()
+    
+    # Verify payment provider configuration
+    try:
+        verify_payment_config()
+    except RuntimeError as e:
+        logger.exception("Payment configuration verification failed during startup")
+        raise
     
     # Register audit logging hooks
     from app.audit.session_hooks import register_audit_hooks

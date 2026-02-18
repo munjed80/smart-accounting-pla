@@ -365,7 +365,7 @@ export const ZZPLeaseLoansPage = () => {
               <div className="space-y-2">
                 <Select value={form.type} onValueChange={(v: 'lease' | 'loan') => setForm({ ...form, type: v })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Type" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="lease">Lease</SelectItem>
@@ -401,7 +401,7 @@ export const ZZPLeaseLoansPage = () => {
                 <div className="space-y-2 sm:col-span-2">
                   <Select value={form.status || 'active'} onValueChange={(v: 'active' | 'paused' | 'ended') => setForm({ ...form, status: v })}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Status" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Actief</SelectItem>

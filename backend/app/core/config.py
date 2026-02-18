@@ -73,6 +73,7 @@ class Settings(BaseSettings):
     
     # Digipoort tax submission connector (optional)
     DIGIPOORT_ENABLED: Optional[str] = None  # Set to "true" to enable Digipoort mode
+    DIGIPOORT_SANDBOX_MODE: Optional[str] = "true"  # Set to "false" for production mode
     DIGIPOORT_ENDPOINT: Optional[str] = None  # Digipoort API endpoint URL
     DIGIPOORT_CLIENT_ID: Optional[str] = None  # Client ID for Digipoort authentication
     DIGIPOORT_CLIENT_SECRET: Optional[str] = None  # Client secret for Digipoort
@@ -82,6 +83,11 @@ class Settings(BaseSettings):
     def digipoort_enabled(self) -> bool:
         """Check if Digipoort submission is enabled."""
         return bool(self.DIGIPOORT_ENABLED and str(self.DIGIPOORT_ENABLED).lower() == 'true')
+    
+    @property
+    def digipoort_sandbox_mode(self) -> bool:
+        """Check if Digipoort is in sandbox mode (no real network calls)."""
+        return str(self.DIGIPOORT_SANDBOX_MODE).lower() != 'false'
     
     class Config:
         env_file = ".env"

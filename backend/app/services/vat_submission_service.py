@@ -381,7 +381,7 @@ class VatSubmissionService:
         Queue a draft submission for Digipoort submission.
         
         Signs the payload with PKIoverheid certificate and moves status to QUEUED.
-        Actual submission will happen in Phase B.
+        If Digipoort is enabled in sandbox mode, immediately simulates submission.
         
         Args:
             submission_id: The submission UUID
@@ -393,6 +393,9 @@ class VatSubmissionService:
         Raises:
             VatSubmissionError: If queueing fails
         """
+        from app.core.config import settings
+        from app.services.logging import accounting_logger
+        
         # Get submission
         result = await self.db.execute(
             select(VatSubmission)
@@ -424,7 +427,7 @@ class VatSubmissionService:
         # Generate correlation ID for tracking
         correlation_id = str(uuid.uuid4())
         
-        # Update submission
+        # Update submission to QUEUED
         submission.signed_xml = signed_xml
         submission.correlation_id = correlation_id
         submission.certificate_id = certificate_id
@@ -438,5 +441,98 @@ class VatSubmissionService:
         
         await self.db.commit()
         await self.db.refresh(submission)
+        
+        # Log queued event
+        accounting_logger.digipoort_queued(
+            submission_id=submission.id,
+            client_id=self.administration_id,
+            period_id=submission.period_id,
+            correlation_id=correlation_id,
+            submission_type=submission.submission_type,
+        )
+        
+        # If Digipoort is enabled, immediately submit in sandbox mode
+        if settings.digipoort_enabled:
+            try:
+                from app.services.digipoort_service import DigipoortService
+                
+                # Initialize Digipoort service in sandbox mode
+                digipoort_service = DigipoortService(
+                    sandbox_mode=settings.digipoort_sandbox_mode
+                )
+                
+                # Submit to Digipoort (sandbox simulates response)
+                result = await digipoort_service.submit_to_digipoort(
+                    signed_xml=signed_xml,
+                    submission_type=submission.submission_type,
+                    administration_id=self.administration_id,
+                    period_id=submission.period_id,
+                    correlation_id=correlation_id,
+                )
+                
+                # Update submission with Digipoort response
+                submission.digipoort_message_id = result.message_id
+                submission.status = result.status.value  # SENT or ACCEPTED in sandbox
+                submission.last_status_check_at = datetime.now(timezone.utc)
+                
+                # Store full response in connector_response
+                submission.connector_response['digipoort_response'] = result.to_dict()
+                
+                # If there's an error, store it
+                if result.error_code:
+                    submission.error_code = result.error_code
+                    submission.error_message = result.error_message
+                
+                await self.db.commit()
+                await self.db.refresh(submission)
+                
+                # Log status updates
+                accounting_logger.digipoort_sent(
+                    submission_id=submission.id,
+                    client_id=self.administration_id,
+                    period_id=submission.period_id,
+                    correlation_id=correlation_id,
+                    message_id=result.message_id,
+                    submission_type=submission.submission_type,
+                    sandbox_mode=settings.digipoort_sandbox_mode,
+                )
+                
+                if result.status.value == "ACCEPTED":
+                    accounting_logger.digipoort_accepted(
+                        submission_id=submission.id,
+                        client_id=self.administration_id,
+                        period_id=submission.period_id,
+                        correlation_id=correlation_id,
+                        message_id=result.message_id,
+                        submission_type=submission.submission_type,
+                    )
+                elif result.status.value == "REJECTED":
+                    accounting_logger.digipoort_rejected(
+                        submission_id=submission.id,
+                        client_id=self.administration_id,
+                        period_id=submission.period_id,
+                        correlation_id=correlation_id,
+                        message_id=result.message_id,
+                        submission_type=submission.submission_type,
+                        error_code=result.error_code,
+                        error_message=result.error_message,
+                    )
+            
+            except Exception as e:
+                # Log error but don't fail the queueing
+                accounting_logger.digipoort_error(
+                    submission_id=submission.id,
+                    client_id=self.administration_id,
+                    period_id=submission.period_id,
+                    correlation_id=correlation_id,
+                    submission_type=submission.submission_type,
+                    error=str(e),
+                )
+                # Update submission with error
+                submission.status = "ERROR"
+                submission.error_code = "SUBMISSION_ERROR"
+                submission.error_message = str(e)
+                await self.db.commit()
+                await self.db.refresh(submission)
         
         return submission

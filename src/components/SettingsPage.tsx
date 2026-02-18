@@ -21,9 +21,11 @@ import {
   Administration, 
   zzpApi,
   ZZPBusinessProfile,
-  ZZPBusinessProfileCreate 
+  ZZPBusinessProfileCreate,
+  subscriptionApi
 } from '@/lib/api'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { useEntitlements } from '@/hooks/useEntitlements'
 import { 
   User,
   Buildings,
@@ -41,6 +43,9 @@ import {
   IdentificationCard,
   GitBranch,
   BellRinging,
+  CreditCard,
+  Calendar,
+  X,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { parseApiError } from '@/lib/utils'
@@ -59,6 +64,11 @@ export const SettingsPage = () => {
   
   // Push notifications hook
   const pushNotifications = usePushNotifications()
+  
+  // Subscription management hook (for ZZP users)
+  const { entitlements, subscription, isLoading: isLoadingSubscription, isAccountantBypass, refetch: refetchSubscription } = useEntitlements()
+  const [isCanceling, setIsCanceling] = useState(false)
+  const [isReactivating, setIsReactivating] = useState(false)
   
   // Business profile state (for ZZP users) - MUST be declared before useDelayedLoading
   const [businessProfile, setBusinessProfile] = useState<ZZPBusinessProfile | null>(null)
@@ -201,6 +211,39 @@ export const SettingsPage = () => {
   
   const updateProfileField = (field: keyof ZZPBusinessProfileCreate, value: string) => {
     setProfileForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  // Subscription management handlers
+  const handleCancelSubscription = async () => {
+    if (!window.confirm('Weet je zeker dat je je abonnement wilt opzeggen? Het blijft actief tot het einde van de huidige periode.')) {
+      return
+    }
+
+    setIsCanceling(true)
+    try {
+      const result = await subscriptionApi.cancelSubscription()
+      toast.success(result.message_nl || 'Abonnement opgezegd')
+      await refetchSubscription()
+    } catch (error) {
+      console.error('Failed to cancel subscription:', error)
+      toast.error(parseApiError(error))
+    } finally {
+      setIsCanceling(false)
+    }
+  }
+
+  const handleReactivateSubscription = async () => {
+    setIsReactivating(true)
+    try {
+      const result = await subscriptionApi.reactivateSubscription()
+      toast.success(result.message_nl || 'Abonnement heractiveerd')
+      await refetchSubscription()
+    } catch (error) {
+      console.error('Failed to reactivate subscription:', error)
+      toast.error(parseApiError(error))
+    } finally {
+      setIsReactivating(false)
+    }
   }
 
   const handleChangePassword = async () => {
@@ -781,6 +824,133 @@ export const SettingsPage = () => {
               </Alert>
             </CardContent>
           </Card>
+
+          {/* Subscription Management Section (ZZP users only) */}
+          {!isAccountantBypass && user?.role === 'zzp' && (
+            <Card className="bg-card/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard size={20} weight="duotone" />
+                  Abonnement
+                </CardTitle>
+                <CardDescription>
+                  Beheer je abonnement en betalingen
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isLoadingSubscription ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                ) : entitlements && subscription ? (
+                  <div className="space-y-4">
+                    {/* Status Display */}
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Status:</span>
+                          {subscription.status === 'ACTIVE' && !subscription.cancel_at_period_end && (
+                            <Badge className="bg-green-100 text-green-800 border-green-300">
+                              Actief
+                            </Badge>
+                          )}
+                          {subscription.status === 'TRIALING' && (
+                            <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+                              Proefperiode
+                            </Badge>
+                          )}
+                          {subscription.status === 'CANCELED' && (
+                            <Badge variant="secondary">Geannuleerd</Badge>
+                          )}
+                          {subscription.status === 'PAST_DUE' && (
+                            <Badge variant="destructive">Betaling mislukt</Badge>
+                          )}
+                          {subscription.status === 'EXPIRED' && (
+                            <Badge variant="secondary">Verlopen</Badge>
+                          )}
+                          {subscription.cancel_at_period_end && subscription.status === 'ACTIVE' && (
+                            <Badge variant="outline" className="border-orange-300 text-orange-700">
+                              <X size={12} className="mr-1" />
+                              Lopend tot periode-einde
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {/* Status Explanation */}
+                        <p className="text-sm text-muted-foreground">
+                          {subscription.status === 'TRIALING' && entitlements.in_trial && (
+                            <>Proefperiode: {entitlements.days_left_trial} {entitlements.days_left_trial === 1 ? 'dag' : 'dagen'} over</>
+                          )}
+                          {subscription.status === 'ACTIVE' && !subscription.cancel_at_period_end && (
+                            <>ZZP Basic abonnement — €6,95/maand</>
+                          )}
+                          {subscription.cancel_at_period_end && (
+                            <>Abonnement opgezegd — blijft actief tot {subscription.current_period_end ? new Date(subscription.current_period_end).toLocaleDateString('nl-NL') : 'periode-einde'}</>
+                          )}
+                          {subscription.status === 'CANCELED' && (
+                            <>Abonnement is geannuleerd</>
+                          )}
+                          {subscription.status === 'PAST_DUE' && (
+                            <>Laatste betaling mislukt — activeer opnieuw om door te gaan</>
+                          )}
+                          {subscription.status === 'EXPIRED' && (
+                            <>Proefperiode afgelopen — activeer abonnement om door te gaan</>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Scheduled Status */}
+                    {subscription.scheduled && subscription.trial_end_at && (
+                      <Alert>
+                        <Calendar size={16} />
+                        <AlertDescription>
+                          Abonnement gepland — start op {new Date(subscription.trial_end_at).toLocaleDateString('nl-NL')}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {/* Show Cancel button for ACTIVE subscriptions without cancellation */}
+                      {subscription.status === 'ACTIVE' && !subscription.cancel_at_period_end && (
+                        <Button 
+                          variant="outline"
+                          onClick={handleCancelSubscription}
+                          disabled={isCanceling}
+                        >
+                          {isCanceling && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
+                          Opzeggen
+                        </Button>
+                      )}
+
+                      {/* Show Reactivate button for canceled/expired/past_due */}
+                      {(subscription.status === 'CANCELED' || 
+                        subscription.status === 'EXPIRED' ||
+                        subscription.status === 'PAST_DUE' ||
+                        (subscription.status === 'ACTIVE' && subscription.cancel_at_period_end)) && (
+                        <Button 
+                          onClick={handleReactivateSubscription}
+                          disabled={isReactivating}
+                        >
+                          {isReactivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
+                          {subscription.cancel_at_period_end ? 'Annulering intrekken' : 'Heractiveren'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <Alert>
+                    <Info size={16} />
+                    <AlertDescription>
+                      Geen abonnementsinformatie beschikbaar
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Password Change Section */}
           <Card className="bg-card/80 backdrop-blur-sm">

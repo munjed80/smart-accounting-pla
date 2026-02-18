@@ -5237,8 +5237,23 @@ export interface ActivateSubscriptionResponse {
 }
 
 export interface CancelSubscriptionResponse {
-  status: string
-  cancel_at_period_end: boolean
+  subscription: {
+    status: string
+    cancel_at_period_end: boolean
+    current_period_end: string | null
+  }
+  message_nl: string
+}
+
+export interface ReactivateSubscriptionResponse {
+  subscription: {
+    status: string
+    cancel_at_period_end: boolean
+    scheduled: boolean
+    provider_subscription_id: string | null
+    trial_end_at?: string | null
+  }
+  message_nl: string
 }
 
 export const subscriptionApi = {
@@ -5285,6 +5300,16 @@ export const subscriptionApi = {
    */
   cancelSubscription: async (): Promise<CancelSubscriptionResponse> => {
     const response = await api.post('/me/subscription/cancel', {})
+    return response.data
+  },
+
+  /**
+   * Reactivate a canceled or expired subscription (Phase 2).
+   * Creates a new subscription if needed, or removes cancellation flag.
+   * Idempotent - returns existing status if already active.
+   */
+  reactivateSubscription: async (): Promise<ReactivateSubscriptionResponse> => {
+    const response = await api.post('/me/subscription/reactivate', {})
     return response.data
   },
 }

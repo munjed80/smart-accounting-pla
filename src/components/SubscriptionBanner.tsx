@@ -89,6 +89,29 @@ export const SubscriptionBanner = () => {
     )
   }
   
+  // PAST_DUE - payment failed
+  if (status === 'PAST_DUE') {
+    return (
+      <Alert className="mb-4 border-red-200 bg-red-50">
+        <AlertCircle className="h-4 w-4 text-red-600" />
+        <AlertDescription className="flex items-center justify-between">
+          <span className="text-red-900">
+            <strong>Betaling mislukt</strong> — Activeer opnieuw om functies te herstellen
+          </span>
+          <Button 
+            variant="default" 
+            size="sm"
+            className="ml-4 bg-red-600 hover:bg-red-700"
+            onClick={handleActivate}
+            disabled={isActivating}
+          >
+            {isActivating ? 'Bezig...' : 'Opnieuw activeren'}
+          </Button>
+        </AlertDescription>
+      </Alert>
+    )
+  }
+  
   // Trial expired - prompt to activate
   if (status === 'EXPIRED' || (status === 'TRIALING' && !can_use_pro_features)) {
     return (

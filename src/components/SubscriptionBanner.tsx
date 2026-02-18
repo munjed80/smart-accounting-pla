@@ -114,11 +114,49 @@ export const SubscriptionBanner = () => {
   
   // Active paid subscription
   if (status === 'ACTIVE' && can_use_pro_features) {
+    // Check if subscription is marked for cancellation
+    const cancelAtPeriodEnd = subscription?.cancel_at_period_end || false
+    const periodEnd = subscription?.current_period_end
+    
+    if (cancelAtPeriodEnd && periodEnd) {
+      return (
+        <Alert className="mb-4 border-orange-200 bg-orange-50">
+          <AlertCircle className="h-4 w-4 text-orange-600" />
+          <AlertDescription className="text-orange-900">
+            <strong>Abonnement opgezegd</strong> — blijft actief tot {new Date(periodEnd).toLocaleDateString('nl-NL')}
+          </AlertDescription>
+        </Alert>
+      )
+    }
+    
     return (
       <Alert className="mb-4 border-green-200 bg-green-50">
         <CheckCircle className="h-4 w-4 text-green-600" />
         <AlertDescription className="text-green-900">
           <strong>Abonnement actief</strong> — ZZP Basic (€6,95/maand)
+        </AlertDescription>
+      </Alert>
+    )
+  }
+  
+  // Past due - payment failed
+  if (status === 'PAST_DUE') {
+    return (
+      <Alert className="mb-4 border-red-200 bg-red-50">
+        <AlertCircle className="h-4 w-4 text-red-600" />
+        <AlertDescription className="flex items-center justify-between">
+          <span className="text-red-900">
+            <strong>Betaling achterstallig</strong> — werk je betaalgegevens bij om toegang te behouden
+          </span>
+          <Button 
+            variant="default" 
+            size="sm"
+            className="ml-4 bg-red-600 hover:bg-red-700"
+            onClick={handleActivate}
+            disabled={isActivating}
+          >
+            {isActivating ? 'Bezig...' : 'Bijwerken'}
+          </Button>
         </AlertDescription>
       </Alert>
     )

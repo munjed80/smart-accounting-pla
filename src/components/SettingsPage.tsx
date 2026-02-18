@@ -47,6 +47,7 @@ import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
 import { APP_VERSION_SHORT, getBuildDate, GIT_COMMIT_HASH, PACKAGE_VERSION_ONLY, IS_PROD } from '@/lib/version'
 import { usePushNotifications, isPushEnabled } from '@/hooks/usePushNotifications'
+import { SubscriptionCard } from '@/components/SubscriptionCard'
 
 export const SettingsPage = () => {
   const { user } = useAuth()
@@ -843,6 +844,24 @@ export const SettingsPage = () => {
               </Alert>
             </CardContent>
           </Card>
+
+          {/* Subscription Section (ZZP users only) */}
+          {user?.role === 'zzp' && (
+            <Card className="bg-card/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle size={20} weight="duotone" />
+                  Abonnement
+                </CardTitle>
+                <CardDescription>
+                  Beheer je abonnement en facturatiegegevens
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <SubscriptionCard />
+              </CardContent>
+            </Card>
+          )}
 
           {/* Data Export/Backup Section */}
           <Card className="bg-card/80 backdrop-blur-sm">

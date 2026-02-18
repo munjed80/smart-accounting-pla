@@ -79,15 +79,43 @@ export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallM
           </div>
           <DialogTitle className="text-center">Abonnement vereist</DialogTitle>
           <DialogDescription className="text-center">
-            {entitlements?.in_trial ? (
-              <>
-                Je proefperiode is afgelopen. Activeer een abonnement om <strong>{featureNameNL}</strong> te blijven gebruiken.
-              </>
-            ) : (
-              <>
-                Deze functie (<strong>{featureNameNL}</strong>) is alleen beschikbaar met een actief abonnement.
-              </>
-            )}
+            {(() => {
+              const status = entitlements?.status
+              
+              // EXPIRED or TRIAL ended
+              if (status === 'EXPIRED' || (status === 'TRIALING' && !entitlements?.can_use_pro_features)) {
+                return (
+                  <>
+                    Je <strong>proefperiode is afgelopen</strong>. Activeer een abonnement om <strong>{featureNameNL}</strong> te blijven gebruiken.
+                  </>
+                )
+              }
+              
+              // PAST_DUE - payment failed
+              if (status === 'PAST_DUE') {
+                return (
+                  <>
+                    Je <strong>betaling is achterstallig</strong>. Werk je betaalgegevens bij om toegang tot <strong>{featureNameNL}</strong> te herstellen.
+                  </>
+                )
+              }
+              
+              // CANCELED
+              if (status === 'CANCELED') {
+                return (
+                  <>
+                    Je abonnement is <strong>geannuleerd</strong>. Activeer een nieuw abonnement om <strong>{featureNameNL}</strong> te gebruiken.
+                  </>
+                )
+              }
+              
+              // Default message
+              return (
+                <>
+                  Deze functie (<strong>{featureNameNL}</strong>) is alleen beschikbaar met een actief abonnement.
+                </>
+              )
+            })()}
           </DialogDescription>
         </DialogHeader>
         

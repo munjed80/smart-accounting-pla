@@ -9,6 +9,7 @@ import { zzpApi, ZZPDashboardResponse, administrationApi, Administration, getErr
 import { navigateTo } from '@/lib/navigation'
 import { NoAdministrationsEmptyState } from '@/components/EmptyState'
 import { AIInsightsPanel } from '@/components/AIInsightsPanel'
+import { SubscriptionBanner } from '@/components/SubscriptionBanner'
 import { 
   Receipt, 
   TrendUp, 
@@ -251,6 +252,9 @@ export const SmartDashboard = () => {
             </Button>
           </div>
         </div>
+
+        {/* Subscription Banner - shows trial status or prompts for activation */}
+        <SubscriptionBanner />
 
         {/* Main KPI Cards - ZZP focused metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

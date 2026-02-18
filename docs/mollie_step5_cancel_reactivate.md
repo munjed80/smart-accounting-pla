@@ -105,6 +105,9 @@ The webhook endpoint now:
 ### Updated DTO
 
 The `/api/v1/me/subscription` response now includes:
+- `scheduled`: Whether a subscription is already planned (for example after trial)
+- `cancel_at_period_end`: Whether cancellation is pending at the end of billing cycle
+- `current_period_end`: Current billing period end timestamp (nullable)
 - `next_payment_date`: Best-effort estimate of next payment (from `current_period_end` or `trial_end_at`)
 - All existing fields maintained for backward compatibility
 

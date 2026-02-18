@@ -79,9 +79,13 @@ export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallM
           </div>
           <DialogTitle className="text-center">Abonnement vereist</DialogTitle>
           <DialogDescription className="text-center">
-            {entitlements?.in_trial ? (
+            {entitlements?.status === 'PAST_DUE' ? (
               <>
-                Je proefperiode is afgelopen. Activeer een abonnement om <strong>{featureNameNL}</strong> te blijven gebruiken.
+                Betaling mislukt. Activeer opnieuw om functies te herstellen.
+              </>
+            ) : entitlements?.status === 'TRIALING' ? (
+              <>
+                Proefperiode actief — {entitlements.days_left_trial} {entitlements.days_left_trial === 1 ? 'dag' : 'dagen'}.
               </>
             ) : (
               <>

@@ -855,7 +855,12 @@ export const SettingsPage = () => {
                               Actief
                             </Badge>
                           )}
-                          {subscription.status === 'TRIALING' && (
+                          {subscription.scheduled && (
+                            <Badge className="bg-indigo-100 text-indigo-800 border-indigo-300">
+                              Gepland
+                            </Badge>
+                          )}
+                          {subscription.status === 'TRIALING' && !subscription.scheduled && (
                             <Badge className="bg-blue-100 text-blue-800 border-blue-300">
                               Proefperiode
                             </Badge>
@@ -879,8 +884,11 @@ export const SettingsPage = () => {
                         
                         {/* Status Explanation */}
                         <p className="text-sm text-muted-foreground">
-                          {subscription.status === 'TRIALING' && entitlements.in_trial && (
-                            <>Proefperiode: {entitlements.days_left_trial} {entitlements.days_left_trial === 1 ? 'dag' : 'dagen'} over</>
+                          {subscription.scheduled && subscription.trial_end_at && (
+                            <>Gepland — start op {new Date(subscription.trial_end_at).toLocaleDateString('nl-NL')}</>
+                          )}
+                          {subscription.status === 'TRIALING' && entitlements.in_trial && !subscription.scheduled && (
+                            <>Proefperiode actief — {entitlements.days_left_trial} {entitlements.days_left_trial === 1 ? 'dag' : 'dagen'}.</>
                           )}
                           {subscription.status === 'ACTIVE' && !subscription.cancel_at_period_end && (
                             <>ZZP Basic abonnement — €6,95/maand</>
@@ -892,7 +900,7 @@ export const SettingsPage = () => {
                             <>Abonnement is geannuleerd</>
                           )}
                           {subscription.status === 'PAST_DUE' && (
-                            <>Laatste betaling mislukt — activeer opnieuw om door te gaan</>
+                            <>Betaling mislukt. Activeer opnieuw om functies te herstellen.</>
                           )}
                           {subscription.status === 'EXPIRED' && (
                             <>Proefperiode afgelopen — activeer abonnement om door te gaan</>
@@ -906,7 +914,7 @@ export const SettingsPage = () => {
                       <Alert>
                         <Calendar size={16} />
                         <AlertDescription>
-                          Abonnement gepland — start op {new Date(subscription.trial_end_at).toLocaleDateString('nl-NL')}
+                          Gepland — start op {new Date(subscription.trial_end_at).toLocaleDateString('nl-NL')}
                         </AlertDescription>
                       </Alert>
                     )}

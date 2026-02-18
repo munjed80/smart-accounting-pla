@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.api.v1.deps import CurrentUser, get_current_user
+from app.api.v1.deps import CurrentUser, get_current_user, require_zzp
 from app.models.administration import AdministrationMember
 from app.models.subscription import SubscriptionStatus
 from app.services.subscription_service import subscription_service
@@ -209,7 +209,9 @@ async def activate_subscription(
     """
     from app.services.mollie_subscription_service import mollie_subscription_service
     from app.integrations.mollie.client import MollieError
-    
+
+    require_zzp(current_user)
+
     # Get user's primary administration
     result = await db.execute(
         select(AdministrationMember)
@@ -268,7 +270,9 @@ async def cancel_subscription(
     """
     from app.services.mollie_subscription_service import mollie_subscription_service
     from app.integrations.mollie.client import MollieError
-    
+
+    require_zzp(current_user)
+
     # Get user's primary administration
     result = await db.execute(
         select(AdministrationMember)
@@ -333,6 +337,8 @@ async def reactivate_subscription(
     """
     from app.services.mollie_subscription_service import mollie_subscription_service
     from app.integrations.mollie.client import MollieError
+
+    require_zzp(current_user)
     
     # Get user's primary administration
     result = await db.execute(

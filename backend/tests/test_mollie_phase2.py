@@ -17,6 +17,10 @@ from app.models.user import User
 from app.core.config import settings
 
 
+# Test fixture for webhook secret
+TEST_WEBHOOK_SECRET = "test_webhook_secret_12345"
+
+
 @pytest.mark.asyncio
 async def test_activate_endpoint_creates_customer_and_subscription(
     async_client: AsyncClient,
@@ -43,7 +47,8 @@ async def test_activate_endpoint_creates_customer_and_subscription(
     }
     
     with patch("app.integrations.mollie.client.MollieClient.create_customer") as mock_create_customer, \
-         patch("app.integrations.mollie.client.MollieClient.create_subscription") as mock_create_subscription:
+         patch("app.integrations.mollie.client.MollieClient.create_subscription") as mock_create_subscription, \
+         patch("app.services.mollie_subscription_service.settings.MOLLIE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET):
         
         # Configure mocks
         mock_create_customer.return_value = mock_customer
@@ -181,15 +186,16 @@ async def test_webhook_endpoint_rejects_invalid_secret(
     db_session,
 ):
     """Test that webhook endpoint rejects requests with invalid secret"""
-    # Call webhook without secret
-    response = await async_client.post(
-        "/api/v1/webhooks/mollie?id=tr_test123",
-    )
-    
-    # Should return 401 Unauthorized
-    assert response.status_code == 401
-    data = response.json()
-    assert data["detail"]["code"] == "INVALID_WEBHOOK"
+    with patch("app.api.v1.webhooks.settings.MOLLIE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET):
+        # Call webhook without secret
+        response = await async_client.post(
+            "/api/v1/webhooks/mollie?id=tr_test123",
+        )
+        
+        # Should return 401 Unauthorized
+        assert response.status_code == 401
+        data = response.json()
+        assert data["detail"]["code"] == "INVALID_WEBHOOK"
 
 
 @pytest.mark.asyncio
@@ -224,13 +230,13 @@ async def test_webhook_endpoint_accepts_valid_secret(
         "subscriptionId": "sub_webhook",
     }
     
-    with patch("app.integrations.mollie.client.MollieClient.get_payment") as mock_get_payment:
+    with patch("app.integrations.mollie.client.MollieClient.get_payment") as mock_get_payment, \
+         patch("app.api.v1.webhooks.settings.MOLLIE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET):
         mock_get_payment.return_value = mock_payment
         
         # Call webhook with valid secret
-        secret = settings.MOLLIE_WEBHOOK_SECRET or "test_secret"
         response = await async_client.post(
-            f"/api/v1/webhooks/mollie?id=tr_test123&secret={secret}",
+            f"/api/v1/webhooks/mollie?id=tr_test123&secret={TEST_WEBHOOK_SECRET}",
         )
         
         # Should succeed
@@ -269,11 +275,12 @@ async def test_webhook_payment_paid_activates_subscription(
         "subscriptionId": "sub_paid",
     }
     
-    with patch("app.integrations.mollie.client.MollieClient.get_payment") as mock_get_payment:
+    with patch("app.integrations.mollie.client.MollieClient.get_payment") as mock_get_payment, \
+         patch("app.api.v1.webhooks.settings.MOLLIE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET):
         mock_get_payment.return_value = mock_payment
         
         # Call webhook
-        secret = settings.MOLLIE_WEBHOOK_SECRET or "test_secret"
+        secret = TEST_WEBHOOK_SECRET
         response = await async_client.post(
             f"/api/v1/webhooks/mollie?id=tr_paid123&secret={secret}",
         )
@@ -317,11 +324,12 @@ async def test_webhook_payment_failed_marks_past_due(
         "subscriptionId": "sub_failed",
     }
     
-    with patch("app.integrations.mollie.client.MollieClient.get_payment") as mock_get_payment:
+    with patch("app.integrations.mollie.client.MollieClient.get_payment") as mock_get_payment, \
+         patch("app.api.v1.webhooks.settings.MOLLIE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET):
         mock_get_payment.return_value = mock_payment
         
         # Call webhook
-        secret = settings.MOLLIE_WEBHOOK_SECRET or "test_secret"
+        secret = TEST_WEBHOOK_SECRET
         response = await async_client.post(
             f"/api/v1/webhooks/mollie?id=tr_failed123&secret={secret}",
         )
@@ -365,11 +373,12 @@ async def test_webhook_payment_pending_keeps_trialing_during_trial(
         "subscriptionId": "sub_pending",
     }
     
-    with patch("app.integrations.mollie.client.MollieClient.get_payment") as mock_get_payment:
+    with patch("app.integrations.mollie.client.MollieClient.get_payment") as mock_get_payment, \
+         patch("app.api.v1.webhooks.settings.MOLLIE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET):
         mock_get_payment.return_value = mock_payment
         
         # Call webhook
-        secret = settings.MOLLIE_WEBHOOK_SECRET or "test_secret"
+        secret = TEST_WEBHOOK_SECRET
         response = await async_client.post(
             f"/api/v1/webhooks/mollie?id=tr_pending123&secret={secret}",
         )
@@ -413,11 +422,12 @@ async def test_webhook_payment_pending_marks_past_due_after_trial(
         "subscriptionId": "sub_expired",
     }
     
-    with patch("app.integrations.mollie.client.MollieClient.get_payment") as mock_get_payment:
+    with patch("app.integrations.mollie.client.MollieClient.get_payment") as mock_get_payment, \
+         patch("app.api.v1.webhooks.settings.MOLLIE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET):
         mock_get_payment.return_value = mock_payment
         
         # Call webhook
-        secret = settings.MOLLIE_WEBHOOK_SECRET or "test_secret"
+        secret = TEST_WEBHOOK_SECRET
         response = await async_client.post(
             f"/api/v1/webhooks/mollie?id=tr_pending_expired&secret={secret}",
         )
@@ -461,11 +471,12 @@ async def test_webhook_subscription_active(
         "customerId": "cst_sub_active",
     }
     
-    with patch("app.integrations.mollie.client.MollieClient.get_subscription") as mock_get_subscription:
+    with patch("app.integrations.mollie.client.MollieClient.get_subscription") as mock_get_subscription, \
+         patch("app.api.v1.webhooks.settings.MOLLIE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET):
         mock_get_subscription.return_value = mock_subscription
         
         # Call webhook
-        secret = settings.MOLLIE_WEBHOOK_SECRET or "test_secret"
+        secret = TEST_WEBHOOK_SECRET
         response = await async_client.post(
             f"/api/v1/webhooks/mollie?id=sub_active123&secret={secret}",
         )
@@ -509,11 +520,12 @@ async def test_webhook_subscription_canceled(
         "customerId": "cst_sub_cancel",
     }
     
-    with patch("app.integrations.mollie.client.MollieClient.get_subscription") as mock_get_subscription:
+    with patch("app.integrations.mollie.client.MollieClient.get_subscription") as mock_get_subscription, \
+         patch("app.api.v1.webhooks.settings.MOLLIE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET):
         mock_get_subscription.return_value = mock_subscription
         
         # Call webhook
-        secret = settings.MOLLIE_WEBHOOK_SECRET or "test_secret"
+        secret = TEST_WEBHOOK_SECRET
         response = await async_client.post(
             f"/api/v1/webhooks/mollie?id=sub_cancel123&secret={secret}",
         )
@@ -557,10 +569,11 @@ async def test_webhook_is_idempotent(
         "subscriptionId": "sub_idempotent",
     }
     
-    with patch("app.integrations.mollie.client.MollieClient.get_payment") as mock_get_payment:
+    with patch("app.integrations.mollie.client.MollieClient.get_payment") as mock_get_payment, \
+         patch("app.api.v1.webhooks.settings.MOLLIE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET):
         mock_get_payment.return_value = mock_payment
         
-        secret = settings.MOLLIE_WEBHOOK_SECRET or "test_secret"
+        secret = TEST_WEBHOOK_SECRET
         
         # First webhook call
         response1 = await async_client.post(

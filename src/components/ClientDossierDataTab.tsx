@@ -18,7 +18,8 @@ const downloadBlob = (blob: Blob, filename: string) => {
   a.href = url
   a.download = filename
   a.click()
-  URL.revokeObjectURL(url)
+  // Revoke URL after a small delay to ensure download starts
+  setTimeout(() => URL.revokeObjectURL(url), 100)
 }
 
 export function ClientDossierDataTab({ clientId, type }: Props) {

@@ -5183,3 +5183,71 @@ export const adminApi = {
     return response.data
   },
 }
+
+// ============================================================================
+// Subscription API - ZZP Subscription Management (Phase 1)
+// ============================================================================
+
+export interface SubscriptionResponse {
+  id: string
+  administration_id: string
+  plan_code: string
+  status: string
+  trial_start_at: string | null
+  trial_end_at: string | null
+  current_period_start: string | null
+  current_period_end: string | null
+  cancel_at_period_end: boolean
+  created_at: string
+  updated_at: string
+  is_paid: boolean
+  in_trial: boolean
+  can_use_pro_features: boolean
+  days_left_trial: number
+}
+
+export interface EntitlementResponse {
+  is_paid: boolean
+  in_trial: boolean
+  can_use_pro_features: boolean
+  days_left_trial: number
+  status: string
+  plan_code: string | null
+}
+
+export interface StartTrialResponse {
+  subscription_id: string
+  status: string
+  trial_start_at: string
+  trial_end_at: string
+  message: string
+}
+
+export const subscriptionApi = {
+  /**
+   * Get current user's subscription status and entitlements.
+   * Auto-starts trial if no subscription exists.
+   */
+  getMySubscription: async (): Promise<SubscriptionResponse> => {
+    const response = await api.get('/me/subscription')
+    return response.data
+  },
+
+  /**
+   * Start a trial subscription for the current user.
+   * Idempotent - returns existing subscription if already started.
+   */
+  startTrial: async (): Promise<StartTrialResponse> => {
+    const response = await api.post('/me/subscription/start-trial', {})
+    return response.data
+  },
+
+  /**
+   * Get entitlement status for the current user.
+   * Lightweight endpoint for checking feature availability.
+   */
+  getEntitlements: async (): Promise<EntitlementResponse> => {
+    const response = await api.get('/me/subscription/entitlements')
+    return response.data
+  },
+}

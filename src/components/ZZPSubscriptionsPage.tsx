@@ -138,7 +138,7 @@ export const ZZPSubscriptionsPage = () => {
               <div className="space-y-2">
                 <Select value={form.recurring_frequency} onValueChange={(v: 'monthly' | 'yearly') => setForm({ ...form, recurring_frequency: v })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Frequentie" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="monthly">Maandelijks</SelectItem>
@@ -155,7 +155,7 @@ export const ZZPSubscriptionsPage = () => {
               <div className="space-y-2">
                 <Select value={String(form.btw_rate ?? 21)} onValueChange={(v) => setForm({ ...form, btw_rate: Number(v) })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="BTW tarief" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="0">0%</SelectItem>
@@ -170,7 +170,7 @@ export const ZZPSubscriptionsPage = () => {
               <div className="space-y-2">
                 <Select value={form.auto_renew === false ? 'false' : 'true'} onValueChange={v => setForm({ ...form, auto_renew: v === 'true' })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Verlenging" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="true">Automatisch verlengen</SelectItem>
@@ -184,7 +184,7 @@ export const ZZPSubscriptionsPage = () => {
               <div className="space-y-2">
                 <Select value={form.status || 'active'} onValueChange={(v: 'active' | 'paused' | 'ended') => setForm({ ...form, status: v })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Status" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="active">Actief</SelectItem>

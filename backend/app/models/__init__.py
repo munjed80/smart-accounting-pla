@@ -54,6 +54,7 @@ from app.models.subscription import (
     Subscription,
     SubscriptionStatus,
     AdminAuditLog,
+    WebhookEvent,
 )
 from app.models.payment import (
     ZZPPayment,
@@ -137,6 +138,7 @@ __all__ = [
     "Subscription",
     "SubscriptionStatus",
     "AdminAuditLog",
+    "WebhookEvent",
     "VatBoxLineage",
     "VatSubmission",
     "Certificate",

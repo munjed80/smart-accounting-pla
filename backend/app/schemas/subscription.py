@@ -19,6 +19,11 @@ class SubscriptionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
+    # Provider fields (Mollie integration)
+    provider: Optional[str] = None
+    provider_subscription_id: Optional[str] = None
+    scheduled: bool = Field(default=False, description="Whether subscription is scheduled to start after trial")
+    
     # Entitlement flags
     is_paid: bool = Field(description="Whether subscription is paid (ACTIVE status)")
     in_trial: bool = Field(description="Whether subscription is in trial period")
@@ -51,3 +56,18 @@ class StartTrialResponse(BaseModel):
     trial_start_at: datetime
     trial_end_at: datetime
     message: str = Field(description="Success message in Dutch")
+
+
+class ActivateSubscriptionResponse(BaseModel):
+    """Response schema for activating a subscription"""
+    status: str = Field(description="Subscription status (TRIALING, ACTIVE, etc.)")
+    in_trial: bool = Field(description="Whether still in trial period")
+    trial_end_at: Optional[str] = Field(None, description="Trial end date (ISO format)")
+    scheduled: bool = Field(description="Whether subscription is scheduled to start after trial")
+    provider_subscription_id: Optional[str] = Field(None, description="Mollie subscription ID")
+
+
+class CancelSubscriptionResponse(BaseModel):
+    """Response schema for canceling a subscription"""
+    status: str = Field(description="Subscription status")
+    cancel_at_period_end: bool = Field(description="Whether subscription cancels at period end")

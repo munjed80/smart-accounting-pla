@@ -12,21 +12,8 @@ from app.models.administration import Administration, AdministrationMember, Memb
 
 
 @pytest.mark.asyncio
-async def test_get_my_subscription_auto_starts_trial(async_client, test_user, db_session):
+async def test_get_my_subscription_auto_starts_trial(async_client, test_user, test_administration, auth_headers, db_session):
     """Test GET /api/v1/me/subscription auto-starts trial if no subscription exists"""
-    # Create administration for user
-    admin = Administration(name="Test Admin", description="Test")
-    db_session.add(admin)
-    await db_session.commit()
-    
-    # Link user to administration
-    member = AdministrationMember(
-        administration_id=admin.id,
-        user_id=test_user.id,
-        role=MemberRole.OWNER,
-    )
-    db_session.add(member)
-    
     # Create ZZP Basic plan
     plan = Plan(
         code="zzp_basic",
@@ -43,7 +30,7 @@ async def test_get_my_subscription_auto_starts_trial(async_client, test_user, db
     # Get subscription (should auto-start trial)
     response = await async_client.get(
         "/api/v1/me/subscription",
-        headers={"Authorization": f"Bearer test_token_{test_user.id}"},
+        headers=auth_headers,
     )
     
     # Assertions
@@ -60,12 +47,9 @@ async def test_get_my_subscription_auto_starts_trial(async_client, test_user, db
 
 
 @pytest.mark.asyncio
-async def test_get_my_subscription_returns_existing(async_client, test_user, db_session):
+async def test_get_my_subscription_returns_existing(async_client, test_user, test_administration, auth_headers, db_session):
     """Test GET /api/v1/me/subscription returns existing subscription"""
-    # Create administration and plan
-    admin = Administration(name="Test Admin", description="Test")
-    db_session.add(admin)
-    
+    # Create plan
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
@@ -78,18 +62,10 @@ async def test_get_my_subscription_returns_existing(async_client, test_user, db_
     db_session.add(plan)
     await db_session.commit()
     
-    # Link user to administration
-    member = AdministrationMember(
-        administration_id=admin.id,
-        user_id=test_user.id,
-        role=MemberRole.OWNER,
-    )
-    db_session.add(member)
-    
     # Create active subscription
     now = datetime.now(timezone.utc)
     subscription = Subscription(
-        administration_id=admin.id,
+        administration_id=test_administration.id,
         plan_id=plan.id,
         plan_code=plan.code,
         status=SubscriptionStatus.ACTIVE,
@@ -106,7 +82,7 @@ async def test_get_my_subscription_returns_existing(async_client, test_user, db_
     # Get subscription
     response = await async_client.get(
         "/api/v1/me/subscription",
-        headers={"Authorization": f"Bearer test_token_{test_user.id}"},
+        headers=auth_headers,
     )
     
     # Assertions
@@ -121,12 +97,20 @@ async def test_get_my_subscription_returns_existing(async_client, test_user, db_
 
 
 @pytest.mark.asyncio
-async def test_get_my_subscription_no_administration(async_client, test_user, db_session):
+async def test_get_my_subscription_no_administration(async_client, test_user, test_administration, auth_headers, db_session):
     """Test GET /api/v1/me/subscription returns 404 if user has no administration"""
-    # No administration for user
+    from sqlalchemy import text
+    
+    # Remove the administration membership that was created by the fixture
+    await db_session.execute(
+        text("DELETE FROM administration_members WHERE user_id = :user_id"),
+        {"user_id": str(test_user.id)}
+    )
+    await db_session.commit()
+    
     response = await async_client.get(
         "/api/v1/me/subscription",
-        headers={"Authorization": f"Bearer test_token_{test_user.id}"},
+        headers=auth_headers,
     )
     
     # Assertions
@@ -136,21 +120,8 @@ async def test_get_my_subscription_no_administration(async_client, test_user, db
 
 
 @pytest.mark.asyncio
-async def test_start_trial(async_client, test_user, db_session):
+async def test_start_trial(async_client, test_user, test_administration, auth_headers, db_session):
     """Test POST /api/v1/me/subscription/start-trial"""
-    # Create administration for user
-    admin = Administration(name="Test Admin", description="Test")
-    db_session.add(admin)
-    await db_session.commit()
-    
-    # Link user to administration
-    member = AdministrationMember(
-        administration_id=admin.id,
-        user_id=test_user.id,
-        role=MemberRole.OWNER,
-    )
-    db_session.add(member)
-    
     # Create ZZP Basic plan
     plan = Plan(
         code="zzp_basic",
@@ -167,7 +138,7 @@ async def test_start_trial(async_client, test_user, db_session):
     # Start trial
     response = await async_client.post(
         "/api/v1/me/subscription/start-trial",
-        headers={"Authorization": f"Bearer test_token_{test_user.id}"},
+        headers=auth_headers,
         json={},
     )
     
@@ -182,12 +153,9 @@ async def test_start_trial(async_client, test_user, db_session):
 
 
 @pytest.mark.asyncio
-async def test_start_trial_idempotent(async_client, test_user, db_session):
+async def test_start_trial_idempotent(async_client, test_user, test_administration, auth_headers, db_session):
     """Test POST /api/v1/me/subscription/start-trial is idempotent"""
-    # Create administration and plan
-    admin = Administration(name="Test Admin", description="Test")
-    db_session.add(admin)
-    
+    # Create plan
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
@@ -200,19 +168,10 @@ async def test_start_trial_idempotent(async_client, test_user, db_session):
     db_session.add(plan)
     await db_session.commit()
     
-    # Link user to administration
-    member = AdministrationMember(
-        administration_id=admin.id,
-        user_id=test_user.id,
-        role=MemberRole.OWNER,
-    )
-    db_session.add(member)
-    await db_session.commit()
-    
     # First call - creates subscription
     response1 = await async_client.post(
         "/api/v1/me/subscription/start-trial",
-        headers={"Authorization": f"Bearer test_token_{test_user.id}"},
+        headers=auth_headers,
         json={},
     )
     assert response1.status_code == 200
@@ -221,7 +180,7 @@ async def test_start_trial_idempotent(async_client, test_user, db_session):
     # Second call - should return same subscription
     response2 = await async_client.post(
         "/api/v1/me/subscription/start-trial",
-        headers={"Authorization": f"Bearer test_token_{test_user.id}"},
+        headers=auth_headers,
         json={},
     )
     assert response2.status_code == 200
@@ -232,12 +191,9 @@ async def test_start_trial_idempotent(async_client, test_user, db_session):
 
 
 @pytest.mark.asyncio
-async def test_get_entitlements(async_client, test_user, db_session):
+async def test_get_entitlements(async_client, test_user, test_administration, auth_headers, db_session):
     """Test GET /api/v1/me/subscription/entitlements"""
-    # Create administration and plan
-    admin = Administration(name="Test Admin", description="Test")
-    db_session.add(admin)
-    
+    # Create plan
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
@@ -250,18 +206,10 @@ async def test_get_entitlements(async_client, test_user, db_session):
     db_session.add(plan)
     await db_session.commit()
     
-    # Link user to administration
-    member = AdministrationMember(
-        administration_id=admin.id,
-        user_id=test_user.id,
-        role=MemberRole.OWNER,
-    )
-    db_session.add(member)
-    
     # Create trial subscription
     now = datetime.now(timezone.utc)
     subscription = Subscription(
-        administration_id=admin.id,
+        administration_id=test_administration.id,
         plan_id=plan.id,
         plan_code=plan.code,
         status=SubscriptionStatus.TRIALING,
@@ -276,7 +224,7 @@ async def test_get_entitlements(async_client, test_user, db_session):
     # Get entitlements
     response = await async_client.get(
         "/api/v1/me/subscription/entitlements",
-        headers={"Authorization": f"Bearer test_token_{test_user.id}"},
+        headers=auth_headers,
     )
     
     # Assertions

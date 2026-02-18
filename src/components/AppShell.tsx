@@ -591,7 +591,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Top Header - Always visible */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-sm">
+      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-sm" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Left: Hamburger Menu + Brand */}
@@ -700,6 +700,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
         </div>
       </header>
 
+      {/* OfflineBanner in normal document flow - pushes content down */}
       <OfflineBanner />
 
       {isZZP && (
@@ -741,20 +742,23 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
       <div className="hidden lg:flex">
         {/* Fixed Sidebar */}
         <aside 
-          className="fixed left-0 top-16 bottom-0 w-64 border-r border-border bg-card/50 overflow-hidden"
-          style={{ zIndex: 40 }}
+          className="fixed left-0 bottom-0 w-64 border-r border-border bg-card/50 overflow-hidden"
+          style={{ 
+            zIndex: 40,
+            top: 'calc(4rem + env(safe-area-inset-top, 0px))' // 4rem = h-16 header height
+          }}
         >
           {renderSidebarContent()}
         </aside>
 
-        {/* Main Content Area with sidebar offset */}
-        <main className="flex-1 ml-64">
+        {/* Main Content Area with sidebar offset and top padding */}
+        <main className="flex-1 ml-64 pt-4">
           {children}
         </main>
       </div>
 
-      {/* Mobile/Tablet Content - No sidebar offset */}
-      <main className={isZZP ? 'lg:hidden pb-20' : 'lg:hidden'}>
+      {/* Mobile/Tablet Content - No sidebar offset but with top padding */}
+      <main className={isZZP ? 'lg:hidden pb-20 pt-4' : 'lg:hidden pt-4'}>
         {children}
       </main>
 

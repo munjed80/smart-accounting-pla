@@ -5,8 +5,10 @@ import { navigateTo } from '@/lib/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { AdminLayout, AdminSection } from '@/components/AdminLayout'
 import { toast } from 'sonner'
+import { WarningCircle, ArrowClockwise } from '@phosphor-icons/react'
 
 export const AdminDashboard = () => {
   const getSectionFromPath = (): AdminSection => {
@@ -65,29 +67,76 @@ export const AdminDashboard = () => {
 
   return (
     <AdminLayout activeSection={section} onSectionChange={handleSectionChange}>
+      {/* Search input with proper spacing */}
       {(section === 'companies' || section === 'users' || section === 'subscriptions') ? (
-        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Zoeken..." />
+        <div className="mb-4">
+          <Input 
+            value={query} 
+            onChange={(e) => setQuery(e.target.value)} 
+            placeholder="Zoeken..." 
+            className="max-w-md"
+          />
+        </div>
       ) : null}
 
       {section === 'users' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-          {overviewQuery.isLoading ? <p>Laden...</p> : null}
-          {overviewQuery.isError ? <p>Overzicht kon niet geladen worden.</p> : null}
-          {overviewQuery.data ? (
-            <>
-              <Card><CardHeader><CardTitle>Gebruikers</CardTitle></CardHeader><CardContent>{overviewQuery.data.users_count}</CardContent></Card>
-              <Card><CardHeader><CardTitle>Administraties</CardTitle></CardHeader><CardContent>{overviewQuery.data.administrations_count}</CardContent></Card>
-              <Card><CardHeader><CardTitle>Actieve subscripties</CardTitle></CardHeader><CardContent>{overviewQuery.data.active_subscriptions_count}</CardContent></Card>
-              <Card><CardHeader><CardTitle>MRR</CardTitle></CardHeader><CardContent>€ {overviewQuery.data.mrr_estimate.toFixed(2)}</CardContent></Card>
-              <Card><CardHeader><CardTitle>Facturen 30d</CardTitle></CardHeader><CardContent>{overviewQuery.data.invoices_last_30_days}</CardContent></Card>
-            </>
-          ) : null}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            {overviewQuery.isLoading ? <p className="text-muted-foreground">Laden...</p> : null}
+            {overviewQuery.isError ? (
+              <div className="col-span-full">
+                <Alert variant="destructive">
+                  <WarningCircle size={20} weight="duotone" />
+                  <AlertTitle>Overzicht kon niet geladen worden</AlertTitle>
+                  <AlertDescription>
+                    <p className="mb-3">Er is een fout opgetreden bij het laden van de systeemoverzicht. Controleer je internetverbinding en probeer het opnieuw.</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => void overviewQuery.refetch()}
+                      className="gap-2"
+                    >
+                      <ArrowClockwise size={16} />
+                      Opnieuw proberen
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              </div>
+            ) : null}
+            {overviewQuery.data ? (
+              <>
+                <Card><CardHeader><CardTitle>Gebruikers</CardTitle></CardHeader><CardContent>{overviewQuery.data.users_count}</CardContent></Card>
+                <Card><CardHeader><CardTitle>Administraties</CardTitle></CardHeader><CardContent>{overviewQuery.data.administrations_count}</CardContent></Card>
+                <Card><CardHeader><CardTitle>Actieve subscripties</CardTitle></CardHeader><CardContent>{overviewQuery.data.active_subscriptions_count}</CardContent></Card>
+                <Card><CardHeader><CardTitle>MRR</CardTitle></CardHeader><CardContent>€ {overviewQuery.data.mrr_estimate.toFixed(2)}</CardContent></Card>
+                <Card><CardHeader><CardTitle>Facturen 30d</CardTitle></CardHeader><CardContent>{overviewQuery.data.invoices_last_30_days}</CardContent></Card>
+              </>
+            ) : null}
+          </div>
+        </>
       ) : null}
 
       {section === 'companies' || section === 'subscriptions' ? (
         <div className="space-y-2">
-          {companiesQuery.isLoading ? <p>Laden...</p> : null}
+          {companiesQuery.isLoading ? <p className="text-muted-foreground">Laden...</p> : null}
+          {companiesQuery.isError ? (
+            <Alert variant="destructive">
+              <WarningCircle size={20} weight="duotone" />
+              <AlertTitle>Bedrijven konden niet geladen worden</AlertTitle>
+              <AlertDescription>
+                <p className="mb-3">Er is een fout opgetreden bij het laden van de bedrijvenlijst. Controleer je internetverbinding en probeer het opnieuw.</p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => void companiesQuery.refetch()}
+                  className="gap-2"
+                >
+                  <ArrowClockwise size={16} />
+                  Opnieuw proberen
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
           {companiesQuery.data?.administrations.map((company) => (
             <Card key={company.id}>
               <CardContent className="pt-4 flex items-center justify-between">
@@ -145,7 +194,25 @@ export const AdminDashboard = () => {
 
       {section === 'users' ? (
         <div className="space-y-2">
-          {usersQuery.isLoading ? <p>Laden...</p> : null}
+          {usersQuery.isLoading ? <p className="text-muted-foreground">Laden...</p> : null}
+          {usersQuery.isError ? (
+            <Alert variant="destructive">
+              <WarningCircle size={20} weight="duotone" />
+              <AlertTitle>Gebruikers konden niet geladen worden</AlertTitle>
+              <AlertDescription>
+                <p className="mb-3">Er is een fout opgetreden bij het laden van de gebruikerslijst. Controleer je internetverbinding en probeer het opnieuw.</p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => void usersQuery.refetch()}
+                  className="gap-2"
+                >
+                  <ArrowClockwise size={16} />
+                  Opnieuw proberen
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
           {usersQuery.data?.users.map((u) => (
             <Card key={u.id}>
               <CardContent className="pt-4 flex items-center justify-between gap-3">

@@ -19,13 +19,15 @@ const sections: Array<{ key: AdminSection; label: string }> = [
 
 export const AdminLayout = ({ activeSection, onSectionChange, children }: AdminLayoutProps) => {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 px-4 sm:px-6 lg:px-8">
+      {/* Tabs - Mobile-first with proper wrapping */}
       <div className="flex flex-wrap gap-2">
         {sections.map((section) => (
           <Button
             key={section.key}
             variant={activeSection === section.key ? 'default' : 'outline'}
             onClick={() => onSectionChange(section.key)}
+            className="min-h-[44px] flex-1 sm:flex-none"
           >
             {section.label}
           </Button>

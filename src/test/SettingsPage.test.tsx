@@ -9,6 +9,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { SettingsPage } from '../components/SettingsPage'
 import * as api from '../lib/api'
 import * as AuthContext from '../lib/AuthContext'
+import * as useEntitlements from '../hooks/useEntitlements'
+import * as usePushNotifications from '../hooks/usePushNotifications'
 
 // Mock the API
 vi.mock('../lib/api', () => ({
@@ -35,6 +37,14 @@ vi.mock('../lib/api', () => ({
     time: {
       list: vi.fn(),
     },
+  },
+  subscriptionApi: {
+    getMySubscription: vi.fn(),
+    startTrial: vi.fn(),
+    getEntitlements: vi.fn(),
+    activateSubscription: vi.fn(),
+    cancelSubscription: vi.fn(),
+    reactivateSubscription: vi.fn(),
   },
   getApiBaseUrl: vi.fn(() => 'http://localhost:8000/api/v1'),
   getRawViteApiUrl: vi.fn(() => 'http://localhost:8000'),
@@ -83,6 +93,15 @@ vi.mock('../hooks/useDelayedLoading', () => ({
   useDelayedLoading: vi.fn((isLoading: boolean) => isLoading),
 }))
 
+vi.mock('../hooks/useEntitlements', () => ({
+  useEntitlements: vi.fn(),
+}))
+
+vi.mock('../hooks/usePushNotifications', () => ({
+  usePushNotifications: vi.fn(),
+  isPushEnabled: vi.fn(() => false),
+}))
+
 // Mock toast
 vi.mock('sonner', () => ({
   toast: {
@@ -113,6 +132,34 @@ describe('SettingsPage', () => {
       register: vi.fn(),
       isLoading: false,
       isAuthenticated: true,
+    } as any)
+    
+    // Mock useEntitlements hook
+    vi.mocked(useEntitlements.useEntitlements).mockReturnValue({
+      entitlements: {
+        is_paid: true,
+        in_trial: false,
+        can_use_pro_features: true,
+        days_left_trial: 0,
+        status: 'ACTIVE',
+        plan_code: 'zzp_basic',
+      },
+      subscription: null,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+      canUseFeature: vi.fn(() => true),
+      isAccountantBypass: false,
+    })
+    
+    // Mock usePushNotifications hook
+    vi.mocked(usePushNotifications.usePushNotifications).mockReturnValue({
+      isSupported: false,
+      isSubscribed: false,
+      isLoading: false,
+      error: null,
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
     } as any)
     
     vi.mocked(api.metaApi.getVersion).mockResolvedValue({

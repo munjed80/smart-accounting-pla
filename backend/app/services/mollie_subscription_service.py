@@ -178,12 +178,21 @@ class MollieSubscriptionService:
             
             scheduled = self._is_subscription_scheduled(subscription)
             
+            # Generate appropriate message
+            if subscription.status == SubscriptionStatus.ACTIVE:
+                message_nl = "Abonnement is actief."
+            elif scheduled:
+                message_nl = "Abonnement gepland. Start na proefperiode."
+            else:
+                message_nl = f"Abonnement status: {subscription.status.value}"
+            
             return {
                 "status": subscription.status.value,
                 "in_trial": subscription.status == SubscriptionStatus.TRIALING,
                 "trial_end_at": subscription.trial_end_at.isoformat() if subscription.trial_end_at else None,
                 "scheduled": scheduled,
                 "provider_subscription_id": subscription.provider_subscription_id,
+                "message_nl": message_nl,
             }
         
         # Ensure Mollie customer exists
@@ -232,7 +241,7 @@ class MollieSubscriptionService:
             client_id=administration_id,
             entity_type="subscription",
             entity_id=subscription.id,
-            action="SUBSCRIPTION_SCHED",
+            action="SUBSCRIPTION_SCHEDULED",
             user_id=user.id,
             user_role=user.role,
             new_value={
@@ -248,12 +257,21 @@ class MollieSubscriptionService:
         # Determine response
         scheduled = self._is_subscription_scheduled(subscription)
         
+        # Generate appropriate message
+        if scheduled:
+            message_nl = "Abonnement gepland. Start na proefperiode."
+        elif subscription.status == SubscriptionStatus.ACTIVE:
+            message_nl = "Abonnement is actief."
+        else:
+            message_nl = f"Abonnement status: {subscription.status.value}"
+        
         return {
             "status": subscription.status.value,
             "in_trial": subscription.status == SubscriptionStatus.TRIALING,
             "trial_end_at": subscription.trial_end_at.isoformat() if subscription.trial_end_at else None,
             "scheduled": scheduled,
             "provider_subscription_id": subscription_data["id"],
+            "message_nl": message_nl,
         }
     
     async def cancel_subscription(
@@ -305,7 +323,7 @@ class MollieSubscriptionService:
             client_id=administration_id,
             entity_type="subscription",
             entity_id=subscription.id,
-            action="SUBSCRIPTION_CANCE",
+            action="SUBSCRIPTION_CANCELED",
             user_id=user.id,
             user_role=user.role,
             new_value={
@@ -444,7 +462,7 @@ class MollieSubscriptionService:
                 client_id=subscription.administration_id,
                 entity_type="subscription",
                 entity_id=subscription.id,
-                action="PAYMENT_PAID",
+                action="SUBSCRIPTION_ACTIVATED",
                 user_id=None,  # System action
                 user_role="system",
                 new_value={
@@ -465,7 +483,7 @@ class MollieSubscriptionService:
                 client_id=subscription.administration_id,
                 entity_type="subscription",
                 entity_id=subscription.id,
-                action="PAYMENT_FAILED",
+                action="SUBSCRIPTION_PAYMENT_FAILED",
                 user_id=None,  # System action
                 user_role="system",
                 new_value={
@@ -507,7 +525,7 @@ class MollieSubscriptionService:
                 client_id=subscription.administration_id,
                 entity_type="subscription",
                 entity_id=subscription.id,
-                action="SUB_ACTIVATED",
+                action="SUBSCRIPTION_ACTIVATED",
                 user_id=None,  # System action
                 user_role="system",
                 new_value={
@@ -526,7 +544,7 @@ class MollieSubscriptionService:
                 client_id=subscription.administration_id,
                 entity_type="subscription",
                 entity_id=subscription.id,
-                action="SUB_CANCELED",
+                action="SUBSCRIPTION_CANCELED",
                 user_id=None,  # System action
                 user_role="system",
                 new_value={
@@ -545,7 +563,7 @@ class MollieSubscriptionService:
         Get webhook URL for Mollie.
         
         Returns:
-            str: Full webhook URL
+            str: Full webhook URL with secret parameter
         """
         public_url = settings.APP_PUBLIC_URL or settings.APP_URL
         
@@ -553,6 +571,12 @@ class MollieSubscriptionService:
         if public_url.endswith("/"):
             public_url = public_url[:-1]
         
+        webhook_secret = settings.MOLLIE_WEBHOOK_SECRET
+        if webhook_secret:
+            return f"{public_url}/api/v1/webhooks/mollie?secret={webhook_secret}"
+        
+        # Fallback without secret (not recommended for production)
+        logger.warning("MOLLIE_WEBHOOK_SECRET not configured - webhook URL without secret")
         return f"{public_url}/api/v1/webhooks/mollie"
 
 

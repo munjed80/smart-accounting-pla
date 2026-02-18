@@ -94,14 +94,16 @@ class MollieSubscriptionService:
         
         # Audit log
         audit = AuditLog(
-            actor_user_id=user.id,
-            action="MOLLIE_CUSTOMER_CREATED",
-            resource_type="subscription",
-            resource_id=str(subscription.id),
-            details=json.dumps({
+            client_id=administration.id,
+            entity_type="subscription",
+            entity_id=subscription.id,
+            action="MOLLIE_CUSTOMER",
+            user_id=user.id,
+            user_role=user.role,
+            new_value={
                 "mollie_customer_id": customer_data["id"],
                 "administration_id": str(administration.id),
-            })
+            }
         )
         db.add(audit)
         await db.commit()
@@ -153,10 +155,16 @@ class MollieSubscriptionService:
             # Determine if scheduled
             now = datetime.now(timezone.utc)
             in_trial = subscription.status == SubscriptionStatus.TRIALING
+            
+            # Ensure trial_end_at is timezone-aware for comparison
+            trial_end_aware = subscription.trial_end_at
+            if trial_end_aware and trial_end_aware.tzinfo is None:
+                trial_end_aware = trial_end_aware.replace(tzinfo=timezone.utc)
+            
             scheduled = bool(
                 in_trial and 
-                subscription.trial_end_at and 
-                now < subscription.trial_end_at
+                trial_end_aware and 
+                now < trial_end_aware
             )
             
             return {
@@ -210,16 +218,18 @@ class MollieSubscriptionService:
         
         # Audit log
         audit = AuditLog(
-            actor_user_id=user.id,
-            action="SUBSCRIPTION_SCHEDULED",
-            resource_type="subscription",
-            resource_id=str(subscription.id),
-            details=json.dumps({
+            client_id=administration_id,
+            entity_type="subscription",
+            entity_id=subscription.id,
+            action="SUBSCRIPTION_SCHED",
+            user_id=user.id,
+            user_role=user.role,
+            new_value={
                 "mollie_subscription_id": subscription_data["id"],
                 "start_date": start_date.isoformat() if start_date else None,
                 "amount": str(ZZP_BASIC_PRICE),
                 "currency": ZZP_BASIC_CURRENCY,
-            })
+            }
         )
         db.add(audit)
         await db.commit()
@@ -227,10 +237,16 @@ class MollieSubscriptionService:
         # Determine response
         now = datetime.now(timezone.utc)
         in_trial = subscription.status == SubscriptionStatus.TRIALING
+        
+        # Ensure trial_end_at is timezone-aware for comparison
+        trial_end_aware = subscription.trial_end_at
+        if trial_end_aware and trial_end_aware.tzinfo is None:
+            trial_end_aware = trial_end_aware.replace(tzinfo=timezone.utc)
+        
         scheduled = bool(
             in_trial and 
-            subscription.trial_end_at and 
-            now < subscription.trial_end_at
+            trial_end_aware and 
+            now < trial_end_aware
         )
         
         return {
@@ -287,14 +303,16 @@ class MollieSubscriptionService:
         
         # Audit log
         audit = AuditLog(
-            actor_user_id=user.id,
-            action="SUBSCRIPTION_CANCELED",
-            resource_type="subscription",
-            resource_id=str(subscription.id),
-            details=json.dumps({
+            client_id=administration_id,
+            entity_type="subscription",
+            entity_id=subscription.id,
+            action="SUBSCRIPTION_CANCE",
+            user_id=user.id,
+            user_role=user.role,
+            new_value={
                 "mollie_subscription_id": subscription.provider_subscription_id,
                 "cancel_at_period_end": True,
-            })
+            }
         )
         db.add(audit)
         await db.commit()
@@ -424,14 +442,16 @@ class MollieSubscriptionService:
             
             # Audit log
             audit = AuditLog(
-                actor_user_id=None,  # System action
-                action="SUBSCRIPTION_ACTIVATED",
-                resource_type="subscription",
-                resource_id=str(subscription.id),
-                details=json.dumps({
+                client_id=subscription.administration_id,
+                entity_type="subscription",
+                entity_id=subscription.id,
+                action="PAYMENT_PAID",
+                user_id=None,  # System action
+                user_role="system",
+                new_value={
                     "mollie_payment_id": payment_id,
                     "status": status,
-                })
+                }
             )
             db.add(audit)
         
@@ -443,14 +463,16 @@ class MollieSubscriptionService:
             
             # Audit log
             audit = AuditLog(
-                actor_user_id=None,  # System action
-                action="SUBSCRIPTION_PAYMENT_FAILED",
-                resource_type="subscription",
-                resource_id=str(subscription.id),
-                details=json.dumps({
+                client_id=subscription.administration_id,
+                entity_type="subscription",
+                entity_id=subscription.id,
+                action="PAYMENT_FAILED",
+                user_id=None,  # System action
+                user_role="system",
+                new_value={
                     "mollie_payment_id": payment_id,
                     "status": status,
-                })
+                }
             )
             db.add(audit)
     
@@ -483,14 +505,16 @@ class MollieSubscriptionService:
             
             # Audit log
             audit = AuditLog(
-                actor_user_id=None,  # System action
-                action="SUBSCRIPTION_ACTIVATED",
-                resource_type="subscription",
-                resource_id=str(subscription.id),
-                details=json.dumps({
+                client_id=subscription.administration_id,
+                entity_type="subscription",
+                entity_id=subscription.id,
+                action="SUB_ACTIVATED",
+                user_id=None,  # System action
+                user_role="system",
+                new_value={
                     "mollie_subscription_id": mollie_sub_id,
                     "status": status,
-                })
+                }
             )
             db.add(audit)
         
@@ -500,14 +524,16 @@ class MollieSubscriptionService:
             
             # Audit log
             audit = AuditLog(
-                actor_user_id=None,  # System action
-                action="SUBSCRIPTION_CANCELED",
-                resource_type="subscription",
-                resource_id=str(subscription.id),
-                details=json.dumps({
+                client_id=subscription.administration_id,
+                entity_type="subscription",
+                entity_id=subscription.id,
+                action="SUB_CANCELED",
+                user_id=None,  # System action
+                user_role="system",
+                new_value={
                     "mollie_subscription_id": mollie_sub_id,
                     "status": status,
-                })
+                }
             )
             db.add(audit)
         

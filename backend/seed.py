@@ -65,10 +65,11 @@ CHART_OF_ACCOUNTS_TEMPLATE = [
 
 
 DEFAULT_PLANS = [
-    {"name": "FREE", "price_monthly": Decimal("0.00"), "max_invoices": 25, "max_storage_mb": 256, "max_users": 1},
-    {"name": "TRIAL", "price_monthly": Decimal("0.00"), "max_invoices": 200, "max_storage_mb": 1024, "max_users": 2},
-    {"name": "BASIC", "price_monthly": Decimal("19.00"), "max_invoices": 500, "max_storage_mb": 2048, "max_users": 3},
-    {"name": "PRO", "price_monthly": Decimal("49.00"), "max_invoices": 5000, "max_storage_mb": 10240, "max_users": 15},
+    {"code": "free", "name": "FREE", "price_monthly": Decimal("0.00"), "trial_days": 0, "max_invoices": 25, "max_storage_mb": 256, "max_users": 1},
+    {"code": "trial", "name": "TRIAL", "price_monthly": Decimal("0.00"), "trial_days": 30, "max_invoices": 200, "max_storage_mb": 1024, "max_users": 2},
+    {"code": "zzp_basic", "name": "ZZP Basic", "price_monthly": Decimal("6.95"), "trial_days": 30, "max_invoices": 999999, "max_storage_mb": 5120, "max_users": 1},
+    {"code": "basic", "name": "BASIC", "price_monthly": Decimal("19.00"), "trial_days": 30, "max_invoices": 500, "max_storage_mb": 2048, "max_users": 3},
+    {"code": "pro", "name": "PRO", "price_monthly": Decimal("49.00"), "trial_days": 30, "max_invoices": 5000, "max_storage_mb": 10240, "max_users": 15},
 ]
 
 
@@ -165,15 +166,17 @@ def seed_default_plans(conn):
     for plan in DEFAULT_PLANS:
         cursor.execute(
             """
-            INSERT INTO plans (id, name, price_monthly, max_invoices, max_storage_mb, max_users)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ON CONFLICT (name) DO UPDATE SET
+            INSERT INTO plans (id, code, name, price_monthly, trial_days, max_invoices, max_storage_mb, max_users)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (code) DO UPDATE SET
+                name = EXCLUDED.name,
                 price_monthly = EXCLUDED.price_monthly,
+                trial_days = EXCLUDED.trial_days,
                 max_invoices = EXCLUDED.max_invoices,
                 max_storage_mb = EXCLUDED.max_storage_mb,
                 max_users = EXCLUDED.max_users
             """,
-            (str(uuid.uuid4()), plan["name"], plan["price_monthly"], plan["max_invoices"], plan["max_storage_mb"], plan["max_users"])
+            (str(uuid.uuid4()), plan["code"], plan["name"], plan["price_monthly"], plan["trial_days"], plan["max_invoices"], plan["max_storage_mb"], plan["max_users"])
         )
 
     conn.commit()

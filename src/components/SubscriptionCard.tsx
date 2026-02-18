@@ -79,7 +79,7 @@ export const SubscriptionCard = () => {
   }
   
   const handleCancel = async () => {
-    if (!confirm('Weet je zeker dat je je abonnement wilt opzeggen? Je behoud toegang tot het einde van de huidige periode.')) {
+    if (!confirm('Weet je zeker dat je je abonnement wilt opzeggen? Je behoudt toegang tot het einde van de huidige periode.')) {
       return
     }
     

@@ -79,6 +79,25 @@ async def mollie_webhook(
     from app.integrations.mollie.client import MollieError
     from app.models.subscription import WebhookEvent
     import asyncio
+    import json
+    
+    def _create_retry_event(resource_id: str, is_payment: bool, error_msg: str = "") -> WebhookEvent:
+        """Helper to create a webhook retry event record."""
+        event_type = "payment" if is_payment else "subscription"
+        payload_data = {
+            "status": "PENDING_WEBHOOK_RETRY",
+            "resource_id": resource_id
+        }
+        if error_msg:
+            payload_data["error"] = error_msg
+        
+        return WebhookEvent(
+            provider="mollie",
+            event_id=f"retry_{event_type}_{resource_id}",
+            event_type=f"{event_type}_retry",
+            resource_id=resource_id,
+            payload=json.dumps(payload_data)[:5000]  # Safely serialize and truncate
+        )
     
     # Verify webhook authenticity
     if not verify_mollie_webhook(request):
@@ -129,14 +148,7 @@ async def mollie_webhook(
         logger.warning(f"Mollie API timeout for webhook {resource_id}, storing for retry")
         
         # Store pending retry record
-        event_type = "payment" if payment_id else "subscription"
-        webhook_event = WebhookEvent(
-            provider="mollie",
-            event_id=f"retry_{event_type}_{resource_id}",
-            event_type=f"{event_type}_retry",
-            resource_id=resource_id,
-            payload=f'{{"status": "PENDING_WEBHOOK_RETRY", "resource_id": "{resource_id}"}}'
-        )
+        webhook_event = _create_retry_event(resource_id, bool(payment_id))
         db.add(webhook_event)
         await db.commit()
         
@@ -148,14 +160,7 @@ async def mollie_webhook(
         logger.error(f"Mollie error processing webhook {resource_id}: {e}, storing for retry")
         
         # Store pending retry record
-        event_type = "payment" if payment_id else "subscription"
-        webhook_event = WebhookEvent(
-            provider="mollie",
-            event_id=f"retry_{event_type}_{resource_id}",
-            event_type=f"{event_type}_retry",
-            resource_id=resource_id,
-            payload=f'{{"status": "PENDING_WEBHOOK_RETRY", "resource_id": "{resource_id}", "error": "{str(e)}"}}'
-        )
+        webhook_event = _create_retry_event(resource_id, bool(payment_id), str(e))
         db.add(webhook_event)
         await db.commit()
         
@@ -167,14 +172,7 @@ async def mollie_webhook(
         logger.exception(f"Unexpected error processing Mollie webhook {resource_id}: {e}")
         
         # Store for retry
-        event_type = "payment" if payment_id else "subscription"
-        webhook_event = WebhookEvent(
-            provider="mollie",
-            event_id=f"retry_{event_type}_{resource_id}",
-            event_type=f"{event_type}_retry",
-            resource_id=resource_id,
-            payload=f'{{"status": "PENDING_WEBHOOK_RETRY", "resource_id": "{resource_id}", "error": "{str(e)}"}}'
-        )
+        webhook_event = _create_retry_event(resource_id, bool(payment_id), str(e))
         db.add(webhook_event)
         await db.commit()
         

@@ -25,6 +25,7 @@ import { accountantClientApi, AccountantClientListItem, getErrorMessage } from '
 import { 
   WarningCircle,
   UsersThree,
+  ArrowClockwise,
 } from '@phosphor-icons/react'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
@@ -183,6 +184,7 @@ export const AccountantReviewQueuePage = () => {
                 }}
                 className="shrink-0"
               >
+                <ArrowClockwise size={16} className="mr-2" />
                 Opnieuw proberen
               </Button>
             </AlertDescription>

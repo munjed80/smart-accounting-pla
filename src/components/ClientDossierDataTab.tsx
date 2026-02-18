@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { accountantDossierApi, getErrorMessage, ZZPExpense, ZZPInvoice, ZZPTimeEntry } from '@/lib/api'
 import { DownloadSimple, ArrowClockwise } from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import { ApiErrorState, parseApiError } from './ApiErrorState'
+import { parseApiError } from './ApiErrorState'
 
 interface Props {
   clientId: string
@@ -104,7 +104,7 @@ export function ClientDossierDataTab({ clientId, type }: Props) {
   }
 
   if (error) {
-    const { type: errorType, message: errorMessage } = parseApiError(error)
+    const { message: errorMessage } = parseApiError(error)
     return (
       <Alert className="bg-destructive/10 border-destructive/40">
         <AlertDescription className="flex items-center justify-between gap-4">

@@ -12,6 +12,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.roles import UserRole
 from app.models.subscription import Plan, Subscription, SubscriptionStatus
 from app.models.administration import Administration
 
@@ -24,6 +25,12 @@ GATED_FEATURES = {
     "bank_reconcile_actions": True,  # Bank reconciliation actions (matching, finalize, bulk ops)
     "exports": True,               # CSV/PDF exports for invoices/expenses/hours/vat
 }
+
+# Roles that bypass subscription checks (accountants and admins)
+SUBSCRIPTION_BYPASS_ROLES = [UserRole.ACCOUNTANT.value, UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value]
+
+# "Unlimited" value for max_invoices (representing no limit)
+UNLIMITED_INVOICES = 999999
 
 
 class EntitlementResult:
@@ -114,7 +121,7 @@ class SubscriptionService:
             status=SubscriptionStatus.TRIALING,
             trial_start_at=now,
             trial_end_at=trial_end,
-            starts_at=now,  # Legacy field
+            starts_at=now,  # Legacy field - kept for backward compatibility with old admin tools
             ends_at=None,
             cancel_at_period_end=False,
         )

@@ -22,7 +22,7 @@ export const SubscriptionBanner = () => {
   // In trial - show days remaining
   if (in_trial && can_use_pro_features) {
     return (
-      <Alert className="mb-4 border-blue-200 bg-blue-50">
+      <Alert className="mb-4 border-blue-200 bg-blue-50" role="status" aria-live="polite">
         <Clock className="h-4 w-4 text-blue-600" />
         <AlertDescription className="flex items-center justify-between">
           <span className="text-blue-900">

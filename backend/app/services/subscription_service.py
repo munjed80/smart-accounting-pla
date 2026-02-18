@@ -198,6 +198,13 @@ class SubscriptionService:
                 plan_code=None,
             )
         
+        # Ensure timezone-aware datetimes (SQLite may return naive datetimes)
+        # Replace naive datetimes with UTC timezone
+        if subscription.trial_end_at and subscription.trial_end_at.tzinfo is None:
+            subscription.trial_end_at = subscription.trial_end_at.replace(tzinfo=timezone.utc)
+        if subscription.trial_start_at and subscription.trial_start_at.tzinfo is None:
+            subscription.trial_start_at = subscription.trial_start_at.replace(tzinfo=timezone.utc)
+        
         # Compute days left in trial
         days_left_trial = 0
         if subscription.trial_end_at:

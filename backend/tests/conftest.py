@@ -14,6 +14,7 @@ from typing import AsyncGenerator, Generator
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool, StaticPool
+from sqlalchemy import select
 
 from app.main import app as fastapi_app
 from app.core.database import get_db, Base
@@ -135,6 +136,36 @@ async def test_administration(db_session: AsyncSession, test_user: User) -> Admi
     await db_session.commit()
     await db_session.refresh(administration)
     return administration
+
+
+@pytest_asyncio.fixture(scope="function")
+async def test_zzp_plan(db_session: AsyncSession):
+    """Create the ZZP Basic plan for tests that require it."""
+    from app.models.subscription import Plan
+    
+    # Check if plan already exists
+    result = await db_session.execute(
+        select(Plan).where(Plan.code == "zzp_basic")
+    )
+    existing_plan = result.scalar_one_or_none()
+    
+    if existing_plan:
+        return existing_plan
+    
+    # Create the plan
+    plan = Plan(
+        code="zzp_basic",
+        name="ZZP Basic",
+        price_monthly=6.95,
+        trial_days=30,
+        max_invoices=999999,
+        max_storage_mb=5120,
+        max_users=1,
+    )
+    db_session.add(plan)
+    await db_session.commit()
+    await db_session.refresh(plan)
+    return plan
 
 
 @pytest_asyncio.fixture(scope="function")

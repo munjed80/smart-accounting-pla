@@ -1578,11 +1578,7 @@ async def get_vat_submission_status(
     status_message = status_messages.get(submission.status, f"Status: {submission.status}")
     
     # Extract metadata from connector_response
-    metadata = None
-    if submission.connector_response:
-        digipoort_response = submission.connector_response.get('digipoort_response', {})
-        if digipoort_response:
-            metadata = digipoort_response.get('metadata')
+    metadata = submission.connector_response.get('digipoort_response', {}).get('metadata') if submission.connector_response else None
     
     return VatSubmissionStatusResponse(
         submission_id=submission.id,

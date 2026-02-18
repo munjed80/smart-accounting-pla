@@ -528,8 +528,8 @@ class VatSubmissionService:
                     submission_type=submission.submission_type,
                     error=str(e),
                 )
-                # Update submission with error
-                submission.status = "ERROR"
+                # Update submission with error - use consistent status from existing flow
+                submission.status = "FAILED"
                 submission.error_code = "SUBMISSION_ERROR"
                 submission.error_message = str(e)
                 await self.db.commit()

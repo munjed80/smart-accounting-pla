@@ -12,20 +12,9 @@ from app.models.administration import Administration, AdministrationMember, Memb
 
 
 @pytest.mark.asyncio
-async def test_get_my_subscription_auto_starts_trial(async_client, test_user, test_administration, auth_headers, db_session):
+async def test_get_my_subscription_auto_starts_trial(async_client, test_user, test_administration, test_zzp_plan, auth_headers, db_session):
     """Test GET /api/v1/me/subscription auto-starts trial if no subscription exists"""
-    # Create ZZP Basic plan
-    plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=6.95,
-        trial_days=30,
-        max_invoices=999999,
-        max_storage_mb=5120,
-        max_users=1,
-    )
-    db_session.add(plan)
-    await db_session.commit()
+    # Plan already created by test_zzp_plan fixture
     
     # Get subscription (should auto-start trial)
     response = await async_client.get(
@@ -41,26 +30,17 @@ async def test_get_my_subscription_auto_starts_trial(async_client, test_user, te
     assert data["in_trial"] is True
     assert data["can_use_pro_features"] is True
     assert data["is_paid"] is False
-    assert data["days_left_trial"] == 30
+    # Days left might be 29 or 30 depending on timing
+    assert 29 <= data["days_left_trial"] <= 30
     assert data["trial_start_at"] is not None
     assert data["trial_end_at"] is not None
 
 
 @pytest.mark.asyncio
-async def test_get_my_subscription_returns_existing(async_client, test_user, test_administration, auth_headers, db_session):
+async def test_get_my_subscription_returns_existing(async_client, test_user, test_administration, test_zzp_plan, auth_headers, db_session):
     """Test GET /api/v1/me/subscription returns existing subscription"""
-    # Create plan
-    plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=6.95,
-        trial_days=30,
-        max_invoices=999999,
-        max_storage_mb=5120,
-        max_users=1,
-    )
-    db_session.add(plan)
-    await db_session.commit()
+    # Plan already created by test_zzp_plan fixture
+    plan = test_zzp_plan
     
     # Create active subscription
     now = datetime.now(timezone.utc)
@@ -97,14 +77,14 @@ async def test_get_my_subscription_returns_existing(async_client, test_user, tes
 
 
 @pytest.mark.asyncio
-async def test_get_my_subscription_no_administration(async_client, test_user, test_administration, auth_headers, db_session):
+async def test_get_my_subscription_no_administration(async_client, test_user, test_administration, test_zzp_plan, auth_headers, db_session):
     """Test GET /api/v1/me/subscription returns 404 if user has no administration"""
-    from sqlalchemy import text
+    from sqlalchemy import text, delete
+    from app.models.administration import AdministrationMember
     
     # Remove the administration membership that was created by the fixture
     await db_session.execute(
-        text("DELETE FROM administration_members WHERE user_id = :user_id"),
-        {"user_id": str(test_user.id)}
+        delete(AdministrationMember).where(AdministrationMember.user_id == test_user.id)
     )
     await db_session.commit()
     
@@ -120,20 +100,9 @@ async def test_get_my_subscription_no_administration(async_client, test_user, te
 
 
 @pytest.mark.asyncio
-async def test_start_trial(async_client, test_user, test_administration, auth_headers, db_session):
+async def test_start_trial(async_client, test_user, test_administration, test_zzp_plan, auth_headers, db_session):
     """Test POST /api/v1/me/subscription/start-trial"""
-    # Create ZZP Basic plan
-    plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=6.95,
-        trial_days=30,
-        max_invoices=999999,
-        max_storage_mb=5120,
-        max_users=1,
-    )
-    db_session.add(plan)
-    await db_session.commit()
+    # Plan already created by test_zzp_plan fixture
     
     # Start trial
     response = await async_client.post(
@@ -153,20 +122,9 @@ async def test_start_trial(async_client, test_user, test_administration, auth_he
 
 
 @pytest.mark.asyncio
-async def test_start_trial_idempotent(async_client, test_user, test_administration, auth_headers, db_session):
+async def test_start_trial_idempotent(async_client, test_user, test_administration, test_zzp_plan, auth_headers, db_session):
     """Test POST /api/v1/me/subscription/start-trial is idempotent"""
-    # Create plan
-    plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=6.95,
-        trial_days=30,
-        max_invoices=999999,
-        max_storage_mb=5120,
-        max_users=1,
-    )
-    db_session.add(plan)
-    await db_session.commit()
+    # Plan already created by test_zzp_plan fixture
     
     # First call - creates subscription
     response1 = await async_client.post(
@@ -191,20 +149,10 @@ async def test_start_trial_idempotent(async_client, test_user, test_administrati
 
 
 @pytest.mark.asyncio
-async def test_get_entitlements(async_client, test_user, test_administration, auth_headers, db_session):
+async def test_get_entitlements(async_client, test_user, test_administration, test_zzp_plan, auth_headers, db_session):
     """Test GET /api/v1/me/subscription/entitlements"""
-    # Create plan
-    plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=6.95,
-        trial_days=30,
-        max_invoices=999999,
-        max_storage_mb=5120,
-        max_users=1,
-    )
-    db_session.add(plan)
-    await db_session.commit()
+    # Plan already created by test_zzp_plan fixture
+    plan = test_zzp_plan
     
     # Create trial subscription
     now = datetime.now(timezone.utc)
@@ -233,6 +181,7 @@ async def test_get_entitlements(async_client, test_user, test_administration, au
     assert data["in_trial"] is True
     assert data["can_use_pro_features"] is True
     assert data["is_paid"] is False
-    assert data["days_left_trial"] == 20
+    # Days left might be 19 or 20 depending on timing
+    assert 19 <= data["days_left_trial"] <= 20
     assert data["status"] == "TRIALING"
     assert data["plan_code"] == "zzp_basic"

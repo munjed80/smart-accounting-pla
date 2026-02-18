@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.api.v1.deps import CurrentUser, get_current_user
 from app.models.administration import AdministrationMember
+from app.models.subscription import SubscriptionStatus
 from app.services.subscription_service import subscription_service
 from app.schemas.subscription import (
     SubscriptionResponse,
@@ -21,6 +22,7 @@ from app.schemas.subscription import (
     StartTrialResponse,
     ActivateSubscriptionResponse,
     CancelSubscriptionResponse,
+    ReactivateSubscriptionResponse,
 )
 from sqlalchemy import select
 
@@ -78,6 +80,15 @@ async def get_my_subscription(
         now < subscription.trial_end_at
     )
     
+    # Determine next_payment_date (best effort)
+    # If subscription is active and has current_period_end, that's the next payment date
+    # If scheduled (in trial), trial_end_at is approximately the next payment date
+    next_payment_date = None
+    if subscription.current_period_end:
+        next_payment_date = subscription.current_period_end
+    elif scheduled and subscription.trial_end_at:
+        next_payment_date = subscription.trial_end_at
+    
     # Build response
     return SubscriptionResponse(
         id=subscription.id,
@@ -94,6 +105,7 @@ async def get_my_subscription(
         provider=subscription.provider,
         provider_subscription_id=subscription.provider_subscription_id,
         scheduled=scheduled,
+        next_payment_date=next_payment_date,
         is_paid=entitlements.is_paid,
         in_trial=entitlements.in_trial,
         can_use_pro_features=entitlements.can_use_pro_features,
@@ -252,7 +264,7 @@ async def cancel_subscription(
     The subscription will remain active until the end of the current billing period.
     
     Returns:
-        CancelSubscriptionResponse with cancellation status
+        CancelSubscriptionResponse with cancellation status and message_nl
     """
     from app.services.mollie_subscription_service import mollie_subscription_service
     from app.integrations.mollie.client import MollieError
@@ -302,4 +314,70 @@ async def cancel_subscription(
                 "code": "CANCELLATION_ERROR",
                 "message": "Failed to cancel subscription"
             }
+        )
+
+
+@router.post("/me/subscription/reactivate", response_model=ReactivateSubscriptionResponse)
+async def reactivate_subscription(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Reactivate a canceled or expired Mollie subscription.
+    
+    Creates a new subscription if needed, or removes cancellation flag.
+    Idempotent - returns existing status if already active.
+    
+    Returns:
+        ReactivateSubscriptionResponse with subscription status and message_nl
+    """
+    from app.services.mollie_subscription_service import mollie_subscription_service
+    from app.integrations.mollie.client import MollieError
+    
+    # Get user's primary administration
+    result = await db.execute(
+        select(AdministrationMember)
+        .where(AdministrationMember.user_id == current_user.id)
+        .order_by(AdministrationMember.created_at.asc())
+    )
+    member = result.scalar_one_or_none()
+    
+    if not member:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "NO_ADMINISTRATION", "message": "User has no administration"}
+        )
+    
+    try:
+        result = await mollie_subscription_service.reactivate_subscription(
+            db=db,
+            user=current_user,
+            administration_id=member.administration_id,
+        )
+        
+        return ReactivateSubscriptionResponse(**result)
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_REQUEST", "message": str(e)}
+        )
+    except MollieError as e:
+        logger.error(f"Mollie error reactivating subscription: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "MOLLIE_ERROR",
+                "message": f"Failed to reactivate subscription: {str(e)}"
+            }
+        )
+    except Exception as e:
+        logger.exception(f"Error reactivating subscription: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "REACTIVATION_ERROR",
+                "message": "Failed to reactivate subscription"
+            }
+        )
         )

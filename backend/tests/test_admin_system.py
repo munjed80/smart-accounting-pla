@@ -14,13 +14,14 @@ async def test_admin_overview_forbidden_for_non_super_admin(async_client, auth_h
 
 @pytest.mark.asyncio
 async def test_admin_overview_happy_path(async_client, db_session, super_admin_headers, test_administration, test_customer):
-    plan = Plan(name='BASIC', price_monthly=19, max_invoices=100, max_storage_mb=500, max_users=2)
+    plan = Plan(code='basic', name='BASIC', price_monthly=19, trial_days=30, max_invoices=100, max_storage_mb=500, max_users=2)
     db_session.add(plan)
     await db_session.flush()
 
     subscription = Subscription(
         administration_id=test_administration.id,
         plan_id=plan.id,
+        plan_code='basic',
         status='active',
         starts_at=datetime.now(timezone.utc),
     )

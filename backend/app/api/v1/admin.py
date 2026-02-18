@@ -360,9 +360,16 @@ async def update_administration_subscription(
     if not subscription:
         if not payload.plan_id:
             raise HTTPException(status_code=400, detail="plan_id is required when creating a subscription")
+        
+        # Fetch the plan to get the plan_code
+        plan = (await db.execute(select(Plan).where(Plan.id == payload.plan_id))).scalar_one_or_none()
+        if not plan:
+            raise HTTPException(status_code=400, detail="Plan not found")
+        
         subscription = Subscription(
             administration_id=admin_id,
             plan_id=payload.plan_id,
+            plan_code=plan.code,
             status=payload.status or "trial",
             starts_at=payload.starts_at or datetime.now(timezone.utc),
             ends_at=payload.ends_at,
@@ -371,7 +378,12 @@ async def update_administration_subscription(
         action = "subscription_created"
     else:
         if payload.plan_id:
+            # If updating plan_id, also update plan_code
+            plan = (await db.execute(select(Plan).where(Plan.id == payload.plan_id))).scalar_one_or_none()
+            if not plan:
+                raise HTTPException(status_code=400, detail="Plan not found")
             subscription.plan_id = payload.plan_id
+            subscription.plan_code = plan.code
         if payload.status:
             subscription.status = payload.status
         if payload.starts_at:

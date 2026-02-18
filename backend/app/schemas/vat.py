@@ -285,6 +285,19 @@ class VatSubmissionListResponse(BaseModel):
     total_count: int
 
 
+class VatSubmissionStatusResponse(BaseModel):
+    """Response for VAT submission status check."""
+    submission_id: UUID
+    status: str
+    digipoort_message_id: Optional[str] = None
+    correlation_id: Optional[str] = None
+    last_checked_at: Optional[datetime] = None
+    status_message: str
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
 class CreateVatSubmissionRequest(BaseModel):
     """Request to create a VAT submission."""
     period_id: UUID

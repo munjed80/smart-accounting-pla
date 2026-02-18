@@ -40,6 +40,7 @@ from app.schemas.vat import (
     MarkSubmittedRequest,
     VatSubmissionResponse,
     VatSubmissionListResponse,
+    VatSubmissionStatusResponse,
     PrepareSubmissionRequest,
     PrepareSubmissionResponse,
     QueueSubmissionRequest,
@@ -1516,4 +1517,81 @@ async def list_vat_submissions(
             for s in submissions
         ],
         total_count=total_count or 0,
+    )
+
+
+@router.get(
+    "/clients/{client_id}/vat/submissions/{submission_id}/status",
+    response_model=VatSubmissionStatusResponse,
+    summary="Get VAT Submission Status",
+    description="""
+    Get the current status of a VAT/ICP submission.
+    
+    Returns:
+    - Current Digipoort status
+    - Message ID (if submitted to Digipoort)
+    - Correlation ID for tracking
+    - Last status check timestamp
+    - Status message (human-readable)
+    - Error details (if applicable)
+    
+    In sandbox mode, status is immediately updated to ACCEPTED.
+    In production mode (future), this would poll Digipoort for actual status.
+    """,
+)
+async def get_vat_submission_status(
+    client_id: UUID,
+    submission_id: UUID,
+    current_user: Annotated[CurrentUser, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Get status of a VAT submission."""
+    from app.models.vat_submission import VatSubmission
+    from app.api.v1.deps import require_assigned_client
+    
+    # Verify accountant access with consent
+    await require_assigned_client(client_id, current_user, db, required_scope="reports")
+    
+    # Get submission
+    result = await db.execute(
+        select(VatSubmission)
+        .where(VatSubmission.id == submission_id)
+        .where(VatSubmission.administration_id == client_id)
+    )
+    submission = result.scalar_one_or_none()
+    
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
+    # Build status message
+    status_messages = {
+        "DRAFT": "Concept - nog niet ingediend",
+        "QUEUED": "In wachtrij voor verzending",
+        "SENT": "Verzonden naar Digipoort",
+        "RECEIVED": "Ontvangen door Belastingdienst",
+        "ACCEPTED": "Geaccepteerd door Belastingdienst",
+        "CONFIRMED": "Bevestigd door Belastingdienst",
+        "REJECTED": "Afgewezen door Belastingdienst",
+        "FAILED": "Fout bij verzending",
+        "ERROR": "Technische fout opgetreden",
+    }
+    status_message = status_messages.get(submission.status, f"Status: {submission.status}")
+    
+    # Extract metadata from connector_response
+    metadata = None
+    if submission.connector_response:
+        digipoort_response = submission.connector_response.get('digipoort_response', {})
+        if digipoort_response:
+            metadata = digipoort_response.get('metadata')
+    
+    return VatSubmissionStatusResponse(
+        submission_id=submission.id,
+        status=submission.status,
+        digipoort_message_id=submission.digipoort_message_id,
+        correlation_id=submission.correlation_id,
+        last_checked_at=submission.last_status_check_at,
+        status_message=status_message,
+        error_code=submission.error_code,
+        error_message=submission.error_message,
+        metadata=metadata,
     )

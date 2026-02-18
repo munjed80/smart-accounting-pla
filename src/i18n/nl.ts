@@ -2474,6 +2474,77 @@ export const nl = {
     issueDateRequired: "Offertedatum is verplicht",
     atLeastOneLine: "Voeg minimaal één regel toe",
   },
+
+  // Platform modules (for landing page and accountant overview)
+  platform: {
+    title: "Compliance Operating System voor accountants",
+    subtitle: "Eén platform voor boekhouding, belastingautomatisering en audit-ready compliance.",
+    platformForAccountants: "Platform voor Accountants",
+    whyDifferent: "Waarom dit systeem anders is",
+    
+    // CTAs
+    startZzp: "Start voor ZZP € 6,95 / maand",
+    contactAccountants: "Contact voor accountants",
+    
+    // Status badges
+    statusLive: "Live",
+    statusInDevelopment: "In ontwikkeling",
+    statusComingSoon: "Coming soon",
+    
+    // Module: Core Accounting
+    coreAccountingTitle: "Core Accounting",
+    coreAccountingBullet1: "Grootboek, Debiteuren, Crediteuren",
+    coreAccountingBullet2: "Multi-client werklijst",
+    coreAccountingBullet3: "Bank & afletteren",
+    
+    // Module: Tax Automation
+    taxAutomationTitle: "Tax Automation",
+    taxAutomationBullet1: "BTW/ICP flows",
+    taxAutomationBullet2: "Rubrieken traceability (why box numbers are what they are)",
+    taxAutomationBullet3: "PKI signing readiness",
+    
+    // Module: Compliance Layer
+    complianceLayerTitle: "Compliance Layer",
+    complianceLayerBullet1: "Audit trail",
+    complianceLayerBullet2: "Period locking",
+    complianceLayerBullet3: "Machtigingen/consent enforcement",
+    complianceLayerBullet4: "Full logging voor submissions",
+    
+    // Module: Banking & Financing
+    bankingFinancingTitle: "Banking & Financing",
+    bankingFinancingBullet1: "PSD2 bankkoppeling",
+    bankingFinancingBullet2: "Matching proposals",
+    bankingFinancingBullet3: "Financing signals",
+    
+    // Module: Annual Reporting
+    annualReportingTitle: "Annual Reporting",
+    annualReportingBullet1: "Jaarafsluiting workflow",
+    annualReportingBullet2: "Jaarrekening concept generator",
+    annualReportingBullet3: "Control checks",
+    
+    // Differentiators
+    diff1: "Multi-tenant en machtigingen per klant",
+    diff2: "Traceability per rubriek (BTW-box drilldown)",
+    diff3: "Audit trail voor elke wijziging",
+    diff4: "PKI signing pipeline (voor Digipoort-ready)",
+    diff5: "Werkqueue first (accountant workflow)",
+    diff6: "Mobile-friendly dossier",
+    
+    // Pricing
+    pricingDisclaimer: "Accountant functies en compliance modules groeien per release.",
+    
+    // Contact form
+    contactName: "Naam",
+    contactFirm: "Kantoor",
+    contactEmail: "E-mailadres",
+    contactMessage: "Bericht",
+    contactSend: "Verstuur",
+    contactSuccess: "Bedankt voor je bericht! We nemen snel contact op.",
+    
+    // Empty states for accountant modules
+    emptyImportBank: "Importeer bankafschrift om matching te starten.",
+    emptyNoData: "Nog geen data beschikbaar. Begin met een transactie of import.",
+  },
 };
 
 /**

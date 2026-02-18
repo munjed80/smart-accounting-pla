@@ -78,6 +78,7 @@ import { RecentActionsPanel } from './RecentActionsPanel'
 import { useClientSelection } from '@/hooks/useClientSelection'
 import { WorkQueueSection } from './WorkQueueSection'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { PlatformModulesCard } from './PlatformModulesCard'
 
 // Local storage keys for user preferences
 const PREF_SEARCH = 'accountant_search'
@@ -705,6 +706,9 @@ export const AccountantHomePage = () => {
             {t('common.refresh')}
           </Button>
         </div>
+
+        {/* Platform Modules Overview */}
+        <PlatformModulesCard />
 
         {/* Dagstart Panel - "Dagstart" Daily workflow panel */}
         <DagstartPanel 

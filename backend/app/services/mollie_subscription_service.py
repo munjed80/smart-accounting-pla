@@ -16,6 +16,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from dateutil import parser as dateutil_parser
 
 from app.core.config import settings
 from app.models.subscription import Subscription, SubscriptionStatus, WebhookEvent
@@ -331,7 +332,7 @@ class MollieSubscriptionService:
         # If no provider subscription, cancel locally
         if not subscription.provider_subscription_id:
             subscription.status = SubscriptionStatus.CANCELED
-            subscription.cancel_at_period_end = False  # Immediate cancellation
+            subscription.cancel_at_period_end = False  # False because subscription is immediately canceled (no period end wait)
             
             await db.commit()
             await db.refresh(subscription)
@@ -553,6 +554,7 @@ class MollieSubscriptionService:
         )
         
         # Determine start date (start immediately or tomorrow)
+        # Mollie requires future date for new subscriptions, so we start tomorrow
         from datetime import timedelta
         start_date = (datetime.now(timezone.utc) + timedelta(days=1)).date()
         
@@ -846,8 +848,7 @@ class MollieSubscriptionService:
             canceled_at = subscription_data.get("canceledAt")
             if canceled_at:
                 try:
-                    from dateutil import parser
-                    subscription.current_period_end = parser.parse(canceled_at)
+                    subscription.current_period_end = dateutil_parser.parse(canceled_at)
                 except Exception as e:
                     logger.warning(f"Failed to parse canceledAt: {e}")
             

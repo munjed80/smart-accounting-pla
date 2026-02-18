@@ -1,38 +1,30 @@
 import { useEffect, useState } from 'react'
 import { navigateTo } from '@/lib/navigation'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { t } from '@/i18n'
 import {
   ArrowRight,
+  Briefcase,
+  Building2,
+  CalendarDays,
   CheckCircle,
-  FileText,
+  ClipboardList,
   Clock,
-  Landmark,
+  FileCheck,
+  FileText,
+  HandCoins,
+  Lock,
+  Receipt,
   ShieldCheck,
   Smartphone,
+  UserPlus,
   Users,
-  FolderLock,
-  FileSignature,
-  BellRing,
-  KeyRound,
+  Wallet,
   Workflow,
-  SearchCheck,
-  Scale,
-  Lock,
-  Euro,
-  WifiOff,
-  Download,
-  Menu,
+  Wrench,
   X,
-  Database,
-  Calculator,
-  Shield,
-  Building2,
-  ClipboardList,
+  Menu,
+  Fingerprint,
 } from 'lucide-react'
 
 const scrollToSection = (id: string) => {
@@ -42,11 +34,99 @@ const scrollToSection = (id: string) => {
   }
 }
 
+const zzpFeatures = [
+  {
+    icon: FileText,
+    title: 'Facturen maken en versturen',
+    description: 'Professionele facturen, automatische BTW-berekening.',
+  },
+  {
+    icon: Clock,
+    title: 'Urenregistratie',
+    description: 'Registreer uren en zet ze direct om in facturen.',
+  },
+  {
+    icon: Receipt,
+    title: 'Uitgaven & kostenbeheer',
+    description: 'Upload bonnetjes en koppel aan je administratie.',
+  },
+  {
+    icon: CalendarDays,
+    title: 'Agenda & planning',
+    description: 'Houd overzicht op opdrachten.',
+  },
+  {
+    icon: FileCheck,
+    title: 'BTW-aangifte met traceability',
+    description: 'Zie exact hoe elke rubriek wordt berekend.',
+  },
+  {
+    icon: Smartphone,
+    title: 'Mobiel als app (PWA)',
+    description: 'Installeer op iOS en Android.',
+  },
+]
+
+const accountantModules = [
+  'Multi-client hub',
+  'Werkqueue',
+  'Audit trail',
+  'Period locking',
+  'PKI signing',
+  'BTW/ICP workflows',
+  'Compliance logging',
+]
+
+const steps = [
+  {
+    icon: UserPlus,
+    title: '1. Account aanmaken (gratis)',
+    description: 'Maak binnen een minuut een account aan en start direct met je administratie.',
+  },
+  {
+    icon: Workflow,
+    title: '2. Facturen & administratie starten',
+    description: 'Beheer facturen, uren en kosten in één centrale workflow.',
+  },
+  {
+    icon: HandCoins,
+    title: '3. BTW indienen met volledige controle',
+    description: 'Controleer alle berekeningen met transparante auditinformatie.',
+  },
+]
+
+const testimonials = [
+  {
+    quote:
+      'Ik factureer sneller en zie precies hoe mijn BTW is opgebouwd. Het geeft rust dat alles op één plek staat.',
+    author: 'Sanne V., ZZP marketeer',
+  },
+  {
+    quote:
+      'Voor ons kantoor is de combinatie van werkqueue en audit trail erg waardevol. We houden beter grip op deadlines.',
+    author: 'Teamlead, klein administratiekantoor',
+  },
+  {
+    quote:
+      'Als freelancer wil ik geen complex systeem. Dit platform is duidelijk, mobiel en professioneel.',
+    author: 'Ruben D., freelance developer',
+  },
+]
+
+const usps = [
+  { icon: ClipboardList, title: 'Transparante BTW-berekening' },
+  { icon: ShieldCheck, title: 'Volledige audit trail' },
+  { icon: Fingerprint, title: 'Compliance-ready' },
+  { icon: Smartphone, title: 'Mobiel & veilig' },
+  { icon: Wallet, title: 'Eenvoudige prijsstructuur' },
+  { icon: Lock, title: 'Controle op toegang en perioden' },
+]
+
 export const LandingPage = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
-    document.title = 'Smart Accounting voor ZZP en accountants | PWA boekhouden met compliance'
+    document.title = 'Smart Accounting | Boekhouden en compliance voor ZZP en accountants'
 
     const ensureMetaDescription = () => {
       let tag = document.querySelector('meta[name="description"]')
@@ -57,7 +137,7 @@ export const LandingPage = () => {
       }
       tag.setAttribute(
         'content',
-        'Smart Accounting helpt ZZP’ers en accountants met auditbare boekhouding, PWA mobiel werken, PKI-ondertekende BTW-submissies en transparante prijzen vanaf €6,95 per maand.',
+        'Boekhouden en compliance in één slim platform voor ZZP’ers en accountants. Start met 1 maand gratis, daarna €6,95 per maand voor ZZP.',
       )
     }
 
@@ -65,17 +145,17 @@ export const LandingPage = () => {
   }, [])
 
   const navigation = [
-    { name: 'Platform', href: '#doelgroepen' },
-    { name: 'PWA', href: '#pwa' },
+    { name: 'Voor ZZP', href: '#voor-zzp' },
+    { name: 'Voor accountants', href: '#voor-accountants' },
+    { name: 'Hoe werkt het', href: '#hoe-werkt-het' },
     { name: 'Prijzen', href: '#prijzen' },
-    { name: 'Security', href: '#security' },
   ]
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <span className="text-xl font-bold text-primary">Smart Accounting</span>
+          <span className="text-lg font-bold text-primary sm:text-xl">Smart Accounting</span>
 
           <div className="hidden items-center space-x-8 md:flex">
             {navigation.map((item) => (
@@ -107,119 +187,119 @@ export const LandingPage = () => {
                 {item.name}
               </a>
             ))}
+            <Button variant="ghost" className="mt-2 w-full justify-start" onClick={() => navigateTo('/login')}>
+              Inloggen
+            </Button>
           </div>
         )}
       </nav>
 
       <section className="relative overflow-hidden border-b border-primary/10">
-        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/15 via-background to-accent-secondary-9/10" />
-        <div className="mx-auto max-w-7xl px-4 py-20 text-center sm:px-6 sm:py-28 lg:px-8">
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">{t('platform.title')}</h1>
-          <p className="mx-auto mt-6 max-w-3xl text-base text-muted-foreground sm:text-lg">
-            {t('platform.subtitle')}
-          </p>
+        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/15 via-background to-emerald-700/10" />
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
+          <div className="mx-auto max-w-4xl text-center">
+            <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">Boekhouden en compliance in één slim platform</h1>
+            <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">
+              Voor ZZP’ers én accountants. Facturen, uren, BTW, audit en PKI — alles geïntegreerd.
+            </p>
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Button size="lg" className="w-full max-w-sm sm:w-auto" onClick={() => navigateTo('/login')}>
+                Start 1 maand gratis
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <Button size="lg" variant="outline" className="w-full max-w-sm sm:w-auto" onClick={() => scrollToSection('voor-accountants')}>
+                Ik ben accountant
+              </Button>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">Daarna €6,95 per maand. Geen verplichtingen.</p>
+            <p className="mt-2 text-sm font-medium text-primary">Binnen 60 seconden gestart.</p>
+          </div>
+        </div>
+      </section>
 
-          <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
-            <Button size="lg" className="px-8 py-6 text-lg" onClick={() => navigateTo('/login')}>
-              {t('platform.startZzp')}
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="border-accent-secondary-9 text-accent-secondary-11 hover:bg-accent-secondary-3"
-              onClick={() => scrollToSection('contact')}
-            >
-              {t('platform.contactAccountants')}
+      <section id="voor-zzp" className="py-14 sm:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-8 sm:mb-10">
+            <h2 className="text-2xl font-bold sm:text-4xl">Alles wat een ZZP’er nodig heeft</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {zzpFeatures.map((feature) => {
+              const Icon = feature.icon
+              return (
+                <Card key={feature.title} className="border-border/80">
+                  <CardHeader>
+                    <div className="mb-2 text-emerald-600">
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <CardTitle className="text-lg">{feature.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription>{feature.description}</CardDescription>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+          <div className="mt-8">
+            <Button size="lg" onClick={() => navigateTo('/login')}>
+              Start gratis proefperiode
             </Button>
           </div>
         </div>
       </section>
 
-      <section id="doelgroepen" className="py-20">
+      <section id="voor-accountants" className="bg-muted/40 py-14 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-center text-3xl font-bold sm:text-4xl">{t('platform.platformForAccountants')}</h2>
-          <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                id: 'core-accounting',
-                icon: <Database className="h-6 w-6" />,
-                title: t('platform.coreAccountingTitle'),
-                bullets: [
-                  t('platform.coreAccountingBullet1'),
-                  t('platform.coreAccountingBullet2'),
-                  t('platform.coreAccountingBullet3'),
-                ],
-                status: 'live',
-              },
-              {
-                id: 'tax-automation',
-                icon: <Calculator className="h-6 w-6" />,
-                title: t('platform.taxAutomationTitle'),
-                bullets: [
-                  t('platform.taxAutomationBullet1'),
-                  t('platform.taxAutomationBullet2'),
-                  t('platform.taxAutomationBullet3'),
-                ],
-                status: 'live',
-              },
-              {
-                id: 'compliance-layer',
-                icon: <Shield className="h-6 w-6" />,
-                title: t('platform.complianceLayerTitle'),
-                bullets: [
-                  t('platform.complianceLayerBullet1'),
-                  t('platform.complianceLayerBullet2'),
-                  t('platform.complianceLayerBullet3'),
-                  t('platform.complianceLayerBullet4'),
-                ],
-                status: 'live',
-              },
-              {
-                id: 'banking-financing',
-                icon: <Building2 className="h-6 w-6" />,
-                title: t('platform.bankingFinancingTitle'),
-                bullets: [
-                  t('platform.bankingFinancingBullet1'),
-                  t('platform.bankingFinancingBullet2'),
-                  t('platform.bankingFinancingBullet3'),
-                ],
-                status: 'coming-soon',
-              },
-              {
-                id: 'annual-reporting',
-                icon: <ClipboardList className="h-6 w-6" />,
-                title: t('platform.annualReportingTitle'),
-                bullets: [
-                  t('platform.annualReportingBullet1'),
-                  t('platform.annualReportingBullet2'),
-                  t('platform.annualReportingBullet3'),
-                ],
-                status: 'in-development',
-              },
-            ].map((module) => (
-              <Card key={module.id} className="border-border/80">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="text-accent-secondary-11">{module.icon}</div>
-                    <Badge
-                      variant={module.status === 'live' ? 'default' : 'secondary'}
-                      className={module.status === 'live' ? 'bg-accent-secondary-9 text-white' : ''}
-                    >
-                      {module.status === 'live' ? 'Live' : module.status === 'in-development' ? 'In Development' : 'Coming Soon'}
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-lg">{module.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 text-sm text-muted-foreground">
-                    {module.bullets.map((bullet, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent-secondary-11" />
-                        <span>{bullet}</span>
-                      </li>
-                    ))}
-                  </ul>
+          <h2 className="text-2xl font-bold sm:text-4xl">Platform voor accountants</h2>
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {accountantModules.map((module) => (
+              <div key={module} className="flex items-center gap-3 rounded-lg border border-border bg-background p-4">
+                <Briefcase className="h-5 w-5 text-emerald-600" />
+                <span className="text-sm font-medium">{module}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8">
+            <Button size="lg" variant="outline" onClick={() => scrollToSection('contact')}>
+              Neem contact op
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section id="hoe-werkt-het" className="py-14 sm:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl font-bold sm:text-4xl">Hoe werkt het?</h2>
+          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+            {steps.map((step) => {
+              const Icon = step.icon
+              return (
+                <Card key={step.title} className="border-border/80">
+                  <CardHeader>
+                    <div className="mb-2 text-emerald-600">
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <CardTitle className="text-lg">{step.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription>{step.description}</CardDescription>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-muted/40 py-14 sm:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl font-bold sm:text-4xl">Wat zeggen gebruikers</h2>
+          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+            {testimonials.map((item) => (
+              <Card key={item.author} className="border-border/80">
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">“{item.quote}”</p>
+                  <p className="mt-4 text-sm font-semibold">{item.author}</p>
                 </CardContent>
               </Card>
             ))}
@@ -227,123 +307,75 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      <section className="bg-muted/40 py-20">
+      <section className="py-14 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-center text-3xl font-bold sm:text-4xl">{t('platform.whyDifferent')}</h2>
-          <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[
-              { icon: <Database className="h-5 w-5" />, text: t('platform.diff1') },
-              { icon: <Calculator className="h-5 w-5" />, text: t('platform.diff2') },
-              { icon: <Shield className="h-5 w-5" />, text: t('platform.diff3') },
-              { icon: <Building2 className="h-5 w-5" />, text: t('platform.diff4') },
-              { icon: <ClipboardList className="h-5 w-5" />, text: t('platform.diff5') },
-              { icon: <Workflow className="h-5 w-5" />, text: t('platform.diff6') },
-            ].map((diff, idx) => (
-              <Card key={idx} className="border-border/80">
-                <CardHeader>
-                  <div className="mb-2 text-accent-secondary-11">{diff.icon}</div>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription>{diff.text}</CardDescription>
-                </CardContent>
-              </Card>
-            ))}
+          <h2 className="text-2xl font-bold sm:text-4xl">Waarom dit platform?</h2>
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {usps.map((usp) => {
+              const Icon = usp.icon
+              return (
+                <Card key={usp.title} className="border-border/80">
+                  <CardHeader>
+                    <div className="mb-2 text-emerald-600">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <CardTitle className="text-lg">{usp.title}</CardTitle>
+                  </CardHeader>
+                </Card>
+              )
+            })}
           </div>
         </div>
       </section>
 
-      <section id="pwa" className="py-20">
-        <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-8 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
-          <div>
-            <h2 className="text-3xl font-bold sm:text-4xl">PWA feature showcase</h2>
-            <ul className="mt-6 space-y-4">
-              <li className="flex items-start gap-3"><Download className="mt-0.5 h-5 w-5 text-emerald-700" />Install on iOS/Android</li>
-              <li className="flex items-start gap-3"><WifiOff className="mt-0.5 h-5 w-5 text-emerald-700" />Works offline</li>
-              <li className="flex items-start gap-3"><Smartphone className="mt-0.5 h-5 w-5 text-emerald-700" />Push / update experience</li>
-            </ul>
-          </div>
-          <Card className="border-primary/20 bg-gradient-to-br from-primary/10 via-background to-emerald-700/10">
-            <CardHeader>
-              <CardTitle>Altijd bereikbaar, ook onderweg</CardTitle>
-              <CardDescription>Gebruik Smart Accounting als app-ervaring zonder appstore-frictie.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>• Installeer direct vanaf browser op mobiel en desktop.</p>
-              <p>• Bekijk cijfers en werk taken af terwijl je offline bent.</p>
-              <p>• Ontvang updates en meldingen zonder handmatig beheer.</p>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      <section id="prijzen" className="bg-gradient-to-b from-primary/5 to-muted/30 py-20">
+      <section id="prijzen" className="bg-gradient-to-b from-primary/5 to-muted/30 py-14 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-center text-3xl font-bold sm:text-4xl">Pricing</h2>
-          <div className="mx-auto mt-10 grid max-w-4xl grid-cols-1 gap-8 md:grid-cols-2">
-            <Card className="border-primary/50 shadow-xl">
-              <CardHeader className="text-center">
+          <h2 className="text-2xl font-bold sm:text-center sm:text-4xl">Prijzen</h2>
+          <div className="mx-auto mt-8 grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-2">
+            <Card className="border-primary/50 shadow-lg">
+              <CardHeader>
                 <CardTitle className="text-2xl">ZZP</CardTitle>
-                <div>
-                  <span className="text-5xl font-extrabold text-primary">€6,95</span>
-                  <span className="text-muted-foreground"> / maand</span>
-                </div>
+                <p className="text-2xl font-bold text-primary">€0 eerste maand</p>
+                <p className="text-muted-foreground">Daarna €6,95 / maand</p>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-3 text-sm">
-                  {['Urenregistratie', 'Facturen & Automatische BTW', 'Bankmatch + Reconciliatie', 'Audit trail', 'PWA toegang'].map((item) => (
+                <ul className="space-y-2 text-sm">
+                  {['Facturatie', 'Uren', 'BTW', 'Audit', 'Bankimport', 'Mobiele app'].map((item) => (
                     <li key={item} className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-emerald-700" /> {item}
+                      <CheckCircle className="h-4 w-4 text-emerald-600" />
+                      {item}
                     </li>
                   ))}
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button className="w-full" onClick={() => navigateTo('/login')}>Start voor €6,95</Button>
-              </CardFooter>
-            </Card>
-
-            <Card className="border-accent-secondary-9/40 bg-background">
-              <CardHeader className="text-center">
-                <CardTitle className="text-2xl">Accountant</CardTitle>
-                <p className="text-3xl font-bold text-accent-secondary-11">Contact</p>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3 text-sm">
-                  {['Multi-client hub', 'Periode locking', 'PKI-signing BTW submissions', 'Werk Queue + Alerts', 'Rollen & Machtigingen'].map((item) => (
-                    <li key={item} className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-accent-secondary-11" /> {item}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-              <CardFooter>
-                <Button variant="outline" className="w-full border-accent-secondary-9 text-accent-secondary-11 hover:bg-accent-secondary-3" onClick={() => scrollToSection('contact')}>
-                  Contact us
+                <Button className="w-full" onClick={() => navigateTo('/login')}>
+                  Start 1 maand gratis
                 </Button>
               </CardFooter>
             </Card>
-          </div>
-          <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-muted-foreground">
-            {t('platform.pricingDisclaimer')}
-          </p>
-        </div>
-      </section>
 
-      <section id="security" className="py-20">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-center text-3xl font-bold sm:text-4xl">Trust & Security</h2>
-          <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2">
-            {[
-              { icon: <Lock className="h-5 w-5" />, title: 'EU hosting' },
-              { icon: <KeyRound className="h-5 w-5" />, title: 'Role-based access' },
-              { icon: <FileSignature className="h-5 w-5" />, title: 'PKI signing' },
-              { icon: <ShieldCheck className="h-5 w-5" />, title: 'Audit logs' },
-            ].map((item) => (
-              <div key={item.title} className="flex items-center gap-3 rounded-lg border border-border bg-background p-4 text-sm font-medium">
-                <span className="text-emerald-700">{item.icon}</span>
-                {item.title}
-              </div>
-            ))}
+            <Card className="border-border/80">
+              <CardHeader>
+                <CardTitle className="text-2xl">Accountant</CardTitle>
+                <p className="text-xl font-semibold">Contact voor prijs</p>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm">
+                  {accountantModules.slice(0, 6).map((item) => (
+                    <li key={item} className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-emerald-600" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+              <CardFooter>
+                <Button variant="outline" className="w-full" onClick={() => scrollToSection('contact')}>
+                  Neem contact op
+                </Button>
+              </CardFooter>
+            </Card>
           </div>
         </div>
       </section>
@@ -352,12 +384,33 @@ export const LandingPage = () => {
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
           <div>
             <span className="text-xl font-bold text-primary">Smart Accounting</span>
-            <p className="mt-3 text-sm text-muted-foreground">Boekhouding voor ZZP, accountants en integratiepartners.</p>
+            <p className="mt-3 text-sm text-muted-foreground">Smart Accounting — Compliance Operating System.</p>
           </div>
-          <a href="mailto:info@smartaccounting.nl" className="text-sm text-muted-foreground hover:text-foreground">Contact</a>
-          <a href="#" className="text-sm text-muted-foreground hover:text-foreground">Privacy</a>
-          <a href="#" className="text-sm text-muted-foreground hover:text-foreground">TOS</a>
-          <a href="#" className="text-sm text-muted-foreground hover:text-foreground">Docs</a>
+          <div className="space-y-3 text-sm">
+            <p className="font-medium">Over ons</p>
+            <a href="mailto:info@smartaccounting.nl" className="block text-muted-foreground hover:text-foreground">
+              Contact
+            </a>
+            <a href="#" className="block text-muted-foreground hover:text-foreground">
+              Support
+            </a>
+          </div>
+          <div className="space-y-3 text-sm">
+            <a href="#" className="block text-muted-foreground hover:text-foreground">
+              Privacybeleid
+            </a>
+            <a href="#" className="block text-muted-foreground hover:text-foreground">
+              Algemene voorwaarden
+            </a>
+          </div>
+          <div className="space-y-3 text-sm">
+            <a href="#" className="block text-muted-foreground hover:text-foreground">
+              API
+            </a>
+            <a href="#" className="block text-muted-foreground hover:text-foreground">
+              Security
+            </a>
+          </div>
         </div>
       </footer>
     </div>

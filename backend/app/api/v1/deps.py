@@ -14,6 +14,10 @@ from app.models.administration import Administration, AdministrationMember, Memb
 from app.models.accountant_dashboard import AccountantClientAssignment, PermissionScope, DEFAULT_SCOPES
 
 
+# Roles that bypass subscription checks
+SUBSCRIPTION_BYPASS_ROLES = [UserRole.ACCOUNTANT.value, UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value]
+
+
 # =============================================================================
 # Authentication: Get current user from token
 # =============================================================================
@@ -497,7 +501,7 @@ async def require_zzp_entitlement(
     from app.services.subscription_service import subscription_service, GATED_FEATURES
     
     # Accountants and admins bypass subscription checks
-    if current_user.role in [UserRole.ACCOUNTANT.value, UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value]:
+    if current_user.role in SUBSCRIPTION_BYPASS_ROLES:
         return
     
     # Only ZZP users are subject to subscription gating

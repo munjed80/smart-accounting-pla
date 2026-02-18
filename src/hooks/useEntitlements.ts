@@ -4,10 +4,12 @@
  * Provides subscription status and entitlement flags for feature gating.
  * Auto-fetches subscription data on mount and provides helpers for checking feature access.
  */
-import { useEffect, useState } from 'react'
 import { subscriptionApi, type EntitlementResponse } from '@/lib/api'
 import { useAuth } from '@/lib/AuthContext'
 import { useQuery } from '@tanstack/react-query'
+
+// Roles that bypass subscription checks
+const SUBSCRIPTION_BYPASS_ROLES = ['accountant', 'admin', 'super_admin']
 
 export interface UseEntitlementsResult {
   entitlements: EntitlementResponse | null
@@ -30,7 +32,7 @@ export const useEntitlements = (): UseEntitlementsResult => {
   const { user } = useAuth()
   
   // Accountants and admins bypass subscription checks
-  const isAccountantBypass = user?.role === 'accountant' || user?.role === 'admin' || user?.role === 'super_admin'
+  const isAccountantBypass = user?.role && SUBSCRIPTION_BYPASS_ROLES.includes(user.role)
   
   // Fetch entitlements (disabled for accountants)
   const { data, isLoading, error, refetch } = useQuery<EntitlementResponse>({

@@ -67,7 +67,7 @@ CHART_OF_ACCOUNTS_TEMPLATE = [
 DEFAULT_PLANS = [
     {"code": "free", "name": "FREE", "price_monthly": Decimal("0.00"), "trial_days": 0, "max_invoices": 25, "max_storage_mb": 256, "max_users": 1},
     {"code": "trial", "name": "TRIAL", "price_monthly": Decimal("0.00"), "trial_days": 30, "max_invoices": 200, "max_storage_mb": 1024, "max_users": 2},
-    {"code": "zzp_basic", "name": "ZZP Basic", "price_monthly": Decimal("6.95"), "trial_days": 30, "max_invoices": 999999, "max_storage_mb": 5120, "max_users": 1},
+    {"code": "zzp_basic", "name": "ZZP Basic", "price_monthly": Decimal("6.95"), "trial_days": 30, "max_invoices": 999999, "max_storage_mb": 5120, "max_users": 1},  # 999999 = unlimited invoices
     {"code": "basic", "name": "BASIC", "price_monthly": Decimal("19.00"), "trial_days": 30, "max_invoices": 500, "max_storage_mb": 2048, "max_users": 3},
     {"code": "pro", "name": "PRO", "price_monthly": Decimal("49.00"), "trial_days": 30, "max_invoices": 5000, "max_storage_mb": 10240, "max_users": 15},
 ]

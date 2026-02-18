@@ -38,6 +38,30 @@ ZZP_BASIC_DESCRIPTION = "ZZP Basic abonnement"
 class MollieSubscriptionService:
     """Service for Mollie subscription management"""
     
+    def _is_subscription_scheduled(self, subscription: Subscription) -> bool:
+        """
+        Determine if a subscription is scheduled (created but trial still active).
+        
+        Args:
+            subscription: Subscription object
+            
+        Returns:
+            bool: True if subscription is scheduled to start after trial
+        """
+        now = datetime.now(timezone.utc)
+        in_trial = subscription.status == SubscriptionStatus.TRIALING
+        
+        # Ensure trial_end_at is timezone-aware for comparison
+        trial_end_aware = subscription.trial_end_at
+        if trial_end_aware and trial_end_aware.tzinfo is None:
+            trial_end_aware = trial_end_aware.replace(tzinfo=timezone.utc)
+        
+        return bool(
+            in_trial and 
+            trial_end_aware and 
+            now < trial_end_aware
+        )
+    
     async def ensure_mollie_customer(
         self,
         db: AsyncSession,
@@ -152,24 +176,11 @@ class MollieSubscriptionService:
                 f"{subscription.provider_subscription_id}"
             )
             
-            # Determine if scheduled
-            now = datetime.now(timezone.utc)
-            in_trial = subscription.status == SubscriptionStatus.TRIALING
-            
-            # Ensure trial_end_at is timezone-aware for comparison
-            trial_end_aware = subscription.trial_end_at
-            if trial_end_aware and trial_end_aware.tzinfo is None:
-                trial_end_aware = trial_end_aware.replace(tzinfo=timezone.utc)
-            
-            scheduled = bool(
-                in_trial and 
-                trial_end_aware and 
-                now < trial_end_aware
-            )
+            scheduled = self._is_subscription_scheduled(subscription)
             
             return {
                 "status": subscription.status.value,
-                "in_trial": in_trial,
+                "in_trial": subscription.status == SubscriptionStatus.TRIALING,
                 "trial_end_at": subscription.trial_end_at.isoformat() if subscription.trial_end_at else None,
                 "scheduled": scheduled,
                 "provider_subscription_id": subscription.provider_subscription_id,
@@ -235,23 +246,11 @@ class MollieSubscriptionService:
         await db.commit()
         
         # Determine response
-        now = datetime.now(timezone.utc)
-        in_trial = subscription.status == SubscriptionStatus.TRIALING
-        
-        # Ensure trial_end_at is timezone-aware for comparison
-        trial_end_aware = subscription.trial_end_at
-        if trial_end_aware and trial_end_aware.tzinfo is None:
-            trial_end_aware = trial_end_aware.replace(tzinfo=timezone.utc)
-        
-        scheduled = bool(
-            in_trial and 
-            trial_end_aware and 
-            now < trial_end_aware
-        )
+        scheduled = self._is_subscription_scheduled(subscription)
         
         return {
             "status": subscription.status.value,
-            "in_trial": in_trial,
+            "in_trial": subscription.status == SubscriptionStatus.TRIALING,
             "trial_end_at": subscription.trial_end_at.isoformat() if subscription.trial_end_at else None,
             "scheduled": scheduled,
             "provider_subscription_id": subscription_data["id"],
@@ -383,10 +382,10 @@ class MollieSubscriptionService:
                     subscription_id=subscription_id
                 )
         
-        # Record webhook event
+        # Record webhook event (use resource_id + event_type for idempotency)
         webhook_event = WebhookEvent(
             provider="mollie",
-            event_id=f"{event_type}_{resource_id}_{datetime.now(timezone.utc).timestamp()}",
+            event_id=f"{event_type}_{resource_id}",
             event_type=event_type,
             resource_id=resource_id,
             payload=json.dumps(resource_data)[:5000],  # Truncate if needed

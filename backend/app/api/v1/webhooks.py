@@ -20,8 +20,7 @@ def verify_mollie_webhook(request: Request, x_mollie_signature: str = Header(Non
     """
     Verify Mollie webhook authenticity.
     
-    For now, we use a simple secret verification.
-    In production, you may want to verify the webhook signature if Mollie provides one.
+    Uses secret parameter verification. In production, MOLLIE_WEBHOOK_SECRET must be set.
     
     Args:
         request: FastAPI request
@@ -29,13 +28,18 @@ def verify_mollie_webhook(request: Request, x_mollie_signature: str = Header(Non
     
     Returns:
         bool: True if webhook is authentic
+        
+    Raises:
+        HTTPException: If webhook secret is not configured
     """
     # Get webhook secret from settings
     webhook_secret = settings.MOLLIE_WEBHOOK_SECRET
     
     if not webhook_secret:
-        logger.warning("MOLLIE_WEBHOOK_SECRET not configured - webhook verification disabled")
-        return True  # Allow in development mode
+        # In production, webhook secret MUST be configured
+        # Don't silently allow unverified webhooks
+        logger.error("MOLLIE_WEBHOOK_SECRET not configured - rejecting webhook")
+        return False
     
     # Check query parameter for secret (simple approach)
     secret_param = request.query_params.get("secret")
@@ -46,7 +50,7 @@ def verify_mollie_webhook(request: Request, x_mollie_signature: str = Header(Non
     # Could also check x_mollie_signature header if Mollie provides signature verification
     # For now, we rely on the secret query parameter
     
-    logger.warning("Mollie webhook verification failed")
+    logger.warning("Mollie webhook verification failed - invalid secret")
     return False
 
 

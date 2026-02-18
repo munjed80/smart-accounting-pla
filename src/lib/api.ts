@@ -5200,6 +5200,11 @@ export interface SubscriptionResponse {
   cancel_at_period_end: boolean
   created_at: string
   updated_at: string
+  // Provider fields (Mollie integration - Phase 2)
+  provider: string | null
+  provider_subscription_id: string | null
+  scheduled: boolean
+  // Entitlement flags
   is_paid: boolean
   in_trial: boolean
   can_use_pro_features: boolean
@@ -5221,6 +5226,19 @@ export interface StartTrialResponse {
   trial_start_at: string
   trial_end_at: string
   message: string
+}
+
+export interface ActivateSubscriptionResponse {
+  status: string
+  in_trial: boolean
+  trial_end_at: string | null
+  scheduled: boolean
+  provider_subscription_id: string | null
+}
+
+export interface CancelSubscriptionResponse {
+  status: string
+  cancel_at_period_end: boolean
 }
 
 export const subscriptionApi = {
@@ -5248,6 +5266,25 @@ export const subscriptionApi = {
    */
   getEntitlements: async (): Promise<EntitlementResponse> => {
     const response = await api.get('/me/subscription/entitlements')
+    return response.data
+  },
+
+  /**
+   * Activate Mollie subscription (Phase 2).
+   * Creates a scheduled subscription that starts after the trial period.
+   * Idempotent - returns existing subscription status if already activated.
+   */
+  activateSubscription: async (): Promise<ActivateSubscriptionResponse> => {
+    const response = await api.post('/me/subscription/activate', {})
+    return response.data
+  },
+
+  /**
+   * Cancel Mollie subscription at period end (Phase 2).
+   * The subscription will remain active until the end of the current billing period.
+   */
+  cancelSubscription: async (): Promise<CancelSubscriptionResponse> => {
+    const response = await api.post('/me/subscription/cancel', {})
     return response.data
   },
 }

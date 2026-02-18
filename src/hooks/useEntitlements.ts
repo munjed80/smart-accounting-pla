@@ -4,7 +4,7 @@
  * Provides subscription status and entitlement flags for feature gating.
  * Auto-fetches subscription data on mount and provides helpers for checking feature access.
  */
-import { subscriptionApi, type EntitlementResponse } from '@/lib/api'
+import { subscriptionApi, type EntitlementResponse, type SubscriptionResponse } from '@/lib/api'
 import { useAuth } from '@/lib/AuthContext'
 import { useQuery } from '@tanstack/react-query'
 
@@ -13,6 +13,7 @@ const SUBSCRIPTION_BYPASS_ROLES = ['accountant', 'admin', 'super_admin']
 
 export interface UseEntitlementsResult {
   entitlements: EntitlementResponse | null
+  subscription: SubscriptionResponse | null
   isLoading: boolean
   error: Error | null
   refetch: () => void
@@ -34,10 +35,10 @@ export const useEntitlements = (): UseEntitlementsResult => {
   // Accountants and admins bypass subscription checks
   const isAccountantBypass = user?.role && SUBSCRIPTION_BYPASS_ROLES.includes(user.role)
   
-  // Fetch entitlements (disabled for accountants)
-  const { data, isLoading, error, refetch } = useQuery<EntitlementResponse>({
-    queryKey: ['entitlements', user?.id],
-    queryFn: subscriptionApi.getEntitlements,
+  // Fetch subscription (includes entitlements)
+  const { data: subscription, isLoading, error, refetch } = useQuery<SubscriptionResponse>({
+    queryKey: ['subscription', user?.id],
+    queryFn: subscriptionApi.getMySubscription,
     enabled: !!user && !isAccountantBypass,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
@@ -54,6 +55,7 @@ export const useEntitlements = (): UseEntitlementsResult => {
         status: 'ACCOUNTANT_BYPASS',
         plan_code: null,
       },
+      subscription: null,
       isLoading: false,
       error: null,
       refetch,
@@ -67,15 +69,26 @@ export const useEntitlements = (): UseEntitlementsResult => {
    * Returns true if user has entitlement or is in trial.
    */
   const canUseFeature = (feature: string): boolean => {
-    // If no entitlements loaded yet, assume blocked
-    if (!data) return false
+    // If no subscription loaded yet, assume blocked
+    if (!subscription) return false
     
     // Check general pro feature access
-    return data.can_use_pro_features
+    return subscription.can_use_pro_features
   }
   
+  // Extract entitlements from subscription
+  const entitlements: EntitlementResponse | null = subscription ? {
+    is_paid: subscription.is_paid,
+    in_trial: subscription.in_trial,
+    can_use_pro_features: subscription.can_use_pro_features,
+    days_left_trial: subscription.days_left_trial,
+    status: subscription.status,
+    plan_code: subscription.plan_code,
+  } : null
+  
   return {
-    entitlements: data || null,
+    entitlements,
+    subscription,
     isLoading,
     error: error as Error | null,
     refetch,

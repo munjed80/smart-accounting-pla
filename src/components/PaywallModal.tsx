@@ -8,6 +8,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button'
 import { Lock, Sparkles } from 'lucide-react'
 import { useEntitlements } from '@/hooks/useEntitlements'
+import { subscriptionApi } from '@/lib/api'
+import { useState } from 'react'
+import { useToast } from '@/hooks/use-toast'
 
 export interface PaywallModalProps {
   open: boolean
@@ -25,13 +28,46 @@ export interface PaywallModalProps {
  * @param featureNameNL - Dutch display name (e.g., "BTW-aangifte acties")
  */
 export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallModalProps) => {
-  const { entitlements } = useEntitlements()
+  const { entitlements, refetch } = useEntitlements()
+  const { toast } = useToast()
+  const [isActivating, setIsActivating] = useState(false)
   
-  const handleActivate = () => {
-    // TODO: Wire to Mollie checkout in Phase 2
-    console.log('Activate subscription for feature:', feature)
-    // For now, just close the modal
-    onClose()
+  const handleActivate = async () => {
+    setIsActivating(true)
+    
+    try {
+      const result = await subscriptionApi.activateSubscription()
+      
+      // Refetch entitlements to update UI
+      await refetch()
+      
+      // Show success message
+      if (result.scheduled) {
+        toast({
+          title: 'Abonnement gepland',
+          description: `Je abonnement start automatisch na de proefperiode${result.trial_end_at ? ` op ${new Date(result.trial_end_at).toLocaleDateString('nl-NL')}` : ''}.`,
+          variant: 'default',
+        })
+      } else {
+        toast({
+          title: 'Abonnement actief',
+          description: 'Je abonnement is nu actief. Je hebt toegang tot alle functies.',
+          variant: 'default',
+        })
+      }
+      
+      onClose()
+    } catch (error: any) {
+      console.error('Failed to activate subscription:', error)
+      
+      toast({
+        title: 'Activatie mislukt',
+        description: error.response?.data?.detail?.message || 'Er is een fout opgetreden bij het activeren van je abonnement.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsActivating(false)
+    }
   }
   
   return (
@@ -87,11 +123,15 @@ export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallM
         </div>
         
         <DialogFooter className="flex gap-2 sm:justify-center">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={isActivating}>
             Annuleren
           </Button>
-          <Button onClick={handleActivate} className="bg-orange-600 hover:bg-orange-700">
-            Abonnement activeren
+          <Button 
+            onClick={handleActivate} 
+            className="bg-orange-600 hover:bg-orange-700"
+            disabled={isActivating}
+          >
+            {isActivating ? 'Bezig...' : 'Abonnement activeren'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -170,7 +170,22 @@ export const AccountantReviewQueuePage = () => {
         {error && (
           <Alert className="mb-6 bg-destructive/10 border-destructive/40">
             <WarningCircle className="h-5 w-5 text-destructive" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription className="flex items-center justify-between gap-4">
+              <span>{error}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setError(null)
+                  if (activeClient) {
+                    fetchClientDetails(activeClient.administrationId)
+                  }
+                }}
+                className="shrink-0"
+              >
+                Opnieuw proberen
+              </Button>
+            </AlertDescription>
           </Alert>
         )}
         

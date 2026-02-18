@@ -108,66 +108,312 @@ export const ZZPSubscriptionsPage = () => {
     setForm({ ...i, type: 'subscription', recurring_frequency: (i.recurring_frequency || 'monthly') as 'monthly' | 'yearly', start_date: i.start_date.slice(0, 10), end_date: i.end_date || undefined, renewal_date: i.renewal_date || undefined })
   }
 
-  return <div className='space-y-4 pb-4'>
-    <h1 className='text-xl sm:text-2xl font-semibold'>Abonnementen & Recurring Kosten</h1>
-    <Card><CardHeader><CardTitle>Nieuw abonnement</CardTitle></CardHeader><CardContent className='grid grid-cols-1 md:grid-cols-3 gap-2'>
-      <Input placeholder='Naam' value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-      <Input type='number' min='0' placeholder='Bedrag (EUR)' value={form.amount_cents ? form.amount_cents / 100 : ''} onChange={e => setForm({ ...form, amount_cents: Math.round(Number(e.target.value || 0) * 100) })} />
-      <Select value={form.recurring_frequency} onValueChange={(v: 'monthly' | 'yearly') => setForm({ ...form, recurring_frequency: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value='monthly'>Maandelijks</SelectItem><SelectItem value='yearly'>Jaarlijks</SelectItem></SelectContent></Select>
-      <Input type='date' value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} />
-      <Input type='number' min='1' placeholder='Contractduur (maanden)' value={form.contract_term_months || ''} onChange={e => setForm({ ...form, contract_term_months: Number(e.target.value || 0) || undefined })} />
-      <Select value={String(form.btw_rate ?? 21)} onValueChange={(v) => setForm({ ...form, btw_rate: Number(v) })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value='0'>0%</SelectItem><SelectItem value='9'>9%</SelectItem><SelectItem value='21'>21%</SelectItem></SelectContent></Select>
-      <Input type='number' min='0' placeholder='Opzegtermijn (dagen)' value={form.notice_period_days || ''} onChange={e => setForm({ ...form, notice_period_days: Number(e.target.value || 0) || undefined })} />
-      <Select value={form.auto_renew === false ? 'false' : 'true'} onValueChange={v => setForm({ ...form, auto_renew: v === 'true' })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value='true'>Automatisch verlengen</SelectItem><SelectItem value='false'>Niet automatisch verlengen</SelectItem></SelectContent></Select>
-      <Input type='date' value={form.renewal_date || ''} onChange={e => setForm({ ...form, renewal_date: e.target.value || undefined })} />
-      <Select value={form.status || 'active'} onValueChange={(v: 'active' | 'paused' | 'ended') => setForm({ ...form, status: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value='active'>Actief</SelectItem><SelectItem value='paused'>Gepauzeerd</SelectItem><SelectItem value='ended'>Beëindigd</SelectItem></SelectContent></Select>
-      <div className='md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-2 rounded border p-3 text-sm'>
-        <div><p className='text-muted-foreground'>Jaarlijkse kosten</p><p className='font-medium'>{eur(yearlyCostCents)}</p></div>
-        <div><p className='text-muted-foreground'>Geschatte BTW-teruggave</p><p className='font-medium'>{form.btw_rate && form.btw_rate > 0 ? eur(estimatedVatReclaimCents) : 'n.v.t.'}</p></div>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
+        {/* Header */}
+        <div className="flex flex-col gap-2 mb-6">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+            Abonnementen & Recurring Kosten
+          </h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Beheer je terugkerende kosten en abonnementen
+          </p>
+        </div>
+
+        {/* Form Card */}
+        <Card className="bg-card/80 backdrop-blur-sm border border-border/50 mb-6">
+          <CardHeader className="pb-4">
+            <CardTitle>Nieuw abonnement</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Input placeholder="Naam" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Input type="number" min="0" placeholder="Bedrag (EUR)" value={form.amount_cents ? form.amount_cents / 100 : ''} onChange={e => setForm({ ...form, amount_cents: Math.round(Number(e.target.value || 0) * 100) })} />
+              </div>
+              <div className="space-y-2">
+                <Select value={form.recurring_frequency} onValueChange={(v: 'monthly' | 'yearly') => setForm({ ...form, recurring_frequency: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Frequentie" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Maandelijks</SelectItem>
+                    <SelectItem value="yearly">Jaarlijks</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Input type="number" min="1" placeholder="Contractduur (maanden)" value={form.contract_term_months || ''} onChange={e => setForm({ ...form, contract_term_months: Number(e.target.value || 0) || undefined })} />
+              </div>
+              <div className="space-y-2">
+                <Select value={String(form.btw_rate ?? 21)} onValueChange={(v) => setForm({ ...form, btw_rate: Number(v) })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="BTW tarief" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0%</SelectItem>
+                    <SelectItem value="9">9%</SelectItem>
+                    <SelectItem value="21">21%</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Input type="number" min="0" placeholder="Opzegtermijn (dagen)" value={form.notice_period_days || ''} onChange={e => setForm({ ...form, notice_period_days: Number(e.target.value || 0) || undefined })} />
+              </div>
+              <div className="space-y-2">
+                <Select value={form.auto_renew === false ? 'false' : 'true'} onValueChange={v => setForm({ ...form, auto_renew: v === 'true' })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Verlenging" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Automatisch verlengen</SelectItem>
+                    <SelectItem value="false">Niet automatisch verlengen</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Input type="date" placeholder="Verlengingsdatum" value={form.renewal_date || ''} onChange={e => setForm({ ...form, renewal_date: e.target.value || undefined })} />
+              </div>
+              <div className="space-y-2">
+                <Select value={form.status || 'active'} onValueChange={(v: 'active' | 'paused' | 'ended') => setForm({ ...form, status: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Actief</SelectItem>
+                    <SelectItem value="paused">Gepauzeerd</SelectItem>
+                    <SelectItem value="ended">Beëindigd</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Cost summary */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-lg border border-border bg-secondary/30 p-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Jaarlijkse kosten</p>
+                <p className="text-lg font-semibold">{eur(yearlyCostCents)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Geschatte BTW-teruggave</p>
+                <p className="text-lg font-semibold">{form.btw_rate && form.btw_rate > 0 ? eur(estimatedVatReclaimCents) : 'n.v.t.'}</p>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2 pt-2">
+              <Button onClick={save} className="h-10 sm:h-11">
+                {editingId ? 'Bijwerken' : 'Opslaan'}
+              </Button>
+              {editingId && (
+                <Button variant="outline" onClick={() => { setEditingId(null); setForm(defaultForm()) }} className="h-10 sm:h-11">
+                  Annuleren
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* List Card */}
+        <Card className="bg-card/80 backdrop-blur-sm border border-border/50 mb-6">
+          <CardHeader className="pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg">Abonnementen</CardTitle>
+              </div>
+              {items.length === 0 && (
+                <Button variant="outline" onClick={addExamples} className="h-10 sm:h-11">
+                  Voeg voorbeelden toe
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {items.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground mb-4">
+                  Nog geen abonnementen toegevoegd. Voeg je eerste abonnement toe om je terugkerende kosten bij te houden.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Mobile card view */}
+                <div className="sm:hidden space-y-3">
+                  {items.map(i => (
+                    <div id={`commitment-${i.id}`} key={i.id} className="rounded-lg border border-border bg-card/50 p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-semibold text-base">{i.name}</p>
+                        {isPaused(i) ? <Badge variant="secondary">Gepauzeerd</Badge> : isExpired(i) ? <Badge variant="secondary">Beëindigd</Badge> : null}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Frequentie</p>
+                          <p className="font-medium">{i.recurring_frequency}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Bedrag</p>
+                          <p className="font-medium">{eur(i.amount_cents)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Volgende vervaldatum</p>
+                          <p className="font-medium">{i.next_due_date || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Auto-renew</p>
+                          <p className="font-medium">{i.auto_renew ? 'Ja' : 'Nee'}</p>
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <p>Opzegtermijn: {i.notice_period_days || 0} dagen</p>
+                        <p>Laatste boeking: {i.last_booked_date || '-'}</p>
+                        <p>Gekoppelde uitgaven: {(expensesByCommitmentId[i.id] || []).length}</p>
+                        {(expensesByCommitmentId[i.id] || []).slice(0, 2).map(exp => (
+                          <p key={exp.id}>• {exp.expense_date}: {eur(exp.amount_cents)}</p>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        <Button variant="outline" size="sm" onClick={() => editItem(i)} className="h-9">
+                          Bewerk
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          disabled={isPaused(i) || isExpired(i)} 
+                          onClick={() => setSelectedExpenseCommitment(i)}
+                          className="h-9"
+                        >
+                          Maak uitgave aan
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          onClick={async () => { 
+                            try { 
+                              await zzpApi.commitments.delete(i.id); 
+                              load() 
+                            } catch (error) { 
+                              toast.error(errorWithStatus(error)) 
+                            } 
+                          }}
+                          className="h-9"
+                        >
+                          Verwijder
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop table view */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Naam</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Frequentie</TableHead>
+                        <TableHead>Volgende vervaldatum</TableHead>
+                        <TableHead>Opzegtermijn</TableHead>
+                        <TableHead>Auto-renew</TableHead>
+                        <TableHead>Bedrag</TableHead>
+                        <TableHead>Laatste boeking</TableHead>
+                        <TableHead>Uitgaven</TableHead>
+                        <TableHead />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {items.map(i => (
+                        <TableRow id={`commitment-${i.id}`} key={i.id}>
+                          <TableCell className="font-medium">{i.name}</TableCell>
+                          <TableCell>{i.status}</TableCell>
+                          <TableCell>{i.recurring_frequency}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {i.next_due_date || '-'} 
+                              {isPaused(i) ? <Badge variant="secondary">Gepauzeerd</Badge> : isExpired(i) ? <Badge variant="secondary">Beëindigd</Badge> : null}
+                            </div>
+                          </TableCell>
+                          <TableCell>{i.notice_period_days || 0} dgn</TableCell>
+                          <TableCell>{i.auto_renew ? 'Ja' : 'Nee'}</TableCell>
+                          <TableCell className="font-medium">{eur(i.amount_cents)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{i.last_booked_date || '-'}</TableCell>
+                          <TableCell>{(expensesByCommitmentId[i.id] || []).length}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2 whitespace-nowrap">
+                              <Button variant="outline" size="sm" onClick={() => editItem(i)}>
+                                Bewerk
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                disabled={isPaused(i) || isExpired(i)} 
+                                onClick={() => setSelectedExpenseCommitment(i)}
+                              >
+                                Maak uitgave aan
+                              </Button>
+                              <Button 
+                                variant="destructive" 
+                                size="sm" 
+                                onClick={async () => { 
+                                  try { 
+                                    await zzpApi.commitments.delete(i.id); 
+                                    load() 
+                                  } catch (error) { 
+                                    toast.error(errorWithStatus(error)) 
+                                  } 
+                                }}
+                              >
+                                Verwijder
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Suggestions Card */}
+        <Card className="bg-card/80 backdrop-blur-sm border border-border/50">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg">Suggesties op basis van bankfeed</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {suggestions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nog geen suggesties gevonden.</p>
+            ) : (
+              suggestions.map(s => (
+                <div key={s.bank_transaction_id} className="border border-border rounded-lg p-3 text-sm flex justify-between items-center">
+                  <span className="font-medium">{s.description}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{eur(s.amount_cents)}</span>
+                    <Badge variant="secondary">{(s.confidence * 100).toFixed(0)}%</Badge>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <CommitmentExpenseDialog 
+          open={!!selectedExpenseCommitment} 
+          commitment={selectedExpenseCommitment} 
+          isSubmitting={isCreatingExpense} 
+          onOpenChange={(open) => { if (!open) setSelectedExpenseCommitment(null) }} 
+          onConfirm={confirmCreateExpense} 
+        />
       </div>
-      <div className='md:col-span-3'>
-        <Button onClick={save}>{editingId ? 'Bijwerken' : 'Opslaan'}</Button>
-      </div>
-    </CardContent></Card>
-
-    <Card><CardHeader><CardTitle>Abonnementen</CardTitle></CardHeader><CardContent className='space-y-3'>
-      {items.length === 0 && <div><Button variant='outline' onClick={addExamples}>Voeg voorbeelden toe</Button></div>}
-
-      <div className='sm:hidden space-y-2'>
-        {items.map(i => <div id={`commitment-${i.id}`} key={i.id} className='rounded-md border p-3 space-y-2'>
-          <div className='flex items-center justify-between gap-2'>
-            <p className='font-medium'>{i.name}</p>
-            {isPaused(i) ? <Badge variant='secondary'>Gepauzeerd</Badge> : isExpired(i) ? <Badge variant='secondary'>Beëindigd</Badge> : null}
-          </div>
-          <p className='text-sm text-muted-foreground'>Frequentie: {i.recurring_frequency}</p>
-          <p className='text-sm text-muted-foreground'>Volgende vervaldatum: {i.next_due_date || '-'}</p>
-          <p className='text-sm text-muted-foreground'>Opzegtermijn: {i.notice_period_days || 0} dagen</p>
-          <p className='text-sm text-muted-foreground'>Auto-renew: {i.auto_renew ? 'Ja' : 'Nee'}</p>
-          <p className='text-sm font-medium'>{eur(i.amount_cents)}</p>
-          <p className='text-xs text-muted-foreground'>Laatste boeking: {i.last_booked_date || '-'}</p>
-          <p className='text-xs text-muted-foreground'>Gekoppelde uitgaven: {(expensesByCommitmentId[i.id] || []).length}</p>
-          {(expensesByCommitmentId[i.id] || []).slice(0, 2).map(exp => <p key={exp.id} className='text-xs text-muted-foreground'>• {exp.expense_date}: {eur(exp.amount_cents)}</p>)}
-          <div className='flex flex-wrap gap-2'>
-            <Button variant='outline' size='sm' onClick={() => editItem(i)}>Bewerk</Button>
-            <Button variant='outline' size='sm' disabled={isPaused(i) || isExpired(i)} onClick={() => setSelectedExpenseCommitment(i)}>Maak uitgave aan</Button>
-            <Button variant='destructive' size='sm' onClick={async () => { try { await zzpApi.commitments.delete(i.id); load() } catch (error) { toast.error(errorWithStatus(error)) } }}>Verwijder</Button>
-          </div>
-        </div>)}
-      </div>
-
-      <div className='hidden sm:block overflow-x-auto'>
-        <Table>
-          <TableHeader><TableRow><TableHead>Naam</TableHead><TableHead>Status</TableHead><TableHead>Frequentie</TableHead><TableHead>Volgende vervaldatum</TableHead><TableHead>Opzegtermijn</TableHead><TableHead>Auto-renew</TableHead><TableHead>Bedrag</TableHead><TableHead>Laatste boeking</TableHead><TableHead>Uitgaven</TableHead><TableHead /></TableRow></TableHeader><TableBody>
-            {items.map(i => <TableRow id={`commitment-${i.id}`} key={i.id}><TableCell>{i.name}</TableCell><TableCell>{i.status}</TableCell><TableCell>{i.recurring_frequency}</TableCell><TableCell><div className='flex items-center gap-2'>{i.next_due_date || '-'} {isPaused(i) ? <Badge variant='secondary'>Gepauzeerd</Badge> : isExpired(i) ? <Badge variant='secondary'>Beëindigd</Badge> : null}</div></TableCell><TableCell>{i.notice_period_days || 0} dgn</TableCell><TableCell>{i.auto_renew ? 'Ja' : 'Nee'}</TableCell><TableCell>{eur(i.amount_cents)}</TableCell><TableCell className='text-xs text-muted-foreground'>{i.last_booked_date || '-'}</TableCell><TableCell>{(expensesByCommitmentId[i.id] || []).length}</TableCell><TableCell className='space-x-2 whitespace-nowrap'><Button variant='outline' size='sm' onClick={() => editItem(i)}>Bewerk</Button><Button variant='outline' size='sm' disabled={isPaused(i) || isExpired(i)} onClick={() => setSelectedExpenseCommitment(i)}>Maak uitgave aan</Button><Button variant='destructive' size='sm' onClick={async () => { try { await zzpApi.commitments.delete(i.id); load() } catch (error) { toast.error(errorWithStatus(error)) } }}>Verwijder</Button></TableCell></TableRow>)}
-          </TableBody></Table>
-      </div>
-    </CardContent></Card>
-
-    <Card><CardHeader><CardTitle>Suggesties op basis van bankfeed</CardTitle></CardHeader><CardContent className='space-y-2'>
-      {suggestions.length === 0 && <p className='text-sm text-muted-foreground'>Nog geen suggesties gevonden.</p>}
-      {suggestions.map(s => <div key={s.bank_transaction_id} className='border rounded p-2 text-sm flex justify-between'><span>{s.description}</span><span>{eur(s.amount_cents)} · {(s.confidence * 100).toFixed(0)}%</span></div>)}
-    </CardContent></Card>
-
-    <CommitmentExpenseDialog open={!!selectedExpenseCommitment} commitment={selectedExpenseCommitment} isSubmitting={isCreatingExpense} onOpenChange={(open) => { if (!open) setSelectedExpenseCommitment(null) }} onConfirm={confirmCreateExpense} />
-  </div>
+    </div>
+  )
 }

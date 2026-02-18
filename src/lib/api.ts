@@ -1347,6 +1347,28 @@ export const accountantDossierApi = {
     const response = await api.get<AccountantCommitmentsResponse>(`/accountant/clients/${clientId}/commitments`, { params: filters })
     return response.data
   },
+
+  exportInvoicesCsv: async (clientId: string): Promise<Blob> => {
+    const response = await api.get(`/accountant/clients/${clientId}/invoices/export`, {
+      responseType: 'blob'
+    })
+    return response.data as Blob
+  },
+
+  exportExpensesCsv: async (clientId: string, filters?: { commitment_id?: string }): Promise<Blob> => {
+    const response = await api.get(`/accountant/clients/${clientId}/expenses/export`, {
+      params: filters,
+      responseType: 'blob'
+    })
+    return response.data as Blob
+  },
+
+  exportHoursCsv: async (clientId: string): Promise<Blob> => {
+    const response = await api.get(`/accountant/clients/${clientId}/hours/export`, {
+      responseType: 'blob'
+    })
+    return response.data as Blob
+  },
 }
 
 // ============ Bookkeeping API ============
@@ -2066,13 +2088,20 @@ export const getErrorMessage = (error: unknown): string => {
     }
     
     // Network error - could be CORS, TLS, or connectivity issue
+    // Only show generic "Network Error" if actually offline
     // Dutch message with helpful troubleshooting hint
     if (error.message === 'Network Error') {
+      // Check if user is actually offline
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        return 'Geen internetverbinding. Controleer je netwerkverbinding.'
+      }
+      
+      // User is online but getting network error - more specific issue
       const baseHint = normalizedEnvApiUrl 
         ? `VITE_API_URL moet alleen ${normalizedEnvApiUrl} zijn (zonder /api paden).`
         : 'VITE_API_URL moet alleen het domein bevatten (zonder /api paden).'
       return `Kan geen verbinding maken met de server op ${API_BASE_URL}. ` +
-        `Mogelijke oorzaken: netwerkproblemen, CORS-fout, of ongeldig TLS-certificaat. ` +
+        `Mogelijke oorzaken: CORS-fout, ongeldig TLS-certificaat, of server niet bereikbaar. ` +
         `Controleer Coolify build env: ${baseHint}`
     }
     

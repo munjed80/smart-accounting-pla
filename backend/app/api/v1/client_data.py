@@ -11,11 +11,14 @@ Uses unified administration_id access pattern to ensure data consistency.
 All endpoints respect AccountantClientAssignment scopes and permissions.
 """
 from datetime import date, timedelta
+import csv
+import io
 from decimal import Decimal
 from typing import Annotated, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import Response
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -475,4 +478,251 @@ async def list_client_commitments(
         missing_this_period_count=missing_this_period_count,
         commitments=sorted_items[:10],
         total=len(sorted_items),
+    )
+
+
+# ============ CSV Export Endpoints ============
+
+
+@router.get("/clients/{client_id}/invoices/export")
+async def export_client_invoices_csv(
+    client_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    status: Optional[str] = Query(None, pattern=r'^(draft|sent|paid|overdue|cancelled)$'),
+    customer_id: Optional[UUID] = Query(None),
+    from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+):
+    """
+    Export invoices as CSV for a client (accountant access).
+    
+    Requires 'invoices' scope in AccountantClientAssignment.
+    """
+    # Verify access with 'invoices' scope
+    administration = await require_approved_mandate_client(
+        client_id, current_user, db, required_scope="invoices"
+    )
+    
+    # Build query - ALWAYS filter by administration_id for data isolation
+    query = (
+        select(ZZPInvoice)
+        .options(selectinload(ZZPInvoice.lines))
+        .where(ZZPInvoice.administration_id == administration.id)
+    )
+    
+    # Apply filters
+    if status:
+        query = query.where(ZZPInvoice.status == status)
+    if customer_id:
+        query = query.where(ZZPInvoice.customer_id == customer_id)
+    if from_date:
+        query = query.where(ZZPInvoice.issue_date >= date.fromisoformat(from_date))
+    if to_date:
+        query = query.where(ZZPInvoice.issue_date <= date.fromisoformat(to_date))
+    
+    query = query.order_by(ZZPInvoice.issue_date.desc(), ZZPInvoice.invoice_number.desc())
+    
+    result = await db.execute(query)
+    invoices = result.scalars().all()
+    
+    # Generate CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write header
+    writer.writerow([
+        'Factuurnummer',
+        'Datum',
+        'Vervaldatum',
+        'Klant',
+        'Status',
+        'Subtotaal (€)',
+        'BTW (€)',
+        'Totaal (€)',
+        'Betaald (€)',
+    ])
+    
+    # Write data
+    for invoice in invoices:
+        writer.writerow([
+            invoice.invoice_number or '',
+            invoice.issue_date.isoformat() if invoice.issue_date else '',
+            invoice.due_date.isoformat() if invoice.due_date else '',
+            invoice.customer_name or '',
+            invoice.status.value if hasattr(invoice.status, 'value') else str(invoice.status),
+            f"{invoice.subtotal_cents / 100:.2f}",
+            f"{invoice.vat_total_cents / 100:.2f}",
+            f"{invoice.total_cents / 100:.2f}",
+            f"{invoice.amount_paid_cents / 100:.2f}",
+        ])
+    
+    # Return CSV response
+    csv_content = output.getvalue()
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=facturen-{administration.name}-{date.today().isoformat()}.csv"
+        }
+    )
+
+
+@router.get("/clients/{client_id}/expenses/export")
+async def export_client_expenses_csv(
+    client_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    category: Optional[str] = Query(None),
+    commitment_id: Optional[UUID] = Query(None),
+    from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+):
+    """
+    Export expenses as CSV for a client (accountant access).
+    
+    Requires 'expenses' scope in AccountantClientAssignment.
+    """
+    # Verify access with 'expenses' scope
+    administration = await require_approved_mandate_client(
+        client_id, current_user, db, required_scope="expenses"
+    )
+    
+    # Build query - ALWAYS filter by administration_id
+    query = (
+        select(ZZPExpense)
+        .where(ZZPExpense.administration_id == administration.id)
+    )
+    
+    # Apply filters
+    if category:
+        query = query.where(ZZPExpense.category == category)
+    if commitment_id:
+        query = query.where(ZZPExpense.commitment_id == commitment_id)
+    if from_date:
+        query = query.where(ZZPExpense.expense_date >= date.fromisoformat(from_date))
+    if to_date:
+        query = query.where(ZZPExpense.expense_date <= date.fromisoformat(to_date))
+    
+    query = query.order_by(ZZPExpense.expense_date.desc())
+    
+    result = await db.execute(query)
+    expenses = result.scalars().all()
+    
+    # Generate CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write header
+    writer.writerow([
+        'Datum',
+        'Leverancier',
+        'Beschrijving',
+        'Categorie',
+        'Bedrag (€)',
+        'BTW %',
+        'BTW Bedrag (€)',
+        'Notities',
+    ])
+    
+    # Write data
+    for expense in expenses:
+        writer.writerow([
+            expense.expense_date.isoformat() if expense.expense_date else '',
+            expense.vendor or '',
+            expense.description or '',
+            expense.category or '',
+            f"{expense.amount_cents / 100:.2f}",
+            f"{float(expense.vat_rate):.1f}",
+            f"{expense.vat_amount_cents / 100:.2f}",
+            expense.notes or '',
+        ])
+    
+    # Return CSV response
+    csv_content = output.getvalue()
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=uitgaven-{administration.name}-{date.today().isoformat()}.csv"
+        }
+    )
+
+
+@router.get("/clients/{client_id}/hours/export")
+async def export_client_hours_csv(
+    client_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    customer_id: Optional[UUID] = Query(None),
+    billable: Optional[bool] = Query(None),
+    from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+):
+    """
+    Export time entries (hours) as CSV for a client (accountant access).
+    
+    Requires 'hours' scope in AccountantClientAssignment.
+    """
+    # Verify access with 'hours' scope
+    administration = await require_approved_mandate_client(
+        client_id, current_user, db, required_scope="hours"
+    )
+    
+    # Build query - ALWAYS filter by administration_id
+    query = (
+        select(ZZPTimeEntry)
+        .where(ZZPTimeEntry.administration_id == administration.id)
+    )
+    
+    # Apply filters
+    if customer_id:
+        query = query.where(ZZPTimeEntry.customer_id == customer_id)
+    if billable is not None:
+        query = query.where(ZZPTimeEntry.billable == billable)
+    if from_date:
+        query = query.where(ZZPTimeEntry.entry_date >= date.fromisoformat(from_date))
+    if to_date:
+        query = query.where(ZZPTimeEntry.entry_date <= date.fromisoformat(to_date))
+    
+    query = query.order_by(ZZPTimeEntry.entry_date.desc())
+    
+    result = await db.execute(query)
+    time_entries = result.scalars().all()
+    
+    # Generate CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write header
+    writer.writerow([
+        'Datum',
+        'Beschrijving',
+        'Project',
+        'Uren',
+        'Uurtarief (€)',
+        'Declarabel',
+        'Gefactureerd',
+    ])
+    
+    # Write data
+    for entry in time_entries:
+        writer.writerow([
+            entry.entry_date.isoformat() if entry.entry_date else '',
+            entry.description or '',
+            entry.project_name or '',
+            f"{float(entry.hours):.2f}",
+            f"{entry.hourly_rate_cents / 100:.2f}" if entry.hourly_rate_cents else '',
+            'Ja' if entry.billable else 'Nee',
+            'Ja' if entry.is_invoiced else 'Nee',
+        ])
+    
+    # Return CSV response
+    csv_content = output.getvalue()
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=uren-{administration.name}-{date.today().isoformat()}.csv"
+        }
     )

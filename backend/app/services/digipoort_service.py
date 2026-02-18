@@ -159,8 +159,8 @@ class DigipoortService:
         attachment_ref = ET.SubElement(body_placeholder, f"{{{digipoort_ns}}}AttachmentReference")
         attachment_ref.text = "cid:signed-xml-attachment"
         
-        # Convert to string
-        xml_str = ET.tostring(envelope, encoding='unicode', method='xml')
+        # Convert to string with explicit control
+        xml_str = ET.tostring(envelope, encoding='unicode', method='xml', xml_declaration=False)
         return f'<?xml version="1.0" encoding="UTF-8"?>\n{xml_str}'
     
     def attach_signed_xml(

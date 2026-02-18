@@ -492,6 +492,23 @@ class MollieSubscriptionService:
                 }
             )
             db.add(audit)
+        
+        elif status in ["pending", "open"]:
+            # Payment pending - check trial status
+            now = datetime.now(timezone.utc)
+            
+            # Ensure trial_end_at is timezone-aware
+            trial_end_aware = subscription.trial_end_at
+            if trial_end_aware and trial_end_aware.tzinfo is None:
+                trial_end_aware = trial_end_aware.replace(tzinfo=timezone.utc)
+            
+            if trial_end_aware and now < trial_end_aware:
+                # Still in trial, keep TRIALING status
+                logger.info(f"Payment pending for subscription {subscription.id}, still in trial")
+            else:
+                # Trial expired, mark as PAST_DUE
+                subscription.status = SubscriptionStatus.PAST_DUE
+                logger.warning(f"Payment pending but trial expired for subscription {subscription.id}")
     
     async def _process_subscription_webhook(
         self,
@@ -535,9 +552,10 @@ class MollieSubscriptionService:
             )
             db.add(audit)
         
-        elif status in ["canceled", "suspended"]:
+        elif status in ["canceled", "suspended", "completed"]:
+            # Subscription ended - mark as CANCELED
             subscription.status = SubscriptionStatus.CANCELED
-            logger.info(f"Subscription canceled: {subscription.id}")
+            logger.info(f"Subscription ended: {subscription.id}, status={status}")
             
             # Audit log
             audit = AuditLog(

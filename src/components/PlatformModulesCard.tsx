@@ -120,7 +120,7 @@ export const PlatformModulesCard = () => {
   return (
     <Card className="mb-6 border-accent-secondary-6/30 bg-gradient-to-br from-accent-secondary-2/20 to-background">
       <CardHeader>
-        <CardTitle className="text-xl flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-xl">
           <span className="text-accent-secondary-11">{t('platform.platformForAccountants')}</span>
         </CardTitle>
       </CardHeader>

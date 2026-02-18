@@ -5204,6 +5204,7 @@ export interface SubscriptionResponse {
   provider: string | null
   provider_subscription_id: string | null
   scheduled: boolean
+  next_payment_date: string | null
   // Entitlement flags
   is_paid: boolean
   in_trial: boolean

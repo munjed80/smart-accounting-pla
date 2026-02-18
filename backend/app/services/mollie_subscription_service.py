@@ -374,20 +374,26 @@ class MollieSubscriptionService:
                 subscription_id=subscription.provider_subscription_id,
             )
         
-        # Mark as cancel at period end
-        subscription.cancel_at_period_end = True
-        
-        # Mollie cancels at period end, so status stays ACTIVE until webhook
-        # Extract current_period_end if available from Mollie response
-        # Note: Mollie doesn't provide nextPaymentDate after cancellation, but we may have it already
-        
+        mollie_status = mollie_sub_data.get("status")
+        immediate_cancel = mollie_status in {"completed"}
+
+        # Prefer cancel-at-period-end semantics when supported by provider response
+        if immediate_cancel:
+            subscription.status = SubscriptionStatus.CANCELED
+            subscription.cancel_at_period_end = False
+        else:
+            subscription.cancel_at_period_end = True
+
         await db.commit()
         await db.refresh(subscription)
-        
-        logger.info(f"Canceled Mollie subscription for subscription {subscription.id}")
-        
+
+        logger.info(
+            f"Canceled Mollie subscription for subscription {subscription.id} "
+            f"(status={mollie_status})"
+        )
+
         # Audit log - SUBSCRIPTION_CANCEL_REQUESTED
-        audit = AuditLog(
+        audit_requested = AuditLog(
             client_id=administration_id,
             entity_type="subscription",
             entity_id=subscription.id,
@@ -396,20 +402,41 @@ class MollieSubscriptionService:
             user_role=user.role,
             new_value={
                 "mollie_subscription_id": subscription.provider_subscription_id,
-                "cancel_at_period_end": True,
-                "mollie_status": mollie_sub_data.get("status"),
+                "cancel_at_period_end": subscription.cancel_at_period_end,
+                "mollie_status": mollie_status,
             }
         )
-        db.add(audit)
+        db.add(audit_requested)
+
+        if immediate_cancel:
+            db.add(
+                AuditLog(
+                    client_id=administration_id,
+                    entity_type="subscription",
+                    entity_id=subscription.id,
+                    action="SUBSCRIPTION_CANCELED",
+                    user_id=user.id,
+                    user_role=user.role,
+                    new_value={
+                        "mollie_subscription_id": subscription.provider_subscription_id,
+                        "reason": "provider_immediate_cancel",
+                    }
+                )
+            )
+
         await db.commit()
-        
+
         return {
             "subscription": {
                 "status": subscription.status.value,
-                "cancel_at_period_end": True,
+                "cancel_at_period_end": subscription.cancel_at_period_end,
                 "current_period_end": subscription.current_period_end.isoformat() if subscription.current_period_end else None,
             },
-            "message_nl": "Abonnement opgezegd. Het blijft actief tot het einde van de huidige periode.",
+            "message_nl": (
+                "Abonnement direct geannuleerd."
+                if immediate_cancel
+                else "Abonnement opgezegd. Het blijft actief tot het einde van de huidige periode."
+            ),
         }
     
     async def reactivate_subscription(
@@ -842,6 +869,7 @@ class MollieSubscriptionService:
         elif status in ["canceled", "suspended", "completed"]:
             # Subscription ended - mark as CANCELED
             subscription.status = SubscriptionStatus.CANCELED
+            subscription.cancel_at_period_end = False
             
             # Record current_period_end if available from Mollie
             # Mollie may provide canceledAt or other timestamps

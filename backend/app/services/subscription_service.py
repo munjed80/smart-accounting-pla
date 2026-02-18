@@ -204,6 +204,8 @@ class SubscriptionService:
             subscription.trial_end_at = subscription.trial_end_at.replace(tzinfo=timezone.utc)
         if subscription.trial_start_at and subscription.trial_start_at.tzinfo is None:
             subscription.trial_start_at = subscription.trial_start_at.replace(tzinfo=timezone.utc)
+        if subscription.current_period_end and subscription.current_period_end.tzinfo is None:
+            subscription.current_period_end = subscription.current_period_end.replace(tzinfo=timezone.utc)
         
         # Compute days left in trial
         days_left_trial = 0
@@ -244,7 +246,25 @@ class SubscriptionService:
                 )
         
         elif subscription.status == SubscriptionStatus.ACTIVE:
-            # Active paid subscription
+            # Cancellation at period end: keep ACTIVE until current_period_end passes
+            if subscription.cancel_at_period_end and subscription.current_period_end and now >= subscription.current_period_end:
+                subscription.status = SubscriptionStatus.CANCELED
+                await db.commit()
+                await db.refresh(subscription)
+
+                logger.info(
+                    f"Subscription reached period end for administration {administration_id}, "
+                    f"status updated to CANCELED"
+                )
+                return EntitlementResult(
+                    is_paid=False,
+                    in_trial=False,
+                    can_use_pro_features=False,
+                    days_left_trial=0,
+                    status=subscription.status.value,
+                    plan_code=subscription.plan_code,
+                )
+
             return EntitlementResult(
                 is_paid=True,
                 in_trial=False,
@@ -253,9 +273,9 @@ class SubscriptionService:
                 status=subscription.status.value,
                 plan_code=subscription.plan_code,
             )
-        
-        else:
-            # PAST_DUE, CANCELED, EXPIRED - no access
+
+        elif subscription.status == SubscriptionStatus.PAST_DUE:
+            # Immediately gate paid features while retaining subscription record
             return EntitlementResult(
                 is_paid=False,
                 in_trial=False,
@@ -264,6 +284,40 @@ class SubscriptionService:
                 status=subscription.status.value,
                 plan_code=subscription.plan_code,
             )
+
+        elif subscription.status == SubscriptionStatus.CANCELED:
+            # Defensive guard: if still before current_period_end, keep ACTIVE behavior
+            if subscription.cancel_at_period_end and subscription.current_period_end and now < subscription.current_period_end:
+                subscription.status = SubscriptionStatus.ACTIVE
+                await db.commit()
+                await db.refresh(subscription)
+                return EntitlementResult(
+                    is_paid=True,
+                    in_trial=False,
+                    can_use_pro_features=True,
+                    days_left_trial=0,
+                    status=subscription.status.value,
+                    plan_code=subscription.plan_code,
+                )
+
+            return EntitlementResult(
+                is_paid=False,
+                in_trial=False,
+                can_use_pro_features=False,
+                days_left_trial=0,
+                status=subscription.status.value,
+                plan_code=subscription.plan_code,
+            )
+
+        # EXPIRED and fallback statuses
+        return EntitlementResult(
+            is_paid=False,
+            in_trial=False,
+            can_use_pro_features=False,
+            days_left_trial=0,
+            status=subscription.status.value,
+            plan_code=subscription.plan_code,
+        )
 
 
 # Singleton instance

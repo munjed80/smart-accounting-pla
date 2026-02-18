@@ -15,6 +15,28 @@ from app.api.v1 import auth, administrations, documents, transactions, dashboard
 logger = logging.getLogger(__name__)
 
 
+def validate_payment_env() -> None:
+    """Validate payment env vars with safe startup behavior."""
+    missing = [
+        key for key, value in {
+            "MOLLIE_API_KEY": settings.MOLLIE_API_KEY,
+            "MOLLIE_WEBHOOK_SECRET": settings.MOLLIE_WEBHOOK_SECRET,
+            "APP_PUBLIC_URL": settings.APP_PUBLIC_URL,
+        }.items()
+        if not value or not str(value).strip()
+    ]
+
+    if not missing:
+        return
+
+    message = f"Missing payment configuration env vars: {', '.join(missing)}"
+    if settings.ENV.lower() == "production":
+        logger.critical(message)
+        raise RuntimeError(message)
+
+    logger.warning(message)
+
+
 def verify_orm_mappings() -> None:
     """
     Verify all SQLAlchemy ORM mappings are valid at startup.
@@ -159,6 +181,9 @@ async def lifespan(app: FastAPI):
         # Non-critical: log warning but allow startup (DB might not be ready yet)
         logger.warning(f"Could not verify database enums (DB may not be ready): {e}")
     
+    # Validate payment-related env config
+    validate_payment_env()
+
     # Log enum and router status for production diagnostics
     log_enum_and_router_status()
     

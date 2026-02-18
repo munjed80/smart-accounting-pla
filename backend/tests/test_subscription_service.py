@@ -368,3 +368,85 @@ async def test_get_subscription_returns_none_if_not_exists(db_session):
     
     # Assertions
     assert retrieved_subscription is None
+
+
+@pytest.mark.asyncio
+async def test_compute_entitlements_active_with_cancel_at_period_end_before_period_end(db_session):
+    """ACTIVE + cancel_at_period_end stays ACTIVE until period_end."""
+    admin = Administration(name="Test Admin", description="Test")
+    db_session.add(admin)
+
+    plan = Plan(
+        code="zzp_basic",
+        name="ZZP Basic",
+        price_monthly=6.95,
+        trial_days=30,
+        max_invoices=999999,
+        max_storage_mb=5120,
+        max_users=1,
+    )
+    db_session.add(plan)
+    await db_session.commit()
+
+    now = datetime.now(timezone.utc)
+    subscription = Subscription(
+        administration_id=admin.id,
+        plan_id=plan.id,
+        plan_code=plan.code,
+        status=SubscriptionStatus.ACTIVE,
+        trial_start_at=now - timedelta(days=60),
+        trial_end_at=now - timedelta(days=30),
+        current_period_start=now - timedelta(days=2),
+        current_period_end=now + timedelta(days=2),
+        starts_at=now - timedelta(days=60),
+        cancel_at_period_end=True,
+    )
+    db_session.add(subscription)
+    await db_session.commit()
+
+    entitlements = await subscription_service.compute_entitlements(db_session, admin.id, now)
+
+    assert entitlements.status == "ACTIVE"
+    assert entitlements.can_use_pro_features is True
+    assert entitlements.is_paid is True
+
+
+@pytest.mark.asyncio
+async def test_compute_entitlements_active_cancel_at_period_end_after_period_end(db_session):
+    """ACTIVE + cancel_at_period_end flips to CANCELED after period_end."""
+    admin = Administration(name="Test Admin", description="Test")
+    db_session.add(admin)
+
+    plan = Plan(
+        code="zzp_basic",
+        name="ZZP Basic",
+        price_monthly=6.95,
+        trial_days=30,
+        max_invoices=999999,
+        max_storage_mb=5120,
+        max_users=1,
+    )
+    db_session.add(plan)
+    await db_session.commit()
+
+    now = datetime.now(timezone.utc)
+    subscription = Subscription(
+        administration_id=admin.id,
+        plan_id=plan.id,
+        plan_code=plan.code,
+        status=SubscriptionStatus.ACTIVE,
+        trial_start_at=now - timedelta(days=60),
+        trial_end_at=now - timedelta(days=30),
+        current_period_start=now - timedelta(days=35),
+        current_period_end=now - timedelta(minutes=5),
+        starts_at=now - timedelta(days=60),
+        cancel_at_period_end=True,
+    )
+    db_session.add(subscription)
+    await db_session.commit()
+
+    entitlements = await subscription_service.compute_entitlements(db_session, admin.id, now)
+
+    assert entitlements.status == "CANCELED"
+    assert entitlements.can_use_pro_features is False
+    assert entitlements.is_paid is False

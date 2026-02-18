@@ -901,6 +901,19 @@ export const SettingsPage = () => {
                       </div>
                     </div>
 
+
+                    <div className="grid gap-1 text-sm text-muted-foreground">
+                      {subscription.trial_end_at && (
+                        <div>Proefperiode eindigt: {new Date(subscription.trial_end_at).toLocaleDateString('nl-NL')}</div>
+                      )}
+                      {subscription.next_payment_date && (
+                        <div>Volgende betaling: {new Date(subscription.next_payment_date).toLocaleDateString('nl-NL')}</div>
+                      )}
+                      {subscription.cancel_at_period_end && subscription.current_period_end && (
+                        <div>Einde lopende periode: {new Date(subscription.current_period_end).toLocaleDateString('nl-NL')}</div>
+                      )}
+                    </div>
+
                     {/* Scheduled Status */}
                     {subscription.scheduled && subscription.trial_end_at && (
                       <Alert>

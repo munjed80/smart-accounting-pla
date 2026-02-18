@@ -9,17 +9,19 @@ Handles:
 """
 import logging
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Optional, Dict, Any
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from dateutil import parser as dateutil_parser
 
 from app.core.config import settings
-from app.models.subscription import Subscription, SubscriptionStatus, WebhookEvent
+from app.models.subscription import Subscription, SubscriptionStatus, WebhookEvent, PendingWebhookRetry
 from app.models.administration import Administration
 from app.models.user import User
 from app.models.audit_log import AuditLog
@@ -34,6 +36,7 @@ ZZP_BASIC_PRICE = Decimal("6.95")
 ZZP_BASIC_CURRENCY = "EUR"
 ZZP_BASIC_INTERVAL = "1 month"
 ZZP_BASIC_DESCRIPTION = "ZZP Basic abonnement"
+AMSTERDAM_TZ = ZoneInfo("Europe/Amsterdam")
 
 
 class MollieSubscriptionService:
@@ -204,8 +207,11 @@ class MollieSubscriptionService:
         # Determine start date (trial_end_at date)
         start_date = None
         if subscription.trial_end_at:
-            # Convert to date (Mollie expects date, not datetime)
-            start_date = subscription.trial_end_at.date()
+            # Convert trial end to Europe/Amsterdam calendar date for Mollie startDate.
+            trial_end = subscription.trial_end_at
+            if trial_end.tzinfo is None:
+                trial_end = trial_end.replace(tzinfo=timezone.utc)
+            start_date = trial_end.astimezone(AMSTERDAM_TZ).date()
         
         # Build webhook URL
         webhook_url = self._get_webhook_url()
@@ -626,6 +632,79 @@ class MollieSubscriptionService:
             "message_nl": "Abonnement heractiveerd. De eerste betaling wordt binnenkort verwerkt.",
         }
     
+
+    async def enqueue_pending_webhook_retry(
+        self,
+        db: AsyncSession,
+        resource_id: str,
+        resource_type: str,
+        reason: str,
+    ) -> None:
+        """Store webhook for retry processing without failing the webhook response."""
+        next_retry = datetime.now(timezone.utc) + timedelta(seconds=30)
+        existing_result = await db.execute(
+            select(PendingWebhookRetry).where(PendingWebhookRetry.resource_id == resource_id)
+        )
+        existing = existing_result.scalar_one_or_none()
+
+        if existing:
+            existing.reason = reason
+            existing.last_error = reason[:2000]
+            existing.next_retry_at = next_retry
+            await db.commit()
+            return
+
+        retry = PendingWebhookRetry(
+            provider="mollie",
+            resource_id=resource_id,
+            resource_type=resource_type,
+            reason="PENDING_WEBHOOK_RETRY",
+            attempts=0,
+            next_retry_at=next_retry,
+            last_error=reason[:2000],
+        )
+        db.add(retry)
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+
+    async def retry_pending_webhooks(
+        self,
+        db: AsyncSession,
+        limit: int = 25,
+    ) -> Dict[str, Any]:
+        """Retry processing of queued webhook events."""
+        now = datetime.now(timezone.utc)
+        result = await db.execute(
+            select(PendingWebhookRetry)
+            .where(PendingWebhookRetry.provider == "mollie")
+            .where(PendingWebhookRetry.next_retry_at <= now)
+            .order_by(PendingWebhookRetry.created_at.asc())
+            .limit(limit)
+        )
+        pending = result.scalars().all()
+
+        processed = 0
+        failed = 0
+        for item in pending:
+            try:
+                await self.process_webhook(
+                    db=db,
+                    payment_id=item.resource_id if item.resource_type == "payment" else None,
+                    subscription_id=item.resource_id if item.resource_type == "subscription" else None,
+                )
+                await db.delete(item)
+                processed += 1
+            except Exception as exc:
+                item.attempts += 1
+                item.last_error = str(exc)[:2000]
+                backoff_minutes = min(30, max(1, 2 ** min(item.attempts, 4)))
+                item.next_retry_at = now + timedelta(minutes=backoff_minutes)
+                failed += 1
+
+        await db.commit()
+        return {"processed": processed, "failed": failed, "remaining": len(pending) - processed}
     async def process_webhook(
         self,
         db: AsyncSession,
@@ -840,26 +919,40 @@ class MollieSubscriptionService:
             db.add(audit)
         
         elif status in ["canceled", "suspended", "completed"]:
-            # Subscription ended - mark as CANCELED
-            subscription.status = SubscriptionStatus.CANCELED
-            
-            # Record current_period_end if available from Mollie
-            # Mollie may provide canceledAt or other timestamps
-            canceled_at = subscription_data.get("canceledAt")
-            if canceled_at:
+            # Keep ACTIVE until period end when cancellation was requested.
+            period_end = None
+            for field in ("nextPaymentDate", "currentPeriodEnd", "canceledAt"):
+                value = subscription_data.get(field)
+                if not value:
+                    continue
                 try:
-                    subscription.current_period_end = dateutil_parser.parse(canceled_at)
+                    parsed = dateutil_parser.parse(value)
+                    if parsed.tzinfo is None:
+                        parsed = parsed.replace(tzinfo=timezone.utc)
+                    period_end = parsed
+                    break
                 except Exception as e:
-                    logger.warning(f"Failed to parse canceledAt: {e}")
-            
-            logger.info(f"Subscription ended: {subscription.id}, status={status}")
-            
+                    logger.warning(f"Failed to parse {field}: {e}")
+
+            if period_end:
+                subscription.current_period_end = period_end
+
+            now = datetime.now(timezone.utc)
+            if subscription.cancel_at_period_end and subscription.current_period_end and now < subscription.current_period_end:
+                subscription.status = SubscriptionStatus.ACTIVE
+                logger.info("Cancellation pending period end, keeping ACTIVE for subscription %s", subscription.id)
+                action = "SUBSCRIPTION_CANCEL_REQUESTED"
+            else:
+                subscription.status = SubscriptionStatus.CANCELED
+                logger.info(f"Subscription ended: {subscription.id}, status={status}")
+                action = "SUBSCRIPTION_CANCELED"
+
             # Audit log
             audit = AuditLog(
                 client_id=subscription.administration_id,
                 entity_type="subscription",
                 entity_id=subscription.id,
-                action="SUBSCRIPTION_CANCELED",
+                action=action,
                 user_id=None,  # System action
                 user_role="system",
                 new_value={

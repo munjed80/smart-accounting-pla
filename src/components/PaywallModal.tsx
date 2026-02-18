@@ -31,6 +31,23 @@ export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallM
   const { entitlements, refetch } = useEntitlements()
   const { toast } = useToast()
   const [isActivating, setIsActivating] = useState(false)
+  const subscriptionStatus = entitlements?.status
+
+  const getStatusMessage = () => {
+    if (subscriptionStatus === 'PAST_DUE') {
+      return <>Je betaling is mislukt. Werk je betaling bij om <strong>{featureNameNL}</strong> direct weer te gebruiken.</>
+    }
+
+    if (subscriptionStatus === 'CANCELED') {
+      return <>Je abonnement is geannuleerd. Heractiveer om <strong>{featureNameNL}</strong> opnieuw te gebruiken.</>
+    }
+
+    if (subscriptionStatus === 'EXPIRED' || entitlements?.in_trial === false) {
+      return <>Je proefperiode is afgelopen. Activeer een abonnement om <strong>{featureNameNL}</strong> te blijven gebruiken.</>
+    }
+
+    return <>Deze functie (<strong>{featureNameNL}</strong>) is alleen beschikbaar met een actief abonnement.</>
+  }
   
   const handleActivate = async () => {
     setIsActivating(true)
@@ -66,6 +83,7 @@ export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallM
         variant: 'destructive',
       })
     } finally {
+      await refetch()
       setIsActivating(false)
     }
   }
@@ -79,15 +97,7 @@ export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallM
           </div>
           <DialogTitle className="text-center">Abonnement vereist</DialogTitle>
           <DialogDescription className="text-center">
-            {entitlements?.in_trial ? (
-              <>
-                Je proefperiode is afgelopen. Activeer een abonnement om <strong>{featureNameNL}</strong> te blijven gebruiken.
-              </>
-            ) : (
-              <>
-                Deze functie (<strong>{featureNameNL}</strong>) is alleen beschikbaar met een actief abonnement.
-              </>
-            )}
+            {getStatusMessage()}
           </DialogDescription>
         </DialogHeader>
         

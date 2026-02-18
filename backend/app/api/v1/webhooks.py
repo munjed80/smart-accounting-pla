@@ -6,11 +6,14 @@ Handles incoming webhooks from Mollie and other payment providers.
 import logging
 from typing import Annotated
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.config import settings
+from app.api.v1.deps import CurrentUser
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -104,26 +107,47 @@ async def mollie_webhook(
         )
     
     try:
-        # Process webhook
-        result = await mollie_subscription_service.process_webhook(
-            db=db,
-            payment_id=payment_id,
-            subscription_id=subscription_id,
+        # Process webhook quickly with timeout to avoid provider retries.
+        result = await asyncio.wait_for(
+            mollie_subscription_service.process_webhook(
+                db=db,
+                payment_id=payment_id,
+                subscription_id=subscription_id,
+            ),
+            timeout=4,
         )
-        
+
         logger.info(f"Mollie webhook processed: {resource_id}, result={result}")
-        
         return {"status": "ok", "result": result}
-    
-    except MollieError as e:
-        logger.error(f"Mollie error processing webhook: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail={"code": "MOLLIE_ERROR", "message": str(e)}
+
+    except (asyncio.TimeoutError, MollieError) as exc:
+        logger.warning("Webhook processing deferred for retry: resource_id=%s error=%s", resource_id, exc)
+        await mollie_subscription_service.enqueue_pending_webhook_retry(
+            db=db,
+            resource_id=resource_id,
+            resource_type="payment" if payment_id else "subscription",
+            reason=str(exc),
         )
-    except Exception as e:
-        logger.exception(f"Error processing Mollie webhook: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail={"code": "WEBHOOK_ERROR", "message": "Failed to process webhook"}
+        return {"status": "accepted", "deferred": True}
+    except Exception as exc:
+        logger.exception(f"Error processing Mollie webhook: {exc}")
+        await mollie_subscription_service.enqueue_pending_webhook_retry(
+            db=db,
+            resource_id=resource_id,
+            resource_type="payment" if payment_id else "subscription",
+            reason=str(exc),
         )
+        return {"status": "accepted", "deferred": True}
+
+
+@router.post("/webhooks/mollie/retry-pending")
+async def retry_pending_mollie_webhooks(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Manually retry pending Mollie webhook events."""
+    from app.services.mollie_subscription_service import mollie_subscription_service
+
+    result = await mollie_subscription_service.retry_pending_webhooks(db=db)
+    logger.info("Manual pending webhook retry executed by user=%s result=%s", current_user.id, result)
+    return {"status": "ok", **result}

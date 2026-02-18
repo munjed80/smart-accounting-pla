@@ -69,9 +69,23 @@ class ActivateSubscriptionResponse(BaseModel):
     message_nl: Optional[str] = Field(None, description="Dutch message describing the subscription state")
 
 
+class CancelSubscriptionPayload(BaseModel):
+    """Normalized subscription payload returned after cancellation."""
+    status: str = Field(description="Subscription status (ACTIVE/CANCELED/etc.)")
+    cancel_at_period_end: bool = Field(description="Whether cancellation is scheduled at period end")
+    current_period_end: Optional[str] = Field(None, description="Billing period end date (ISO format)")
+
+
 class CancelSubscriptionResponse(BaseModel):
-    """Response schema for canceling a subscription"""
-    subscription: dict = Field(description="Updated subscription data")
+    """Response schema for canceling a subscription."""
+    # Canonical payload structure
+    subscription: Optional[CancelSubscriptionPayload] = Field(None, description="Updated subscription data")
+
+    # Backward-compatible flattened fields used by older clients/branches
+    status: Optional[str] = Field(None, description="Subscription status (legacy compatibility)")
+    cancel_at_period_end: Optional[bool] = Field(None, description="Cancellation flag (legacy compatibility)")
+    current_period_end: Optional[str] = Field(None, description="Period end date (legacy compatibility)")
+
     message_nl: Optional[str] = Field(None, description="Dutch message describing the cancellation")
 
 

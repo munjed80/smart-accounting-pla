@@ -78,7 +78,7 @@ async def mollie_webhook(
     # Verify webhook authenticity
     if not verify_mollie_webhook(request):
         raise HTTPException(
-            status_code=403,
+            status_code=401,
             detail={"code": "INVALID_WEBHOOK", "message": "Webhook verification failed"}
         )
     

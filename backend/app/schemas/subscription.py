@@ -65,6 +65,7 @@ class ActivateSubscriptionResponse(BaseModel):
     trial_end_at: Optional[str] = Field(None, description="Trial end date (ISO format)")
     scheduled: bool = Field(description="Whether subscription is scheduled to start after trial")
     provider_subscription_id: Optional[str] = Field(None, description="Mollie subscription ID")
+    message_nl: Optional[str] = Field(None, description="Dutch message describing the subscription state")
 
 
 class CancelSubscriptionResponse(BaseModel):

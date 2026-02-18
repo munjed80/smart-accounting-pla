@@ -178,12 +178,21 @@ class MollieSubscriptionService:
             
             scheduled = self._is_subscription_scheduled(subscription)
             
+            # Generate appropriate message
+            if subscription.status == SubscriptionStatus.ACTIVE:
+                message_nl = "Abonnement is actief."
+            elif scheduled:
+                message_nl = "Abonnement gepland. Start na proefperiode."
+            else:
+                message_nl = f"Abonnement status: {subscription.status.value}"
+            
             return {
                 "status": subscription.status.value,
                 "in_trial": subscription.status == SubscriptionStatus.TRIALING,
                 "trial_end_at": subscription.trial_end_at.isoformat() if subscription.trial_end_at else None,
                 "scheduled": scheduled,
                 "provider_subscription_id": subscription.provider_subscription_id,
+                "message_nl": message_nl,
             }
         
         # Ensure Mollie customer exists
@@ -232,7 +241,7 @@ class MollieSubscriptionService:
             client_id=administration_id,
             entity_type="subscription",
             entity_id=subscription.id,
-            action="SUBSCRIPTION_SCHED",
+            action="SUBSCRIPTION_SCHEDULED",
             user_id=user.id,
             user_role=user.role,
             new_value={
@@ -248,12 +257,21 @@ class MollieSubscriptionService:
         # Determine response
         scheduled = self._is_subscription_scheduled(subscription)
         
+        # Generate appropriate message
+        if scheduled:
+            message_nl = "Abonnement gepland. Start na proefperiode."
+        elif subscription.status == SubscriptionStatus.ACTIVE:
+            message_nl = "Abonnement is actief."
+        else:
+            message_nl = f"Abonnement status: {subscription.status.value}"
+        
         return {
             "status": subscription.status.value,
             "in_trial": subscription.status == SubscriptionStatus.TRIALING,
             "trial_end_at": subscription.trial_end_at.isoformat() if subscription.trial_end_at else None,
             "scheduled": scheduled,
             "provider_subscription_id": subscription_data["id"],
+            "message_nl": message_nl,
         }
     
     async def cancel_subscription(
@@ -305,7 +323,7 @@ class MollieSubscriptionService:
             client_id=administration_id,
             entity_type="subscription",
             entity_id=subscription.id,
-            action="SUBSCRIPTION_CANCE",
+            action="SUBSCRIPTION_CANCELED",
             user_id=user.id,
             user_role=user.role,
             new_value={
@@ -444,7 +462,7 @@ class MollieSubscriptionService:
                 client_id=subscription.administration_id,
                 entity_type="subscription",
                 entity_id=subscription.id,
-                action="PAYMENT_PAID",
+                action="SUBSCRIPTION_ACTIVATED",
                 user_id=None,  # System action
                 user_role="system",
                 new_value={
@@ -465,7 +483,7 @@ class MollieSubscriptionService:
                 client_id=subscription.administration_id,
                 entity_type="subscription",
                 entity_id=subscription.id,
-                action="PAYMENT_FAILED",
+                action="SUBSCRIPTION_PAYMENT_FAILED",
                 user_id=None,  # System action
                 user_role="system",
                 new_value={
@@ -474,6 +492,23 @@ class MollieSubscriptionService:
                 }
             )
             db.add(audit)
+        
+        elif status in ["pending", "open"]:
+            # Payment pending - check trial status
+            now = datetime.now(timezone.utc)
+            
+            # Ensure trial_end_at is timezone-aware
+            trial_end_aware = subscription.trial_end_at
+            if trial_end_aware and trial_end_aware.tzinfo is None:
+                trial_end_aware = trial_end_aware.replace(tzinfo=timezone.utc)
+            
+            if trial_end_aware and now < trial_end_aware:
+                # Still in trial, keep TRIALING status
+                logger.info(f"Payment pending for subscription {subscription.id}, still in trial")
+            else:
+                # Trial expired, mark as PAST_DUE
+                subscription.status = SubscriptionStatus.PAST_DUE
+                logger.warning(f"Payment pending but trial expired for subscription {subscription.id}")
     
     async def _process_subscription_webhook(
         self,
@@ -507,7 +542,7 @@ class MollieSubscriptionService:
                 client_id=subscription.administration_id,
                 entity_type="subscription",
                 entity_id=subscription.id,
-                action="SUB_ACTIVATED",
+                action="SUBSCRIPTION_ACTIVATED",
                 user_id=None,  # System action
                 user_role="system",
                 new_value={
@@ -517,16 +552,17 @@ class MollieSubscriptionService:
             )
             db.add(audit)
         
-        elif status in ["canceled", "suspended"]:
+        elif status in ["canceled", "suspended", "completed"]:
+            # Subscription ended - mark as CANCELED
             subscription.status = SubscriptionStatus.CANCELED
-            logger.info(f"Subscription canceled: {subscription.id}")
+            logger.info(f"Subscription ended: {subscription.id}, status={status}")
             
             # Audit log
             audit = AuditLog(
                 client_id=subscription.administration_id,
                 entity_type="subscription",
                 entity_id=subscription.id,
-                action="SUB_CANCELED",
+                action="SUBSCRIPTION_CANCELED",
                 user_id=None,  # System action
                 user_role="system",
                 new_value={
@@ -545,7 +581,7 @@ class MollieSubscriptionService:
         Get webhook URL for Mollie.
         
         Returns:
-            str: Full webhook URL
+            str: Full webhook URL with secret parameter
         """
         public_url = settings.APP_PUBLIC_URL or settings.APP_URL
         
@@ -553,6 +589,12 @@ class MollieSubscriptionService:
         if public_url.endswith("/"):
             public_url = public_url[:-1]
         
+        webhook_secret = settings.MOLLIE_WEBHOOK_SECRET
+        if webhook_secret:
+            return f"{public_url}/api/v1/webhooks/mollie?secret={webhook_secret}"
+        
+        # Fallback without secret (not recommended for production)
+        logger.warning("MOLLIE_WEBHOOK_SECRET not configured - webhook URL without secret")
         return f"{public_url}/api/v1/webhooks/mollie"
 
 

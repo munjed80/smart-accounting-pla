@@ -10,11 +10,10 @@ import { Button } from '@/components/ui/button'
 import { useEntitlements } from '@/hooks/useEntitlements'
 import { subscriptionApi } from '@/lib/api'
 import { useState } from 'react'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 
 export const SubscriptionBanner = () => {
   const { entitlements, subscription, isLoading, isAccountantBypass, refetch } = useEntitlements()
-  const { toast } = useToast()
   const [isActivating, setIsActivating] = useState(false)
   
   // Don't show banner for accountants
@@ -35,25 +34,19 @@ export const SubscriptionBanner = () => {
       
       // Show success message
       if (result.scheduled) {
-        toast({
-          title: 'Abonnement gepland',
+        toast.success('Abonnement gepland', {
           description: `Je abonnement start automatisch na de proefperiode${result.trial_end_at ? ` op ${new Date(result.trial_end_at).toLocaleDateString('nl-NL')}` : ''}.`,
-          variant: 'default',
         })
       } else {
-        toast({
-          title: 'Abonnement actief',
+        toast.success('Abonnement actief', {
           description: 'Je abonnement is nu actief. Je hebt toegang tot alle functies.',
-          variant: 'default',
         })
       }
     } catch (error: any) {
       console.error('Failed to activate subscription:', error)
       
-      toast({
-        title: 'Activatie mislukt',
+      toast.error('Activatie mislukt', {
         description: error.response?.data?.detail?.message || 'Er is een fout opgetreden bij het activeren van je abonnement.',
-        variant: 'destructive',
       })
     } finally {
       setIsActivating(false)

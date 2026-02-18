@@ -10,7 +10,7 @@ import { Lock, Sparkles } from 'lucide-react'
 import { useEntitlements } from '@/hooks/useEntitlements'
 import { subscriptionApi } from '@/lib/api'
 import { useState } from 'react'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 
 export interface PaywallModalProps {
   open: boolean
@@ -29,7 +29,6 @@ export interface PaywallModalProps {
  */
 export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallModalProps) => {
   const { entitlements, refetch } = useEntitlements()
-  const { toast } = useToast()
   const [isActivating, setIsActivating] = useState(false)
   
   const handleActivate = async () => {
@@ -43,16 +42,12 @@ export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallM
       
       // Show success message
       if (result.scheduled) {
-        toast({
-          title: 'Abonnement gepland',
+        toast.success('Abonnement gepland', {
           description: `Je abonnement start automatisch na de proefperiode${result.trial_end_at ? ` op ${new Date(result.trial_end_at).toLocaleDateString('nl-NL')}` : ''}.`,
-          variant: 'default',
         })
       } else {
-        toast({
-          title: 'Abonnement actief',
+        toast.success('Abonnement actief', {
           description: 'Je abonnement is nu actief. Je hebt toegang tot alle functies.',
-          variant: 'default',
         })
       }
       
@@ -60,10 +55,8 @@ export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallM
     } catch (error: any) {
       console.error('Failed to activate subscription:', error)
       
-      toast({
-        title: 'Activatie mislukt',
+      toast.error('Activatie mislukt', {
         description: error.response?.data?.detail?.message || 'Er is een fout opgetreden bij het activeren van je abonnement.',
-        variant: 'destructive',
       })
     } finally {
       setIsActivating(false)

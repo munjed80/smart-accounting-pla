@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { getErrorMessage, periodApi, vatApi, type Period, type VATAnomaly, type VATReportResponse, type ICPReportResponse } from '@/lib/api'
-import { ArrowsClockwise, CheckCircle, DownloadSimple, FileArrowDown, Globe, Warning, WarningCircle, Eye } from '@phosphor-icons/react'
+import { ArrowsClockwise, CheckCircle, DownloadSimple, FileArrowDown, Globe, Warning, WarningCircle, Eye, ArrowClockwise } from '@phosphor-icons/react'
 import { BTWBoxDrilldown } from './BTWBoxDrilldown'
 import { VATSubmissionHistory } from './VATSubmissionHistory'
 import { navigateTo } from '@/lib/navigation'
@@ -213,7 +213,24 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
 
           {error && (
             <Alert className="bg-destructive/10 border-destructive/40">
-              <AlertTitle>Fout bij BTW workflow</AlertTitle>
+              <AlertTitle className="flex items-center justify-between">
+                <span>Fout bij BTW workflow</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setError(null)
+                    if (selectedPeriodId) {
+                      loadReport(selectedPeriodId)
+                    } else {
+                      loadPeriods()
+                    }
+                  }}
+                >
+                  <ArrowClockwise size={16} className="mr-2" />
+                  Opnieuw proberen
+                </Button>
+              </AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}

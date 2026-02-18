@@ -290,7 +290,20 @@ export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }:
       {error && (
         <Alert className="bg-destructive/10 border-destructive/40">
           <WarningCircle size={18} className="text-destructive" />
-          <AlertTitle>Error</AlertTitle>
+          <AlertTitle className="flex items-center justify-between">
+            <span>Error</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setError(null)
+                load()
+              }}
+            >
+              <ArrowClockwise size={16} className="mr-2" />
+              Opnieuw proberen
+            </Button>
+          </AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}

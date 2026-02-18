@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { accountantDossierApi, getErrorMessage, ZZPExpense, ZZPInvoice, ZZPTimeEntry } from '@/lib/api'
-import { DownloadSimple } from '@phosphor-icons/react'
+import { DownloadSimple, ArrowClockwise } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 
 interface Props {
@@ -24,8 +24,7 @@ const downloadBlob = (blob: Blob, filename: string) => {
 
 export function ClientDossierDataTab({ clientId, type }: Props) {
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [statusCode, setStatusCode] = useState<number | null>(null)
+  const [error, setError] = useState<unknown | null>(null)
   const [invoices, setInvoices] = useState<ZZPInvoice[]>([])
   const [expenses, setExpenses] = useState<ZZPExpense[]>([])
   const [hours, setHours] = useState<ZZPTimeEntry[]>([])
@@ -36,40 +35,37 @@ export function ClientDossierDataTab({ clientId, type }: Props) {
     return params.get('commitmentId')
   }, [type])
 
-  useEffect(() => {
-    const load = async () => {
-      if (!clientId) {
-        setError('Geen klant geselecteerd.')
-        setIsLoading(false)
-        return
-      }
-
-      setIsLoading(true)
-      setError(null)
-      setStatusCode(null)
-      try {
-        if (type === 'invoices') {
-          const response = await accountantDossierApi.getInvoices(clientId)
-          setInvoices(response.invoices)
-        } else if (type === 'expenses') {
-          const response = await accountantDossierApi.getExpenses(
-            clientId,
-            commitmentIdFilter ? { commitment_id: commitmentIdFilter } : undefined,
-          )
-          setExpenses(response.expenses)
-        } else {
-          const response = await accountantDossierApi.getHours(clientId)
-          setHours(response.entries)
-        }
-      } catch (err: unknown) {
-        const maybeResponse = (err as { response?: { status?: number } } | null)?.response
-        setStatusCode(maybeResponse?.status ?? null)
-        setError(getErrorMessage(err))
-      } finally {
-        setIsLoading(false)
-      }
+  const load = async () => {
+    if (!clientId) {
+      setError({ message: 'Geen klant geselecteerd.' })
+      setIsLoading(false)
+      return
     }
 
+    setIsLoading(true)
+    setError(null)
+    try {
+      if (type === 'invoices') {
+        const response = await accountantDossierApi.getInvoices(clientId)
+        setInvoices(response.invoices)
+      } else if (type === 'expenses') {
+        const response = await accountantDossierApi.getExpenses(
+          clientId,
+          commitmentIdFilter ? { commitment_id: commitmentIdFilter } : undefined,
+        )
+        setExpenses(response.expenses)
+      } else {
+        const response = await accountantDossierApi.getHours(clientId)
+        setHours(response.entries)
+      }
+    } catch (err: unknown) {
+      setError(err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
     load()
   }, [clientId, type, commitmentIdFilter])
 
@@ -109,9 +105,19 @@ export function ClientDossierDataTab({ clientId, type }: Props) {
   if (error) {
     return (
       <Alert className="bg-destructive/10 border-destructive/40">
-        <AlertDescription>
-          {statusCode ? `HTTP ${statusCode}: ` : ''}
-          {error}
+        <AlertDescription className="flex items-center justify-between gap-4">
+          <span>
+            {getErrorMessage(error)}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => load()}
+            className="shrink-0"
+          >
+            <ArrowClockwise size={16} className="mr-2" />
+            Opnieuw proberen
+          </Button>
         </AlertDescription>
       </Alert>
     )

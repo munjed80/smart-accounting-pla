@@ -25,6 +25,7 @@ import { accountantClientApi, AccountantClientListItem, getErrorMessage } from '
 import { 
   WarningCircle,
   UsersThree,
+  ArrowClockwise,
 } from '@phosphor-icons/react'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
@@ -73,6 +74,13 @@ export const AccountantReviewQueuePage = () => {
       }
     } finally {
       setIsLoading(false)
+    }
+  }
+  
+  const handleRetry = () => {
+    setError(null)
+    if (activeClient) {
+      fetchClientDetails(activeClient.administrationId)
     }
   }
   
@@ -170,7 +178,18 @@ export const AccountantReviewQueuePage = () => {
         {error && (
           <Alert className="mb-6 bg-destructive/10 border-destructive/40">
             <WarningCircle className="h-5 w-5 text-destructive" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription className="flex items-center justify-between gap-4">
+              <span>{error}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRetry}
+                className="shrink-0"
+              >
+                <ArrowClockwise size={16} className="mr-2" />
+                Opnieuw proberen
+              </Button>
+            </AlertDescription>
           </Alert>
         )}
         

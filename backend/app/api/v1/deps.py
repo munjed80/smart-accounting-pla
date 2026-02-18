@@ -466,3 +466,113 @@ async def get_admin_with_access(
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     
     return administration
+
+
+# =============================================================================
+# Subscription / Entitlement Guards (ZZP only)
+# =============================================================================
+
+async def require_zzp_entitlement(
+    feature: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    administration_id: Optional[UUID] = None,
+) -> None:
+    """
+    Guard: Require ZZP entitlement for a specific feature.
+    
+    Enforces payment gate for ZZP features after trial expires.
+    Accountants are NOT gated - they have access without subscription.
+    
+    Args:
+        feature: Feature identifier (e.g., "vat_actions", "bank_reconcile_actions", "exports")
+        current_user: Authenticated user
+        db: Database session
+        administration_id: Optional administration ID (if None, uses user's primary administration)
+        
+    Raises:
+        HTTP 402 Payment Required: If subscription required and not active/trial
+        HTTP 403: If user is not ZZP or feature not found
+    """
+    from app.services.subscription_service import subscription_service, GATED_FEATURES
+    
+    # Accountants and admins bypass subscription checks
+    if current_user.role in [UserRole.ACCOUNTANT.value, UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value]:
+        return
+    
+    # Only ZZP users are subject to subscription gating
+    if current_user.role != UserRole.ZZP.value:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "FORBIDDEN_ROLE", "message": "This feature is only available for ZZP users"}
+        )
+    
+    # Check if feature requires gating
+    if feature not in GATED_FEATURES or not GATED_FEATURES[feature]:
+        # Feature is not gated, allow access
+        return
+    
+    # Get user's administration (ZZP users should have one primary administration)
+    if not administration_id:
+        # Get user's primary administration
+        result = await db.execute(
+            select(Administration)
+            .join(AdministrationMember)
+            .where(AdministrationMember.user_id == current_user.id)
+            .order_by(AdministrationMember.created_at.asc())
+        )
+        administration = result.scalar_one_or_none()
+        
+        if not administration:
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "NO_ADMINISTRATION", "message": "User has no administration"}
+            )
+        
+        administration_id = administration.id
+    
+    # Compute entitlements
+    entitlements = await subscription_service.compute_entitlements(db, administration_id)
+    
+    # Check if user can use pro features
+    if not entitlements.can_use_pro_features:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "code": "SUBSCRIPTION_REQUIRED",
+                "feature": feature,
+                "message_nl": "Abonnement vereist om deze actie te gebruiken.",
+                "status": entitlements.status,
+                "in_trial": entitlements.in_trial,
+                "days_left_trial": entitlements.days_left_trial,
+            }
+        )
+
+
+def require_feature(feature: str):
+    """
+    Factory function to create a feature-specific entitlement guard.
+    
+    Usage:
+        @router.post("/vat/submit")
+        async def submit_vat(
+            _: None = Depends(require_feature("vat_actions")),
+            current_user: CurrentUser,
+            db: Annotated[AsyncSession, Depends(get_db)],
+        ):
+            ...
+    
+    Args:
+        feature: Feature identifier from GATED_FEATURES
+        
+    Returns:
+        Dependency function that enforces entitlement check
+    """
+    async def dependency(
+        current_user: Annotated[User, Depends(get_current_user)],
+        db: Annotated[AsyncSession, Depends(get_db)],
+        administration_id: Optional[UUID] = None,
+    ) -> None:
+        await require_zzp_entitlement(feature, current_user, db, administration_id)
+    
+    return dependency

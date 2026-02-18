@@ -52,6 +52,7 @@ from app.models.financial_commitment import (
 from app.models.subscription import (
     Plan,
     Subscription,
+    SubscriptionStatus,
     AdminAuditLog,
 )
 from app.models.payment import (
@@ -134,6 +135,7 @@ __all__ = [
     "RecurringFrequency",
     "Plan",
     "Subscription",
+    "SubscriptionStatus",
     "AdminAuditLog",
     "VatBoxLineage",
     "VatSubmission",

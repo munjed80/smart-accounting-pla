@@ -589,3 +589,286 @@ async def test_webhook_is_idempotent(
         
         # Verify Mollie API was only called once (second call detected as duplicate)
         assert mock_get_payment.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_cancel_subscription_idempotency(
+    async_client: AsyncClient,
+    auth_headers: dict,
+    test_user: User,
+    test_administration: Administration,
+    test_zzp_plan: Plan,
+    db_session,
+):
+    """Test that cancel endpoint is idempotent"""
+    # Create a subscription with Mollie IDs
+    from sqlalchemy import select
+    from app.models.subscription import Subscription
+    
+    subscription = Subscription(
+        administration_id=test_administration.id,
+        plan_id=test_zzp_plan.id,
+        plan_code="zzp_basic",
+        status=SubscriptionStatus.ACTIVE,
+        provider="mollie",
+        provider_customer_id="cst_test123",
+        provider_subscription_id="sub_test123",
+        starts_at=datetime.now(timezone.utc),
+    )
+    db_session.add(subscription)
+    await db_session.commit()
+    
+    # Mock Mollie cancel response
+    mock_canceled_sub = {
+        "id": "sub_test123",
+        "status": "canceled",
+        "canceledAt": "2024-03-15T10:00:00Z",
+    }
+    
+    with patch("app.integrations.mollie.client.MollieClient.cancel_subscription") as mock_cancel:
+        mock_cancel.return_value = mock_canceled_sub
+        
+        # First cancel call
+        response1 = await async_client.post(
+            "/api/v1/me/subscription/cancel",
+            headers=auth_headers,
+        )
+        assert response1.status_code == 200
+        data1 = response1.json()
+        assert data1["subscription"]["cancel_at_period_end"] == True
+        assert "message_nl" in data1
+        
+        # Verify Mollie API was called
+        assert mock_cancel.call_count == 1
+        
+        # Second cancel call (idempotent)
+        response2 = await async_client.post(
+            "/api/v1/me/subscription/cancel",
+            headers=auth_headers,
+        )
+        assert response2.status_code == 200
+        data2 = response2.json()
+        assert data2["subscription"]["cancel_at_period_end"] == True
+        
+        # Mollie API should not be called again
+        assert mock_cancel.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_reactivate_subscription_idempotency(
+    async_client: AsyncClient,
+    auth_headers: dict,
+    test_user: User,
+    test_administration: Administration,
+    test_zzp_plan: Plan,
+    db_session,
+):
+    """Test that reactivate endpoint is idempotent for active subscriptions"""
+    # Create an active subscription
+    from sqlalchemy import select
+    from app.models.subscription import Subscription
+    
+    subscription = Subscription(
+        administration_id=test_administration.id,
+        plan_id=test_zzp_plan.id,
+        plan_code="zzp_basic",
+        status=SubscriptionStatus.ACTIVE,
+        provider="mollie",
+        provider_customer_id="cst_test123",
+        provider_subscription_id="sub_test123",
+        starts_at=datetime.now(timezone.utc),
+        cancel_at_period_end=False,
+    )
+    db_session.add(subscription)
+    await db_session.commit()
+    
+    # Call reactivate on already active subscription
+    response = await async_client.post(
+        "/api/v1/me/subscription/reactivate",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["subscription"]["status"] == "ACTIVE"
+    assert "al actief" in data["message_nl"].lower()
+
+
+@pytest.mark.asyncio
+async def test_reactivate_canceled_subscription_creates_new(
+    async_client: AsyncClient,
+    auth_headers: dict,
+    test_user: User,
+    test_administration: Administration,
+    test_zzp_plan: Plan,
+    db_session,
+):
+    """Test that reactivate creates new subscription for canceled status"""
+    # Create a canceled subscription
+    from sqlalchemy import select
+    from app.models.subscription import Subscription
+    
+    subscription = Subscription(
+        administration_id=test_administration.id,
+        plan_id=test_zzp_plan.id,
+        plan_code="zzp_basic",
+        status=SubscriptionStatus.CANCELED,
+        provider="mollie",
+        provider_customer_id="cst_test123",
+        provider_subscription_id="sub_old123",
+        starts_at=datetime.now(timezone.utc) - timedelta(days=60),
+        trial_start_at=datetime.now(timezone.utc) - timedelta(days=60),
+        trial_end_at=datetime.now(timezone.utc) - timedelta(days=30),
+    )
+    db_session.add(subscription)
+    await db_session.commit()
+    
+    # Mock Mollie responses
+    mock_new_subscription = {
+        "id": "sub_new123",
+        "status": "active",
+        "amount": {"value": "6.95", "currency": "EUR"},
+        "interval": "1 month",
+    }
+    
+    with patch("app.integrations.mollie.client.MollieClient.create_subscription") as mock_create:
+        mock_create.return_value = mock_new_subscription
+        
+        # Reactivate
+        response = await async_client.post(
+            "/api/v1/me/subscription/reactivate",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["subscription"]["provider_subscription_id"] == "sub_new123"
+        assert "heractiveerd" in data["message_nl"].lower()
+        
+        # Verify new subscription was created
+        assert mock_create.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_webhook_payment_paid_from_past_due(
+    async_client: AsyncClient,
+    auth_headers: dict,
+    test_user: User,
+    test_administration: Administration,
+    test_zzp_plan: Plan,
+    db_session,
+):
+    """Test webhook activates subscription when payment is paid after PAST_DUE"""
+    from sqlalchemy import select
+    from app.models.subscription import Subscription
+    
+    # Create subscription in PAST_DUE state
+    subscription = Subscription(
+        administration_id=test_administration.id,
+        plan_id=test_zzp_plan.id,
+        plan_code="zzp_basic",
+        status=SubscriptionStatus.PAST_DUE,
+        provider="mollie",
+        provider_customer_id="cst_test123",
+        provider_subscription_id="sub_test123",
+        starts_at=datetime.now(timezone.utc) - timedelta(days=30),
+        trial_start_at=datetime.now(timezone.utc) - timedelta(days=60),
+        trial_end_at=datetime.now(timezone.utc) - timedelta(days=30),
+    )
+    db_session.add(subscription)
+    await db_session.commit()
+    
+    # Mock Mollie payment response (paid)
+    mock_payment = {
+        "id": "tr_recovery123",
+        "status": "paid",
+        "subscriptionId": "sub_test123",
+    }
+    
+    # Set webhook secret in settings
+    original_secret = getattr(settings, 'MOLLIE_WEBHOOK_SECRET', None)
+    settings.MOLLIE_WEBHOOK_SECRET = TEST_WEBHOOK_SECRET
+    
+    try:
+        with patch("app.integrations.mollie.client.MollieClient.get_payment") as mock_get_payment:
+            mock_get_payment.return_value = mock_payment
+            
+            # Send webhook
+            response = await async_client.post(
+                f"/api/v1/webhooks/mollie?id=tr_recovery123&secret={TEST_WEBHOOK_SECRET}",
+            )
+            assert response.status_code == 200
+            
+            # Verify subscription is now ACTIVE
+            result = await db_session.execute(
+                select(Subscription).where(
+                    Subscription.administration_id == test_administration.id
+                )
+            )
+            updated_sub = result.scalar_one()
+            assert updated_sub.status == SubscriptionStatus.ACTIVE
+    finally:
+        # Restore original secret
+        settings.MOLLIE_WEBHOOK_SECRET = original_secret
+
+
+@pytest.mark.asyncio
+async def test_webhook_subscription_canceled_records_period_end(
+    async_client: AsyncClient,
+    auth_headers: dict,
+    test_user: User,
+    test_administration: Administration,
+    test_zzp_plan: Plan,
+    db_session,
+):
+    """Test webhook records current_period_end when subscription is canceled"""
+    from sqlalchemy import select
+    from app.models.subscription import Subscription
+    
+    # Create active subscription
+    subscription = Subscription(
+        administration_id=test_administration.id,
+        plan_id=test_zzp_plan.id,
+        plan_code="zzp_basic",
+        status=SubscriptionStatus.ACTIVE,
+        provider="mollie",
+        provider_customer_id="cst_test123",
+        provider_subscription_id="sub_test123",
+        starts_at=datetime.now(timezone.utc),
+        cancel_at_period_end=True,
+    )
+    db_session.add(subscription)
+    await db_session.commit()
+    
+    # Mock Mollie subscription response (canceled with timestamp)
+    canceled_at = "2024-03-31T23:59:59Z"
+    mock_subscription = {
+        "id": "sub_test123",
+        "status": "canceled",
+        "canceledAt": canceled_at,
+    }
+    
+    # Set webhook secret in settings
+    original_secret = getattr(settings, 'MOLLIE_WEBHOOK_SECRET', None)
+    settings.MOLLIE_WEBHOOK_SECRET = TEST_WEBHOOK_SECRET
+    
+    try:
+        with patch("app.integrations.mollie.client.MollieClient.get_subscription") as mock_get_sub:
+            mock_get_sub.return_value = mock_subscription
+            
+            # Send webhook
+            response = await async_client.post(
+                f"/api/v1/webhooks/mollie?id=sub_test123&secret={TEST_WEBHOOK_SECRET}",
+            )
+            assert response.status_code == 200
+            
+            # Verify subscription is CANCELED with period end recorded
+            result = await db_session.execute(
+                select(Subscription).where(
+                    Subscription.administration_id == test_administration.id
+                )
+            )
+            updated_sub = result.scalar_one()
+            assert updated_sub.status == SubscriptionStatus.CANCELED
+            assert updated_sub.current_period_end is not None
+    finally:
+        # Restore original secret
+        settings.MOLLIE_WEBHOOK_SECRET = original_secret

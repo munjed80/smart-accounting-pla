@@ -218,20 +218,20 @@
     --color-accent-12: var(--blue-12);
     --color-accent-contrast: var(--blue-contrast);
 
-    /* Secondary accent colors */
-    --color-accent-secondary-1: var(--violet-1);
-    --color-accent-secondary-2: var(--violet-2);
-    --color-accent-secondary-3: var(--violet-3);
-    --color-accent-secondary-4: var(--violet-4);
-    --color-accent-secondary-5: var(--violet-5);
-    --color-accent-secondary-6: var(--violet-6);
-    --color-accent-secondary-7: var(--violet-7);
-    --color-accent-secondary-8: var(--violet-8);
-    --color-accent-secondary-9: var(--violet-9);
-    --color-accent-secondary-10: var(--violet-10);
-    --color-accent-secondary-11: var(--violet-11);
-    --color-accent-secondary-12: var(--violet-12);
-    --color-accent-secondary-contrast: var(--violet-contrast);
+    /* Secondary accent colors - Teal for compliance/professional feel */
+    --color-accent-secondary-1: var(--teal-1);
+    --color-accent-secondary-2: var(--teal-2);
+    --color-accent-secondary-3: var(--teal-3);
+    --color-accent-secondary-4: var(--teal-4);
+    --color-accent-secondary-5: var(--teal-5);
+    --color-accent-secondary-6: var(--teal-6);
+    --color-accent-secondary-7: var(--teal-7);
+    --color-accent-secondary-8: var(--teal-8);
+    --color-accent-secondary-9: var(--teal-9);
+    --color-accent-secondary-10: var(--teal-10);
+    --color-accent-secondary-11: var(--teal-11);
+    --color-accent-secondary-12: var(--teal-12);
+    --color-accent-secondary-contrast: var(--teal-contrast);
 
     /* Foreground colors */
     --color-fg: var(--color-neutral-12);

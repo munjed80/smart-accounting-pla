@@ -105,6 +105,7 @@ import {
   ZZPInvoiceLineCreate,
   ZZPCustomer,
   ZZPBusinessProfile,
+  getApiBaseUrl,
 } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
@@ -113,26 +114,52 @@ import { useDebounce } from '@/hooks/useDebounce'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useQueryFilters } from '@/hooks/useQueryFilters'
 import { filterInvoices, InvoiceFilters } from '@/lib/filtering'
+import { ApiHttpError, NetworkError, ServerError, UnauthorizedError } from '@/lib/errors'
 
 // Format amount in cents to EUR currency string
 function formatAmountEUR(amountCents: number): string {
+  const safeAmount = Number(amountCents)
+  const normalizedAmount = Number.isFinite(safeAmount) ? safeAmount : 0
   return new Intl.NumberFormat('nl-NL', {
     style: 'currency',
     currency: 'EUR',
-  }).format(amountCents / 100)
+  }).format(normalizedAmount / 100)
 }
 
 // Format date string for display (Dutch locale)
-function formatDate(isoDate: string): string {
+function formatDate(isoDate: string | null | undefined): string {
+  if (!isoDate) return '—'
+  const parsedDate = new Date(isoDate)
+  if (Number.isNaN(parsedDate.getTime())) return '—'
+
   return new Intl.DateTimeFormat('nl-NL', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-  }).format(new Date(isoDate))
+  }).format(parsedDate)
+}
+
+const getStatusCodeFromError = (error: unknown): number | null => {
+  if (error instanceof ApiHttpError && error.statusCode) return error.statusCode
+  if (typeof error === 'object' && error !== null) {
+    const maybeStatus = (error as { statusCode?: unknown }).statusCode
+    if (typeof maybeStatus === 'number') return maybeStatus
+    const responseStatus = (error as { response?: { status?: unknown } }).response?.status
+    if (typeof responseStatus === 'number') return responseStatus
+  }
+  return null
 }
 
 // Invoice status types (matches backend)
 type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+type InvoiceLoadState = 'idle' | 'loading' | 'success' | 'forbidden' | 'server' | 'network' | 'error'
+
+interface InvoicesRequestTrace {
+  endpoint: string
+  status: number | null
+  ok: boolean
+  timestamp: string
+}
 
 
 const defaultInvoiceFilters: InvoiceFilters = {
@@ -1340,6 +1367,9 @@ export const ZZPInvoicesPage = () => {
   const [searchQuery, setSearchQuery] = useState(filters.q)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [loadState, setLoadState] = useState<InvoiceLoadState>('idle')
+  const [requestTraces, setRequestTraces] = useState<InvoicesRequestTrace[]>([])
+  const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null)
   
   const showLoading = useDelayedLoading(isLoading, 300, invoices.length > 0)
   
@@ -1376,6 +1406,8 @@ export const ZZPInvoicesPage = () => {
   
   // Pre-selected invoice ID from URL
   const [preSelectedInvoiceId, setPreSelectedInvoiceId] = useState<string | null>(null)
+  const debugEnabled = import.meta.env.DEV && new URLSearchParams(window.location.search).get('debug') === '1'
+  const administrationId = typeof window !== 'undefined' ? localStorage.getItem('administration_id') : null
 
   // Check for customer_id in URL params or invoice_id in URL path
   useEffect(() => {
@@ -1401,30 +1433,107 @@ export const ZZPInvoicesPage = () => {
   // Load data from API
   const loadData = useCallback(async () => {
     if (!user?.id) return
-    
+
     setIsLoading(true)
     setError(null)
-    
+    setLoadState('loading')
+
+    const invoiceEndpoint = `${getApiBaseUrl()}/zzp/invoices`
+    const customerEndpoint = `${getApiBaseUrl()}/zzp/customers`
+    const profileEndpoint = `${getApiBaseUrl()}/zzp/profile`
+
     try {
       // Load invoices, customers, and business profile in parallel
       const [invoicesResponse, customersResponse, profileData] = await Promise.all([
         zzpApi.invoices.list(),
         zzpApi.customers.list(),
-        zzpApi.profile.get().catch(() => null), // Profile might not exist
+        zzpApi.profile.get().catch((profileError) => {
+          console.error('[Invoices] Failed to load profile during invoices bootstrap', {
+            route: 'Facturen',
+            endpoint: profileEndpoint,
+            userRole: user.role,
+            administration_id: administrationId,
+            error: profileError,
+          })
+          return null
+        }), // Profile might not exist
       ])
-      
-      setInvoices(invoicesResponse.invoices)
-      setCustomers(customersResponse.customers)
+
+      const normalizedInvoices = Array.isArray(invoicesResponse?.invoices)
+        ? invoicesResponse.invoices
+        : Array.isArray(invoicesResponse)
+          ? invoicesResponse
+          : []
+
+      const normalizedCustomers = Array.isArray(customersResponse?.customers)
+        ? customersResponse.customers
+        : []
+
+      setRequestTraces(prev => [
+        {
+          endpoint: invoiceEndpoint,
+          status: 200,
+          ok: true,
+          timestamp: new Date().toISOString(),
+        },
+        {
+          endpoint: customerEndpoint,
+          status: 200,
+          ok: true,
+          timestamp: new Date().toISOString(),
+        },
+        ...prev,
+      ].slice(0, 12))
+
+      setInvoices(normalizedInvoices)
+      setCustomers(normalizedCustomers)
       setBusinessProfile(profileData)
+      setLoadState('success')
+      setLastErrorMessage(null)
     } catch (err) {
-      console.error('Failed to load data:', err)
-      const errorMessage = parseApiError(err)
-      setError(errorMessage)
-      toast.error(errorMessage)
+      console.error('[Invoices] Failed to load invoices page data', {
+        route: 'Facturen',
+        endpoint: invoiceEndpoint,
+        userRole: user.role,
+        administration_id: administrationId,
+        error: err,
+      })
+
+      const statusCode = getStatusCodeFromError(err)
+      setRequestTraces(prev => [
+        {
+          endpoint: invoiceEndpoint,
+          status: statusCode,
+          ok: false,
+          timestamp: new Date().toISOString(),
+        },
+        ...prev,
+      ].slice(0, 12))
+
+      if (statusCode === 401 || statusCode === 403 || err instanceof UnauthorizedError) {
+        setError('Geen toegang tot facturen.')
+        setLoadState('forbidden')
+      } else if (statusCode !== null && statusCode >= 500 || err instanceof ServerError) {
+        setError('Serverfout bij het laden van facturen.')
+        setLoadState('server')
+      } else if (err instanceof NetworkError || statusCode === null) {
+        setError('Geen verbinding met de server.')
+        setLoadState('network')
+      } else {
+        const errorMessage = parseApiError(err)
+        setError(errorMessage)
+        setLoadState('error')
+      }
+
+      const parsed = parseApiError(err)
+      setLastErrorMessage(parsed)
+      toast.error(parsed)
+      setInvoices([])
+      setCustomers([])
     } finally {
       setIsLoading(false)
     }
-  }, [user?.id])
+  }, [administrationId, user?.id, user?.role])
 
   useEffect(() => {
     loadData()
@@ -1947,9 +2056,19 @@ export const ZZPInvoicesPage = () => {
           </div>
         )}
 
-        {/* Show loading, empty state or content */}
+        {/* Show loading, error, empty state or content */}
         {showLoading ? (
           <TableLoadingSkeleton />
+        ) : error ? (
+          <Card className="bg-card/80 backdrop-blur-sm border-destructive/30">
+            <CardHeader>
+              <CardTitle>{loadState === 'forbidden' ? 'Geen toegang' : loadState === 'server' ? 'Serverfout' : loadState === 'network' ? 'Geen verbinding' : 'Facturen laden mislukt'}</CardTitle>
+              <CardDescription>{error}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={() => { void loadData() }} variant="outline">Opnieuw proberen</Button>
+            </CardContent>
+          </Card>
         ) : invoices.length === 0 ? (
           <EmptyState onAddInvoice={openNewForm} hasCustomers={hasActiveCustomers} />
         ) : (
@@ -2241,6 +2360,35 @@ export const ZZPInvoicesPage = () => {
                     )}
                   </TableBody>
                 </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {debugEnabled && (
+          <Card className="mt-4 border-dashed border-amber-500/40 bg-amber-50/40 dark:bg-amber-950/10">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Invoices debug</CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs space-y-1 font-mono">
+              <p>role: {user?.role ?? 'unknown'}</p>
+              <p>administration_id: {administrationId ?? 'missing'}</p>
+              <p>api: {getApiBaseUrl()}</p>
+              <p>loadState: {loadState}</p>
+              <p>lastError: {lastErrorMessage ?? 'none'}</p>
+              <div>
+                <p className="font-semibold mb-1">requests:</p>
+                {requestTraces.length === 0 ? (
+                  <p>none</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {requestTraces.map((trace, index) => (
+                      <li key={`${trace.timestamp}-${trace.endpoint}-${index}`}>
+                        [{trace.status ?? 'ERR'}] {trace.endpoint}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </CardContent>
           </Card>

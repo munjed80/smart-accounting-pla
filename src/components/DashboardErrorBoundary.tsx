@@ -7,6 +7,8 @@ import { WarningCircle, ArrowsClockwise } from '@phosphor-icons/react'
 interface Props {
   children: ReactNode
   pageName?: string
+  userRole?: string
+  apiEndpoint?: string
 }
 
 interface State {
@@ -38,6 +40,9 @@ export class DashboardErrorBoundary extends Component<Props, State> {
       message: error.message,
       stack: error.stack,
       page: pageName,
+      userRole: this.props.userRole ?? 'unknown',
+      apiEndpoint: this.props.apiEndpoint ?? 'unknown',
+      componentStack: errorInfo.componentStack,
     })
   }
 

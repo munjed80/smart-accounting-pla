@@ -140,7 +140,7 @@ describe('ZZPLeaseLoansPage loading fix', () => {
 
     await waitFor(() => {
       // The Beta badge should appear in the beta-mode card
-      expect(screen.getAllByText('Beta').length).toBeGreaterThan(0)
+      expect(screen.getByText('Beta')).toBeInTheDocument()
     })
     // The destructive error alert must NOT appear
     expect(screen.queryByText('Fout bij laden')).not.toBeInTheDocument()
@@ -221,7 +221,7 @@ describe('ZZPSubscriptionsPage loading fix', () => {
     render(<ZZPSubscriptionsPage />)
 
     await waitFor(() => {
-      expect(screen.getAllByText('Beta').length).toBeGreaterThan(0)
+      expect(screen.getByText('Beta')).toBeInTheDocument()
     })
     expect(screen.queryByText('Fout bij laden')).not.toBeInTheDocument()
   })

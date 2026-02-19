@@ -81,6 +81,34 @@ export class ServerError extends ApiHttpError {
 }
 
 /**
+ * PaymentRequiredError - Subscription/payment required (402)
+ * Use for feature gating, subscription expired, payment required
+ */
+export class PaymentRequiredError extends ApiHttpError {
+  feature?: string
+  status?: string
+  inTrial?: boolean
+  daysLeftTrial?: number
+
+  constructor(
+    message: string = 'Payment or subscription required',
+    metadata: HttpErrorMetadata & {
+      feature?: string
+      status?: string
+      inTrial?: boolean
+      daysLeftTrial?: number
+    } = {}
+  ) {
+    super(message, metadata)
+    this.name = 'PaymentRequiredError'
+    this.feature = metadata.feature
+    this.status = metadata.status
+    this.inTrial = metadata.inTrial
+    this.daysLeftTrial = metadata.daysLeftTrial
+  }
+}
+
+/**
  * Helper to check if an error is recoverable (non-fatal)
  * Recoverable errors should show inline error states, not full-screen overlays
  */
@@ -97,4 +125,11 @@ export function isRecoverableError(error: Error): boolean {
  */
 export function requiresReauth(error: Error): boolean {
   return error instanceof UnauthorizedError
+}
+
+/**
+ * Helper to check if an error requires payment/subscription
+ */
+export function requiresPayment(error: Error): boolean {
+  return error instanceof PaymentRequiredError
 }

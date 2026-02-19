@@ -151,8 +151,7 @@ export const ErrorMessages = {
   
   // Feature Availability
   BETA_TITLE: 'Binnenkort beschikbaar',
-  BETA_SUBSCRIPTIONS: 'Deze functie is binnenkort beschikbaar. We werken hard om deze module voor je klaar te maken.',
-  BETA_LEASE_LOANS: 'Deze functie is binnenkort beschikbaar. We werken hard om deze module voor je klaar te maken.',
+  BETA_FEATURE_UNAVAILABLE: 'Deze functie is binnenkort beschikbaar. We werken hard om deze module voor je klaar te maken.',
   BETA_NOTE: 'Houd je terugkerende kosten voor nu bij in de uitgaven module, of kom later terug wanneer deze functie actief is.',
   
   // Generic

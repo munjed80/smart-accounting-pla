@@ -273,7 +273,7 @@ export const ZZPLeaseLoansPage = () => {
                   <div>
                     <h3 className="text-xl font-semibold mb-2">Lease & Leningen</h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      {ErrorMessages.BETA_LEASE_LOANS}
+                      {ErrorMessages.BETA_FEATURE_UNAVAILABLE}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {ErrorMessages.BETA_NOTE}

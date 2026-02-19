@@ -263,7 +263,7 @@ export const ZZPSubscriptionsPage = () => {
                   <div>
                     <h3 className="text-xl font-semibold mb-2">Abonnementen & Recurring Kosten</h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      {ErrorMessages.BETA_SUBSCRIPTIONS}
+                      {ErrorMessages.BETA_FEATURE_UNAVAILABLE}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {ErrorMessages.BETA_NOTE}

@@ -133,3 +133,35 @@ export function requiresReauth(error: Error): boolean {
 export function requiresPayment(error: Error): boolean {
   return error instanceof PaymentRequiredError
 }
+
+/**
+ * Error Message Constants
+ * 
+ * Centralized error messages for consistent UX across the application.
+ * Dutch language messages for end users.
+ */
+export const ErrorMessages = {
+  // Authentication & Authorization
+  SESSION_EXPIRED: 'Sessie verlopen. Log opnieuw in.',
+  NO_ACCESS: 'Geen toegang tot deze pagina. Controleer je rechten.',
+  
+  // Network & Connectivity
+  NO_CONNECTION: 'Geen verbinding met de server. Controleer je internetverbinding.',
+  TIMEOUT: 'Verzoek duurde te lang. Probeer het opnieuw.',
+  
+  // Feature Availability
+  BETA_TITLE: 'Binnenkort beschikbaar',
+  BETA_SUBSCRIPTIONS: 'Deze functie is binnenkort beschikbaar. We werken hard om deze module voor je klaar te maken.',
+  BETA_LEASE_LOANS: 'Deze functie is binnenkort beschikbaar. We werken hard om deze module voor je klaar te maken.',
+  BETA_NOTE: 'Houd je terugkerende kosten voor nu bij in de uitgaven module, of kom later terug wanneer deze functie actief is.',
+  
+  // Generic
+  GENERIC_ERROR: 'Er is een fout opgetreden. Probeer het opnieuw.',
+  LOADING: 'Laden...',
+  
+  // Actions
+  RETRY: 'Opnieuw proberen',
+  RETRY_BUSY: 'Bezig...',
+  CHECK_AGAIN: 'Opnieuw controleren',
+  CHECK_AGAIN_BUSY: 'Controleren...',
+} as const

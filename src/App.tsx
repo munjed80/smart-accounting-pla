@@ -39,7 +39,7 @@ import { SupportPage } from '@/components/SupportPage'
 import { AdminDashboard } from '@/components/AdminDashboard'
 import { AppShell } from '@/components/AppShell'
 import { DashboardErrorBoundary } from '@/components/DashboardErrorBoundary'
-import { administrationApi, accountantClientApi } from '@/lib/api'
+import { administrationApi, accountantClientApi, getApiBaseUrl } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { pathToTab, tabToPath } from '@/lib/routing'
 import { cleanupOverlayPortals } from '@/hooks/useCloseOverlayOnRouteChange'
@@ -649,7 +649,7 @@ const AppContent = () => {
         activeTab={activeTab} 
         onTabChange={handleTabChange}
       >
-        <DashboardErrorBoundary pageName={getPageName()}>
+        <DashboardErrorBoundary pageName={getPageName()} userRole={user?.role} apiEndpoint={getApiBaseUrl()}>
           {renderTabContent()}
         </DashboardErrorBoundary>
       </AppShell>

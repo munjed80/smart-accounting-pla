@@ -455,14 +455,37 @@ api.interceptors.response.use(
     return response
   },
   async (error: AxiosError) => {
-    // DEBUG: Log error response with details (only in DEV mode to avoid exposing info in production)
-    if (isDev) {
-      const url = error.config?.url || 'unknown'
-      const status = error.response?.status || 'network error'
-      const message = error.message || 'unknown error'
-      console.error('[API Error]', status, url, message)
+    // Always log structured error details for developer diagnostics.
+    // Includes method, full URL, HTTP status, response body snippet (≤500 chars), and request-id.
+    // Production logs omit the body snippet to avoid leaking sensitive data.
+    {
+      const method = (error.config?.method ?? 'unknown').toUpperCase()
+      const fullUrl = `${error.config?.baseURL ?? ''}${error.config?.url ?? ''}`
+      const status = error.response?.status ?? 'no-response'
+      const requestId =
+        error.response?.headers?.['x-request-id'] ??
+        error.response?.headers?.['x-correlation-id'] ??
+        (error.response?.data as Record<string, unknown> | undefined)?.request_id ??
+        null
+      if (isDev) {
+        const rawBody = error.response?.data
+        const bodySnippet =
+          rawBody !== undefined
+            ? JSON.stringify(rawBody).slice(0, 500)
+            : '(no body)'
+        console.error('[API Error]', {
+          method,
+          url: fullUrl,
+          status,
+          body: bodySnippet,
+          requestId,
+          message: error.message,
+        })
+      } else {
+        console.error(`[API Error] ${method} ${fullUrl} → HTTP ${status}${requestId ? ` (id: ${requestId})` : ''}`)
+      }
     }
-    
+
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
     if (isOfflineError(error)) {
@@ -477,8 +500,12 @@ api.interceptors.response.use(
     let typedError: Error = error
 
     if (!error.response) {
-      // Network error (no response from server)
-      typedError = new NetworkError(error.message || 'Network connection failed')
+      // True network error: connection refused, DNS failure, CORS preflight rejected, etc.
+      // Avoid surfacing the raw axios "Network Error" string which gives no actionable detail.
+      const networkMsg = error.message === 'Network Error'
+        ? 'Geen verbinding met de server. Controleer je internetverbinding.'
+        : (error.message || 'Geen verbinding met de server. Controleer je internetverbinding.')
+      typedError = new NetworkError(networkMsg)
     } else {
       const status = error.response.status
       const parsedError = extractApiErrorInfo(error)

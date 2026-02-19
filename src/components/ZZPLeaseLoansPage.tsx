@@ -16,7 +16,7 @@ import { toast } from 'sonner'
 import { CommitmentExpenseDialog } from '@/components/CommitmentExpenseDialog'
 import { createDemoCommitments } from '@/lib/commitments'
 import { PaywallModal } from '@/components/PaywallModal'
-import { PaymentRequiredError, ErrorMessages } from '@/lib/errors'
+import { PaymentRequiredError, NotFoundError, NetworkError, UnauthorizedError, ErrorMessages } from '@/lib/errors'
 import { AlertCircle, ArrowClockwise } from '@phosphor-icons/react'
 
 const eur = (cents?: number | null) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format((cents || 0) / 100)
@@ -97,37 +97,31 @@ export const ZZPLeaseLoansPage = () => {
         setPaywallOpen(true)
         return // Don't show error state, show paywall instead
       }
-      
-      // Handle different error types
-      if (axios.isAxiosError(error)) {
-        const status = error.response?.status
-        
-        // 404 = module not available, show beta/coming soon state
-        if (status === 404) {
-          setIsBetaMode(true)
-          return // Don't show error state
-        }
-        
-        // 401/403 = auth/permission issue
-        if (status === 401 || status === 403) {
-          const errorMsg = status === 401 
-            ? ErrorMessages.SESSION_EXPIRED
-            : ErrorMessages.NO_ACCESS
-          setLoadError(errorMsg)
-          return
-        }
-        
-        // Network errors (no response)
-        if (!error.response) {
-          setLoadError(ErrorMessages.NO_CONNECTION)
-          return
-        }
-        
-        // Other HTTP errors
-        const errorMsg = errorWithStatus(error)
-        setLoadError(errorMsg)
+
+      // 404 = module not yet available for this user, show beta/coming soon state.
+      // NOTE: The axios interceptor converts AxiosErrors to typed errors, so we check
+      // NotFoundError (from 404), UnauthorizedError (from 401/403), NetworkError
+      // (no-response), instead of axios.isAxiosError().
+      if (error instanceof NotFoundError) {
+        setIsBetaMode(true)
+        return // Don't show error state
+      }
+
+      if (error instanceof UnauthorizedError) {
+        const statusCode = error.statusCode
+        setLoadError(statusCode === 401 ? ErrorMessages.SESSION_EXPIRED : ErrorMessages.NO_ACCESS)
+        return
+      }
+
+      if (error instanceof NetworkError) {
+        setLoadError(ErrorMessages.NO_CONNECTION)
+        return
+      }
+
+      // All other typed / generic errors
+      if (error instanceof Error) {
+        setLoadError(error.message)
       } else {
-        // Non-axios errors
         setLoadError(parseApiError(error))
       }
     } finally {

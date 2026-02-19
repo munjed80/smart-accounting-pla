@@ -35,7 +35,7 @@ export const ZZPSubscriptionsPage = () => {
   const [form, setForm] = useState<ZZPCommitmentCreate>(defaultForm())
   
   // Error handling state
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isBetaMode, setIsBetaMode] = useState(false)
   const [isRetrying, setIsRetrying] = useState(false)
@@ -43,9 +43,6 @@ export const ZZPSubscriptionsPage = () => {
   const [paywallFeature, setPaywallFeature] = useState<{ code: string; nameNL: string }>({ code: '', nameNL: '' })
 
   const load = async () => {
-    // Prevent duplicate requests if already loading or retrying
-    if (isLoading || isRetrying) return
-    
     setIsLoading(true)
     setLoadError(null)
     setIsBetaMode(false)
@@ -137,6 +134,8 @@ export const ZZPSubscriptionsPage = () => {
   
   const retry = async () => {
     setIsRetrying(true)
+    setLoadError(null)
+    setIsBetaMode(false)
     await load()
   }
 

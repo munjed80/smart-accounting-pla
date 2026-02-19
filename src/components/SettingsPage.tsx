@@ -69,6 +69,7 @@ export const SettingsPage = () => {
   const { entitlements, subscription, isLoading: isLoadingSubscription, isAccountantBypass, refetch: refetchSubscription } = useEntitlements()
   const [isCanceling, setIsCanceling] = useState(false)
   const [isReactivating, setIsReactivating] = useState(false)
+  const [isActivating, setIsActivating] = useState(false)
   
   // Business profile state (for ZZP users) - MUST be declared before useDelayedLoading
   const [businessProfile, setBusinessProfile] = useState<ZZPBusinessProfile | null>(null)
@@ -243,6 +244,28 @@ export const SettingsPage = () => {
       toast.error(parseApiError(error))
     } finally {
       setIsReactivating(false)
+    }
+  }
+
+  const handleActivateSubscription = async () => {
+    setIsActivating(true)
+    try {
+      const result = await subscriptionApi.activateSubscription()
+      if (result.scheduled) {
+        toast.success('Abonnement gepland', {
+          description: `Je abonnement start automatisch na de proefperiode${result.trial_end_at ? ` op ${new Date(result.trial_end_at).toLocaleDateString('nl-NL')}` : ''}.`,
+        })
+      } else {
+        toast.success('Abonnement actief', {
+          description: 'Je abonnement is nu actief.',
+        })
+      }
+      await refetchSubscription()
+    } catch (error) {
+      console.error('Failed to activate subscription:', error)
+      toast.error(parseApiError(error))
+    } finally {
+      setIsActivating(false)
     }
   }
 
@@ -888,10 +911,10 @@ export const SettingsPage = () => {
                             <>Gepland — start op {new Date(subscription.trial_end_at).toLocaleDateString('nl-NL')}</>
                           )}
                           {subscription.status === 'TRIALING' && entitlements.in_trial && !subscription.scheduled && (
-                            <>Proefperiode actief — {entitlements.days_left_trial} {entitlements.days_left_trial === 1 ? 'dag' : 'dagen'}.</>
+                            <>Proefperiode actief — {entitlements.days_left_trial} {entitlements.days_left_trial === 1 ? 'dag' : 'dagen'}{subscription.trial_end_at ? ` (eindigt ${new Date(subscription.trial_end_at).toLocaleDateString('nl-NL')})` : ''}.</>
                           )}
                           {subscription.status === 'ACTIVE' && !subscription.cancel_at_period_end && (
-                            <>ZZP Basic abonnement — €6,95/maand</>
+                            <>ZZP Basic abonnement — €6,95/maand{subscription.next_payment_date ? ` · volgende betaling ${new Date(subscription.next_payment_date).toLocaleDateString('nl-NL')}` : ''}</>
                           )}
                           {subscription.cancel_at_period_end && (
                             <>Abonnement opgezegd — blijft actief tot {subscription.current_period_end ? new Date(subscription.current_period_end).toLocaleDateString('nl-NL') : 'periode-einde'}</>
@@ -921,6 +944,17 @@ export const SettingsPage = () => {
 
                     {/* Action Buttons */}
                     <div className="flex flex-wrap gap-2 pt-2">
+                      {/* Show Activate button for TRIALING without scheduled subscription */}
+                      {subscription.status === 'TRIALING' && !subscription.scheduled && (
+                        <Button 
+                          onClick={handleActivateSubscription}
+                          disabled={isActivating}
+                        >
+                          {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
+                          Abonnement activeren
+                        </Button>
+                      )}
+
                       {/* Show Cancel button for ACTIVE subscriptions without cancellation */}
                       {subscription.status === 'ACTIVE' && !subscription.cancel_at_period_end && (
                         <Button 

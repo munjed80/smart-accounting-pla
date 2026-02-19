@@ -6,12 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { zzpApi, ZZPCommitment, ZZPCommitmentCreate, ZZPCommitmentSuggestion, ZZPExpense } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
 import { navigateTo } from '@/lib/navigation'
 import { toast } from 'sonner'
 import { CommitmentExpenseDialog } from '@/components/CommitmentExpenseDialog'
 import { createDemoCommitments } from '@/lib/commitments'
+import { PaywallModal } from '@/components/PaywallModal'
+import { PaymentRequiredError } from '@/lib/errors'
+import { AlertCircle, ArrowClockwise } from '@phosphor-icons/react'
 
 const eur = (cents: number) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(cents / 100)
 const todayStr = () => new Date().toISOString().slice(0, 10)
@@ -29,15 +33,40 @@ export const ZZPSubscriptionsPage = () => {
   const [isCreatingExpense, setIsCreatingExpense] = useState(false)
   const [expenses, setExpenses] = useState<ZZPExpense[]>([])
   const [form, setForm] = useState<ZZPCommitmentCreate>(defaultForm())
+  
+  // Error handling state
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [paywallOpen, setPaywallOpen] = useState(false)
+  const [paywallFeature, setPaywallFeature] = useState<{ code: string; nameNL: string }>({ code: '', nameNL: '' })
 
   const load = async () => {
+    setIsLoading(true)
+    setLoadError(null)
     try {
-      const [list, suggestionResp, expenseResp] = await Promise.all([zzpApi.commitments.list('subscription'), zzpApi.commitments.suggestions(), zzpApi.expenses.list()])
+      const [list, suggestionResp, expenseResp] = await Promise.all([
+        zzpApi.commitments.list('subscription'), 
+        zzpApi.commitments.suggestions(), 
+        zzpApi.expenses.list()
+      ])
       setItems(list.commitments)
       setSuggestions(suggestionResp.suggestions)
       setExpenses(expenseResp.expenses)
     } catch (error) {
-      toast.error(errorWithStatus(error))
+      // Check if it's a payment required error
+      if (error instanceof PaymentRequiredError) {
+        setPaywallFeature({ 
+          code: error.feature || 'subscriptions', 
+          nameNL: 'Abonnementen & Recurring Kosten' 
+        })
+        setPaywallOpen(true)
+      } else {
+        const errorMsg = errorWithStatus(error)
+        setLoadError(errorMsg)
+        toast.error(errorMsg)
+      }
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -118,10 +147,38 @@ export const ZZPSubscriptionsPage = () => {
             Abonnementen & Recurring Kosten
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground">
-            Beheer je terugkerende kosten en abonnementen
+            Beheer je terugkerende kosten
           </p>
         </div>
 
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex justify-center items-center py-12">
+            <div className="text-center space-y-3">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
+              <p className="text-muted-foreground">Laden...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {!isLoading && loadError && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Fout bij laden</AlertTitle>
+            <AlertDescription className="space-y-3">
+              <p>{loadError}</p>
+              <Button onClick={() => void load()} variant="outline" size="sm">
+                <ArrowClockwise className="mr-2 h-4 w-4" />
+                Opnieuw proberen
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Main Content - Only show if not loading and no error */}
+        {!isLoading && !loadError && (
+          <>
         {/* Form Card */}
         <Card className="bg-card/80 backdrop-blur-sm border border-border/50 mb-6">
           <CardHeader className="pb-4">
@@ -412,6 +469,22 @@ export const ZZPSubscriptionsPage = () => {
           isSubmitting={isCreatingExpense} 
           onOpenChange={(open) => { if (!open) setSelectedExpenseCommitment(null) }} 
           onConfirm={confirmCreateExpense} 
+        />
+        
+        {/* Close the conditional wrapper for main content */}
+        </>
+        )}
+
+        {/* Paywall Modal */}
+        <PaywallModal
+          open={paywallOpen}
+          onClose={() => {
+            setPaywallOpen(false)
+            // Retry loading after paywall is closed (user might have activated subscription)
+            void load()
+          }}
+          feature={paywallFeature.code}
+          featureNameNL={paywallFeature.nameNL}
         />
       </div>
     </div>

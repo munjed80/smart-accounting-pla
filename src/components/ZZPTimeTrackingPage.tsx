@@ -14,6 +14,9 @@ import { WorkSession, getApiBaseUrl, zzpApi, ZZPCustomer, ZZPTimeEntry, ZZPTimeE
 import { parseApiError } from '@/lib/utils'
 import { toast } from 'sonner'
 import { navigateTo } from '@/lib/navigation'
+import { useDebounce } from '@/hooks/useDebounce'
+import { useQueryFilters } from '@/hooks/useQueryFilters'
+import { filterTimeEntries, getTimeEntryTotals, TimeEntryFilters } from '@/lib/filtering'
 import {
   formatDurationHHMMSS,
   getInvoicePeriodRange,
@@ -24,6 +27,18 @@ import {
 } from '@/lib/timeTracking'
 
 const NO_CUSTOMER = '__none__'
+
+const defaultTimeFilters: TimeEntryFilters = {
+  q: '',
+  from: '',
+  to: '',
+  billable: 'all',
+  invoiced: 'all',
+  customer_id: '',
+  project: '',
+  min_minutes: '',
+  max_minutes: '',
+}
 
 type EntryFormState = {
   entry_date: string
@@ -86,7 +101,9 @@ export const ZZPTimeTrackingPage = () => {
   const [invoicing, setInvoicing] = useState(false)
   const [pageError, setPageError] = useState<string | null>(null)
 
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('')
+  const { filters, setFilter, reset } = useQueryFilters(defaultTimeFilters)
+  const [searchQuery, setSearchQuery] = useState(filters.q)
+  const debouncedSearch = useDebounce(searchQuery, 300)
   const [periodStart, setPeriodStart] = useState<string>(initialPeriod?.start || '')
   const [periodEnd, setPeriodEnd] = useState<string>(initialPeriod?.end || '')
   const [hourlyRate, setHourlyRate] = useState<string>('')
@@ -177,7 +194,17 @@ export const ZZPTimeTrackingPage = () => {
     if (!period) return
     setPeriodStart(period.start)
     setPeriodEnd(period.end)
-  }, [invoiceMode])
+    setFilter('from', period.start)
+    setFilter('to', period.end)
+  }, [invoiceMode, setFilter])
+
+  useEffect(() => {
+    setSearchQuery(filters.q)
+  }, [filters.q])
+
+  useEffect(() => {
+    if (debouncedSearch !== filters.q) setFilter('q', debouncedSearch)
+  }, [debouncedSearch, filters.q, setFilter])
 
   useEffect(() => {
     if (!activeSession?.started_at) {
@@ -197,13 +224,8 @@ export const ZZPTimeTrackingPage = () => {
   }, [activeSession])
 
   const filteredOpenEntries = useMemo(() => {
-    return openEntries.filter((entry) => {
-      if (selectedCustomerId && entry.customer_id !== selectedCustomerId) return false
-      if (periodStart && entry.entry_date < periodStart) return false
-      if (periodEnd && entry.entry_date > periodEnd) return false
-      return true
-    })
-  }, [openEntries, selectedCustomerId, periodStart, periodEnd])
+    return filterTimeEntries(openEntries, { ...filters, q: debouncedSearch, from: filters.from || periodStart, to: filters.to || periodEnd }, customerMap)
+  }, [openEntries, filters, debouncedSearch, customerMap, periodStart, periodEnd])
 
   const filteredInvoicedEntries = useMemo(() => {
     return invoicedEntries.filter((entry) => {
@@ -218,6 +240,7 @@ export const ZZPTimeTrackingPage = () => {
 
   const totalOpenMinutes = useMemo(() => totalMinutesForEntries(filteredOpenEntries), [filteredOpenEntries])
   const totalOpenHours = useMemo(() => minutesToHours(totalOpenMinutes), [totalOpenMinutes])
+  const timeTotals = useMemo(() => getTimeEntryTotals(filteredOpenEntries), [filteredOpenEntries])
 
   const totalOpenAmount = useMemo(() => totalOpenHours * Number(hourlyRate || 0), [totalOpenHours, hourlyRate])
 
@@ -451,11 +474,11 @@ export const ZZPTimeTrackingPage = () => {
   }
 
   const handleInvoiceWeek = async () => {
-    if (!selectedCustomerId || totalOpenHours <= 0) return
+    if (!filters.customer_id || totalOpenHours <= 0) return
     setInvoicing(true)
     try {
       const response = await zzpApi.timeEntries.invoiceWeek({
-        customer_id: selectedCustomerId,
+        customer_id: filters.customer_id,
         period_start: periodStart,
         period_end: periodEnd,
         hourly_rate: hourlyRate ? Number(hourlyRate) : undefined,
@@ -512,7 +535,7 @@ export const ZZPTimeTrackingPage = () => {
 
             <div className="space-y-2">
               <Label>Klant</Label>
-              <Select value={selectedCustomerId || NO_CUSTOMER} onValueChange={(value) => setSelectedCustomerId(value === NO_CUSTOMER ? '' : value)}>
+              <Select value={filters.customer_id || NO_CUSTOMER} onValueChange={(value) => setFilter('customer_id', value === NO_CUSTOMER ? '' : value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecteer klant" />
                 </SelectTrigger>
@@ -527,12 +550,12 @@ export const ZZPTimeTrackingPage = () => {
 
             <div className="space-y-2">
               <Label>Periode start</Label>
-              <Input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} />
+              <Input type="date" value={periodStart} onChange={(event) => { setPeriodStart(event.target.value); setFilter('from', event.target.value) }} />
             </div>
 
             <div className="space-y-2">
               <Label>Periode eind</Label>
-              <Input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} />
+              <Input type="date" value={periodEnd} onChange={(event) => { setPeriodEnd(event.target.value); setFilter('to', event.target.value) }} />
             </div>
 
             <div className="space-y-2">
@@ -554,9 +577,13 @@ export const ZZPTimeTrackingPage = () => {
               <p className="text-sm text-muted-foreground">Bedrag preview</p>
               <p className="text-2xl font-semibold">€ {totalOpenAmount.toFixed(2)}</p>
             </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-sm text-muted-foreground">Billable uren (filter)</p>
+              <p className="text-2xl font-semibold">{timeTotals.billableHours.toFixed(2)}u</p>
+            </div>
           </div>
 
-          <Button disabled={!selectedCustomerId || totalOpenHours === 0 || invoicing} onClick={() => void handleInvoiceWeek()}>
+          <Button disabled={!filters.customer_id || totalOpenHours === 0 || invoicing} onClick={() => void handleInvoiceWeek()}>
             {invoicing ? 'Factuur maken...' : 'Maak factuur'}
           </Button>
         </CardContent>
@@ -606,6 +633,34 @@ export const ZZPTimeTrackingPage = () => {
           </div>
         </CardHeader>
         <CardContent>
+          <div className="grid gap-3 md:grid-cols-3 mb-4">
+            <Input placeholder="Zoek op project, klant of omschrijving" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
+            <Select value={filters.billable} onValueChange={(value) => setFilter('billable', value as TimeEntryFilters['billable'])}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle</SelectItem>
+                <SelectItem value="billable">Billable</SelectItem>
+                <SelectItem value="non_billable">Non-billable</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filters.invoiced} onValueChange={(value) => setFilter('invoiced', value as TimeEntryFilters['invoiced'])}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle</SelectItem>
+                <SelectItem value="invoiced">Gefactureerd</SelectItem>
+                <SelectItem value="not_invoiced">Niet gefactureerd</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input type="number" placeholder="Min minuten" value={filters.min_minutes} onChange={(e) => setFilter('min_minutes', e.target.value)} />
+            <Input type="number" placeholder="Max minuten" value={filters.max_minutes} onChange={(e) => setFilter('max_minutes', e.target.value)} />
+            <Input placeholder="Project" value={filters.project} onChange={(e) => setFilter('project', e.target.value)} />
+          </div>
+          <div className="flex flex-wrap gap-2 mb-4">
+            <Button size="sm" variant="outline" onClick={() => { const d = toLocalISODate(new Date()); setFilter('from', d); setFilter('to', d); }}>Today</Button>
+            <Button size="sm" variant="outline" onClick={() => { const p = getInvoicePeriodRange('weekly', new Date()); if (p) { setFilter('from', p.start); setFilter('to', p.end); } }}>This week</Button>
+            <Button size="sm" variant="outline" onClick={() => { const p = getInvoicePeriodRange('monthly', new Date()); if (p) { setFilter('from', p.start); setFilter('to', p.end); } }}>This month</Button>
+            <Button size="sm" variant="outline" onClick={reset}>Clear filters</Button>
+          </div>
           {loading ? (
             <div className="space-y-3">
               <Skeleton className="h-16 w-full" />

@@ -5,3 +5,5 @@
  */
 
 export { useDebounce } from './useDebounce'
+
+export { useQueryFilters } from './useQueryFilters'

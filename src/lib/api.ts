@@ -1,5 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
-import { NotFoundError, NetworkError, UnauthorizedError, ValidationError, ServerError } from './errors'
+import { ApiHttpError, NotFoundError, NetworkError, UnauthorizedError, ValidationError, ServerError } from './errors'
 
 /**
  * ==== DATA MAP: Accountant Screens → Endpoints ====
@@ -247,6 +247,73 @@ export const api = axios.create({
   withCredentials: true,
 })
 
+
+
+interface ApiErrorInfo {
+  message: string
+  statusCode?: number
+  correlationId?: string
+  errorCode?: string
+}
+
+const extractApiErrorInfo = (error: AxiosError): ApiErrorInfo => {
+  const statusCode = error.response?.status
+  const responseData = error.response?.data as any
+  const correlationId =
+    error.response?.headers?.['x-correlation-id'] ||
+    error.response?.headers?.['x-request-id'] ||
+    responseData?.correlation_id ||
+    responseData?.request_id ||
+    undefined
+
+  const errorCode = responseData?.detail?.code || responseData?.code
+  const backendMessage = responseData?.detail?.message || responseData?.detail || responseData?.message
+
+  let message = backendMessage || error.message || 'Er is een onbekende fout opgetreden'
+
+  switch (statusCode) {
+    case 401:
+      message = 'Sessie verlopen, log opnieuw in'
+      break
+    case 403:
+      message = 'Geen rechten voor deze pagina'
+      break
+    case 404:
+      message = 'Endpoint ontbreekt (configuratie)'
+      break
+    case 500:
+    case 502:
+    case 503:
+    case 504:
+      message = 'Serverfout, probeer later'
+      break
+    default:
+      break
+  }
+
+  return { message, statusCode, correlationId, errorCode }
+}
+
+export const formatApiErrorForDisplay = (error: unknown): { message: string; detail?: string } => {
+  if (error instanceof ApiHttpError) {
+    const detailParts = [
+      error.statusCode ? `HTTP ${error.statusCode}` : null,
+      error.errorCode ? `code: ${error.errorCode}` : null,
+      error.correlationId ? `correlation: ${error.correlationId}` : null,
+    ].filter(Boolean)
+
+    return {
+      message: error.message,
+      detail: detailParts.length ? detailParts.join(' · ') : undefined,
+    }
+  }
+
+  if (error instanceof Error) {
+    return { message: error.message }
+  }
+
+  return { message: 'Er is een onbekende fout opgetreden' }
+}
 const API_OFFLINE_EVENT = 'smart-accounting:api-offline-status'
 
 export interface ApiOfflineStatus {
@@ -388,30 +455,34 @@ api.interceptors.response.use(
       typedError = new NetworkError(error.message || 'Network connection failed')
     } else {
       const status = error.response.status
-      const errorMessage = (error.response.data as any)?.detail || error.message
+      const parsedError = extractApiErrorInfo(error)
+      const metadata = {
+        statusCode: parsedError.statusCode,
+        correlationId: parsedError.correlationId,
+        errorCode: parsedError.errorCode,
+      }
 
       switch (status) {
         case 400:
-          typedError = new ValidationError(errorMessage)
+          typedError = new ValidationError(parsedError.message, metadata)
           break
         case 401:
-          typedError = new UnauthorizedError(errorMessage)
+          typedError = new UnauthorizedError(parsedError.message, metadata)
           break
         case 403:
-          typedError = new UnauthorizedError(errorMessage || 'Access forbidden')
+          typedError = new UnauthorizedError(parsedError.message, metadata)
           break
         case 404:
-          typedError = new NotFoundError(errorMessage || 'Resource not found')
+          typedError = new NotFoundError(parsedError.message, metadata)
           break
         case 500:
         case 502:
         case 503:
         case 504:
-          typedError = new ServerError(errorMessage || 'Server error')
+          typedError = new ServerError(parsedError.message, metadata)
           break
         default:
-          // Keep as generic error for other status codes
-          typedError = error
+          typedError = new ApiHttpError(parsedError.message, metadata)
       }
     }
 
@@ -5180,6 +5251,10 @@ export const adminApi = {
   },
   impersonate: async (userId: string): Promise<{ access_token: string; token_type: string; impersonated_user_id: string }> => {
     const response = await api.post(`/admin/impersonate/${userId}`)
+    return response.data
+  },
+  getSystemLogs: async (limit = 50): Promise<{ logs: { id: string; action: string; target_type: string; target_id: string; created_at: string; actor_user_id: string | null }[] }> => {
+    const response = await api.get('/admin/logs', { params: { limit } })
     return response.data
   },
 }

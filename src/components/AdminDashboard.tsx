@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { adminApi } from '@/lib/api'
+import { adminApi, formatApiErrorForDisplay } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -38,6 +38,12 @@ export const AdminDashboard = () => {
     enabled: section === 'users',
   })
 
+  const logsQuery = useQuery({
+    queryKey: ['admin-system-logs'],
+    queryFn: () => adminApi.getSystemLogs(50),
+    enabled: section === 'logs',
+  })
+
   const handleSectionChange = (nextSection: AdminSection) => {
     setSection(nextSection)
     navigateTo(nextSection === 'users' ? '/admin' : `/admin/${nextSection}`)
@@ -65,6 +71,17 @@ export const AdminDashboard = () => {
     }
   }
 
+
+  const renderErrorDescription = (error: unknown, fallback: string) => {
+    const parsed = formatApiErrorForDisplay(error)
+    return (
+      <>
+        <p className="mb-3">{parsed.message || fallback}</p>
+        {parsed.detail ? <p className="mb-3 text-xs text-muted-foreground">{parsed.detail}</p> : null}
+      </>
+    )
+  }
+
   return (
     <AdminLayout activeSection={section} onSectionChange={handleSectionChange}>
       {/* Search input with proper spacing */}
@@ -89,7 +106,7 @@ export const AdminDashboard = () => {
                   <WarningCircle size={20} weight="duotone" />
                   <AlertTitle>Overzicht kon niet geladen worden</AlertTitle>
                   <AlertDescription>
-                    <p className="mb-3">Er is een fout opgetreden bij het laden van het systeemoverzicht. Controleer je internetverbinding en probeer het opnieuw.</p>
+                    {renderErrorDescription(overviewQuery.error, 'Er is een fout opgetreden bij het laden van het systeemoverzicht.')}
                     <Button 
                       variant="outline" 
                       size="sm"
@@ -124,7 +141,7 @@ export const AdminDashboard = () => {
               <WarningCircle size={20} weight="duotone" />
               <AlertTitle>Bedrijven konden niet geladen worden</AlertTitle>
               <AlertDescription>
-                <p className="mb-3">Er is een fout opgetreden bij het laden van de bedrijvenlijst. Controleer je internetverbinding en probeer het opnieuw.</p>
+                {renderErrorDescription(companiesQuery.error, 'Er is een fout opgetreden bij het laden van de bedrijvenlijst.')}
                 <Button 
                   variant="outline" 
                   size="sm"
@@ -186,8 +203,34 @@ export const AdminDashboard = () => {
       {section === 'logs' ? (
         <Card>
           <CardHeader><CardTitle>System logs</CardTitle></CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Logging endpoint is not exposed yet. Connect this panel to the backend audit stream when available.
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            {logsQuery.isLoading ? <p>Laden...</p> : null}
+            {logsQuery.isError ? (
+              <Alert variant="destructive">
+                <WarningCircle size={20} weight="duotone" />
+                <AlertTitle>System logs konden niet geladen worden</AlertTitle>
+                <AlertDescription>
+                  {renderErrorDescription(logsQuery.error, 'Er is een fout opgetreden bij het laden van de systeemlogs.')}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void logsQuery.refetch()}
+                    className="gap-2"
+                  >
+                    <ArrowClockwise size={16} />
+                    Opnieuw proberen
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            {logsQuery.data?.logs.length ? logsQuery.data.logs.map((log) => (
+              <div key={log.id} className="rounded-md border p-3">
+                <p className="font-medium">{log.action}</p>
+                <p className="text-xs text-muted-foreground">{log.target_type} · {log.target_id}</p>
+                <p className="text-xs text-muted-foreground">{new Date(log.created_at).toLocaleString()}</p>
+              </div>
+            )) : null}
+            {logsQuery.data && logsQuery.data.logs.length === 0 ? <p>Geen logs gevonden.</p> : null}
           </CardContent>
         </Card>
       ) : null}
@@ -200,7 +243,7 @@ export const AdminDashboard = () => {
               <WarningCircle size={20} weight="duotone" />
               <AlertTitle>Gebruikers konden niet geladen worden</AlertTitle>
               <AlertDescription>
-                <p className="mb-3">Er is een fout opgetreden bij het laden van de gebruikerslijst. Controleer je internetverbinding en probeer het opnieuw.</p>
+                {renderErrorDescription(usersQuery.error, 'Er is een fout opgetreden bij het laden van de gebruikerslijst.')}
                 <Button 
                   variant="outline" 
                   size="sm"

@@ -1,5 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
-import { ApiHttpError, NotFoundError, NetworkError, UnauthorizedError, ValidationError, ServerError } from './errors'
+import { ApiHttpError, NotFoundError, NetworkError, UnauthorizedError, ValidationError, ServerError, PaymentRequiredError } from './errors'
 
 /**
  * ==== DATA MAP: Accountant Screens → Endpoints ====
@@ -275,6 +275,10 @@ const extractApiErrorInfo = (error: AxiosError): ApiErrorInfo => {
     case 401:
       message = 'Sessie verlopen, log opnieuw in'
       break
+    case 402:
+      // For 402, prefer backend message_nl if provided
+      message = responseData?.message_nl || backendMessage || 'Abonnement vereist om deze functie te gebruiken'
+      break
     case 403:
       message = 'Geen rechten voor deze pagina'
       break
@@ -338,8 +342,27 @@ const emitOfflineStatus = (status: ApiOfflineStatus) => {
 }
 
 const isOfflineError = (error: AxiosError) => {
-  if (!error.response) return true
-  return error.response.status === 503 || error.response.status === 504
+  // True offline conditions:
+  // 1. No response at all (network failure, CORS, connection refused, timeout)
+  // 2. Status 503 (Service Unavailable) or 504 (Gateway Timeout)
+  // 
+  // NOT offline:
+  // - 401 (Unauthorized) - auth issue, not network issue
+  // - 402 (Payment Required) - subscription/payment issue, not network issue
+  // - 403 (Forbidden) - permission issue, not network issue
+  // - 404 (Not Found) - routing/endpoint issue, not network issue
+  // - Other 4xx errors - client errors, not network issues
+  // - 500/502 - server errors, not network issues (server is reachable)
+  
+  if (!error.response) {
+    // No response object means a true network error
+    // This includes: timeout, connection refused, CORS, network unreachable
+    return true
+  }
+  
+  // Service unavailable or gateway timeout = infrastructure offline
+  const status = error.response.status
+  return status === 503 || status === 504
 }
 
 const isOfflineSimulationEnabled = () => {
@@ -468,6 +491,20 @@ api.interceptors.response.use(
           break
         case 401:
           typedError = new UnauthorizedError(parsedError.message, metadata)
+          break
+        case 402:
+          // Payment Required - extract additional metadata from response
+          const responseData = error.response.data as any
+          typedError = new PaymentRequiredError(
+            parsedError.message || responseData?.message_nl || 'Abonnement vereist',
+            {
+              ...metadata,
+              feature: responseData?.feature,
+              status: responseData?.status,
+              inTrial: responseData?.in_trial,
+              daysLeftTrial: responseData?.days_left_trial,
+            }
+          )
           break
         case 403:
           typedError = new UnauthorizedError(parsedError.message, metadata)

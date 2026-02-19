@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 import { CommitmentExpenseDialog } from '@/components/CommitmentExpenseDialog'
 import { createDemoCommitments } from '@/lib/commitments'
 import { PaywallModal } from '@/components/PaywallModal'
-import { PaymentRequiredError } from '@/lib/errors'
+import { PaymentRequiredError, ErrorMessages } from '@/lib/errors'
 import { AlertCircle, ArrowClockwise } from '@phosphor-icons/react'
 
 const eur = (cents: number) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(cents / 100)
@@ -110,15 +110,15 @@ export const ZZPSubscriptionsPage = () => {
         // 401/403 = auth/permission issue
         if (status === 401 || status === 403) {
           const errorMsg = status === 401 
-            ? 'Sessie verlopen. Log opnieuw in.' 
-            : 'Geen toegang tot deze pagina. Controleer je rechten.'
+            ? ErrorMessages.SESSION_EXPIRED
+            : ErrorMessages.NO_ACCESS
           setLoadError(errorMsg)
           return
         }
         
         // Network errors (no response)
         if (!error.response) {
-          setLoadError('Geen verbinding met de server. Controleer je internetverbinding.')
+          setLoadError(ErrorMessages.NO_CONNECTION)
           return
         }
         
@@ -226,7 +226,7 @@ export const ZZPSubscriptionsPage = () => {
           <div className="flex justify-center items-center py-12">
             <div className="text-center space-y-3">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-              <p className="text-muted-foreground">Laden...</p>
+              <p className="text-muted-foreground">{ErrorMessages.LOADING}</p>
             </div>
           </div>
         )}
@@ -245,7 +245,7 @@ export const ZZPSubscriptionsPage = () => {
                 disabled={isRetrying}
               >
                 <ArrowClockwise className={`mr-2 h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
-                {isRetrying ? 'Bezig...' : 'Opnieuw proberen'}
+                {isRetrying ? ErrorMessages.RETRY_BUSY : ErrorMessages.RETRY}
               </Button>
             </AlertDescription>
           </Alert>
@@ -263,10 +263,10 @@ export const ZZPSubscriptionsPage = () => {
                   <div>
                     <h3 className="text-xl font-semibold mb-2">Abonnementen & Recurring Kosten</h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Deze functie is binnenkort beschikbaar. We werken hard om deze module voor je klaar te maken.
+                      {ErrorMessages.BETA_SUBSCRIPTIONS}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Houd je terugkerende kosten voor nu bij in de uitgaven module, of kom later terug wanneer deze functie actief is.
+                      {ErrorMessages.BETA_NOTE}
                     </p>
                   </div>
                   <Button 
@@ -275,7 +275,7 @@ export const ZZPSubscriptionsPage = () => {
                     disabled={isRetrying}
                   >
                     <ArrowClockwise className={`mr-2 h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
-                    {isRetrying ? 'Controleren...' : 'Opnieuw controleren'}
+                    {isRetrying ? ErrorMessages.CHECK_AGAIN_BUSY : ErrorMessages.CHECK_AGAIN}
                   </Button>
                 </div>
               </div>

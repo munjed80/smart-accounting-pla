@@ -37,37 +37,107 @@ export const ZZPSubscriptionsPage = () => {
   // Error handling state
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [isBetaMode, setIsBetaMode] = useState(false)
+  const [isRetrying, setIsRetrying] = useState(false)
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [paywallFeature, setPaywallFeature] = useState<{ code: string; nameNL: string }>({ code: '', nameNL: '' })
 
   const load = async () => {
+    // Prevent duplicate requests if already loading or retrying
+    if (isLoading || isRetrying) return
+    
     setIsLoading(true)
     setLoadError(null)
+    setIsBetaMode(false)
+    
     try {
+      // DEBUG: Log API calls (dev-only)
+      if (import.meta.env.DEV) {
+        console.log('[ZZPSubscriptionsPage] Starting API calls...')
+      }
+      
       const [list, suggestionResp, expenseResp] = await Promise.all([
         zzpApi.commitments.list('subscription'), 
         zzpApi.commitments.suggestions(), 
         zzpApi.expenses.list()
       ])
+      
+      // DEBUG: Log successful responses (dev-only)
+      if (import.meta.env.DEV) {
+        console.log('[ZZPSubscriptionsPage] API responses:', {
+          commitments: list.commitments.length,
+          suggestions: suggestionResp.suggestions.length,
+          expenses: expenseResp.expenses.length
+        })
+      }
+      
       setItems(list.commitments)
       setSuggestions(suggestionResp.suggestions)
       setExpenses(expenseResp.expenses)
     } catch (error) {
-      // Check if it's a payment required error
+      // DEBUG: Log error details (dev-only)
+      if (import.meta.env.DEV) {
+        console.error('[ZZPSubscriptionsPage] Load error:', {
+          error,
+          isAxiosError: axios.isAxiosError(error),
+          status: axios.isAxiosError(error) ? error.response?.status : 'N/A',
+          statusText: axios.isAxiosError(error) ? error.response?.statusText : 'N/A',
+          url: axios.isAxiosError(error) ? error.config?.url : 'N/A',
+          responseData: axios.isAxiosError(error) ? error.response?.data : 'N/A'
+        })
+      }
+      
+      // Check if it's a payment required error (402)
       if (error instanceof PaymentRequiredError) {
         setPaywallFeature({ 
           code: error.feature || 'subscriptions', 
           nameNL: 'Abonnementen & Recurring Kosten' 
         })
         setPaywallOpen(true)
-      } else {
+        return // Don't show error state, show paywall instead
+      }
+      
+      // Handle different error types
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status
+        
+        // 404 = module not available, show beta/coming soon state
+        if (status === 404) {
+          setIsBetaMode(true)
+          return // Don't show error state
+        }
+        
+        // 401/403 = auth/permission issue
+        if (status === 401 || status === 403) {
+          const errorMsg = status === 401 
+            ? 'Sessie verlopen. Log opnieuw in.' 
+            : 'Geen toegang tot deze pagina. Controleer je rechten.'
+          setLoadError(errorMsg)
+          return
+        }
+        
+        // Network errors (no response)
+        if (!error.response) {
+          setLoadError('Geen verbinding met de server. Controleer je internetverbinding.')
+          return
+        }
+        
+        // Other HTTP errors
         const errorMsg = errorWithStatus(error)
         setLoadError(errorMsg)
-        toast.error(errorMsg)
+      } else {
+        // Non-axios errors
+        setLoadError(parseApiError(error))
       }
     } finally {
       setIsLoading(false)
+      setIsRetrying(false)
     }
+  }
+  
+  const retry = async () => {
+    setIsRetrying(true)
+    await load()
   }
 
   useEffect(() => { load() }, [])
@@ -168,16 +238,53 @@ export const ZZPSubscriptionsPage = () => {
             <AlertTitle>Fout bij laden</AlertTitle>
             <AlertDescription className="space-y-3">
               <p>{loadError}</p>
-              <Button onClick={() => void load()} variant="outline" size="sm">
-                <ArrowClockwise className="mr-2 h-4 w-4" />
-                Opnieuw proberen
+              <Button 
+                onClick={() => void retry()} 
+                variant="outline" 
+                size="sm"
+                disabled={isRetrying}
+              >
+                <ArrowClockwise className={`mr-2 h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
+                {isRetrying ? 'Bezig...' : 'Opnieuw proberen'}
               </Button>
             </AlertDescription>
           </Alert>
         )}
+        
+        {/* Beta Mode State - Show when feature is not available (404) */}
+        {!isLoading && !loadError && isBetaMode && (
+          <Card className="bg-card/80 backdrop-blur-sm border border-border/50 mb-6">
+            <CardContent className="pt-6">
+              <div className="text-center py-12">
+                <div className="max-w-md mx-auto space-y-4">
+                  <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                    <Badge variant="secondary" className="text-sm">Beta</Badge>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2">Abonnementen & Recurring Kosten</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Deze functie is binnenkort beschikbaar. We werken hard om deze module voor je klaar te maken.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Houd je terugkerende kosten voor nu bij in de uitgaven module, of kom later terug wanneer deze functie actief is.
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={() => void retry()} 
+                    variant="outline"
+                    disabled={isRetrying}
+                  >
+                    <ArrowClockwise className={`mr-2 h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
+                    {isRetrying ? 'Controleren...' : 'Opnieuw controleren'}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Main Content - Only show if not loading and no error */}
-        {!isLoading && !loadError && (
+        {/* Main Content - Only show if not loading, no error, and not beta mode */}
+        {!isLoading && !loadError && !isBetaMode && (
           <>
         {/* Form Card */}
         <Card className="bg-card/80 backdrop-blur-sm border border-border/50 mb-6">

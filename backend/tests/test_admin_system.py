@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 
 import pytest
 
-from app.models.subscription import Plan, Subscription
+from app.models.subscription import Plan, Subscription, SubscriptionStatus
 from app.models.zzp import ZZPInvoice
 
 
@@ -22,7 +22,7 @@ async def test_admin_overview_happy_path(async_client, db_session, super_admin_h
         administration_id=test_administration.id,
         plan_id=plan.id,
         plan_code='basic',
-        status='active',
+        status=SubscriptionStatus.ACTIVE,
         starts_at=datetime.now(timezone.utc),
     )
     db_session.add(subscription)
@@ -50,3 +50,17 @@ async def test_admin_overview_happy_path(async_client, db_session, super_admin_h
     assert payload['active_subscriptions_count'] >= 1
     assert payload['mrr_estimate'] >= 19
     assert payload['invoices_last_30_days'] >= 1
+
+
+@pytest.mark.asyncio
+async def test_admin_users_list_super_admin_access(async_client, super_admin_headers):
+    response = await async_client.get('/api/v1/admin/users', headers=super_admin_headers)
+    assert response.status_code == 200
+    payload = response.json()
+    assert 'users' in payload
+
+
+@pytest.mark.asyncio
+async def test_admin_users_list_forbidden_for_non_super_admin(async_client, auth_headers):
+    response = await async_client.get('/api/v1/admin/users', headers=auth_headers)
+    assert response.status_code == 403

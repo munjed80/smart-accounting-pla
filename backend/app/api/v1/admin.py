@@ -14,7 +14,7 @@ from app.api.v1.deps import CurrentUser, require_super_admin
 from app.core.database import get_db
 from app.core.security import create_access_token
 from app.models.administration import Administration, AdministrationMember, MemberRole
-from app.models.subscription import AdminAuditLog, Plan, Subscription
+from app.models.subscription import AdminAuditLog, Plan, Subscription, SubscriptionStatus
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.zzp import ZZPInvoice
@@ -78,12 +78,59 @@ class ImpersonateResponse(BaseModel):
     impersonated_user_id: UUID
 
 
+class AdminAuditLogItem(BaseModel):
+    id: UUID
+    actor_user_id: UUID | None
+    action: str
+    target_type: str
+    target_id: str
+    created_at: datetime
+
+
+class AdminAuditLogResponse(BaseModel):
+    logs: list[AdminAuditLogItem]
+
+
 def _ensure_super_admin(current_user: CurrentUser) -> User:
     require_super_admin(current_user)
     return current_user
 
 
 SuperAdminUser = Annotated[User, Depends(_ensure_super_admin)]
+
+_REQUEST_TO_SUBSCRIPTION_STATUS: dict[str, SubscriptionStatus] = {
+    "trial": SubscriptionStatus.TRIALING,
+    "active": SubscriptionStatus.ACTIVE,
+    "past_due": SubscriptionStatus.PAST_DUE,
+    "canceled": SubscriptionStatus.CANCELED,
+}
+
+_SUBSCRIPTION_STATUS_TO_RESPONSE: dict[SubscriptionStatus, str] = {
+    SubscriptionStatus.TRIALING: "trial",
+    SubscriptionStatus.ACTIVE: "active",
+    SubscriptionStatus.PAST_DUE: "past_due",
+    SubscriptionStatus.CANCELED: "canceled",
+    SubscriptionStatus.EXPIRED: "canceled",
+}
+
+
+def _parse_subscription_status(value: str | None) -> SubscriptionStatus | None:
+    if value is None:
+        return None
+    return _REQUEST_TO_SUBSCRIPTION_STATUS.get(value)
+
+
+def _serialize_subscription_status(value: SubscriptionStatus | str | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, SubscriptionStatus):
+        return _SUBSCRIPTION_STATUS_TO_RESPONSE.get(value)
+
+    normalized = value.strip().upper()
+    try:
+        return _SUBSCRIPTION_STATUS_TO_RESPONSE[SubscriptionStatus(normalized)]
+    except (ValueError, KeyError):
+        return value.lower()
 
 
 def _latest_subscription_subquery():
@@ -137,7 +184,7 @@ async def get_admin_overview(
                     latest_subscription_sq.c.max_created_at == Subscription.created_at,
                 ),
             )
-            .where(Subscription.status.in_(["active", "trial"]))
+            .where(Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING]))
         )
     ).scalar() or 0
 
@@ -153,7 +200,7 @@ async def get_admin_overview(
                 ),
             )
             .join(Plan, Plan.id == Subscription.plan_id)
-            .where(Subscription.status == "active")
+            .where(Subscription.status == SubscriptionStatus.ACTIVE)
         )
     ).scalar() or Decimal("0")
 
@@ -231,7 +278,10 @@ async def list_administrations(
             or_(func.lower(Administration.name).like(q), func.lower(func.coalesce(owner_alias.email, "")).like(q))
         )
     if status:
-        stmt = stmt.where(Subscription.status == status)
+        parsed_status = _parse_subscription_status(status)
+        if not parsed_status:
+            raise HTTPException(status_code=400, detail="Unsupported subscription status filter")
+        stmt = stmt.where(Subscription.status == parsed_status)
     if plan:
         stmt = stmt.where(func.lower(Plan.name) == plan.lower())
 
@@ -242,7 +292,7 @@ async def list_administrations(
             name=row.name,
             owner_email=row.email,
             plan=row.plan_name,
-            subscription_status=row.status,
+            subscription_status=_serialize_subscription_status(row.status),
             created_at=row.created_at,
             last_activity=row.last_activity,
         )
@@ -305,6 +355,40 @@ async def list_users(
     )
 
     return UserListResponse(users=users, total=len(users))
+
+
+@router.get("/logs", response_model=AdminAuditLogResponse)
+async def list_admin_logs(
+    super_admin: SuperAdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = Query(default=50, ge=1, le=250),
+):
+    rows = (
+        await db.execute(
+            select(AdminAuditLog)
+            .order_by(AdminAuditLog.created_at.desc())
+            .limit(limit)
+        )
+    ).scalars().all()
+
+    logger.info(
+        "Admin logs requested",
+        extra={"event": "admin_logs_list", "user_id": str(super_admin.id), "count": len(rows)},
+    )
+
+    return AdminAuditLogResponse(
+        logs=[
+            AdminAuditLogItem(
+                id=row.id,
+                actor_user_id=row.actor_user_id,
+                action=row.action,
+                target_type=row.target_type,
+                target_id=row.target_id,
+                created_at=row.created_at,
+            )
+            for row in rows
+        ]
+    )
 
 
 @router.patch("/users/{user_id}/status")
@@ -370,7 +454,7 @@ async def update_administration_subscription(
             administration_id=admin_id,
             plan_id=payload.plan_id,
             plan_code=plan.code,
-            status=payload.status or "trial",
+            status=_parse_subscription_status(payload.status) or SubscriptionStatus.TRIALING,
             starts_at=payload.starts_at or datetime.now(timezone.utc),
             ends_at=payload.ends_at,
         )
@@ -385,7 +469,10 @@ async def update_administration_subscription(
             subscription.plan_id = payload.plan_id
             subscription.plan_code = plan.code
         if payload.status:
-            subscription.status = payload.status
+            parsed_status = _parse_subscription_status(payload.status)
+            if not parsed_status:
+                raise HTTPException(status_code=400, detail="Unsupported subscription status")
+            subscription.status = parsed_status
         if payload.starts_at:
             subscription.starts_at = payload.starts_at
         if payload.ends_at is not None:

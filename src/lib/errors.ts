@@ -5,13 +5,33 @@
  * Different error types can be handled differently in error boundaries.
  */
 
+interface HttpErrorMetadata {
+  statusCode?: number
+  correlationId?: string
+  errorCode?: string
+}
+
+export class ApiHttpError extends Error {
+  statusCode?: number
+  correlationId?: string
+  errorCode?: string
+
+  constructor(message: string, metadata: HttpErrorMetadata = {}) {
+    super(message)
+    this.name = 'ApiHttpError'
+    this.statusCode = metadata.statusCode
+    this.correlationId = metadata.correlationId
+    this.errorCode = metadata.errorCode
+  }
+}
+
 /**
  * NotFoundError - Resource not found (404)
  * Use for API 404 responses or missing data
  */
-export class NotFoundError extends Error {
-  constructor(message: string = 'Resource not found') {
-    super(message)
+export class NotFoundError extends ApiHttpError {
+  constructor(message: string = 'Resource not found', metadata: HttpErrorMetadata = {}) {
+    super(message, metadata)
     this.name = 'NotFoundError'
   }
 }
@@ -20,9 +40,9 @@ export class NotFoundError extends Error {
  * NetworkError - Network/connection issues
  * Use for connection refused, timeouts, CORS errors
  */
-export class NetworkError extends Error {
-  constructor(message: string = 'Network error occurred') {
-    super(message)
+export class NetworkError extends ApiHttpError {
+  constructor(message: string = 'Network error occurred', metadata: HttpErrorMetadata = {}) {
+    super(message, metadata)
     this.name = 'NetworkError'
   }
 }
@@ -31,9 +51,9 @@ export class NetworkError extends Error {
  * UnauthorizedError - Authentication/authorization failures (401/403)
  * Use for missing tokens, expired sessions, insufficient permissions
  */
-export class UnauthorizedError extends Error {
-  constructor(message: string = 'Unauthorized access') {
-    super(message)
+export class UnauthorizedError extends ApiHttpError {
+  constructor(message: string = 'Unauthorized access', metadata: HttpErrorMetadata = {}) {
+    super(message, metadata)
     this.name = 'UnauthorizedError'
   }
 }
@@ -42,9 +62,9 @@ export class UnauthorizedError extends Error {
  * ValidationError - Data validation failures (400)
  * Use for invalid input, schema validation errors
  */
-export class ValidationError extends Error {
-  constructor(message: string = 'Validation failed') {
-    super(message)
+export class ValidationError extends ApiHttpError {
+  constructor(message: string = 'Validation failed', metadata: HttpErrorMetadata = {}) {
+    super(message, metadata)
     this.name = 'ValidationError'
   }
 }
@@ -53,9 +73,9 @@ export class ValidationError extends Error {
  * ServerError - Server-side errors (500+)
  * Use for internal server errors, database errors
  */
-export class ServerError extends Error {
-  constructor(message: string = 'Server error occurred') {
-    super(message)
+export class ServerError extends ApiHttpError {
+  constructor(message: string = 'Server error occurred', metadata: HttpErrorMetadata = {}) {
+    super(message, metadata)
     this.name = 'ServerError'
   }
 }

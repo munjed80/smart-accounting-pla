@@ -21,6 +21,62 @@ describe('invoice filtering', () => {
     expect(result).toHaveLength(1)
     expect(result[0].id).toBe('1')
   })
+
+  it('does not crash when invoice lines are missing', () => {
+    const invoices: any[] = [
+      {
+        id: '3',
+        status: 'sent',
+        issue_date: '2026-01-25',
+        customer_id: 'c3',
+        invoice_number: 'INV-3',
+        customer_name: 'Gamma',
+        total_cents: 15000,
+        notes: 'maintenance',
+      },
+    ]
+
+    const result = filterInvoices(invoices, {
+      q: 'gamma',
+      status: 'all',
+      from: '',
+      to: '',
+      min: '',
+      max: '',
+      customer_id: '',
+    })
+
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('3')
+  })
+
+  it('treats invalid totals as zero for amount filters', () => {
+    const invoices: any[] = [
+      {
+        id: '4',
+        status: 'draft',
+        issue_date: '2026-01-25',
+        customer_id: 'c4',
+        invoice_number: 'INV-4',
+        customer_name: 'Delta',
+        total_cents: undefined,
+        notes: '',
+        lines: [],
+      },
+    ]
+
+    const result = filterInvoices(invoices, {
+      q: '',
+      status: 'all',
+      from: '',
+      to: '',
+      min: '1',
+      max: '',
+      customer_id: '',
+    })
+
+    expect(result).toHaveLength(0)
+  })
 })
 
 describe('time filtering and totals', () => {

@@ -147,7 +147,7 @@ export const ZZPSubscriptionsPage = () => {
             Abonnementen & Recurring Kosten
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground">
-            Beheer je terugkerende kosten
+            Beheer je terugkerende kosten en abonnementen
           </p>
         </div>
 

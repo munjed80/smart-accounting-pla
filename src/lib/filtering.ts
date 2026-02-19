@@ -53,15 +53,19 @@ export const filterInvoices = (invoices: ZZPInvoice[], filters: InvoiceFilters):
     if (from && issueDate < from) return false
     if (to && issueDate > to) return false
 
-    if (min !== null && invoice.total_cents < Math.round(min * 100)) return false
-    if (max !== null && invoice.total_cents > Math.round(max * 100)) return false
+    const totalCents = Number(invoice.total_cents)
+    const normalizedTotalCents = Number.isFinite(totalCents) ? totalCents : 0
+
+    if (min !== null && normalizedTotalCents < Math.round(min * 100)) return false
+    if (max !== null && normalizedTotalCents > Math.round(max * 100)) return false
 
     if (query) {
+      const lines = Array.isArray(invoice.lines) ? invoice.lines : []
       const text = [
         invoice.invoice_number,
         invoice.customer_name,
         invoice.notes,
-        ...invoice.lines.map((line) => `${line.description} ${line.reference || ''}`),
+        ...lines.map((line) => `${line.description} ${line.reference || ''}`),
       ]
         .filter(Boolean)
         .join(' ')

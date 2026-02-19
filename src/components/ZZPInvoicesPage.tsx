@@ -111,6 +111,8 @@ import { t } from '@/i18n'
 import { toast } from 'sonner'
 import { useDebounce } from '@/hooks/useDebounce'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { useQueryFilters } from '@/hooks/useQueryFilters'
+import { filterInvoices, InvoiceFilters } from '@/lib/filtering'
 
 // Format amount in cents to EUR currency string
 function formatAmountEUR(amountCents: number): string {
@@ -131,6 +133,17 @@ function formatDate(isoDate: string): string {
 
 // Invoice status types (matches backend)
 type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+
+
+const defaultInvoiceFilters: InvoiceFilters = {
+  q: '',
+  status: 'all',
+  from: '',
+  to: '',
+  min: '',
+  max: '',
+  customer_id: '',
+}
 
 // Helper to detect iOS devices (including iPadOS)
 function isIOS(): boolean {
@@ -1323,8 +1336,8 @@ export const ZZPInvoicesPage = () => {
   const [invoices, setInvoices] = useState<ZZPInvoice[]>([])
   const [customers, setCustomers] = useState<ZZPCustomer[]>([])
   const [businessProfile, setBusinessProfile] = useState<ZZPBusinessProfile | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | InvoiceStatus>('all')
+  const { filters, setFilter, reset } = useQueryFilters(defaultInvoiceFilters)
+  const [searchQuery, setSearchQuery] = useState(filters.q)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -1337,6 +1350,16 @@ export const ZZPInvoicesPage = () => {
   
   // Debounced search for better performance
   const debouncedSearch = useDebounce(searchQuery, 300)
+
+  useEffect(() => {
+    setSearchQuery(filters.q)
+  }, [filters.q])
+
+  useEffect(() => {
+    if (debouncedSearch !== filters.q) {
+      setFilter('q', debouncedSearch)
+    }
+  }, [debouncedSearch, filters.q, setFilter])
   
   // Dialog state
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -1360,8 +1383,7 @@ export const ZZPInvoicesPage = () => {
     const customerId = params.get('customer_id')
     if (customerId) {
       setPreSelectedCustomerId(customerId)
-      // Clear the URL param after reading it
-      window.history.replaceState({}, '', window.location.pathname)
+      setFilter('customer_id', customerId)
     }
     
     // Check for invoice ID in URL path: /zzp/invoices/:id
@@ -1372,7 +1394,7 @@ export const ZZPInvoicesPage = () => {
       // We'll handle this after invoices are loaded
       setPreSelectedInvoiceId(invoiceId)
       // Clean up the URL to /zzp/invoices
-      window.history.replaceState({}, '', '/zzp/invoices')
+      window.history.replaceState({}, '', `/zzp/invoices${window.location.search}`)
     }
   }, [])
 
@@ -1457,27 +1479,25 @@ export const ZZPInvoicesPage = () => {
 
   // Filter invoices based on search and status
   const filteredInvoices = useMemo(() => {
-    return invoices.filter((invoice) => {
-      // Status filter
-      if (statusFilter !== 'all' && invoice.status !== statusFilter) {
-        return false
-      }
-      
-      // Search filter (debounced)
-      if (debouncedSearch) {
-        const query = debouncedSearch.toLowerCase()
-        const matchesNumber = invoice.invoice_number.toLowerCase().includes(query)
-        const matchesCustomer = invoice.customer_name?.toLowerCase().includes(query)
-        // Also search in amount
-        const matchesAmount = formatAmountEUR(invoice.total_cents).toLowerCase().includes(query)
-        if (!matchesNumber && !matchesCustomer && !matchesAmount) {
-          return false
-        }
-      }
-      
-      return true
-    })
-  }, [invoices, debouncedSearch, statusFilter])
+    return filterInvoices(invoices, { ...filters, q: debouncedSearch })
+  }, [invoices, filters, debouncedSearch])
+
+  const activeFilterChips = useMemo(() => {
+    const chips: Array<{ key: keyof InvoiceFilters; label: string }> = []
+    if (filters.status !== 'all') chips.push({ key: 'status', label: `Status: ${filters.status}` })
+    if (filters.from) chips.push({ key: 'from', label: `Vanaf: ${filters.from}` })
+    if (filters.to) chips.push({ key: 'to', label: `Tot: ${filters.to}` })
+    if (filters.min) chips.push({ key: 'min', label: `Min: €${filters.min}` })
+    if (filters.max) chips.push({ key: 'max', label: `Max: €${filters.max}` })
+    if (filters.customer_id) {
+      chips.push({
+        key: 'customer_id',
+        label: `Klant: ${customers.find((c) => c.id === filters.customer_id)?.name || filters.customer_id}`,
+      })
+    }
+    if (filters.q) chips.push({ key: 'q', label: `Zoek: ${filters.q}` })
+    return chips
+  }, [filters, customers])
 
   // Active customers for quick actions
   const activeCustomers = useMemo(() => {
@@ -1953,35 +1973,46 @@ export const ZZPInvoicesPage = () => {
             </CardHeader>
             <CardContent>
               {/* Search and filter controls */}
-              <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                <div className="relative flex-1">
-                  <MagnifyingGlass 
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" 
-                    size={18} 
-                  />
-                  <Input
-                    placeholder={t('zzpInvoices.searchPlaceholder')}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 h-11"
-                  />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                <div className="relative sm:col-span-2 lg:col-span-1">
+                  <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                  <Input placeholder={t('zzpInvoices.searchPlaceholder')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-11" />
                 </div>
-                <Select 
-                  value={statusFilter} 
-                  onValueChange={(value) => setStatusFilter(value as 'all' | InvoiceStatus)}
-                >
-                  <SelectTrigger className="w-full sm:w-44 h-11">
-                    <SelectValue />
-                  </SelectTrigger>
+                <Select value={filters.status} onValueChange={(value) => setFilter('status', value as InvoiceFilters['status'])}>
+                  <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t('zzpInvoices.filterAll')}</SelectItem>
                     <SelectItem value="draft">{t('zzpInvoices.filterDraft')}</SelectItem>
                     <SelectItem value="sent">{t('zzpInvoices.filterSent')}</SelectItem>
                     <SelectItem value="paid">{t('zzpInvoices.filterPaid')}</SelectItem>
                     <SelectItem value="overdue">{t('zzpInvoices.filterOverdue')}</SelectItem>
+                    <SelectItem value="cancelled">{t('zzpInvoices.filterCancelled')}</SelectItem>
                   </SelectContent>
                 </Select>
+                <Input type="date" value={filters.from} onChange={(e) => setFilter('from', e.target.value)} className="h-11" />
+                <Input type="date" value={filters.to} onChange={(e) => setFilter('to', e.target.value)} className="h-11" />
+                <Input type="number" step="0.01" placeholder="Min bedrag" value={filters.min} onChange={(e) => setFilter('min', e.target.value)} className="h-11" />
+                <Input type="number" step="0.01" placeholder="Max bedrag" value={filters.max} onChange={(e) => setFilter('max', e.target.value)} className="h-11" />
+                <Select value={filters.customer_id || 'all'} onValueChange={(value) => setFilter('customer_id', value === 'all' ? '' : value)}>
+                  <SelectTrigger className="h-11"><SelectValue placeholder="Klant" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle klanten</SelectItem>
+                    {customers.map((customer) => <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={reset} className="h-11">Clear filters</Button>
               </div>
+
+              {activeFilterChips.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {activeFilterChips.map((chip) => (
+                    <Badge key={chip.key} variant="secondary" className="gap-1">
+                      {chip.label}
+                      <button type="button" onClick={() => setFilter(chip.key, defaultInvoiceFilters[chip.key])}><X size={12} /></button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
 
               {/* Mobile: Card list */}
               <div className="sm:hidden space-y-3">

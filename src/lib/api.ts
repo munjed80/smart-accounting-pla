@@ -495,7 +495,7 @@ api.interceptors.response.use(
         case 401:
           typedError = new UnauthorizedError(parsedError.message, metadata)
           break
-        case 402:
+        case 402: {
           // Payment Required - extract additional metadata from response
           const responseData = error.response.data as any
           typedError = new PaymentRequiredError(
@@ -509,6 +509,7 @@ api.interceptors.response.use(
             }
           )
           break
+        }
         case 403:
           typedError = new UnauthorizedError(parsedError.message, metadata)
           break

@@ -5,6 +5,11 @@
  * API calls on mount (regression for the useState(true) guard bug).
  *
  * Also verifies that SmartDashboard no longer renders SubscriptionBanner.
+ *
+ * Typed-error handling tests: the axios response interceptor converts AxiosErrors
+ * to typed errors (NotFoundError, UnauthorizedError, NetworkError, …).  These tests
+ * confirm that both ZZP pages react correctly to those typed errors rather than
+ * requiring a raw AxiosError (which the interceptor no longer passes through).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -16,6 +21,7 @@ import { SmartDashboard } from '../components/SmartDashboard'
 import * as api from '../lib/api'
 import * as AuthContext from '../lib/AuthContext'
 import * as useEntitlements from '../hooks/useEntitlements'
+import { NotFoundError, UnauthorizedError, NetworkError, PaymentRequiredError } from '../lib/errors'
 
 // ── API mocks ──────────────────────────────────────────────────────────────────
 vi.mock('../lib/api', () => ({
@@ -77,6 +83,15 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
 
+vi.mock('@phosphor-icons/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@phosphor-icons/react')>()
+  return {
+    ...actual,
+    AlertCircle: () => <span data-testid="icon-alert-circle" />,
+    ArrowClockwise: () => <span data-testid="icon-arrow-clockwise" />,
+  }
+})
+
 const defaultUser = {
   id: 'u1',
   email: 'zzp@example.com',
@@ -113,6 +128,67 @@ describe('ZZPLeaseLoansPage loading fix', () => {
       expect(api.zzpApi.expenses.list).toHaveBeenCalled()
     })
   })
+
+  it('shows beta/coming-soon state when a NotFoundError (HTTP 404) is thrown', async () => {
+    // Simulate the axios interceptor converting a 404 response to NotFoundError
+    vi.mocked(api.zzpApi.commitments.list).mockRejectedValue(
+      new NotFoundError('Endpoint ontbreekt (configuratie)', { statusCode: 404 })
+    )
+    vi.mocked(api.zzpApi.expenses.list).mockResolvedValue({ expenses: [] })
+
+    render(<ZZPLeaseLoansPage />)
+
+    await waitFor(() => {
+      // The Beta badge should appear in the beta-mode card
+      expect(screen.getAllByText('Beta').length).toBeGreaterThan(0)
+    })
+    // The destructive error alert must NOT appear
+    expect(screen.queryByText('Fout bij laden')).not.toBeInTheDocument()
+  })
+
+  it('shows NO_CONNECTION message when a NetworkError is thrown', async () => {
+    vi.mocked(api.zzpApi.commitments.list).mockRejectedValue(
+      new NetworkError('Geen verbinding met de server. Controleer je internetverbinding.')
+    )
+    vi.mocked(api.zzpApi.expenses.list).mockResolvedValue({ expenses: [] })
+
+    render(<ZZPLeaseLoansPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Fout bij laden')).toBeInTheDocument()
+      expect(
+        screen.getByText(/Geen verbinding met de server/)
+      ).toBeInTheDocument()
+    })
+  })
+
+  it('shows paywall modal when a PaymentRequiredError (HTTP 402) is thrown', async () => {
+    vi.mocked(api.zzpApi.commitments.list).mockRejectedValue(
+      new PaymentRequiredError('Abonnement vereist', { statusCode: 402, feature: 'lease_loans' })
+    )
+    vi.mocked(api.zzpApi.expenses.list).mockResolvedValue({ expenses: [] })
+
+    render(<ZZPLeaseLoansPage />)
+
+    // The PaywallModal mock renders null so we just confirm no error state is shown
+    await waitFor(() => {
+      expect(screen.queryByText('Fout bij laden')).not.toBeInTheDocument()
+    })
+  })
+
+  it('shows auth error message when an UnauthorizedError (HTTP 403) is thrown', async () => {
+    vi.mocked(api.zzpApi.commitments.list).mockRejectedValue(
+      new UnauthorizedError('Geen rechten voor deze pagina', { statusCode: 403 })
+    )
+    vi.mocked(api.zzpApi.expenses.list).mockResolvedValue({ expenses: [] })
+
+    render(<ZZPLeaseLoansPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Fout bij laden')).toBeInTheDocument()
+      expect(screen.getByText(/Geen toegang/)).toBeInTheDocument()
+    })
+  })
 })
 
 describe('ZZPSubscriptionsPage loading fix', () => {
@@ -132,6 +208,52 @@ describe('ZZPSubscriptionsPage loading fix', () => {
       expect(api.zzpApi.commitments.list).toHaveBeenCalledWith('subscription')
       expect(api.zzpApi.commitments.suggestions).toHaveBeenCalled()
       expect(api.zzpApi.expenses.list).toHaveBeenCalled()
+    })
+  })
+
+  it('shows beta/coming-soon state when a NotFoundError (HTTP 404) is thrown', async () => {
+    vi.mocked(api.zzpApi.commitments.list).mockRejectedValue(
+      new NotFoundError('Endpoint ontbreekt (configuratie)', { statusCode: 404 })
+    )
+    vi.mocked(api.zzpApi.commitments.suggestions).mockResolvedValue({ suggestions: [] })
+    vi.mocked(api.zzpApi.expenses.list).mockResolvedValue({ expenses: [] })
+
+    render(<ZZPSubscriptionsPage />)
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Beta').length).toBeGreaterThan(0)
+    })
+    expect(screen.queryByText('Fout bij laden')).not.toBeInTheDocument()
+  })
+
+  it('shows NO_CONNECTION message when a NetworkError is thrown', async () => {
+    vi.mocked(api.zzpApi.commitments.list).mockRejectedValue(
+      new NetworkError('Geen verbinding met de server. Controleer je internetverbinding.')
+    )
+    vi.mocked(api.zzpApi.commitments.suggestions).mockResolvedValue({ suggestions: [] })
+    vi.mocked(api.zzpApi.expenses.list).mockResolvedValue({ expenses: [] })
+
+    render(<ZZPSubscriptionsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Fout bij laden')).toBeInTheDocument()
+      expect(
+        screen.getByText(/Geen verbinding met de server/)
+      ).toBeInTheDocument()
+    })
+  })
+
+  it('shows paywall modal when a PaymentRequiredError (HTTP 402) is thrown', async () => {
+    vi.mocked(api.zzpApi.commitments.list).mockRejectedValue(
+      new PaymentRequiredError('Abonnement vereist', { statusCode: 402, feature: 'subscriptions' })
+    )
+    vi.mocked(api.zzpApi.commitments.suggestions).mockResolvedValue({ suggestions: [] })
+    vi.mocked(api.zzpApi.expenses.list).mockResolvedValue({ expenses: [] })
+
+    render(<ZZPSubscriptionsPage />)
+
+    await waitFor(() => {
+      expect(screen.queryByText('Fout bij laden')).not.toBeInTheDocument()
     })
   })
 })

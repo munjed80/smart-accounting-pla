@@ -343,7 +343,9 @@ const emitOfflineStatus = (status: ApiOfflineStatus) => {
 
 const isOfflineError = (error: AxiosError) => {
   // True offline conditions:
-  // 1. No response at all (network failure, CORS, connection refused, timeout)
+  // 1. No response at all (network-level failure: connection refused, CORS, DNS resolution failed, network unreachable)
+  //    Note: Axios timeout errors MAY include a response object depending on timing and configuration.
+  //    We treat "no response" as a true network error, not all timeouts.
   // 2. Status 503 (Service Unavailable) or 504 (Gateway Timeout)
   // 
   // NOT offline:
@@ -355,8 +357,9 @@ const isOfflineError = (error: AxiosError) => {
   // - 500/502 - server errors, not network issues (server is reachable)
   
   if (!error.response) {
-    // No response object means a true network error
-    // This includes: timeout, connection refused, CORS, network unreachable
+    // No response object means a connection-level network error
+    // This includes: connection refused, CORS, DNS resolution failed, network unreachable
+    // Some timeout scenarios may also fall here if no response was received
     return true
   }
   

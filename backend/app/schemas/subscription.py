@@ -79,3 +79,11 @@ class ReactivateSubscriptionResponse(BaseModel):
     """Response schema for reactivating a subscription"""
     subscription: dict = Field(description="Updated subscription data")
     message_nl: Optional[str] = Field(None, description="Dutch message describing the reactivation")
+
+
+class SubscriptionMeResponse(BaseModel):
+    """Simplified subscription response for ZZP settings page (GET /subscription/me)"""
+    status: str = Field(description="Simplified status: trial | active | expired")
+    startDate: Optional[str] = Field(None, description="Subscription start date (ISO 8601)")
+    endDate: Optional[str] = Field(None, description="Subscription end date (ISO 8601)")
+    daysRemaining: int = Field(description="Days remaining until subscription ends (0 if expired)")

@@ -4788,11 +4788,24 @@ export const zzpApi = {
     },
 
     /**
-     * Get the invoice PDF URL for direct download.
-     * This returns a URL that can be used in an anchor tag or window.open.
+     * Get the invoice PDF URL for direct download (browser navigation).
+     * Includes `?download=1` to signal explicit download intent and
+     * `?token=<jwt>` so that browsers (e.g. iOS Safari) that cannot attach
+     * Authorization headers during direct navigation are still authenticated.
+     *
+     * NOTE: The JWT is short-lived and scoped to the authenticated user.
+     * Passing it in the URL is an accepted trade-off for file-download flows
+     * where custom headers are unavailable (see iOS Safari / PWA constraints).
      */
     getPdfUrl: (invoiceId: string): string => {
-      return `${api.defaults.baseURL}/zzp/invoices/${invoiceId}/pdf`
+      let token: string | null = null
+      try {
+        token = localStorage.getItem('access_token')
+      } catch {
+        // localStorage may be unavailable in certain browser contexts (e.g. private mode)
+      }
+      const tokenParam = token ? `&token=${encodeURIComponent(token)}` : ''
+      return `${api.defaults.baseURL}/zzp/invoices/${invoiceId}/pdf?download=1${tokenParam}`
     },
     
     /**

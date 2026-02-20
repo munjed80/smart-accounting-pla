@@ -174,6 +174,67 @@ class TestInvoicePdfEndpoint:
             assert test_invoice_sent.invoice_number in response.headers["content-disposition"]
     
     @pytest.mark.asyncio
+    async def test_pdf_download_with_download_param(
+        self,
+        async_client: AsyncClient,
+        test_invoice_sent: ZZPInvoice,
+        auth_headers: dict
+    ):
+        """?download=1 sets Cache-Control: no-store for iOS Safari compatibility."""
+        with patch('app.api.v1.zzp_invoices.generate_invoice_pdf_reportlab') as mock_pdf:
+            mock_pdf.return_value = b'%PDF-1.4 fake pdf content'
+
+            response = await async_client.get(
+                f"/api/v1/zzp/invoices/{test_invoice_sent.id}/pdf?download=1",
+                headers=auth_headers
+            )
+
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "application/pdf"
+            assert "attachment" in response.headers["content-disposition"]
+            assert response.headers["cache-control"] == "no-store"
+
+    @pytest.mark.asyncio
+    async def test_pdf_download_with_token_query_param(
+        self,
+        async_client: AsyncClient,
+        test_invoice_sent: ZZPInvoice,
+        test_user,
+    ):
+        """JWT token in ?token= query param authenticates without Authorization header.
+
+        This is the mechanism used by iOS Safari direct URL navigation where
+        custom request headers cannot be set.
+        """
+        from app.core.security import create_access_token
+
+        token = create_access_token(data={"sub": str(test_user.id), "email": test_user.email})
+
+        with patch('app.api.v1.zzp_invoices.generate_invoice_pdf_reportlab') as mock_pdf:
+            mock_pdf.return_value = b'%PDF-1.4 fake pdf content'
+
+            # No Authorization header – token is passed in query string only
+            response = await async_client.get(
+                f"/api/v1/zzp/invoices/{test_invoice_sent.id}/pdf?download=1&token={token}"
+            )
+
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "application/pdf"
+            assert "attachment" in response.headers["content-disposition"]
+
+    @pytest.mark.asyncio
+    async def test_pdf_download_no_auth_returns_401(
+        self,
+        async_client: AsyncClient,
+        test_invoice_sent: ZZPInvoice,
+    ):
+        """PDF endpoint requires authentication; missing credentials return 401."""
+        response = await async_client.get(
+            f"/api/v1/zzp/invoices/{test_invoice_sent.id}/pdf"
+        )
+        assert response.status_code == 401
+
+    @pytest.mark.asyncio
     async def test_pdf_download_not_found(
         self,
         async_client: AsyncClient,

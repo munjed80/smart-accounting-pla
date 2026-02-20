@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import Annotated, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +19,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.security import decode_token
 from app.services.invoice_pdf import generate_invoice_pdf, get_invoice_pdf_filename
 from app.services.invoice_pdf_reportlab import generate_invoice_pdf_reportlab
 from app.services.email import email_service
@@ -45,6 +46,66 @@ from app.services.ledger_service import LedgerPostingService, LedgerPostingError
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+async def _get_user_for_pdf(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    token: Optional[str] = Query(default=None),
+) -> "User":
+    """
+    Resolve the current user for PDF download.
+
+    Supports two auth methods so that iOS Safari can navigate directly to the
+    PDF URL without custom request headers:
+      1. Query parameter  ?token=<jwt>  (used by direct browser navigation)
+      2. Authorization: Bearer <jwt>    (used by fetch/axios calls)
+    """
+    from app.models.user import User as _User
+
+    # Prefer Authorization header; fall back to ?token= query parameter.
+    bearer = request.headers.get("Authorization", "")
+    if bearer.startswith("Bearer "):
+        jwt_token = bearer.split(" ", 1)[1]
+    elif token:
+        jwt_token = token
+    else:
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    payload = decode_token(jwt_token)
+    if payload is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id_str = payload.get("sub")
+    if user_id_str is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        user_uuid = UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=401,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    result = await db.execute(select(_User).where(_User.id == user_uuid))
+    user = result.scalar_one_or_none()
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
+    return user
 
 
 async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
@@ -633,25 +694,37 @@ async def delete_invoice(
 @router.get("/invoices/{invoice_id}/pdf")
 async def get_invoice_pdf(
     invoice_id: UUID,
-    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated["User", Depends(_get_user_for_pdf)],
+    download: bool = Query(default=False),
 ):
     """
     Generate and download a PDF for an invoice.
-    
+
+    Accepts auth via Authorization header (Bearer) **or** via the ``?token=``
+    query parameter.  The query-parameter form is required for direct browser
+    navigation (``window.location.href``) which cannot set custom headers —
+    this is the only reliable way to trigger a native download on iOS Safari.
+
+    Query parameters:
+    - ``download=1``  – signals an explicit download intent; sets
+      ``Cache-Control: no-store`` so the browser never shows a cached copy.
+    - ``token=<jwt>`` – alternative auth for browsers that cannot send
+      Authorization headers (e.g. iOS Safari direct navigation).
+
     Returns the invoice as a downloadable PDF file with proper headers:
     - Content-Type: application/pdf
     - Content-Disposition: attachment; filename="INV-YYYY-XXXX.pdf"
     - Content-Length: <size> (for mobile browser compatibility)
-    - Cache-Control: no-cache (prevent stale PDFs)
-    
+    - Cache-Control: no-store when download=1, otherwise no-cache
+
     Uses ReportLab as the primary PDF generator (pure Python, Docker-safe).
     Falls back to WeasyPrint if ReportLab fails.
     """
     require_zzp(current_user)
-    
+
     administration = await get_user_administration(current_user.id, db)
-    
+
     result = await db.execute(
         select(ZZPInvoice)
         .options(selectinload(ZZPInvoice.lines))
@@ -661,24 +734,22 @@ async def get_invoice_pdf(
         )
     )
     invoice = result.scalar_one_or_none()
-    
+
     if not invoice:
         raise HTTPException(
             status_code=404,
             detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
         )
-    
+
     try:
         # Try ReportLab first (pure Python, Docker-safe, no system dependencies)
         pdf_bytes = generate_invoice_pdf_reportlab(invoice)
         filename = get_invoice_pdf_filename(invoice)
-        
+
     except Exception as reportlab_error:
         # Fallback to WeasyPrint if ReportLab fails
-        import logging
-        logger = logging.getLogger(__name__)
         logger.warning(f"ReportLab PDF generation failed, trying WeasyPrint fallback: {reportlab_error}")
-        
+
         try:
             pdf_bytes = generate_invoice_pdf(invoice)
             filename = get_invoice_pdf_filename(invoice)
@@ -701,17 +772,18 @@ async def get_invoice_pdf(
                         "message": "Kon de PDF niet genereren. Probeer het later opnieuw."
                     }
                 )
-    
-    # Return PDF with mobile-safe headers
-    # Content-Length is critical for iOS Safari to show download progress
-    # Cache-Control prevents browsers from showing stale versions
+
+    # Cache-Control: use no-store for explicit download requests so that
+    # browsers (especially iOS Safari) never serve a stale cached copy.
+    cache_control = "no-store" if download else "no-cache, no-store, must-revalidate"
+
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Content-Length": str(len(pdf_bytes)),
-            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Cache-Control": cache_control,
             "Pragma": "no-cache",
             "Expires": "0",
         }

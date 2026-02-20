@@ -5400,6 +5400,13 @@ export interface ReactivateSubscriptionResponse {
   message_nl: string
 }
 
+export interface SubscriptionMeResponse {
+  status: 'trial' | 'active' | 'expired'
+  startDate: string | null
+  endDate: string | null
+  daysRemaining: number
+}
+
 export const subscriptionApi = {
   /**
    * Get current user's subscription status and entitlements.
@@ -5454,6 +5461,15 @@ export const subscriptionApi = {
    */
   reactivateSubscription: async (): Promise<ReactivateSubscriptionResponse> => {
     const response = await api.post('/me/subscription/reactivate', {})
+    return response.data
+  },
+
+  /**
+   * Get simplified subscription summary for ZZP settings page.
+   * Returns status (trial/active/expired), start/end dates, and days remaining.
+   */
+  getSubscriptionMe: async (): Promise<SubscriptionMeResponse> => {
+    const response = await api.get('/subscription/me')
     return response.data
   },
 }

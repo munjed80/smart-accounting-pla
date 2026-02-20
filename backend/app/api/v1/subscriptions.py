@@ -23,6 +23,7 @@ from app.schemas.subscription import (
     ActivateSubscriptionResponse,
     CancelSubscriptionResponse,
     ReactivateSubscriptionResponse,
+    SubscriptionMeResponse,
 )
 from sqlalchemy import select
 
@@ -386,3 +387,79 @@ async def reactivate_subscription(
                 "message": "Failed to reactivate subscription"
             }
         )
+
+
+@router.get("/subscription/me", response_model=SubscriptionMeResponse)
+async def get_subscription_me(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Simplified subscription status for ZZP settings page.
+
+    Returns a clean summary with:
+    - status: "trial" | "active" | "expired"
+    - startDate: ISO 8601 string (trial_start_at or current_period_start)
+    - endDate: ISO 8601 string (trial_end_at or current_period_end)
+    - daysRemaining: integer days until endDate (0 if already passed)
+    """
+    from datetime import datetime, timezone
+
+    result = await db.execute(
+        select(AdministrationMember)
+        .where(AdministrationMember.user_id == current_user.id)
+        .order_by(AdministrationMember.created_at.asc())
+    )
+    member = result.scalar_one_or_none()
+
+    if not member:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "NO_ADMINISTRATION", "message": "User has no administration"},
+        )
+
+    subscription = await subscription_service.get_subscription(db, member.administration_id)
+
+    if not subscription:
+        subscription = await subscription_service.ensure_trial_started(db, member.administration_id)
+
+    now = datetime.now(timezone.utc)
+
+    # Map internal status to simplified status
+    raw_status = subscription.status.value if hasattr(subscription.status, "value") else str(subscription.status)
+    if raw_status == SubscriptionStatus.TRIALING.value:
+        simple_status = "trial"
+        start_dt = subscription.trial_start_at
+        end_dt = subscription.trial_end_at
+    elif raw_status == SubscriptionStatus.ACTIVE.value:
+        simple_status = "active"
+        start_dt = subscription.current_period_start or subscription.trial_start_at
+        end_dt = subscription.current_period_end
+    else:
+        # EXPIRED, CANCELED, PAST_DUE → expired
+        simple_status = "expired"
+        start_dt = subscription.current_period_start or subscription.trial_start_at
+        end_dt = subscription.current_period_end or subscription.trial_end_at
+
+    # Compute daysRemaining
+    days_remaining = 0
+    if end_dt:
+        # Make end_dt timezone-aware if it is naive
+        if end_dt.tzinfo is None:
+            end_dt = end_dt.replace(tzinfo=timezone.utc)
+        delta = end_dt - now
+        days_remaining = max(0, delta.days)
+
+    def _iso(dt) -> str | None:
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
+    return SubscriptionMeResponse(
+        status=simple_status,
+        startDate=_iso(start_dt),
+        endDate=_iso(end_dt),
+        daysRemaining=days_remaining,
+    )

@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,7 +23,8 @@ import {
   zzpApi,
   ZZPBusinessProfile,
   ZZPBusinessProfileCreate,
-  subscriptionApi
+  subscriptionApi,
+  SubscriptionMeResponse,
 } from '@/lib/api'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useEntitlements } from '@/hooks/useEntitlements'
@@ -41,16 +43,14 @@ import {
   Globe,
   Bank,
   IdentificationCard,
-  GitBranch,
   BellRinging,
   CreditCard,
   Calendar,
-  X,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
-import { APP_VERSION_SHORT, getBuildDate, GIT_COMMIT_HASH, PACKAGE_VERSION_ONLY, IS_PROD } from '@/lib/version'
+import { getBuildDate, PACKAGE_VERSION_ONLY } from '@/lib/version'
 import { usePushNotifications, isPushEnabled } from '@/hooks/usePushNotifications'
 
 export const SettingsPage = () => {
@@ -66,10 +66,24 @@ export const SettingsPage = () => {
   const pushNotifications = usePushNotifications()
   
   // Subscription management hook (for ZZP users)
-  const { entitlements, subscription, isLoading: isLoadingSubscription, isAccountantBypass, refetch: refetchSubscription } = useEntitlements()
+  const { isAccountantBypass, refetch: refetchSubscription } = useEntitlements()
   const [isCanceling, setIsCanceling] = useState(false)
   const [isReactivating, setIsReactivating] = useState(false)
   const [isActivating, setIsActivating] = useState(false)
+
+  // Simplified subscription data from /subscription/me (ZZP users only)
+  const isZzp = user?.role === 'zzp' && !isAccountantBypass
+  const {
+    data: subscriptionMe,
+    isLoading: isLoadingSubscriptionMe,
+    error: subscriptionMeError,
+    refetch: refetchSubscriptionMe,
+  } = useQuery<SubscriptionMeResponse>({
+    queryKey: ['subscriptionMe', user?.id],
+    queryFn: subscriptionApi.getSubscriptionMe,
+    enabled: isZzp,
+    staleTime: 5 * 60 * 1000,
+  })
   
   // Business profile state (for ZZP users) - MUST be declared before useDelayedLoading
   const [businessProfile, setBusinessProfile] = useState<ZZPBusinessProfile | null>(null)
@@ -225,6 +239,7 @@ export const SettingsPage = () => {
       const result = await subscriptionApi.cancelSubscription()
       toast.success(result.message_nl || 'Abonnement opgezegd')
       await refetchSubscription()
+      await refetchSubscriptionMe()
     } catch (error) {
       console.error('Failed to cancel subscription:', error)
       toast.error(parseApiError(error))
@@ -239,6 +254,7 @@ export const SettingsPage = () => {
       const result = await subscriptionApi.reactivateSubscription()
       toast.success(result.message_nl || 'Abonnement heractiveerd')
       await refetchSubscription()
+      await refetchSubscriptionMe()
     } catch (error) {
       console.error('Failed to reactivate subscription:', error)
       toast.error(parseApiError(error))
@@ -261,6 +277,7 @@ export const SettingsPage = () => {
         })
       }
       await refetchSubscription()
+      await refetchSubscriptionMe()
     } catch (error) {
       console.error('Failed to activate subscription:', error)
       toast.error(parseApiError(error))
@@ -849,7 +866,7 @@ export const SettingsPage = () => {
           </Card>
 
           {/* Subscription Management Section (ZZP users only) */}
-          {!isAccountantBypass && user?.role === 'zzp' && (
+          {isZzp && (
             <Card className="bg-card/80 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -861,123 +878,118 @@ export const SettingsPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {isLoadingSubscription ? (
+                {isLoadingSubscriptionMe ? (
                   <div className="space-y-2">
                     <Skeleton className="h-4 w-full" />
                     <Skeleton className="h-4 w-3/4" />
                   </div>
-                ) : entitlements && subscription ? (
+                ) : subscriptionMeError ? (
+                  <Alert variant="destructive">
+                    <Info size={16} />
+                    <AlertDescription>
+                      Abonnementsinformatie kon niet worden geladen. Probeer het opnieuw.
+                    </AlertDescription>
+                  </Alert>
+                ) : subscriptionMe ? (
                   <div className="space-y-4">
-                    {/* Status Display */}
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">Status:</span>
-                          {subscription.status === 'ACTIVE' && !subscription.cancel_at_period_end && (
-                            <Badge className="bg-green-100 text-green-800 border-green-300">
-                              Actief
-                            </Badge>
-                          )}
-                          {subscription.scheduled && (
-                            <Badge className="bg-indigo-100 text-indigo-800 border-indigo-300">
-                              Gepland
-                            </Badge>
-                          )}
-                          {subscription.status === 'TRIALING' && !subscription.scheduled && (
-                            <Badge className="bg-blue-100 text-blue-800 border-blue-300">
-                              Proefperiode
-                            </Badge>
-                          )}
-                          {subscription.status === 'CANCELED' && (
-                            <Badge variant="secondary">Geannuleerd</Badge>
-                          )}
-                          {subscription.status === 'PAST_DUE' && (
-                            <Badge variant="destructive">Betaling mislukt</Badge>
-                          )}
-                          {subscription.status === 'EXPIRED' && (
-                            <Badge variant="secondary">Verlopen</Badge>
-                          )}
-                          {subscription.cancel_at_period_end && subscription.status === 'ACTIVE' && (
-                            <Badge variant="outline" className="border-orange-300 text-orange-700">
-                              <X size={12} className="mr-1" />
-                              Lopend tot periode-einde
-                            </Badge>
-                          )}
+                    {/* Status Badge */}
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">Status:</span>
+                      {subscriptionMe.status === 'trial' && (
+                        <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+                          Trial
+                        </Badge>
+                      )}
+                      {subscriptionMe.status === 'active' && (
+                        <Badge className="bg-green-100 text-green-800 border-green-300">
+                          Active
+                        </Badge>
+                      )}
+                      {subscriptionMe.status === 'expired' && (
+                        <Badge variant="secondary">
+                          Expired
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Date Info */}
+                    <div className="space-y-2 text-sm">
+                      {subscriptionMe.startDate && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Calendar size={14} />
+                            Startdatum
+                          </span>
+                          <span className="font-medium">
+                            {new Date(subscriptionMe.startDate).toLocaleDateString('nl-NL')}
+                          </span>
                         </div>
-                        
-                        {/* Status Explanation */}
-                        <p className="text-sm text-muted-foreground">
-                          {subscription.scheduled && subscription.trial_end_at && (
-                            <>Gepland — start op {new Date(subscription.trial_end_at).toLocaleDateString('nl-NL')}</>
-                          )}
-                          {subscription.status === 'TRIALING' && entitlements.in_trial && !subscription.scheduled && (
-                            <>Proefperiode actief — {entitlements.days_left_trial} {entitlements.days_left_trial === 1 ? 'dag' : 'dagen'}{subscription.trial_end_at ? ` (eindigt ${new Date(subscription.trial_end_at).toLocaleDateString('nl-NL')})` : ''}.</>
-                          )}
-                          {subscription.status === 'ACTIVE' && !subscription.cancel_at_period_end && (
-                            <>ZZP Basic abonnement — €6,95/maand{subscription.next_payment_date ? ` · volgende betaling ${new Date(subscription.next_payment_date).toLocaleDateString('nl-NL')}` : ''}</>
-                          )}
-                          {subscription.cancel_at_period_end && (
-                            <>Abonnement opgezegd — blijft actief tot {subscription.current_period_end ? new Date(subscription.current_period_end).toLocaleDateString('nl-NL') : 'periode-einde'}</>
-                          )}
-                          {subscription.status === 'CANCELED' && (
-                            <>Abonnement is geannuleerd</>
-                          )}
-                          {subscription.status === 'PAST_DUE' && (
-                            <>Betaling mislukt. Activeer opnieuw om functies te herstellen.</>
-                          )}
-                          {subscription.status === 'EXPIRED' && (
-                            <>Proefperiode afgelopen — activeer abonnement om door te gaan</>
-                          )}
-                        </p>
+                      )}
+                      {subscriptionMe.endDate && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Calendar size={14} />
+                            Einddatum
+                          </span>
+                          <span className="font-medium">
+                            {new Date(subscriptionMe.endDate).toLocaleDateString('nl-NL')}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Dagen resterend</span>
+                        <span className="font-medium">{subscriptionMe.daysRemaining}</span>
                       </div>
                     </div>
 
-                    {/* Scheduled Status */}
-                    {subscription.scheduled && subscription.trial_end_at && (
-                      <Alert>
-                        <Calendar size={16} />
-                        <AlertDescription>
-                          Gepland — start op {new Date(subscription.trial_end_at).toLocaleDateString('nl-NL')}
-                        </AlertDescription>
-                      </Alert>
-                    )}
+                    <Separator />
 
                     {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      {/* Show Activate button for TRIALING without scheduled subscription */}
-                      {subscription.status === 'TRIALING' && !subscription.scheduled && (
-                        <Button 
-                          onClick={handleActivateSubscription}
-                          disabled={isActivating}
-                        >
-                          {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                          Abonnement activeren
-                        </Button>
+                    <div className="flex flex-wrap gap-2">
+                      {subscriptionMe.status === 'trial' && (
+                        <>
+                          <Button
+                            onClick={handleActivateSubscription}
+                            disabled={isActivating}
+                          >
+                            {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
+                            Upgrade to Pro
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={handleCancelSubscription}
+                            disabled={isCanceling}
+                          >
+                            {isCanceling && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
+                            Cancel Trial
+                          </Button>
+                        </>
                       )}
-
-                      {/* Show Cancel button for ACTIVE subscriptions without cancellation */}
-                      {subscription.status === 'ACTIVE' && !subscription.cancel_at_period_end && (
-                        <Button 
-                          variant="outline"
-                          onClick={handleCancelSubscription}
-                          disabled={isCanceling}
-                        >
-                          {isCanceling && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                          Opzeggen
-                        </Button>
+                      {subscriptionMe.status === 'active' && (
+                        <>
+                          <Button
+                            variant="outline"
+                            onClick={() => toast.info('Abonnementsbeheer wordt binnenkort beschikbaar.')}
+                          >
+                            Manage Subscription
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={handleCancelSubscription}
+                            disabled={isCanceling}
+                          >
+                            {isCanceling && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
+                            Cancel Subscription
+                          </Button>
+                        </>
                       )}
-
-                      {/* Show Reactivate button for canceled/expired/past_due */}
-                      {(subscription.status === 'CANCELED' || 
-                        subscription.status === 'EXPIRED' ||
-                        subscription.status === 'PAST_DUE' ||
-                        (subscription.status === 'ACTIVE' && subscription.cancel_at_period_end)) && (
-                        <Button 
+                      {subscriptionMe.status === 'expired' && (
+                        <Button
                           onClick={handleReactivateSubscription}
                           disabled={isReactivating}
                         >
                           {isReactivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                          {subscription.cancel_at_period_end ? 'Annulering intrekken' : 'Heractiveren'}
+                          Renew Subscription
                         </Button>
                       )}
                     </div>
@@ -1115,40 +1127,24 @@ export const SettingsPage = () => {
               <div className="space-y-3">
                 <div className="flex justify-between items-center py-2">
                   <span className="text-sm text-muted-foreground">Versie</span>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="font-mono text-xs">
-                      {PACKAGE_VERSION_ONLY}
-                    </Badge>
-                  </div>
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {PACKAGE_VERSION_ONLY}
+                  </Badge>
                 </div>
-                
-                {IS_PROD && GIT_COMMIT_HASH !== 'dev' && (
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-sm text-muted-foreground flex items-center gap-1">
-                      <GitBranch size={14} />
-                      Build
-                    </span>
-                    <Badge variant="outline" className="font-mono text-xs">
-                      {GIT_COMMIT_HASH}
-                    </Badge>
-                  </div>
-                )}
-                
+
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-muted-foreground">Volledige versie</span>
+                  <Badge variant="outline" className="font-mono text-xs">
+                    {PACKAGE_VERSION_ONLY}
+                  </Badge>
+                </div>
+
                 <div className="flex justify-between items-center py-2">
                   <span className="text-sm text-muted-foreground">Laatste build</span>
                   <span className="text-sm font-medium">
                     {getBuildDate()}
                   </span>
                 </div>
-
-                {!IS_PROD && (
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-sm text-muted-foreground">Modus</span>
-                    <Badge variant="destructive" className="text-xs">
-                      Development
-                    </Badge>
-                  </div>
-                )}
               </div>
 
               <Separator />
@@ -1156,8 +1152,8 @@ export const SettingsPage = () => {
               <Alert>
                 <Info size={16} />
                 <AlertDescription className="text-xs">
-                  <strong>Smart Accounting Platform</strong> — Professioneel boekhoudplatform voor ZZP'ers en accountants. 
-                  {IS_PROD && ' Volledige versie: '}{IS_PROD && <code className="text-xs bg-muted px-1 py-0.5 rounded">{APP_VERSION_SHORT}</code>}
+                  <strong>Smart Accounting Platform</strong> — Professioneel boekhoudplatform voor ZZP'ers en accountants.
+                  {' '}Versie: <code className="text-xs bg-muted px-1 py-0.5 rounded">{PACKAGE_VERSION_ONLY}</code>
                 </AlertDescription>
               </Alert>
             </CardContent>

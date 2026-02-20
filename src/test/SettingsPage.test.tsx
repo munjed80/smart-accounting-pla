@@ -4,8 +4,11 @@
  * Tests ensuring Settings page handles errors and empty states properly
  */
 
+import React from 'react'
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SettingsPage } from '../components/SettingsPage'
 import * as api from '../lib/api'
 import * as AuthContext from '../lib/AuthContext'
@@ -45,6 +48,7 @@ vi.mock('../lib/api', () => ({
     activateSubscription: vi.fn(),
     cancelSubscription: vi.fn(),
     reactivateSubscription: vi.fn(),
+    getSubscriptionMe: vi.fn(),
   },
   getApiBaseUrl: vi.fn(() => 'http://localhost:8000/api/v1'),
   getRawViteApiUrl: vi.fn(() => 'http://localhost:8000'),
@@ -114,6 +118,15 @@ vi.mock('sonner', () => ({
 describe('SettingsPage', () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>
 
+  const renderWithClient = (ui: React.ReactElement) => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    return render(
+      <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    )
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -169,6 +182,13 @@ describe('SettingsPage', () => {
       build_time: '2024-01-01T00:00:00Z',
       env_name: 'test',
     } as any)
+
+    vi.mocked(api.subscriptionApi.getSubscriptionMe).mockResolvedValue({
+      status: 'trial',
+      startDate: '2026-01-01T00:00:00Z',
+      endDate: '2026-02-01T00:00:00Z',
+      daysRemaining: 10,
+    })
   })
 
   afterEach(() => {
@@ -180,7 +200,7 @@ describe('SettingsPage', () => {
     vi.mocked(api.administrationApi.list).mockRejectedValue(new Error('Network error'))
     vi.mocked(api.zzpApi.profile.get).mockResolvedValue({} as any)
 
-    render(<SettingsPage />)
+    renderWithClient(<SettingsPage />)
 
     // Wait for error to appear
     await waitFor(() => {
@@ -193,7 +213,7 @@ describe('SettingsPage', () => {
     vi.mocked(api.administrationApi.list).mockResolvedValue([])
     vi.mocked(api.zzpApi.profile.get).mockResolvedValue({} as any)
 
-    render(<SettingsPage />)
+    renderWithClient(<SettingsPage />)
 
     // Wait for empty state to appear
     await waitFor(() => {
@@ -207,7 +227,7 @@ describe('SettingsPage', () => {
     vi.mocked(api.zzpApi.profile.get).mockRejectedValue(new Error('Profile error'))
 
     // Should render without throwing
-    const { container } = render(<SettingsPage />)
+    const { container } = renderWithClient(<SettingsPage />)
     
     await waitFor(() => {
       // Page should be rendered (not blank/crashed)
@@ -227,7 +247,7 @@ describe('SettingsPage', () => {
       company_name: 'Test Company',
     } as any)
 
-    render(<SettingsPage />)
+    renderWithClient(<SettingsPage />)
 
     // Wait for content to load - just check that page header is there
     await waitFor(() => {

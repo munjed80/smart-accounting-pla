@@ -77,4 +77,54 @@ describe('ZZPInvoicesPage', () => {
       expect(screen.getByText('Opnieuw proberen')).toBeInTheDocument()
     })
   })
+
+  it('renders empty state safely when API returns null', async () => {
+    vi.mocked(api.zzpApi.invoices.list).mockResolvedValue(null as any)
+
+    render(<ZZPInvoicesPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('zzpInvoices.noInvoices')).toBeInTheDocument()
+    })
+  })
+
+  it('renders empty state safely when API returns {}', async () => {
+    vi.mocked(api.zzpApi.invoices.list).mockResolvedValue({} as any)
+
+    render(<ZZPInvoicesPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('zzpInvoices.noInvoices')).toBeInTheDocument()
+    })
+  })
+
+  it('renders empty state safely when API returns {items: null}', async () => {
+    vi.mocked(api.zzpApi.invoices.list).mockResolvedValue({ items: null } as any)
+
+    render(<ZZPInvoicesPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('zzpInvoices.noInvoices')).toBeInTheDocument()
+    })
+  })
+
+  it('normalizes {data: []} API response correctly', async () => {
+    vi.mocked(api.zzpApi.invoices.list).mockResolvedValue({ data: [] } as any)
+
+    render(<ZZPInvoicesPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('zzpInvoices.noInvoices')).toBeInTheDocument()
+    })
+  })
+
+  it('normalizes {items: []} API response correctly', async () => {
+    vi.mocked(api.zzpApi.invoices.list).mockResolvedValue({ items: [] } as any)
+
+    render(<ZZPInvoicesPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('zzpInvoices.noInvoices')).toBeInTheDocument()
+    })
+  })
 })

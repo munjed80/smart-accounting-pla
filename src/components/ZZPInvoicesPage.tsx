@@ -14,7 +14,7 @@
  * - Seller details preview from Business Profile
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, Component, ReactNode } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -148,6 +148,20 @@ const getStatusCodeFromError = (error: unknown): number | null => {
     if (typeof responseStatus === 'number') return responseStatus
   }
   return null
+}
+
+// Normalize any API list response shape into a typed array.
+// Handles: [], {invoices:[]}, {data:[]}, {items:[]}, null, {}, {items:null}
+function normalizeListResponse<T>(response: unknown, primaryKey?: string): T[] {
+  if (Array.isArray(response)) return response as T[]
+  if (response !== null && typeof response === 'object') {
+    const obj = response as Record<string, unknown>
+    if (primaryKey && Array.isArray(obj[primaryKey])) return obj[primaryKey] as T[]
+    for (const key of ['data', 'items', 'results']) {
+      if (Array.isArray(obj[key])) return obj[key] as T[]
+    }
+  }
+  return []
 }
 
 // Invoice status types (matches backend)
@@ -1358,7 +1372,60 @@ const InvoiceCard = ({
   </Card>
 )
 
+// Inline error boundary for the invoices page — shows a contained error card
+// instead of letting errors bubble up to the global DashboardErrorBoundary.
+class InvoicesErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error) {
+    console.error('[ZZPInvoicesPage] Unhandled render error:', error)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <Card className="bg-card/80 backdrop-blur-sm border-destructive/30">
+              <CardHeader>
+                <CardTitle>Facturen tijdelijk niet beschikbaar</CardTitle>
+                <CardDescription>
+                  Er is een onverwachte fout opgetreden bij het laden van de facturen.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button onClick={() => window.location.reload()} variant="outline">
+                  Opnieuw proberen
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 export const ZZPInvoicesPage = () => {
+  return (
+    <InvoicesErrorBoundary>
+      <ZZPInvoicesPageContent />
+    </InvoicesErrorBoundary>
+  )
+}
+
+const ZZPInvoicesPageContent = () => {
   const { user } = useAuth()
   const [invoices, setInvoices] = useState<ZZPInvoice[]>([])
   const [customers, setCustomers] = useState<ZZPCustomer[]>([])
@@ -1459,15 +1526,8 @@ export const ZZPInvoicesPage = () => {
         }), // Profile might not exist
       ])
 
-      const normalizedInvoices = Array.isArray(invoicesResponse?.invoices)
-        ? invoicesResponse.invoices
-        : Array.isArray(invoicesResponse)
-          ? invoicesResponse
-          : []
-
-      const normalizedCustomers = Array.isArray(customersResponse?.customers)
-        ? customersResponse.customers
-        : []
+      const normalizedInvoices = normalizeListResponse<ZZPInvoice>(invoicesResponse, 'invoices')
+      const normalizedCustomers = normalizeListResponse<ZZPCustomer>(customersResponse, 'customers')
 
       setRequestTraces(prev => [
         {
@@ -2079,12 +2139,12 @@ export const ZZPInvoicesPage = () => {
                   <CardTitle className="text-lg">{t('zzpInvoices.listTitle')}</CardTitle>
                   <CardDescription>
                     {filteredInvoices.length} {filteredInvoices.length === 1 ? 'factuur' : 'facturen'}
-                    {statusFilter !== 'all' && ` (${
-                      statusFilter === 'draft' ? t('zzpInvoices.filterDraft') :
-                      statusFilter === 'sent' ? t('zzpInvoices.filterSent') :
-                      statusFilter === 'paid' ? t('zzpInvoices.filterPaid') :
-                      statusFilter === 'overdue' ? t('zzpInvoices.filterOverdue') :
-                      statusFilter === 'cancelled' ? t('zzpInvoices.filterCancelled') : ''
+                    {filters.status !== 'all' && ` (${
+                      filters.status === 'draft' ? t('zzpInvoices.filterDraft') :
+                      filters.status === 'sent' ? t('zzpInvoices.filterSent') :
+                      filters.status === 'paid' ? t('zzpInvoices.filterPaid') :
+                      filters.status === 'overdue' ? t('zzpInvoices.filterOverdue') :
+                      filters.status === 'cancelled' ? t('zzpInvoices.filterCancelled') : ''
                     })`}
                   </CardDescription>
                 </div>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { ZZPInvoicesPage } from '../components/ZZPInvoicesPage'
 import * as api from '../lib/api'
 import * as AuthContext from '../lib/AuthContext'
@@ -125,6 +125,47 @@ describe('ZZPInvoicesPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('zzpInvoices.noInvoices')).toBeInTheDocument()
+    })
+  })
+
+  it('does not get stuck loading when user is null (back-navigation guard)', async () => {
+    // Simulate the back-navigation scenario: component mounts before auth resolves
+    vi.mocked(AuthContext.useAuth).mockReturnValue({ user: null } as any)
+
+    render(<ZZPInvoicesPage />)
+
+    // The page must NOT stay in infinite loading — it should exit loading state
+    // and show some non-loading content (warning or empty state)
+    await waitFor(() => {
+      // The loading skeleton is NOT shown (useDelayedLoading mock returns isLoading directly,
+      // so if isLoading is cleared to false the skeleton disappears)
+      // The no-customers warning appears because customers = [] and isLoading = false
+      expect(screen.getByText('zzpInvoices.noCustomersWarning')).toBeInTheDocument()
+    })
+  })
+
+  it('"Nieuwe factuur" button opens the invoice form dialog when active customers exist', async () => {
+    vi.mocked(api.zzpApi.invoices.list).mockResolvedValue([] as any)
+    vi.mocked(api.zzpApi.customers.list).mockResolvedValue({
+      customers: [{ id: 'c1', name: 'Test Klant', status: 'active' }],
+    } as any)
+
+    render(<ZZPInvoicesPage />)
+
+    // Wait for data to load
+    await waitFor(() => {
+      expect(screen.getByText('zzpInvoices.noInvoices')).toBeInTheDocument()
+    })
+
+    // Find and click the "Nieuwe factuur" button (the one in the page header)
+    const buttons = screen.getAllByText('zzpInvoices.newInvoice')
+    const newInvoiceButton = buttons[0]
+    expect(newInvoiceButton).not.toBeDisabled()
+    fireEvent.click(newInvoiceButton)
+
+    // The dialog should now be open
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
   })
 })

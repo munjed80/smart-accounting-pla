@@ -1501,7 +1501,14 @@ const ZZPInvoicesPageContent = () => {
 
   // Load data from API
   const loadData = useCallback(async () => {
-    if (!user?.id) return
+    if (!user?.id) {
+      // Auth not yet resolved — clear the initial loading state so the page
+      // doesn't get stuck showing a skeleton indefinitely on back navigation.
+      // When auth resolves, loadData is recreated (user?.id dep changes) and
+      // the effect re-runs to fetch data.
+      setIsLoading(false)
+      return
+    }
 
     setIsLoading(true)
     setError(null)

@@ -7,10 +7,11 @@ import { ApiHttpError, NotFoundError, NetworkError, UnauthorizedError, Validatio
  * 1. ACTIVA (Bank & Kas)
  *    - Screen: BankReconciliationPage
  *    - Endpoints:
- *      * GET  /accountant/bank/transactions?administration_id=X       → List bank transactions
- *      * POST /accountant/bank/import                                 → Import bank CSV
- *      * POST /accountant/bank/transactions/{id}/suggest              → Get match suggestions
- *      * POST /accountant/bank/transactions/{id}/apply                → Apply reconciliation action
+ *      * GET  /accountant/clients/{clientId}/bank/transactions        → List bank transactions
+ *      * POST /accountant/clients/{clientId}/bank/import              → Import bank CSV
+ *      * POST /accountant/clients/{clientId}/bank/transactions/{id}/suggest → Get match suggestions
+ *      * POST /accountant/clients/{clientId}/bank/transactions/{id}/apply   → Apply reconciliation action
+ *      * GET  /accountant/clients/{clientId}/bank/kpi                 → KPI summary
  *    - API: bankReconciliationApi
  * 
  * 2. DEBITEUREN (Klanten/Customers)
@@ -3765,8 +3766,7 @@ export const bankReconciliationApi = {
     if (request.bank_name) {
       formData.append('bank_name', request.bank_name)
     }
-    const response = await api.post<BankImportResponse>('/accountant/bank/import', formData, {
-      params: { administration_id: request.administration_id },
+    const response = await api.post<BankImportResponse>(`/accountant/clients/${request.administration_id}/bank/import`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     return response.data
@@ -3785,7 +3785,7 @@ export const bankReconciliationApi = {
       pageSize?: number
     }
   ): Promise<BankTransactionListResponse> => {
-    const params: Record<string, unknown> = { administration_id: administrationId }
+    const params: Record<string, unknown> = {}
     if (options?.status) params.status = options.status
     if (options?.q) params.q = options.q
     if (options?.dateFrom) params.date_from = options.dateFrom
@@ -3794,15 +3794,14 @@ export const bankReconciliationApi = {
     if (options?.maxAmount !== undefined) params.max_amount = options.maxAmount
     if (options?.page) params.page = options.page
     if (options?.pageSize) params.page_size = options.pageSize
-    const response = await api.get<BankTransactionListResponse>('/accountant/bank/transactions', { params })
+    const response = await api.get<BankTransactionListResponse>(`/accountant/clients/${administrationId}/bank/transactions`, { params })
     return response.data
   },
 
   suggestMatches: async (transactionId: string, administrationId: string): Promise<SuggestMatchResponse> => {
     const response = await api.post<SuggestMatchResponse>(
-      `/accountant/bank/transactions/${transactionId}/suggest`,
-      null,
-      { params: { administration_id: administrationId } }
+      `/accountant/clients/${administrationId}/bank/transactions/${transactionId}/suggest`,
+      null
     )
     return response.data
   },
@@ -3813,9 +3812,8 @@ export const bankReconciliationApi = {
     request: ApplyActionRequest
   ): Promise<ApplyActionResponse> => {
     const response = await api.post<ApplyActionResponse>(
-      `/accountant/bank/transactions/${transactionId}/apply`,
-      request,
-      { params: { administration_id: administrationId } }
+      `/accountant/clients/${administrationId}/bank/transactions/${transactionId}/apply`,
+      request
     )
     return response.data
   },
@@ -3824,10 +3822,10 @@ export const bankReconciliationApi = {
     administrationId: string,
     options?: { page?: number; pageSize?: number }
   ): Promise<ReconciliationActionsListResponse> => {
-    const params: Record<string, unknown> = { administration_id: administrationId }
+    const params: Record<string, unknown> = {}
     if (options?.page) params.page = options.page
     if (options?.pageSize) params.page_size = options.pageSize
-    const response = await api.get<ReconciliationActionsListResponse>('/accountant/bank/actions', { params })
+    const response = await api.get<ReconciliationActionsListResponse>(`/accountant/clients/${administrationId}/bank/actions`, { params })
     return response.data
   },
 

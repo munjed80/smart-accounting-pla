@@ -73,6 +73,45 @@ def log_enum_and_router_status() -> None:
     )
 
 
+def log_mollie_status() -> None:
+    """
+    Log Mollie integration status at startup (no secrets logged).
+
+    Prints whether Mollie is enabled and which mode (TEST / LIVE) is active
+    based on the API key prefix (test_xxx → TEST, live_xxx → LIVE).
+    """
+    if not settings.mollie_enabled:
+        logger.info("Mollie integration: DISABLED (MOLLIE_API_KEY not set)")
+        return
+
+    api_key_prefix = (settings.MOLLIE_API_KEY or "")[:5]
+    if api_key_prefix == "live_":
+        mode = "LIVE"
+    elif api_key_prefix == "test_":
+        mode = "TEST"
+    else:
+        mode = "UNKNOWN"
+
+    webhook_secret_configured = bool(settings.MOLLIE_WEBHOOK_SECRET)
+    public_url = settings.APP_PUBLIC_URL or settings.APP_URL
+
+    logger.info(
+        "Mollie integration: ENABLED | mode=%s | webhook_secret_configured=%s | public_url=%s",
+        mode,
+        webhook_secret_configured,
+        public_url,
+    )
+
+    if not webhook_secret_configured:
+        logger.warning("Mollie: MOLLIE_WEBHOOK_SECRET is not set – webhooks will be rejected")
+
+    if not settings.APP_PUBLIC_URL:
+        logger.warning(
+            "Mollie: APP_PUBLIC_URL is not set – falling back to APP_URL (%s) for webhook URLs",
+            settings.APP_URL,
+        )
+
+
 async def verify_database_enums() -> None:
     """
     Verify that database enum values match the required Python enum values.
@@ -161,7 +200,10 @@ async def lifespan(app: FastAPI):
     
     # Log enum and router status for production diagnostics
     log_enum_and_router_status()
-    
+
+    # Log Mollie integration status (safe – no secrets)
+    log_mollie_status()
+
     # Register audit logging hooks
     from app.audit.session_hooks import register_audit_hooks
     from app.core.database import async_session_maker

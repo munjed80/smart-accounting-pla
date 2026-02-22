@@ -21,7 +21,7 @@ import { ClientAccessError, parseClientAccessError } from '@/components/ClientAc
 import { useAuth } from '@/lib/AuthContext'
 import { useActiveClient } from '@/lib/ActiveClientContext'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
-import { accountantClientApi, AccountantClientListItem, getErrorMessage } from '@/lib/api'
+import { accountantMasterDashboardApi, ClientStatusCard, getErrorMessage } from '@/lib/api'
 import { 
   WarningCircle,
   UsersThree,
@@ -35,7 +35,7 @@ export const AccountantReviewQueuePage = () => {
   const { activeClient, hasActiveClients, hasPendingClients } = useActiveClient()
   
   // Client details state
-  const [selectedClient, setSelectedClient] = useState<AccountantClientListItem | null>(null)
+  const [selectedClient, setSelectedClient] = useState<ClientStatusCard | null>(null)
   
   // Loading and error state
   const [isLoading, setIsLoading] = useState(true)
@@ -59,8 +59,8 @@ export const AccountantReviewQueuePage = () => {
     setClientAccessError(null)
     
     try {
-      const response = await accountantClientApi.listClients()
-      const client = response.clients.find(c => c.administration_id === clientId)
+      const response = await accountantMasterDashboardApi.getClients()
+      const client = response.clients.find(c => c.id === clientId)
       if (client) {
         setSelectedClient(client)
       }

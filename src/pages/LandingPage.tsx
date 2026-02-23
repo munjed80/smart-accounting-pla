@@ -31,7 +31,7 @@ import {
 import { MarketingFooter } from '@/components/marketing/Footer'
 import { CookieBanner } from '@/components/marketing/CookieBanner'
 import { FaqSection } from '@/components/marketing/FaqSection'
-import { HoeWerktHetSection } from '@/components/HoeWerktHetSection'
+import { HowItWorksSection } from '@/components/landing/HowItWorksSection'
 
 const scrollToSection = (id: string) => {
   const section = document.getElementById(id)
@@ -231,8 +231,8 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* Hoe werkt het — 5-step infographic */}
-      <HoeWerktHetSection />
+      {/* Hoe werkt het — 3-step premium workflow */}
+      <HowItWorksSection />
 
       {/* For ZZP */}
       <section id="voor-zzp" className="py-14 sm:py-20">

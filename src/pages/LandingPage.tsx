@@ -12,20 +12,20 @@ import {
   Clock,
   FileCheck,
   FileText,
-  HandCoins,
   Lock,
   Receipt,
   ShieldCheck,
   Smartphone,
+  Star,
   UserPlus,
-  Users,
   Wallet,
-  Workflow,
-  Wrench,
   X,
   Menu,
   Fingerprint,
 } from 'lucide-react'
+import { MarketingFooter } from '@/components/marketing/Footer'
+import { CookieBanner } from '@/components/marketing/CookieBanner'
+import { FaqSection } from '@/components/marketing/FaqSection'
 
 const scrollToSection = (id: string) => {
   const section = document.getElementById(id)
@@ -38,78 +38,94 @@ const zzpFeatures = [
   {
     icon: FileText,
     title: 'Facturen maken en versturen',
-    description: 'Professionele facturen, automatische BTW-berekening.',
+    description: 'Professionele facturen, automatische BTW-berekening en directe e-mailverzending naar uw klanten.',
   },
   {
     icon: Clock,
     title: 'Urenregistratie',
-    description: 'Registreer uren en zet ze direct om in facturen.',
+    description: 'Registreer uren handmatig of via timer en zet ze direct om in factuurregels.',
   },
   {
     icon: Receipt,
-    title: 'Uitgaven & kostenbeheer',
-    description: 'Upload bonnetjes en koppel aan je administratie.',
+    title: 'Uitgaven & bonnetjes',
+    description: 'Upload bonnetjes, koppel aan kosten en zie ze direct terug in uw BTW-overzicht.',
   },
   {
     icon: CalendarDays,
-    title: 'Agenda & planning',
-    description: 'Houd overzicht op opdrachten.',
+    title: 'Klanten & agenda',
+    description: 'Beheer uw klantenbestand en houd grip op opdrachten en deadlines.',
   },
   {
     icon: FileCheck,
-    title: 'BTW-aangifte met traceability',
-    description: 'Zie exact hoe elke rubriek wordt berekend.',
+    title: 'BTW-overzicht met drilldown',
+    description: 'Zie exact hoe elke rubriek wordt berekend — volledig transparant voor uw aangifte.',
   },
   {
     icon: Smartphone,
     title: 'Mobiel als app (PWA)',
-    description: 'Installeer op iOS en Android.',
+    description: 'Installeer op iOS en Android. Altijd toegankelijk, ook offline.',
   },
 ]
 
-const accountantModules = [
-  'Multi-client hub',
-  'Werkqueue',
-  'Audit trail',
-  'Period locking',
-  'PKI signing',
-  'BTW/ICP workflows',
-  'Compliance logging',
+const accountantFeatures = [
+  { title: 'Multi-client hub', description: 'Beheer alle klantdossiers vanuit één overzicht.' },
+  { title: 'Werkqueue', description: 'Prioriteer en verwerk openstaande taken per klant.' },
+  { title: 'BTW-traceerbaarheid', description: 'Volledig audittrail van rubriek tot bronboek.' },
+  { title: 'Periodebeheer', description: 'Sluit perioden af en voorkom terugwerkende aanpassingen.' },
+  { title: 'Beoordelingslijst', description: 'Review en goedkeur facturen en uitgaven van klanten.' },
+  { title: 'Bankreconciliatie', description: 'Koppel bankregels aan boekingen.', beta: true },
+  { title: 'PKI-ondertekening', description: 'Digitale handtekening voor documenten.', beta: true },
+  { title: 'Compliance logging', description: 'Automatische vastlegging van alle acties voor dossiervorming.' },
 ]
 
 const steps = [
   {
     icon: UserPlus,
-    title: '1. Account aanmaken (gratis)',
-    description: 'Maak binnen een minuut een account aan en start direct met je administratie.',
+    step: '1',
+    title: 'Account aanmaken (gratis)',
+    description: 'Maak binnen een minuut een account aan en start uw 30 dagen gratis proef.',
   },
   {
-    icon: Workflow,
-    title: '2. Facturen & administratie starten',
-    description: 'Beheer facturen, uren en kosten in één centrale workflow.',
+    icon: Building2,
+    step: '2',
+    title: 'Uw administratie inrichten',
+    description: 'Voer uw bedrijfsgegevens, BTW-nummer en eerste klant in.',
   },
   {
-    icon: HandCoins,
-    title: '3. BTW indienen met volledige controle',
-    description: 'Controleer alle berekeningen met transparante auditinformatie.',
+    icon: FileText,
+    step: '3',
+    title: 'Facturen sturen',
+    description: 'Maak uw eerste factuur en verzend direct als PDF per e-mail.',
+  },
+  {
+    icon: Receipt,
+    step: '4',
+    title: 'Kosten en uren bijhouden',
+    description: 'Upload bonnetjes en registreer gewerkte uren per project.',
+  },
+  {
+    icon: FileCheck,
+    step: '5',
+    title: 'BTW controleren & indienen',
+    description: 'Controleer uw BTW-overzicht met volledige drilldown en dien in met vertrouwen.',
   },
 ]
 
 const testimonials = [
   {
-    quote:
-      'Ik factureer sneller en zie precies hoe mijn BTW is opgebouwd. Het geeft rust dat alles op één plek staat.',
-    author: 'Sanne V., ZZP marketeer',
+    quote: 'Eindelijk inzicht in mijn BTW zonder gedoe. Ik zie precies hoe elke rubriek is opgebouwd.',
+    author: 'ZZP-gebruiker',
+    role: 'Freelance marketeer',
   },
   {
-    quote:
-      'Voor ons kantoor is de combinatie van werkqueue en audit trail erg waardevol. We houden beter grip op deadlines.',
-    author: 'Teamlead, klein administratiekantoor',
+    quote: 'De werkqueue en het audittrail geven ons kantoor echt grip op deadlines en kwaliteit.',
+    author: 'Accountant',
+    role: 'Klein administratiekantoor',
   },
   {
-    quote:
-      'Als freelancer wil ik geen complex systeem. Dit platform is duidelijk, mobiel en professioneel.',
-    author: 'Ruben D., freelance developer',
+    quote: 'Eenvoudig, mobiel en professioneel. Ik gebruik het dagelijks op mijn telefoon.',
+    author: 'Klein bedrijf',
+    role: 'Zelfstandig ondernemer',
   },
 ]
 
@@ -137,7 +153,7 @@ export const LandingPage = () => {
       }
       tag.setAttribute(
         'content',
-        'Boekhouden en compliance in één slim platform voor ZZP’ers en accountants. Start met 1 maand gratis, daarna €6,95 per maand voor ZZP.',
+        "Boekhouden en compliance in één slim platform voor ZZP'ers en accountants. Start met 30 dagen gratis, daarna €6,95 per maand voor ZZP.",
       )
     }
 
@@ -149,10 +165,12 @@ export const LandingPage = () => {
     { name: 'Voor accountants', href: '#voor-accountants' },
     { name: 'Hoe werkt het', href: '#hoe-werkt-het' },
     { name: 'Prijzen', href: '#prijzen' },
+    { name: 'FAQ', href: '#faq' },
   ]
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* Navigation */}
       <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <span className="text-lg font-bold text-primary sm:text-xl">Smart Accounting</span>
@@ -194,33 +212,41 @@ export const LandingPage = () => {
         )}
       </nav>
 
+      {/* Hero */}
       <section className="relative overflow-hidden border-b border-primary/10">
-        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/15 via-background to-emerald-700/10" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/15 via-background to-accent/10" />
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
           <div className="mx-auto max-w-4xl text-center">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
+              <Star className="h-3 w-3" />
+              30 dagen gratis uitproberen — geen creditcard vereist
+            </div>
             <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">Boekhouden en compliance in één slim platform</h1>
             <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">
-              Voor ZZP’ers én accountants. Facturen, uren, BTW, audit en PKI — alles geïntegreerd.
+              Voor ZZP'ers én accountants. Facturen, uren, BTW-overzicht, samenwerking en audit — volledig geïntegreerd.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button size="lg" className="w-full max-w-sm sm:w-auto" onClick={() => navigateTo('/login')}>
-                Start 1 maand gratis
+                Start gratis proefperiode
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
               <Button size="lg" variant="outline" className="w-full max-w-sm sm:w-auto" onClick={() => scrollToSection('voor-accountants')}>
                 Ik ben accountant
               </Button>
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">Daarna €6,95 per maand. Geen verplichtingen.</p>
-            <p className="mt-2 text-sm font-medium text-primary">Binnen 60 seconden gestart.</p>
+            <p className="mt-3 text-sm text-muted-foreground">30 dagen gratis, daarna €6,95 per maand. Geen verplichtingen.</p>
+            <p className="mt-2 text-sm font-medium" style={{ color: 'var(--accent2)' }}>Binnen 60 seconden gestart.</p>
           </div>
         </div>
       </section>
 
+      {/* For ZZP */}
       <section id="voor-zzp" className="py-14 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-8 sm:mb-10">
-            <h2 className="text-2xl font-bold sm:text-4xl">Alles wat een ZZP’er nodig heeft</h2>
+            <p className="text-sm font-semibold text-accent uppercase tracking-wider mb-2">Voor ZZP'ers</p>
+            <h2 className="text-2xl font-bold sm:text-4xl">Alles wat een ZZP'er nodig heeft</h2>
+            <p className="mt-3 text-muted-foreground max-w-2xl">Van eerste factuur tot kwartaalaangifte: alles in één overzichtelijk platform.</p>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
             {zzpFeatures.map((feature) => {
@@ -228,7 +254,7 @@ export const LandingPage = () => {
               return (
                 <Card key={feature.title} className="border-border/80">
                   <CardHeader>
-                    <div className="mb-2 text-emerald-600">
+                    <div className="mb-2 text-accent">
                       <Icon className="h-6 w-6" />
                     </div>
                     <CardTitle className="text-lg">{feature.title}</CardTitle>
@@ -243,19 +269,35 @@ export const LandingPage = () => {
           <div className="mt-8">
             <Button size="lg" onClick={() => navigateTo('/login')}>
               Start gratis proefperiode
+              <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </div>
         </div>
       </section>
 
+      {/* For Accountants */}
       <section id="voor-accountants" className="bg-muted/40 py-14 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold sm:text-4xl">Platform voor accountants</h2>
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {accountantModules.map((module) => (
-              <div key={module} className="flex items-center gap-3 rounded-lg border border-border bg-background p-4">
-                <Briefcase className="h-5 w-5 text-emerald-600" />
-                <span className="text-sm font-medium">{module}</span>
+          <div className="mb-8">
+            <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-2">Voor accountants &amp; kantoren</p>
+            <h2 className="text-2xl font-bold sm:text-4xl">Platform voor accountants</h2>
+            <p className="mt-3 text-muted-foreground max-w-2xl">
+              Beheer meerdere klantdossiers, houd grip op deadlines en werk efficiënt samen met uw ZZP-klanten.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {accountantFeatures.map((feature) => (
+              <div key={feature.title} className="flex flex-col gap-2 rounded-lg border border-border bg-background p-4">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-sm font-medium">
+                    {feature.title}
+                    {feature.beta && (
+                      <span className="ml-2 text-xs text-muted-foreground font-normal">(Coming soon)</span>
+                    )}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -267,22 +309,29 @@ export const LandingPage = () => {
         </div>
       </section>
 
+      {/* How it works */}
       <section id="hoe-werkt-het" className="py-14 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold sm:text-4xl">Hoe werkt het?</h2>
-          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <h2 className="text-2xl font-bold sm:text-4xl mb-2">Hoe werkt het?</h2>
+          <p className="text-muted-foreground mb-10">In 5 stappen van aanmelding tot BTW-aangifte.</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {steps.map((step) => {
               const Icon = step.icon
               return (
                 <Card key={step.title} className="border-border/80">
                   <CardHeader>
-                    <div className="mb-2 text-emerald-600">
-                      <Icon className="h-6 w-6" />
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                        {step.step}
+                      </span>
                     </div>
-                    <CardTitle className="text-lg">{step.title}</CardTitle>
+                    <div className="mb-1 text-accent">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <CardTitle className="text-sm">{step.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription>{step.description}</CardDescription>
+                    <CardDescription className="text-xs">{step.description}</CardDescription>
                   </CardContent>
                 </Card>
               )
@@ -291,15 +340,24 @@ export const LandingPage = () => {
         </div>
       </section>
 
+      {/* Testimonials */}
       <section className="bg-muted/40 py-14 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold sm:text-4xl">Wat zeggen gebruikers</h2>
-          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <h2 className="text-2xl font-bold sm:text-4xl mb-10">Wat zeggen gebruikers</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {testimonials.map((item) => (
               <Card key={item.author} className="border-border/80">
                 <CardContent className="pt-6">
-                  <p className="text-sm text-muted-foreground">“{item.quote}”</p>
-                  <p className="mt-4 text-sm font-semibold">{item.author}</p>
+                  <div className="flex gap-0.5 mb-3">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="h-3.5 w-3.5" style={{ color: 'var(--accent2)', fill: 'var(--accent2)' }} />
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground">"{item.quote}"</p>
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold">{item.author}</p>
+                    <p className="text-xs text-muted-foreground">{item.role}</p>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -307,6 +365,7 @@ export const LandingPage = () => {
         </div>
       </section>
 
+      {/* Why this platform */}
       <section className="py-14 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl font-bold sm:text-4xl">Waarom dit platform?</h2>
@@ -316,7 +375,7 @@ export const LandingPage = () => {
               return (
                 <Card key={usp.title} className="border-border/80">
                   <CardHeader>
-                    <div className="mb-2 text-emerald-600">
+                    <div className="mb-2 text-accent">
                       <Icon className="h-5 w-5" />
                     </div>
                     <CardTitle className="text-lg">{usp.title}</CardTitle>
@@ -328,21 +387,27 @@ export const LandingPage = () => {
         </div>
       </section>
 
+      {/* Pricing */}
       <section id="prijzen" className="bg-gradient-to-b from-primary/5 to-muted/30 py-14 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold sm:text-center sm:text-4xl">Prijzen</h2>
+          <h2 className="text-2xl font-bold sm:text-center sm:text-4xl mb-2">Prijzen</h2>
+          <p className="text-muted-foreground sm:text-center mb-10">Eenvoudig en transparant — geen verborgen kosten.</p>
           <div className="mx-auto mt-8 grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-2">
-            <Card className="border-primary/50 shadow-lg">
+            <Card className="border-primary/50 shadow-lg relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary to-accent" />
               <CardHeader>
                 <CardTitle className="text-2xl">ZZP</CardTitle>
-                <p className="text-2xl font-bold text-primary">€0 eerste maand</p>
-                <p className="text-muted-foreground">Daarna €6,95 / maand</p>
+                <div>
+                  <p className="text-3xl font-bold text-primary">Gratis</p>
+                  <p className="text-sm text-muted-foreground">eerste 30 dagen</p>
+                </div>
+                <p className="text-lg font-semibold">Daarna €6,95 <span className="text-sm font-normal text-muted-foreground">/ maand</span></p>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm">
-                  {['Facturatie', 'Uren', 'BTW', 'Audit', 'Bankimport', 'Mobiele app'].map((item) => (
+                  {['Facturatie & klantbeheer', 'Urenregistratie', 'BTW-overzicht met drilldown', 'Uitgaven & bonnetjes', 'Bankimport', 'Mobiele app (PWA)', 'Accountant uitnodigen'].map((item) => (
                     <li key={item} className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-emerald-600" />
+                      <CheckCircle className="h-4 w-4 text-accent shrink-0" />
                       {item}
                     </li>
                   ))}
@@ -350,7 +415,8 @@ export const LandingPage = () => {
               </CardContent>
               <CardFooter>
                 <Button className="w-full" onClick={() => navigateTo('/login')}>
-                  Start 1 maand gratis
+                  Start 30 dagen gratis
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </CardFooter>
             </Card>
@@ -358,13 +424,14 @@ export const LandingPage = () => {
             <Card className="border-border/80">
               <CardHeader>
                 <CardTitle className="text-2xl">Accountant</CardTitle>
-                <p className="text-xl font-semibold">Contact voor prijs</p>
+                <p className="text-xl font-semibold">Op aanvraag</p>
+                <p className="text-sm text-muted-foreground">Prijsafspraken op basis van klantvolume.</p>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm">
-                  {accountantModules.slice(0, 6).map((item) => (
+                  {['Multi-client hub', 'Werkqueue & beoordelingslijst', 'Audittrail & compliance', 'Periodebeheer', 'BTW-traceerbaarheid', 'Klantuitnodigingen'].map((item) => (
                     <li key={item} className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-emerald-600" />
+                      <CheckCircle className="h-4 w-4 text-primary shrink-0" />
                       {item}
                     </li>
                   ))}
@@ -380,39 +447,33 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      <footer id="contact" className="border-t border-border bg-muted/50">
-        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
-          <div>
-            <span className="text-xl font-bold text-primary">Smart Accounting</span>
-            <p className="mt-3 text-sm text-muted-foreground">Smart Accounting — Compliance Operating System.</p>
-          </div>
-          <div className="space-y-3 text-sm">
-            <p className="font-medium">Over ons</p>
-            <a href="mailto:info@smartaccounting.nl" className="block text-muted-foreground hover:text-foreground">
-              Contact
-            </a>
-            <a href="#" className="block text-muted-foreground hover:text-foreground">
-              Support
-            </a>
-          </div>
-          <div className="space-y-3 text-sm">
-            <a href="#" className="block text-muted-foreground hover:text-foreground">
-              Privacybeleid
-            </a>
-            <a href="#" className="block text-muted-foreground hover:text-foreground">
-              Algemene voorwaarden
-            </a>
-          </div>
-          <div className="space-y-3 text-sm">
-            <a href="#" className="block text-muted-foreground hover:text-foreground">
-              API
-            </a>
-            <a href="#" className="block text-muted-foreground hover:text-foreground">
-              Security
-            </a>
+      {/* FAQ */}
+      <FaqSection />
+
+      {/* Final CTA */}
+      <section className="bg-gradient-to-br from-primary/10 via-background to-accent/5 py-14 sm:py-20 border-t border-primary/10">
+        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+          <h2 className="text-2xl font-bold sm:text-4xl">Klaar om te beginnen?</h2>
+          <p className="mt-4 text-muted-foreground">
+            Start vandaag nog met uw gratis proefperiode van 30 dagen. Geen creditcard, geen verplichtingen.
+          </p>
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Button size="lg" onClick={() => navigateTo('/login')}>
+              Start gratis proefperiode
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+            <Button size="lg" variant="outline" onClick={() => scrollToSection('contact')}>
+              Neem contact op
+            </Button>
           </div>
         </div>
-      </footer>
+      </section>
+
+      {/* Footer */}
+      <MarketingFooter />
+
+      {/* Cookie Banner */}
+      <CookieBanner />
     </div>
   )
 }

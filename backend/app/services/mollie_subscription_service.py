@@ -676,10 +676,18 @@ class MollieSubscriptionService:
         # Determine event type and resource
         resource_id = payment_id or subscription_id
         event_type = "payment" if payment_id else "subscription"
-        
+        event_id = f"{event_type}_{resource_id}"
+
         if not resource_id:
             raise ValueError("Either payment_id or subscription_id must be provided")
-        
+
+        logger.info(
+            "Mollie webhook processing start: event_id=%s event_type=%s resource_id=%s",
+            event_id,
+            event_type,
+            resource_id,
+        )
+
         # Check if already processed (idempotency)
         result = await db.execute(
             select(WebhookEvent)
@@ -689,8 +697,12 @@ class MollieSubscriptionService:
         existing_event = result.scalar_one_or_none()
         
         if existing_event:
-            logger.info(f"Webhook event already processed: {resource_id}")
-            return {"status": "already_processed"}
+            logger.info(
+                "Mollie webhook already processed: event_id=%s resource_id=%s",
+                event_id,
+                resource_id,
+            )
+            return {"status": "already_processed", "event_id": event_id}
         
         # Fetch resource from Mollie
         async with MollieClient() as mollie:
@@ -706,8 +718,12 @@ class MollieSubscriptionService:
                 sub = sub_result.scalar_one_or_none()
                 
                 if not sub or not sub.provider_customer_id:
-                    logger.error(f"Subscription not found for webhook: {subscription_id}")
-                    return {"status": "subscription_not_found"}
+                    logger.error(
+                        "Mollie webhook subscription not found: event_id=%s subscription_id=%s",
+                        event_id,
+                        subscription_id,
+                    )
+                    return {"status": "subscription_not_found", "event_id": event_id}
                 
                 resource_data = await mollie.get_subscription(
                     customer_id=sub.provider_customer_id,
@@ -717,7 +733,7 @@ class MollieSubscriptionService:
         # Record webhook event (use resource_id + event_type for idempotency)
         webhook_event = WebhookEvent(
             provider="mollie",
-            event_id=f"{event_type}_{resource_id}",
+            event_id=event_id,
             event_type=event_type,
             resource_id=resource_id,
             payload=json.dumps(resource_data)[:5000],  # Truncate if needed
@@ -731,8 +747,23 @@ class MollieSubscriptionService:
             await self._process_subscription_webhook(db, resource_data)
         
         await db.commit()
-        
-        return {"status": "processed"}
+
+        # For payment webhooks: resource_data is the payment object whose
+        # 'subscriptionId' field carries the Mollie subscription ID.
+        # For subscription webhooks: resource_data is the subscription object
+        # and 'id' is the subscription ID itself.
+        mollie_sub_id = resource_data.get("subscriptionId") or resource_data.get("id")
+        resulting_status = resource_data.get("status")
+        logger.info(
+            "Mollie webhook processing complete: event_id=%s event_type=%s "
+            "subscription_id=%s resulting_status=%s",
+            event_id,
+            event_type,
+            mollie_sub_id,
+            resulting_status,
+        )
+
+        return {"status": "processed", "event_id": event_id}
     
     async def _process_payment_webhook(
         self,

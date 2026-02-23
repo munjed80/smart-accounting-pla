@@ -41,17 +41,25 @@ def verify_mollie_webhook(request: Request, x_mollie_signature: str = Header(Non
         logger.error("MOLLIE_WEBHOOK_SECRET not configured - rejecting webhook")
         return False
     
-    # Check query parameter for secret (simple approach)
-    secret_param = request.query_params.get("secret")
+    # Check query parameter for secret (Mollie uses a URL-embedded secret)
+    secret_param = request.query_params.get("secret", "")
     
     if secret_param == webhook_secret:
         return True
     
-    # Could also check x_mollie_signature header if Mollie provides signature verification
-    # For now, we rely on the secret query parameter
-    
     logger.warning("Mollie webhook verification failed - invalid secret")
     return False
+
+
+@router.get("/webhooks/mollie")
+async def mollie_webhook_probe(request: Request):
+    """
+    Lightweight probe for the Mollie webhook endpoint.
+
+    Mollie may perform a GET probe when the webhook URL is first registered.
+    Returns 200 so the URL passes validation. Real events arrive via POST.
+    """
+    return {"message": "Webhook endpoint ready; use POST"}
 
 
 @router.post("/webhooks/mollie")
@@ -61,14 +69,14 @@ async def mollie_webhook(
 ):
     """
     Handle Mollie webhook events.
-    
-    Mollie sends webhook notifications for payment and subscription status changes.
-    This endpoint processes those notifications and updates our database accordingly.
-    
-    Query parameters:
-        id: The ID of the Mollie resource (payment or subscription)
-        secret: Webhook verification secret (optional, for extra security)
-    
+
+    Mollie sends webhook notifications for payment and subscription status changes
+    as an HTTP POST with an application/x-www-form-urlencoded body containing
+    the ``id`` of the resource (payment or subscription).
+
+    The ``secret`` verification token is expected as a URL query parameter
+    (embedded in the webhook URL registered with Mollie).
+
     Returns:
         200 OK if webhook is processed successfully
     """
@@ -81,12 +89,21 @@ async def mollie_webhook(
             status_code=401,
             detail={"code": "INVALID_WEBHOOK", "message": "Webhook verification failed"}
         )
-    
-    # Get resource ID from query parameters (Mollie standard)
-    resource_id = request.query_params.get("id")
-    
+
+    # Mollie sends the resource ID in the form-encoded request body (id=tr_xxx).
+    # Fall back to a query parameter so existing test tooling still works.
+    resource_id: str | None = None
+    try:
+        form_data = await request.form()
+        resource_id = str(form_data.get("id") or "") or None
+    except Exception:
+        pass
+
     if not resource_id:
-        logger.error("Mollie webhook missing 'id' parameter")
+        resource_id = request.query_params.get("id")
+
+    if not resource_id:
+        logger.error("Mollie webhook missing 'id' parameter (body and query)")
         raise HTTPException(
             status_code=400,
             detail={"code": "MISSING_ID", "message": "Webhook missing resource ID"}
@@ -102,7 +119,14 @@ async def mollie_webhook(
             status_code=400,
             detail={"code": "UNKNOWN_RESOURCE", "message": "Unknown resource type"}
         )
-    
+
+    event_type = "payment" if payment_id else "subscription"
+    logger.info(
+        "Mollie webhook received: event_type=%s resource_id=%s",
+        event_type,
+        resource_id,
+    )
+
     try:
         # Process webhook
         result = await mollie_subscription_service.process_webhook(
@@ -110,19 +134,33 @@ async def mollie_webhook(
             payment_id=payment_id,
             subscription_id=subscription_id,
         )
-        
-        logger.info(f"Mollie webhook processed: {resource_id}, result={result}")
+
+        logger.info(
+            "Mollie webhook completed: event_type=%s resource_id=%s result_status=%s",
+            event_type,
+            resource_id,
+            result.get("status"),
+        )
         
         return {"status": "ok", "result": result}
     
     except MollieError as e:
-        logger.error(f"Mollie error processing webhook: {e}")
+        logger.error(
+            "Mollie webhook error: event_type=%s resource_id=%s error=%s",
+            event_type,
+            resource_id,
+            e,
+        )
         raise HTTPException(
             status_code=500,
             detail={"code": "MOLLIE_ERROR", "message": str(e)}
         )
     except Exception as e:
-        logger.exception(f"Error processing Mollie webhook: {e}")
+        logger.exception(
+            "Mollie webhook unexpected error: event_type=%s resource_id=%s",
+            event_type,
+            resource_id,
+        )
         raise HTTPException(
             status_code=500,
             detail={"code": "WEBHOOK_ERROR", "message": "Failed to process webhook"}

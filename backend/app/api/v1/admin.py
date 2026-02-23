@@ -526,3 +526,158 @@ async def impersonate_user(
     )
 
     return ImpersonateResponse(access_token=token, impersonated_user_id=user.id)
+
+
+# ---------------------------------------------------------------------------
+# Mollie verification helpers (super_admin only)
+# ---------------------------------------------------------------------------
+
+class MollieWebhookConfigResponse(BaseModel):
+    mollie_enabled: bool
+    mode: str  # "TEST", "LIVE", "UNKNOWN", or "DISABLED"
+    webhook_url_masked: str | None  # secret replaced with ***
+    webhook_secret_configured: bool
+    app_public_url: str | None
+    route_path: str = "/api/v1/webhooks/mollie"
+    probe_instructions: str = (
+        "Send GET /api/v1/webhooks/mollie to verify the route is reachable. "
+        "Mollie events arrive via POST with form body id=<payment_id>."
+    )
+
+
+class MollieSubscriptionInfoResponse(BaseModel):
+    administration_id: UUID
+    subscription_id: UUID | None
+    status: str | None
+    provider: str | None
+    provider_customer_id: str | None
+    provider_subscription_id: str | None
+    trial_start_at: datetime | None
+    trial_end_at: datetime | None
+    current_period_start: datetime | None
+    current_period_end: datetime | None
+    cancel_at_period_end: bool | None
+    next_payment_date: datetime | None
+
+
+@router.get("/mollie/webhook-config", response_model=MollieWebhookConfigResponse)
+async def get_mollie_webhook_config(
+    super_admin: SuperAdminUser,
+):
+    """
+    Return computed Mollie webhook config for verification (secret masked).
+
+    Useful for confirming APP_PUBLIC_URL, the webhook path, and whether the
+    MOLLIE_WEBHOOK_SECRET is configured without exposing the secret itself.
+    """
+    from app.core.config import settings as cfg
+
+    enabled = cfg.mollie_enabled
+    api_key_prefix = (cfg.MOLLIE_API_KEY or "")[:5]
+    if not enabled:
+        mode = "DISABLED"
+    elif api_key_prefix == "live_":
+        mode = "LIVE"
+    elif api_key_prefix == "test_":
+        mode = "TEST"
+    else:
+        mode = "UNKNOWN"
+
+    secret_configured = bool(cfg.MOLLIE_WEBHOOK_SECRET)
+    public_url = cfg.APP_PUBLIC_URL or cfg.APP_URL
+    if public_url.endswith("/"):
+        public_url = public_url[:-1]
+
+    if secret_configured:
+        webhook_url_masked = f"{public_url}/api/v1/webhooks/mollie?secret=***"
+    elif enabled:
+        webhook_url_masked = f"{public_url}/api/v1/webhooks/mollie"
+    else:
+        webhook_url_masked = None
+
+    logger.info(
+        "Admin requested Mollie webhook config",
+        extra={"event": "admin_mollie_webhook_config", "user_id": str(super_admin.id)},
+    )
+
+    return MollieWebhookConfigResponse(
+        mollie_enabled=enabled,
+        mode=mode,
+        webhook_url_masked=webhook_url_masked,
+        webhook_secret_configured=secret_configured,
+        app_public_url=cfg.APP_PUBLIC_URL,
+    )
+
+
+@router.get(
+    "/mollie/subscriptions/{admin_id}",
+    response_model=MollieSubscriptionInfoResponse,
+)
+async def get_mollie_subscription_info(
+    admin_id: UUID,
+    super_admin: SuperAdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Return stored Mollie subscription fields for a given administration.
+
+    Shows provider_customer_id, provider_subscription_id and all relevant
+    date fields so admins can verify they match the Mollie dashboard after
+    activation.
+    """
+    administration = (
+        await db.execute(select(Administration).where(Administration.id == admin_id))
+    ).scalar_one_or_none()
+    if not administration:
+        raise HTTPException(status_code=404, detail="Administration not found")
+
+    subscription = (
+        await db.execute(
+            select(Subscription)
+            .where(Subscription.administration_id == admin_id)
+            .order_by(Subscription.created_at.desc())
+        )
+    ).scalars().first()
+
+    if not subscription:
+        return MollieSubscriptionInfoResponse(
+            administration_id=admin_id,
+            subscription_id=None,
+            status=None,
+            provider=None,
+            provider_customer_id=None,
+            provider_subscription_id=None,
+            trial_start_at=None,
+            trial_end_at=None,
+            current_period_start=None,
+            current_period_end=None,
+            cancel_at_period_end=None,
+            next_payment_date=None,
+        )
+
+    # Best-effort next_payment_date
+    next_payment_date = subscription.current_period_end or subscription.trial_end_at
+
+    logger.info(
+        "Admin requested Mollie subscription info",
+        extra={
+            "event": "admin_mollie_subscription_info",
+            "user_id": str(super_admin.id),
+            "administration_id": str(admin_id),
+        },
+    )
+
+    return MollieSubscriptionInfoResponse(
+        administration_id=admin_id,
+        subscription_id=subscription.id,
+        status=subscription.status.value if subscription.status else None,
+        provider=subscription.provider,
+        provider_customer_id=subscription.provider_customer_id,
+        provider_subscription_id=subscription.provider_subscription_id,
+        trial_start_at=subscription.trial_start_at,
+        trial_end_at=subscription.trial_end_at,
+        current_period_start=subscription.current_period_start,
+        current_period_end=subscription.current_period_end,
+        cancel_at_period_end=subscription.cancel_at_period_end,
+        next_payment_date=next_payment_date,
+    )

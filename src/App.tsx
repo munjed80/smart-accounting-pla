@@ -13,6 +13,9 @@ import { LandingPage } from '@/pages/LandingPage'
 import { PrivacyPage } from '@/pages/PrivacyPage'
 import { CookiesPage } from '@/pages/CookiesPage'
 import { TermsPage } from '@/pages/TermsPage'
+import { DisclaimerPage } from '@/pages/DisclaimerPage'
+import { ContactPage } from '@/pages/ContactPage'
+import { HelpPage } from '@/pages/HelpPage'
 import { SmartDashboard } from '@/components/SmartDashboard'
 import { AccountantHomePage } from '@/components/AccountantHomePage'
 import { AccountantReviewQueuePage } from '@/components/AccountantReviewQueuePage'
@@ -85,7 +88,9 @@ type Route =
   | { type: 'onboarding' }
   | { type: 'accountant-onboarding' }
   | { type: 'app'; path: string }
-  | { type: 'legal'; page: 'privacy' | 'cookies' | 'terms' }
+  | { type: 'legal'; page: 'privacy' | 'cookies' | 'terms' | 'disclaimer' }
+  | { type: 'contact' }
+  | { type: 'help' }
   | { type: 'client-dossier'; clientId: string; tab: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'bookkeeping' | 'periods' | 'decisions' | 'audit' | 'commitments' }
   | { type: 'bulk-operations-history' }
   | { type: 'bank-reconciliation' }
@@ -136,6 +141,18 @@ const getRouteFromURL = (): Route => {
   
   if (path === '/terms') {
     return { type: 'legal', page: 'terms' }
+  }
+  
+  if (path === '/disclaimer') {
+    return { type: 'legal', page: 'disclaimer' }
+  }
+  
+  if (path === '/contact') {
+    return { type: 'contact' }
+  }
+  
+  if (path === '/help' || path === '/faq') {
+    return { type: 'help' }
   }
   
   if (path === '/onboarding') {
@@ -417,6 +434,15 @@ const AppContent = () => {
     if (route.page === 'privacy') return <PrivacyPage />
     if (route.page === 'cookies') return <CookiesPage />
     if (route.page === 'terms') return <TermsPage />
+    if (route.page === 'disclaimer') return <DisclaimerPage />
+  }
+
+  if (route.type === 'contact') {
+    return <ContactPage />
+  }
+
+  if (route.type === 'help') {
+    return <HelpPage />
   }
 
 

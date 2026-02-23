@@ -39,8 +39,11 @@ export const HoeWerktHetSection = () => {
     <section id="hoe-werkt-het" className="border-b border-border/60 py-14 sm:py-20" style={{ background: 'hsl(var(--background))' }}>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-10 text-center">
+          <p className="text-sm font-semibold text-accent uppercase tracking-wider mb-2">Stap voor stap</p>
           <h2 className="text-2xl font-bold sm:text-4xl">Hoe werkt het?</h2>
-          <p className="mt-3 text-muted-foreground">Van aanmelden tot samenwerken — in vijf eenvoudige stappen.</p>
+          <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
+            Van uw eerste aanmelding tot naadloze samenwerking met uw accountant — in vijf doordachte stappen volledig ingericht voor uw administratie.
+          </p>
         </div>
 
         {/* Step cards — horizontal on desktop, vertical on mobile */}

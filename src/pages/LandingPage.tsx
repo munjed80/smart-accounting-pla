@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import {
   ArrowRight,
   Briefcase,
-  Building2,
   CalendarDays,
   CheckCircle,
   ClipboardList,
@@ -23,7 +22,6 @@ import {
   Smartphone,
   Star,
   UserCheck,
-  UserPlus,
   Users,
   Wallet,
   X,
@@ -33,6 +31,7 @@ import {
 import { MarketingFooter } from '@/components/marketing/Footer'
 import { CookieBanner } from '@/components/marketing/CookieBanner'
 import { FaqSection } from '@/components/marketing/FaqSection'
+import { HoeWerktHetSection } from '@/components/HoeWerktHetSection'
 
 const scrollToSection = (id: string) => {
   const section = document.getElementById(id)
@@ -87,27 +86,6 @@ const accountantFeatures = [
   { icon: History, title: 'Audit trail', description: 'Automatische vastlegging van alle acties voor compliance en dossiervorming.' },
   { icon: GitBranch, title: 'Bank matching/reconciliatie', description: 'Koppel bankregels aan boekingen en werk efficiënt met bankimport.', beta: true },
   { icon: Key, title: 'PKI-ondertekening', description: 'Digitale handtekening voor documenten (voorbereid voor toekomstige certificering).', beta: true },
-]
-
-const steps = [
-  {
-    icon: UserPlus,
-    step: '1',
-    title: 'Maak account aan',
-    description: 'Maak binnen een minuut een gratis account aan — geen creditcard vereist.',
-  },
-  {
-    icon: Building2,
-    step: '2',
-    title: 'Voeg klanten, facturen of uren toe',
-    description: 'Voer uw bedrijfsgegevens in en voeg uw eerste klant, factuur of urenboeking toe, of importeer bestaande data.',
-  },
-  {
-    icon: FileCheck,
-    step: '3',
-    title: 'Dien BTW in en werk samen',
-    description: 'Controleer uw BTW-overzicht met volledige drilldown en nodig uw boekhouder uit om samen te werken.',
-  },
 ]
 
 const testimonials = [
@@ -253,31 +231,8 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* Zo werkt het — inline 3-step under hero */}
-      <section className="border-b border-border/60 bg-muted/20 py-10 sm:py-12">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-center text-base font-semibold text-muted-foreground mb-6 uppercase tracking-wider">Zo werkt het</h2>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-            {steps.map((step) => {
-              const Icon = step.icon
-              return (
-                <div key={step.step} className="flex flex-col items-center text-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 border border-primary/30">
-                    <Icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <div className="inline-flex items-center gap-1.5 mb-1">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{step.step}</span>
-                      <p className="text-sm font-semibold">{step.title}</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{step.description}</p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
+      {/* Hoe werkt het — 5-step infographic */}
+      <HoeWerktHetSection />
 
       {/* For ZZP */}
       <section id="voor-zzp" className="py-14 sm:py-20">

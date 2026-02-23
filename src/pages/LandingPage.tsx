@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import {
   ArrowRight,
   Briefcase,
-  Building2,
   CalendarDays,
   CheckCircle,
   ClipboardList,
@@ -23,7 +22,6 @@ import {
   Smartphone,
   Star,
   UserCheck,
-  UserPlus,
   Users,
   Wallet,
   X,
@@ -89,26 +87,6 @@ const accountantFeatures = [
   { icon: Key, title: 'PKI-ondertekening', description: 'Digitale handtekening voor documenten (voorbereid voor toekomstige certificering).', beta: true },
 ]
 
-const steps = [
-  {
-    icon: UserPlus,
-    step: '1',
-    title: 'Maak account aan',
-    description: 'Maak binnen een minuut een gratis account aan — geen creditcard vereist.',
-  },
-  {
-    icon: Building2,
-    step: '2',
-    title: 'Voeg klanten, facturen of uren toe',
-    description: 'Voer uw bedrijfsgegevens in en voeg uw eerste klant, factuur of urenboeking toe, of importeer bestaande data.',
-  },
-  {
-    icon: FileCheck,
-    step: '3',
-    title: 'Dien BTW in en werk samen',
-    description: 'Controleer uw BTW-overzicht met volledige drilldown en nodig uw boekhouder uit om samen te werken.',
-  },
-]
 
 const testimonials = [
   {
@@ -163,6 +141,7 @@ export const LandingPage = () => {
   }, [])
 
   const navigation = [
+    { name: 'Hoe werkt het?', href: '#hoe-werkt-het' },
     { name: 'Voor ZZP', href: '#voor-zzp' },
     { name: 'Voor accountants', href: '#voor-accountants' },
     { name: 'Prijzen', href: '#prijzen' },
@@ -253,29 +232,21 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* Zo werkt het — inline 3-step under hero */}
-      <section className="border-b border-border/60 bg-muted/20 py-10 sm:py-12">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-center text-base font-semibold text-muted-foreground mb-6 uppercase tracking-wider">Zo werkt het</h2>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-            {steps.map((step) => {
-              const Icon = step.icon
-              return (
-                <div key={step.step} className="flex flex-col items-center text-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 border border-primary/30">
-                    <Icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <div className="inline-flex items-center gap-1.5 mb-1">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{step.step}</span>
-                      <p className="text-sm font-semibold">{step.title}</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{step.description}</p>
-                  </div>
-                </div>
-              )
-            })}
+      {/* Hoe werkt het? — infographic */}
+      <section id="hoe-werkt-het" className="border-b border-border/60 bg-muted/10 py-10 sm:py-14">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-6 text-center">
+            <p className="text-sm font-semibold uppercase tracking-widest mb-2 text-primary">Hoe werkt het?</p>
+            <h2 className="text-2xl font-bold sm:text-3xl">In 5 stappen aan de slag</h2>
           </div>
+          <img
+            src="/hoe-werkt-het.png"
+            alt="Hoe werkt Smart Accounting? 5 stappen: Aanmelden, Administratie, Facturen & Uren, BTW & Overzicht, Samenwerken"
+            className="w-full rounded-xl shadow-lg"
+            width={2400}
+            height={1350}
+            loading="lazy"
+          />
         </div>
       </section>
 

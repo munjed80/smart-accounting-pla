@@ -10,14 +10,21 @@ import {
   CheckCircle,
   ClipboardList,
   Clock,
+  Download,
   FileCheck,
   FileText,
+  GitBranch,
+  History,
+  Key,
   Lock,
   Receipt,
+  Search,
   ShieldCheck,
   Smartphone,
   Star,
+  UserCheck,
   UserPlus,
+  Users,
   Wallet,
   X,
   Menu,
@@ -37,8 +44,13 @@ const scrollToSection = (id: string) => {
 const zzpFeatures = [
   {
     icon: FileText,
-    title: 'Facturen maken en versturen',
+    title: 'Facturen & betalingen',
     description: 'Professionele facturen, automatische BTW-berekening en directe e-mailverzending naar uw klanten.',
+  },
+  {
+    icon: Receipt,
+    title: 'Uitgaven & bonnen',
+    description: 'Upload bonnetjes, koppel aan kosten en zie ze direct terug in uw BTW-overzicht.',
   },
   {
     icon: Clock,
@@ -46,86 +58,76 @@ const zzpFeatures = [
     description: 'Registreer uren handmatig of via timer en zet ze direct om in factuurregels.',
   },
   {
-    icon: Receipt,
-    title: 'Uitgaven & bonnetjes',
-    description: 'Upload bonnetjes, koppel aan kosten en zie ze direct terug in uw BTW-overzicht.',
-  },
-  {
     icon: CalendarDays,
-    title: 'Klanten & agenda',
-    description: 'Beheer uw klantenbestand en houd grip op opdrachten en deadlines.',
+    title: 'Agenda',
+    description: 'Houd grip op opdrachten, deadlines en afspraken in uw geïntegreerde agenda.',
   },
   {
     icon: FileCheck,
-    title: 'BTW-overzicht met drilldown',
+    title: 'BTW-overzicht',
     description: 'Zie exact hoe elke rubriek wordt berekend — volledig transparant voor uw aangifte.',
   },
   {
-    icon: Smartphone,
-    title: 'Mobiel als app (PWA)',
-    description: 'Installeer op iOS en Android. Altijd toegankelijk, ook offline.',
+    icon: Download,
+    title: 'Exports (PDF/CSV/JSON)',
+    description: 'Exporteer facturen als PDF en uw volledige administratie als CSV of JSON voor archivering.',
+  },
+  {
+    icon: Users,
+    title: 'Klantenbeheer',
+    description: 'Beheer uw klantenbestand, klantgegevens en communicatiehistorie in één overzicht.',
   },
 ]
 
 const accountantFeatures = [
-  { title: 'Multi-client hub', description: 'Beheer alle klantdossiers vanuit één overzicht.' },
-  { title: 'Werkqueue', description: 'Prioriteer en verwerk openstaande taken per klant.' },
-  { title: 'BTW-traceerbaarheid', description: 'Volledig audittrail van rubriek tot bronboek.' },
-  { title: 'Periodebeheer', description: 'Sluit perioden af en voorkom terugwerkende aanpassingen.' },
-  { title: 'Beoordelingslijst', description: 'Review en goedkeur facturen en uitgaven van klanten.' },
-  { title: 'Bankreconciliatie', description: 'Koppel bankregels aan boekingen.', beta: true },
-  { title: 'PKI-ondertekening', description: 'Digitale handtekening voor documenten.', beta: true },
-  { title: 'Compliance logging', description: 'Automatische vastlegging van alle acties voor dossiervorming.' },
+  { icon: ClipboardList, title: 'Werklijst', description: 'Prioriteer en verwerk openstaande taken per klant vanuit één overzicht.' },
+  { icon: UserCheck, title: 'Te beoordelen', description: 'Review en keur facturen en uitgaven van klanten goed of stuur terug.' },
+  { icon: Briefcase, title: 'Dossier per klant', description: 'Volledig klantdossier met facturen, uitgaven, uren, BTW en perioden.' },
+  { icon: Search, title: 'BTW rubrieken drilldown', description: 'Van rubriek tot bronboeking met toewijzingsreden — volledige traceerbaarheid.' },
+  { icon: History, title: 'Audit trail', description: 'Automatische vastlegging van alle acties voor compliance en dossiervorming.' },
+  { icon: GitBranch, title: 'Bank matching/reconciliatie', description: 'Koppel bankregels aan boekingen en werk efficiënt met bankimport.', beta: true },
+  { icon: Key, title: 'PKI-ondertekening', description: 'Digitale handtekening voor documenten (voorbereid voor toekomstige certificering).', beta: true },
 ]
 
 const steps = [
   {
     icon: UserPlus,
     step: '1',
-    title: 'Account aanmaken (gratis)',
-    description: 'Maak binnen een minuut een account aan en start uw 30 dagen gratis proef.',
+    title: 'Maak account aan',
+    description: 'Maak binnen een minuut een gratis account aan — geen creditcard vereist.',
   },
   {
     icon: Building2,
     step: '2',
-    title: 'Uw administratie inrichten',
-    description: 'Voer uw bedrijfsgegevens, BTW-nummer en eerste klant in.',
-  },
-  {
-    icon: FileText,
-    step: '3',
-    title: 'Facturen sturen',
-    description: 'Maak uw eerste factuur en verzend direct als PDF per e-mail.',
-  },
-  {
-    icon: Receipt,
-    step: '4',
-    title: 'Kosten en uren bijhouden',
-    description: 'Upload bonnetjes en registreer gewerkte uren per project.',
+    title: 'Voeg klanten, facturen of uren toe',
+    description: 'Voer uw bedrijfsgegevens in en voeg uw eerste klant, factuur of urenboeking toe, of importeer bestaande data.',
   },
   {
     icon: FileCheck,
-    step: '5',
-    title: 'BTW controleren & indienen',
-    description: 'Controleer uw BTW-overzicht met volledige drilldown en dien in met vertrouwen.',
+    step: '3',
+    title: 'Dien BTW in en werk samen',
+    description: 'Controleer uw BTW-overzicht met volledige drilldown en nodig uw boekhouder uit om samen te werken.',
   },
 ]
 
 const testimonials = [
   {
     quote: 'Eindelijk inzicht in mijn BTW zonder gedoe. Ik zie precies hoe elke rubriek is opgebouwd.',
-    author: 'ZZP-gebruiker',
-    role: 'Freelance marketeer',
+    initials: 'M.V.',
+    author: 'M. Vermeer',
+    role: 'ZZP — Freelance ontwerper',
   },
   {
-    quote: 'De werkqueue en het audittrail geven ons kantoor echt grip op deadlines en kwaliteit.',
-    author: 'Accountant',
-    role: 'Klein administratiekantoor',
+    quote: 'De werkqueue en het audittrail geven ons kantoor echt grip op deadlines en kwaliteit. De drilldown per klant is een uitkomst.',
+    initials: 'R.H.',
+    author: 'R. Hendriks',
+    role: 'Boekhouder — Klein administratiekantoor',
   },
   {
-    quote: 'Eenvoudig, mobiel en professioneel. Ik gebruik het dagelijks op mijn telefoon.',
-    author: 'Klein bedrijf',
-    role: 'Zelfstandig ondernemer',
+    quote: 'Eenvoudig, mobiel en professioneel. Ik gebruik het dagelijks op mijn telefoon en verstuur facturen onderweg.',
+    initials: 'S.B.',
+    author: 'S. Bakker',
+    role: 'ZZP — Zelfstandig aannemer',
   },
 ]
 
@@ -163,9 +165,9 @@ export const LandingPage = () => {
   const navigation = [
     { name: 'Voor ZZP', href: '#voor-zzp' },
     { name: 'Voor accountants', href: '#voor-accountants' },
-    { name: 'Hoe werkt het', href: '#hoe-werkt-het' },
     { name: 'Prijzen', href: '#prijzen' },
     { name: 'FAQ', href: '#faq' },
+    { name: 'Help', href: '/help' },
   ]
 
   return (
@@ -225,17 +227,54 @@ export const LandingPage = () => {
             <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">
               Voor ZZP'ers én accountants. Facturen, uren, BTW-overzicht, samenwerking en audit — volledig geïntegreerd.
             </p>
+            {/* Dual audience value props */}
+            <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 max-w-2xl mx-auto text-left">
+              <div className="rounded-lg border border-accent/20 bg-accent/5 p-3">
+                <p className="text-xs font-semibold text-accent uppercase tracking-wider mb-1">Voor ZZP'ers</p>
+                <p className="text-xs text-muted-foreground">Facturen, uitgaven, uren, agenda, BTW-aangifte en export — alles in één app.</p>
+              </div>
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Voor accountants</p>
+                <p className="text-xs text-muted-foreground">Werklijst, audit trail, BTW-traceerbaarheid, PKI-signing en klantdossiers.</p>
+              </div>
+            </div>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button size="lg" className="w-full max-w-sm sm:w-auto" onClick={() => navigateTo('/login')}>
-                Start gratis proefperiode
+                Start gratis (30 dagen proefperiode)
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-              <Button size="lg" variant="outline" className="w-full max-w-sm sm:w-auto" onClick={() => scrollToSection('voor-accountants')}>
-                Ik ben accountant
+              <Button size="lg" variant="outline" className="w-full max-w-sm sm:w-auto" onClick={() => navigateTo('/login')}>
+                Inloggen
               </Button>
             </div>
             <p className="mt-3 text-sm text-muted-foreground">30 dagen gratis, daarna €6,95 per maand. Geen verplichtingen.</p>
             <p className="mt-2 text-sm font-medium" style={{ color: 'var(--accent2)' }}>Binnen 60 seconden gestart.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Zo werkt het — inline 3-step under hero */}
+      <section className="border-b border-border/60 bg-muted/20 py-10 sm:py-12">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <h2 className="text-center text-base font-semibold text-muted-foreground mb-6 uppercase tracking-wider">Zo werkt het</h2>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+            {steps.map((step) => {
+              const Icon = step.icon
+              return (
+                <div key={step.step} className="flex flex-col items-center text-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 border border-primary/30">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 mb-1">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{step.step}</span>
+                      <p className="text-sm font-semibold">{step.title}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{step.description}</p>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </section>
@@ -248,16 +287,16 @@ export const LandingPage = () => {
             <h2 className="text-2xl font-bold sm:text-4xl">Alles wat een ZZP'er nodig heeft</h2>
             <p className="mt-3 text-muted-foreground max-w-2xl">Van eerste factuur tot kwartaalaangifte: alles in één overzichtelijk platform.</p>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {zzpFeatures.map((feature) => {
               const Icon = feature.icon
               return (
                 <Card key={feature.title} className="border-border/80">
                   <CardHeader>
-                    <div className="mb-2 text-accent">
+                    <div className="mb-2" style={{ color: 'oklch(0.72 0.18 150)' }}>
                       <Icon className="h-6 w-6" />
                     </div>
-                    <CardTitle className="text-lg">{feature.title}</CardTitle>
+                    <CardTitle className="text-base">{feature.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <CardDescription>{feature.description}</CardDescription>
@@ -268,7 +307,7 @@ export const LandingPage = () => {
           </div>
           <div className="mt-8">
             <Button size="lg" onClick={() => navigateTo('/login')}>
-              Start gratis proefperiode
+              Start gratis (30 dagen proefperiode)
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </div>
@@ -286,56 +325,28 @@ export const LandingPage = () => {
             </p>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {accountantFeatures.map((feature) => (
-              <div key={feature.title} className="flex flex-col gap-2 rounded-lg border border-border bg-background p-4">
-                <div className="flex items-center gap-2">
-                  <Briefcase className="h-4 w-4 text-primary shrink-0" />
-                  <span className="text-sm font-medium">
-                    {feature.title}
-                    {feature.beta && (
-                      <span className="ml-2 text-xs text-muted-foreground font-normal">(Coming soon)</span>
-                    )}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">{feature.description}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-8">
-            <Button size="lg" variant="outline" onClick={() => scrollToSection('contact')}>
-              Neem contact op
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section id="hoe-werkt-het" className="py-14 sm:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold sm:text-4xl mb-2">Hoe werkt het?</h2>
-          <p className="text-muted-foreground mb-10">In 5 stappen van aanmelding tot BTW-aangifte.</p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {steps.map((step) => {
-              const Icon = step.icon
+            {accountantFeatures.map((feature) => {
+              const Icon = feature.icon
               return (
-                <Card key={step.title} className="border-border/80">
-                  <CardHeader>
-                    <div className="mb-2 flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                        {step.step}
-                      </span>
-                    </div>
-                    <div className="mb-1 text-accent">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <CardTitle className="text-sm">{step.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-xs">{step.description}</CardDescription>
-                  </CardContent>
-                </Card>
+                <div key={feature.title} className="flex flex-col gap-2 rounded-lg border border-border bg-background p-4">
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-sm font-medium">
+                      {feature.title}
+                      {feature.beta && (
+                        <span className="ml-2 text-xs text-muted-foreground font-normal">(coming soon)</span>
+                      )}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{feature.description}</p>
+                </div>
               )
             })}
+          </div>
+          <div className="mt-8">
+            <Button size="lg" variant="outline" onClick={() => navigateTo('/contact')}>
+              Contact opnemen
+            </Button>
           </div>
         </div>
       </section>
@@ -343,7 +354,7 @@ export const LandingPage = () => {
       {/* Testimonials */}
       <section className="bg-muted/40 py-14 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold sm:text-4xl mb-10">Wat zeggen gebruikers</h2>
+          <h2 className="text-2xl font-bold sm:text-4xl mb-10">Wat klanten zeggen</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {testimonials.map((item) => (
               <Card key={item.author} className="border-border/80">
@@ -354,9 +365,14 @@ export const LandingPage = () => {
                     ))}
                   </div>
                   <p className="text-sm text-muted-foreground">"{item.quote}"</p>
-                  <div className="mt-4">
-                    <p className="text-sm font-semibold">{item.author}</p>
-                    <p className="text-xs text-muted-foreground">{item.role}</p>
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary shrink-0">
+                      {item.initials}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold">{item.author}</p>
+                      <p className="text-xs text-muted-foreground">{item.role}</p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -438,8 +454,8 @@ export const LandingPage = () => {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button variant="outline" className="w-full" onClick={() => scrollToSection('contact')}>
-                  Neem contact op
+                <Button variant="outline" className="w-full" onClick={() => navigateTo('/contact')}>
+                  Contact opnemen
                 </Button>
               </CardFooter>
             </Card>
@@ -450,6 +466,18 @@ export const LandingPage = () => {
       {/* FAQ */}
       <FaqSection />
 
+      {/* Help / Startgids */}
+      <section className="py-14 sm:py-16 border-t border-border/60">
+        <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
+          <h2 className="text-xl font-bold sm:text-3xl mb-3">Hulp nodig om te starten?</h2>
+          <p className="text-muted-foreground mb-6 max-w-xl mx-auto">Onze uitgebreide startgids helpt u snel op weg — van account aanmaken tot BTW-aangifte.</p>
+          <Button variant="outline" size="lg" onClick={() => navigateTo('/help')}>
+            Bekijk de Startgids
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className="bg-gradient-to-br from-primary/10 via-background to-accent/5 py-14 sm:py-20 border-t border-primary/10">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
@@ -459,11 +487,11 @@ export const LandingPage = () => {
           </p>
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Button size="lg" onClick={() => navigateTo('/login')}>
-              Start gratis proefperiode
+              Start gratis (30 dagen proefperiode)
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            <Button size="lg" variant="outline" onClick={() => scrollToSection('contact')}>
-              Neem contact op
+            <Button size="lg" variant="outline" onClick={() => navigateTo('/contact')}>
+              Contact opnemen
             </Button>
           </div>
         </div>

@@ -118,6 +118,9 @@ export const nl = {
     didntReceiveEmail: "Geen e-mail ontvangen?",
     checkSpamFolder: "Controleer je spammap of probeer opnieuw met een ander e-mailadres.",
     tryAgain: "Opnieuw proberen",
+    noAccount: "Geen account?",
+    createAccountCta: "Maak er nu één aan",
+    trialInfo: "30 dagen gratis proefperiode. Daarna €6,95/maand.",
   },
 
   // Roles

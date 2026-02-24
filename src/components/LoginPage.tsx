@@ -18,7 +18,9 @@ interface LoginPageProps {
 
 export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   const { login, register, resendVerification, isLoading } = useAuth()
-  
+
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login')
+
   const [loginForm, setLoginForm] = useState({
     username: '',
     password: '',
@@ -173,7 +175,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
             </div>
           </div>
 
-          <Card className="bg-card/80 backdrop-blur-sm border-2 border-primary/20">
+          <Card className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
             <CardHeader className="text-center">
               <div className="flex justify-center mb-4">
                 <CheckCircle size={48} weight="fill" className="text-green-500" />
@@ -247,25 +249,25 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
       )}
       
       <div className={`relative w-full max-w-md ${isMisconfigured ? 'mt-24' : ''}`}>
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Database size={48} weight="duotone" className="text-primary" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Database size={36} weight="duotone" className="text-primary" />
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
               {t('brand.name')}
             </h1>
           </div>
-          <p className="text-muted-foreground">{t('brand.tagline')}</p>
+          <p className="text-sm text-muted-foreground">{t('brand.tagline')}</p>
         </div>
 
-        <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'register')} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
             <TabsTrigger value="login">{t('auth.login')}</TabsTrigger>
             <TabsTrigger value="register">{t('auth.register')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="login">
-            <Card className="bg-card/80 backdrop-blur-sm border-2 border-primary/20">
-              <CardHeader>
+            <Card className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
+              <CardHeader className="pb-4">
                 <CardTitle>{t('auth.welcomeBack')}</CardTitle>
                 <CardDescription>{t('auth.loginDescription')}</CardDescription>
               </CardHeader>
@@ -346,15 +348,13 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                     <div className="flex justify-between items-center">
                       <Label htmlFor="login-password">{t('auth.password')}</Label>
                       {onForgotPassword && (
-                        <Button
+                        <button
                           type="button"
-                          variant="link"
-                          size="sm"
-                          className="text-xs p-0 h-auto"
+                          className="text-xs text-muted-foreground underline-offset-4 hover:underline hover:text-foreground focus:underline focus:outline-none transition-colors"
                           onClick={onForgotPassword}
                         >
                           {t('auth.forgotPassword')}
-                        </Button>
+                        </button>
                       )}
                     </div>
                     <div className="relative">
@@ -375,13 +375,27 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                     {isLoading ? t('auth.loggingIn') : t('auth.login')}
                   </Button>
                 </form>
+
+                <div className="mt-5 text-center space-y-1">
+                  <p className="text-sm text-muted-foreground">
+                    {t('auth.noAccount')}{' '}
+                    <button
+                      type="button"
+                      className="text-primary underline-offset-4 hover:underline focus:underline focus:outline-none font-medium transition-colors"
+                      onClick={() => setActiveTab('register')}
+                    >
+                      {t('auth.createAccountCta')}
+                    </button>
+                  </p>
+                  <p className="text-xs text-muted-foreground/60">{t('auth.trialInfo')}</p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="register">
-            <Card className="bg-card/80 backdrop-blur-sm border-2 border-primary/20">
-              <CardHeader>
+            <Card className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
+              <CardHeader className="pb-4">
                 <CardTitle>{t('auth.createAccount')}</CardTitle>
                 <CardDescription>{t('auth.registerDescription')}</CardDescription>
               </CardHeader>

@@ -235,10 +235,10 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
-  // 8. Documenten (AI Upload + document status list)
+  // 8. Documenten (ZZP Document Inbox)
   {
     label: t('sidebar.documenten'),
-    tabValue: 'upload',
+    tabValue: 'documents',
     icon: <FileText size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',

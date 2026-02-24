@@ -16,6 +16,81 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 
+class ZZPDocType(str, Enum):
+    """Document type values for ZZP inbox."""
+    BON = "BON"
+    FACTUUR = "FACTUUR"
+    OVERIG = "OVERIG"
+
+
+class ZZPDocStatus(str, Enum):
+    """Document status values for ZZP inbox workflow."""
+    NEW = "NEW"
+    REVIEW = "REVIEW"
+    PROCESSED = "PROCESSED"
+    FAILED = "FAILED"
+
+
+class ZZPDocument(Base):
+    """
+    Document inbox for ZZP users.
+
+    Stores uploaded receipts and invoices (bon/factuur) before or after
+    they are converted into a ZZPExpense via the 'create-expense' workflow.
+
+    Workflow: NEW -> REVIEW -> PROCESSED (or FAILED)
+    """
+    __tablename__ = "zzp_documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    administration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("administrations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    # File metadata
+    filename: Mapped[str] = mapped_column(String(500), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    storage_ref: Mapped[str] = mapped_column(String(1000), nullable=False)
+
+    # Classification
+    doc_type: Mapped[ZZPDocType] = mapped_column(
+        SQLEnum(ZZPDocType), default=ZZPDocType.OVERIG, nullable=False
+    )
+    status: Mapped[ZZPDocStatus] = mapped_column(
+        SQLEnum(ZZPDocStatus), default=ZZPDocStatus.NEW, nullable=False, index=True
+    )
+
+    # Extracted fields (nullable, filled by OCR or user)
+    supplier: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    amount_cents: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    vat_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
+    doc_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    # Relationships
+    administration = relationship("Administration")
+    user = relationship("User")
+    expense = relationship("ZZPExpense", back_populates="document", uselist=False)
+
+
 class InvoiceStatus(str, Enum):
     """Invoice status values."""
     DRAFT = "draft"
@@ -394,6 +469,12 @@ class ZZPExpense(Base):
         index=True
     )
     period_key: Mapped[Optional[str]] = mapped_column(String(16), nullable=True, index=True)
+    document_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("zzp_documents.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -406,6 +487,7 @@ class ZZPExpense(Base):
     # Relationships
     administration = relationship("Administration")
     commitment = relationship("FinancialCommitment")
+    document = relationship("ZZPDocument", back_populates="expense", foreign_keys=[document_id])
 
 
 class ZZPTimeEntry(Base):

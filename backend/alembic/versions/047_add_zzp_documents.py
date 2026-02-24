@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy import text
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
@@ -19,11 +20,18 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Create enums
-    zzp_doc_type = sa.Enum('BON', 'FACTUUR', 'OVERIG', name='zzpdoctype')
-    zzp_doc_status = sa.Enum('NEW', 'REVIEW', 'PROCESSED', 'FAILED', name='zzpdocstatus')
-    zzp_doc_type.create(op.get_bind(), checkfirst=True)
-    zzp_doc_status.create(op.get_bind(), checkfirst=True)
+    bind = op.get_bind()
+
+    # Create zzpdoctype enum only if it does not already exist
+    if not bind.execute(text("SELECT 1 FROM pg_type WHERE typname='zzpdoctype'")).scalar():
+        op.execute("CREATE TYPE zzpdoctype AS ENUM ('BON','FACTUUR','OVERIG')")
+
+    # Create zzpdocstatus enum only if it does not already exist
+    if not bind.execute(text("SELECT 1 FROM pg_type WHERE typname='zzpdocstatus'")).scalar():
+        op.execute("CREATE TYPE zzpdocstatus AS ENUM ('NEW','REVIEW','PROCESSED','FAILED')")
+
+    doc_type_enum = postgresql.ENUM('BON', 'FACTUUR', 'OVERIG', name='zzpdoctype', create_type=False)
+    doc_status_enum = postgresql.ENUM('NEW', 'REVIEW', 'PROCESSED', 'FAILED', name='zzpdocstatus', create_type=False)
 
     # Create zzp_documents table
     op.create_table(
@@ -38,10 +46,8 @@ def upgrade() -> None:
         sa.Column('filename', sa.String(500), nullable=False),
         sa.Column('mime_type', sa.String(100), nullable=False),
         sa.Column('storage_ref', sa.String(1000), nullable=False),
-        sa.Column('doc_type', sa.Enum('BON', 'FACTUUR', 'OVERIG', name='zzpdoctype'),
-                  nullable=False, server_default='OVERIG'),
-        sa.Column('status', sa.Enum('NEW', 'REVIEW', 'PROCESSED', 'FAILED', name='zzpdocstatus'),
-                  nullable=False, server_default='NEW', index=True),
+        sa.Column('doc_type', doc_type_enum, nullable=False, server_default='OVERIG'),
+        sa.Column('status', doc_status_enum, nullable=False, server_default='NEW', index=True),
         sa.Column('supplier', sa.String(255), nullable=True),
         sa.Column('amount_cents', sa.Integer, nullable=True),
         sa.Column('vat_rate', sa.Numeric(5, 2), nullable=True),
@@ -64,5 +70,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_column('zzp_expenses', 'document_id')
     op.drop_table('zzp_documents')
-    sa.Enum(name='zzpdocstatus').drop(op.get_bind(), checkfirst=True)
-    sa.Enum(name='zzpdoctype').drop(op.get_bind(), checkfirst=True)

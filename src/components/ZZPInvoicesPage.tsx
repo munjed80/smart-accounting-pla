@@ -1233,6 +1233,7 @@ const InvoiceCard = ({
           <Select 
             value={invoice.status} 
             onValueChange={(value) => onStatusChange(value as 'sent' | 'paid' | 'cancelled')}
+            disabled={isUpdatingStatus || invoice.status === 'cancelled'}
           >
             <SelectTrigger className="w-auto border-0 p-0 h-auto focus:ring-0">
               <StatusBadge status={invoice.status} size="sm" />
@@ -1316,6 +1317,21 @@ const InvoiceCard = ({
                     <PaperPlaneTilt size={16} className="mr-2" />
                   )}
                   {t('zzpInvoices.sendInvoice')}
+                </DropdownMenuItem>
+              )}
+
+              {/* Cancel invoice - for draft invoices (backend supports draft → cancelled) */}
+              {invoice.status === 'draft' && (
+                <DropdownMenuItem onClick={(event) => {
+                  event.stopPropagation()
+                  onStatusChange('cancelled')
+                }} disabled={isUpdatingStatus} className="text-destructive focus:text-destructive">
+                  {isUpdatingStatus ? (
+                    <SpinnerGap size={16} className="mr-2 animate-spin" />
+                  ) : (
+                    <XCircle size={16} className="mr-2" />
+                  )}
+                  {t('zzpInvoices.statusCancelled')}
                 </DropdownMenuItem>
               )}
               
@@ -2322,6 +2338,7 @@ const ZZPInvoicesPageContent = () => {
                                 <Select 
                                   value={invoice.status} 
                                   onValueChange={(value) => handleStatusChange(invoice, value as 'sent' | 'paid' | 'cancelled')}
+                                  disabled={updatingStatusInvoiceId === invoice.id || invoice.status === 'cancelled'}
                                 >
                                   <SelectTrigger className="w-auto border-0 p-0 h-auto focus:ring-0">
                                     <StatusBadge status={invoice.status} />
@@ -2402,6 +2419,22 @@ const ZZPInvoicesPageContent = () => {
                                           <PaperPlaneTilt size={16} className="mr-2" />
                                         )}
                                         {t('zzpInvoices.sendInvoice')}
+                                      </DropdownMenuItem>
+                                    )}
+
+                                    {/* Cancel invoice - for draft invoices (backend supports draft → cancelled) */}
+                                    {invoice.status === 'draft' && (
+                                      <DropdownMenuItem
+                                        onSelect={() => handleStatusChange(invoice, 'cancelled')}
+                                        disabled={updatingStatusInvoiceId === invoice.id}
+                                        className="text-destructive focus:text-destructive"
+                                      >
+                                        {updatingStatusInvoiceId === invoice.id ? (
+                                          <SpinnerGap size={16} className="mr-2 animate-spin" />
+                                        ) : (
+                                          <XCircle size={16} className="mr-2" />
+                                        )}
+                                        {t('zzpInvoices.statusCancelled')}
                                       </DropdownMenuItem>
                                     )}
                                     

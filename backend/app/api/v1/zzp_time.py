@@ -202,6 +202,35 @@ async def update_time_entry(
     return entry_to_response(entry)
 
 
+@router.delete("/time-entries/{entry_id}", status_code=204)
+async def delete_time_entry(
+    entry_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Delete a time entry. Only non-invoiced entries can be deleted."""
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
+
+    entry = await db.scalar(
+        select(ZZPTimeEntry).where(
+            ZZPTimeEntry.id == entry_id,
+            ZZPTimeEntry.administration_id == administration.id,
+        )
+    )
+    if not entry:
+        raise HTTPException(status_code=404, detail={"code": "TIME_ENTRY_NOT_FOUND", "message": "Uren niet gevonden."})
+
+    if entry.invoice_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "TIME_ENTRY_INVOICED", "message": "Gefactureerde uren kunnen niet worden verwijderd."},
+        )
+
+    await db.delete(entry)
+    await db.commit()
+
+
 @router.get("/time-entries/open", response_model=list[TimeEntryOut])
 async def list_open_time_entries(
     current_user: CurrentUser,

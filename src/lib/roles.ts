@@ -83,3 +83,15 @@ export function isZzpRole(role: string | undefined): boolean {
   if (!role) return false
   return role === UserRole.ZZP
 }
+
+/**
+ * Get the brand display name based on the user's role.
+ *
+ * ZZP users see "ZZPers Hub"; all other roles see "Smart Accounting".
+ */
+export const BRAND_NAME_ZZP = 'ZZPers Hub'
+export const BRAND_NAME_DEFAULT = 'Smart Accounting'
+
+export function getBrandName(role?: string): string {
+  return isZzpRole(role) ? BRAND_NAME_ZZP : BRAND_NAME_DEFAULT
+}

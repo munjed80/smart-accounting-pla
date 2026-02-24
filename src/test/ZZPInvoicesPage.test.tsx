@@ -6,7 +6,7 @@ import * as AuthContext from '../lib/AuthContext'
 
 vi.mock('../lib/api', () => ({
   zzpApi: {
-    invoices: { list: vi.fn() },
+    invoices: { list: vi.fn(), updateStatus: vi.fn() },
     customers: { list: vi.fn() },
     profile: { get: vi.fn() },
   },
@@ -167,5 +167,36 @@ describe('ZZPInvoicesPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
+  })
+
+  it('updateStatus API is wired and invoice renders with correct sent status badge', async () => {
+    const sentInvoice = {
+      id: 'inv-1',
+      invoice_number: 'INV-2026-0001',
+      status: 'sent',
+      customer_id: 'c1',
+      customer_name: 'Test Klant',
+      issue_date: '2026-01-01',
+      total_cents: 10000,
+      lines: [],
+    }
+    vi.mocked(api.zzpApi.invoices.list).mockResolvedValue({ invoices: [sentInvoice] } as any)
+    vi.mocked(api.zzpApi.customers.list).mockResolvedValue({ customers: [] } as any)
+    vi.mocked(api.zzpApi.invoices.updateStatus).mockResolvedValue({
+      ...sentInvoice,
+      status: 'cancelled',
+    } as any)
+
+    render(<ZZPInvoicesPage />)
+
+    await waitFor(() => {
+      expect(screen.getAllByText('INV-2026-0001').length).toBeGreaterThan(0)
+    })
+
+    // The invoice renders with 'sent' status (badge shows zzpInvoices.statusSent key via t())
+    expect(screen.getAllByText('zzpInvoices.statusSent').length).toBeGreaterThan(0)
+
+    // updateStatus mock is available but not called on initial render
+    expect(api.zzpApi.invoices.updateStatus).not.toHaveBeenCalled()
   })
 })

@@ -92,6 +92,32 @@ class TestInvoiceStatusTransitions:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "cancelled"
+
+    @pytest.mark.asyncio
+    async def test_status_draft_to_cancelled(
+        self,
+        async_client: AsyncClient,
+        test_invoice_draft: ZZPInvoice,
+        auth_headers: dict
+    ):
+        """Draft invoice can be cancelled (Geannuleerd) and the status persists."""
+        response = await async_client.patch(
+            f"/api/v1/zzp/invoices/{test_invoice_draft.id}/status",
+            json={"status": "cancelled"},
+            headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "cancelled"
+
+        # Verify the status persists by fetching the invoice again
+        get_response = await async_client.get(
+            f"/api/v1/zzp/invoices/{test_invoice_draft.id}",
+            headers=auth_headers
+        )
+        assert get_response.status_code == 200
+        assert get_response.json()["status"] == "cancelled"
     
     @pytest.mark.asyncio
     async def test_invalid_status_transition_draft_to_paid(

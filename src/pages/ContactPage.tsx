@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { CheckCircle } from 'lucide-react'
 import { MarketingFooter } from '@/components/marketing/Footer'
+import { publicContactApi } from '@/lib/api'
+import { toast } from 'sonner'
 
 type ContactFormData = {
   name: string
@@ -28,6 +30,7 @@ export const ContactPage = () => {
   })
   const [submitted, setSubmitted] = useState(false)
   const [errors, setErrors] = useState<ContactFormErrors>({})
+  const [submitting, setSubmitting] = useState(false)
 
   const validate = (): boolean => {
     const newErrors: ContactFormErrors = {}
@@ -43,11 +46,25 @@ export const ContactPage = () => {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validate()) return
-    // In a real implementation this would call an API endpoint
-    setSubmitted(true)
+    setSubmitting(true)
+    try {
+      await publicContactApi.submit({
+        name: formData.name || undefined,
+        email: formData.email,
+        subject: formData.role ? `Rol: ${formData.role}` : undefined,
+        message: formData.message,
+        page_url: window.location.href,
+      })
+      setSubmitted(true)
+      toast.success('Bericht opgeslagen.')
+    } catch {
+      toast.error('Versturen mislukt. Probeer het opnieuw.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleChange = (field: keyof ContactFormData, value: string) => {
@@ -161,10 +178,10 @@ export const ContactPage = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button type="submit" className="w-full sm:w-auto">
-                Verstuur bericht
+              <Button type="submit" className="w-full sm:w-auto" disabled={submitting}>
+                {submitting ? 'Versturen...' : 'Verstuur bericht'}
               </Button>
-              <Button type="button" variant="ghost" onClick={() => navigateTo('/')}>
+              <Button type="button" variant="ghost" onClick={() => navigateTo('/')} disabled={submitting}>
                 Annuleren
               </Button>
             </div>

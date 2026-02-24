@@ -66,6 +66,7 @@ from app.models.vat_lineage import VatBoxLineage
 from app.models.vat_submission import VatSubmission
 from app.models.certificate import Certificate
 from app.models.audit_log import AuditLog
+from app.models.contact_message import ContactMessage, ContactMessageStatus
 
 __all__ = [
     "User",
@@ -143,4 +144,6 @@ __all__ = [
     "VatSubmission",
     "Certificate",
     "AuditLog",
+    "ContactMessage",
+    "ContactMessageStatus",
 ]

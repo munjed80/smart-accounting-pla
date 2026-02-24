@@ -5307,6 +5307,41 @@ export interface AdminUserRow {
   administration_membership_count: number
 }
 
+export type ContactMessageStatus = 'NEW' | 'READ' | 'RESOLVED'
+
+export interface ContactMessageListItem {
+  id: string
+  created_at: string
+  status: ContactMessageStatus
+  name: string | null
+  email: string
+  subject: string | null
+  message_snippet: string
+}
+
+export interface ContactMessageListResponse {
+  items: ContactMessageListItem[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface ContactMessageDetail {
+  id: string
+  created_at: string
+  updated_at: string
+  status: ContactMessageStatus
+  name: string | null
+  email: string
+  subject: string | null
+  message: string
+  page_url: string | null
+  user_id: string | null
+  user_agent: string | null
+  administration_id: string | null
+  internal_note: string | null
+}
+
 export const adminApi = {
   getOverview: async (): Promise<AdminOverview> => {
     const response = await api.get('/admin/overview')
@@ -5334,6 +5369,25 @@ export const adminApi = {
   },
   getSystemLogs: async (limit = 50): Promise<{ logs: { id: string; action: string; target_type: string; target_id: string; created_at: string; actor_user_id: string | null }[] }> => {
     const response = await api.get('/admin/logs', { params: { limit } })
+    return response.data
+  },
+  listContactMessages: async (params?: {
+    page?: number
+    page_size?: number
+    status?: string
+    q?: string
+    date_from?: string
+    date_to?: string
+  }): Promise<ContactMessageListResponse> => {
+    const response = await api.get('/admin/contact-messages', { params })
+    return response.data
+  },
+  getContactMessage: async (id: string): Promise<ContactMessageDetail> => {
+    const response = await api.get(`/admin/contact-messages/${id}`)
+    return response.data
+  },
+  updateContactMessage: async (id: string, payload: { status?: string; internal_note?: string }): Promise<ContactMessageDetail> => {
+    const response = await api.patch(`/admin/contact-messages/${id}`, payload)
     return response.data
   },
 }
@@ -5481,6 +5535,23 @@ export const subscriptionApi = {
    */
   getSubscriptionMe: async (): Promise<SubscriptionMeResponse> => {
     const response = await api.get('/subscription/me')
+    return response.data
+  },
+}
+
+// ============================================================================
+// Public Contact Form API
+// ============================================================================
+
+export const publicContactApi = {
+  submit: async (payload: {
+    name?: string
+    email: string
+    subject?: string
+    message: string
+    page_url?: string
+  }): Promise<{ ok: boolean }> => {
+    const response = await api.post('/public/contact', payload)
     return response.data
   },
 }

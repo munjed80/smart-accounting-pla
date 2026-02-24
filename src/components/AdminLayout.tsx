@@ -1,7 +1,7 @@
 import { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 
-export type AdminSection = 'users' | 'companies' | 'subscriptions' | 'revenue' | 'logs'
+export type AdminSection = 'users' | 'companies' | 'subscriptions' | 'revenue' | 'logs' | 'messages'
 
 interface AdminLayoutProps {
   activeSection: AdminSection
@@ -15,6 +15,7 @@ const sections: Array<{ key: AdminSection; label: string }> = [
   { key: 'subscriptions', label: 'Subscriptions' },
   { key: 'revenue', label: 'Revenue metrics' },
   { key: 'logs', label: 'System logs' },
+  { key: 'messages', label: 'Contact berichten' },
 ]
 
 export const AdminLayout = ({ activeSection, onSectionChange, children }: AdminLayoutProps) => {

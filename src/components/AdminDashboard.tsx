@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { adminApi, formatApiErrorForDisplay } from '@/lib/api'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { adminApi, formatApiErrorForDisplay, ContactMessageListItem, ContactMessageDetail } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -14,12 +14,16 @@ export const AdminDashboard = () => {
   const getSectionFromPath = (): AdminSection => {
     const [, , rawSection] = window.location.pathname.split('/')
     const section = rawSection as AdminSection | undefined
-    const allowedSections: AdminSection[] = ['users', 'companies', 'subscriptions', 'revenue', 'logs']
+    const allowedSections: AdminSection[] = ['users', 'companies', 'subscriptions', 'revenue', 'logs', 'messages']
     return section && allowedSections.includes(section) ? section : 'users'
   }
 
   const [section, setSection] = useState<AdminSection>(getSectionFromPath)
   const [query, setQuery] = useState('')
+  const [selectedMessage, setSelectedMessage] = useState<ContactMessageDetail | null>(null)
+  const [messagesStatusFilter, setMessagesStatusFilter] = useState<string>('')
+  const [messagesQuery, setMessagesQuery] = useState('')
+  const queryClient = useQueryClient()
 
   const overviewQuery = useQuery({
     queryKey: ['admin-overview'],
@@ -43,6 +47,51 @@ export const AdminDashboard = () => {
     queryFn: () => adminApi.getSystemLogs(50),
     enabled: section === 'logs',
   })
+
+  const contactMessagesQuery = useQuery({
+    queryKey: ['admin-contact-messages', messagesStatusFilter, messagesQuery],
+    queryFn: () => adminApi.listContactMessages({
+      page: 1,
+      page_size: 50,
+      status: messagesStatusFilter || undefined,
+      q: messagesQuery || undefined,
+    }),
+    enabled: section === 'messages',
+  })
+
+  const updateMessageMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: { status?: string; internal_note?: string } }) =>
+      adminApi.updateContactMessage(id, payload),
+    onSuccess: (updated) => {
+      setSelectedMessage(updated)
+      void queryClient.invalidateQueries({ queryKey: ['admin-contact-messages'] })
+    },
+    onError: () => {
+      toast.error('Actie mislukt, probeer opnieuw')
+    },
+  })
+
+  const handleOpenMessage = async (item: ContactMessageListItem) => {
+    try {
+      const detail = await adminApi.getContactMessage(item.id)
+      setSelectedMessage(detail)
+      void queryClient.invalidateQueries({ queryKey: ['admin-contact-messages'] })
+    } catch {
+      toast.error('Bericht kon niet geladen worden')
+    }
+  }
+
+  const STATUS_LABEL: Record<string, string> = {
+    NEW: 'Nieuw',
+    READ: 'Gelezen',
+    RESOLVED: 'Opgelost',
+  }
+
+  const STATUS_BADGE_CLASS: Record<string, string> = {
+    NEW: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+    READ: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+    RESOLVED: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  }
 
   const handleSectionChange = (nextSection: AdminSection) => {
     setSection(nextSection)
@@ -274,6 +323,137 @@ export const AdminDashboard = () => {
               </CardContent>
             </Card>
           ))}
+        </div>
+      ) : null}
+
+      {section === 'messages' ? (
+        <div className="space-y-4">
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3">
+            <Input
+              value={messagesQuery}
+              onChange={(e) => setMessagesQuery(e.target.value)}
+              placeholder="Zoeken in berichten..."
+              className="max-w-xs"
+            />
+            <select
+              value={messagesStatusFilter}
+              onChange={(e) => setMessagesStatusFilter(e.target.value)}
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Alle statussen</option>
+              <option value="NEW">Nieuw</option>
+              <option value="READ">Gelezen</option>
+              <option value="RESOLVED">Opgelost</option>
+            </select>
+          </div>
+
+          {/* List */}
+          {contactMessagesQuery.isLoading ? <p className="text-muted-foreground">Laden...</p> : null}
+          {contactMessagesQuery.isError ? (
+            <Alert variant="destructive">
+              <WarningCircle size={20} weight="duotone" />
+              <AlertTitle>Berichten konden niet geladen worden</AlertTitle>
+              <AlertDescription>
+                {renderErrorDescription(contactMessagesQuery.error, 'Er is een fout opgetreden bij het laden van de berichten.')}
+                <Button variant="outline" size="sm" onClick={() => void contactMessagesQuery.refetch()} className="gap-2">
+                  <ArrowClockwise size={16} />
+                  Opnieuw proberen
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {contactMessagesQuery.data && contactMessagesQuery.data.items.length === 0 ? (
+            <p className="text-muted-foreground">Geen berichten gevonden.</p>
+          ) : null}
+          {contactMessagesQuery.data?.items.map((item) => (
+            <Card
+              key={item.id}
+              className="cursor-pointer hover:border-primary/50 transition-colors"
+              onClick={() => void handleOpenMessage(item)}
+            >
+              <CardContent className="pt-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE_CLASS[item.status] ?? ''}`}>
+                        {STATUS_LABEL[item.status] ?? item.status}
+                      </span>
+                      <span className="font-semibold text-sm truncate">{item.email}</span>
+                      {item.subject ? <span className="text-sm text-muted-foreground truncate">· {item.subject}</span> : null}
+                    </div>
+                    <p className="text-sm text-muted-foreground line-clamp-2">{item.message_snippet}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
+                    {new Date(item.created_at).toLocaleDateString('nl-NL')}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Detail panel */}
+          {selectedMessage ? (
+            <Card className="border-primary/30 mt-4">
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="text-base">
+                    {selectedMessage.subject ?? 'Bericht'} — {selectedMessage.email}
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedMessage(null)}>✕</Button>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE_CLASS[selectedMessage.status] ?? ''}`}>
+                    {STATUS_LABEL[selectedMessage.status] ?? selectedMessage.status}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(selectedMessage.created_at).toLocaleString('nl-NL')}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {selectedMessage.name ? (
+                  <p className="text-sm"><span className="font-medium">Naam:</span> {selectedMessage.name}</p>
+                ) : null}
+                {selectedMessage.page_url ? (
+                  <p className="text-sm text-muted-foreground"><span className="font-medium">Pagina:</span> {selectedMessage.page_url}</p>
+                ) : null}
+                {selectedMessage.user_agent ? (
+                  <p className="text-xs text-muted-foreground truncate"><span className="font-medium">Browser:</span> {selectedMessage.user_agent}</p>
+                ) : null}
+                <div className="rounded-md bg-muted/50 p-3">
+                  <p className="text-sm whitespace-pre-wrap">{selectedMessage.message}</p>
+                </div>
+                {selectedMessage.internal_note ? (
+                  <div className="rounded-md border border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 p-3">
+                    <p className="text-xs font-medium text-yellow-800 dark:text-yellow-200 mb-1">Interne notitie</p>
+                    <p className="text-sm">{selectedMessage.internal_note}</p>
+                  </div>
+                ) : null}
+                <div className="flex gap-2 flex-wrap pt-2">
+                  {selectedMessage.status !== 'READ' ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={updateMessageMutation.isPending}
+                      onClick={() => updateMessageMutation.mutate({ id: selectedMessage.id, payload: { status: 'READ' } })}
+                    >
+                      Markeer als gelezen
+                    </Button>
+                  ) : null}
+                  {selectedMessage.status !== 'RESOLVED' ? (
+                    <Button
+                      size="sm"
+                      disabled={updateMessageMutation.isPending}
+                      onClick={() => updateMessageMutation.mutate({ id: selectedMessage.id, payload: { status: 'RESOLVED' } })}
+                    >
+                      Markeer als opgelost
+                    </Button>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       ) : null}
 

@@ -47,6 +47,7 @@ import {
   CurrencyEur,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
+import { getBrandName } from '@/lib/roles'
 import { PwaInstallCard } from '@/components/PwaInstallCard'
 import { IOSInstallModal } from '@/components/IOSInstallModal'
 import { SwUpdateBanner } from '@/components/SwUpdateBanner'
@@ -428,7 +429,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
         <div className="flex items-center gap-3">
           <Database size={28} weight="duotone" className="text-primary" />
           <span className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            {t('brand.name')}
+            {getBrandName(user?.role)}
           </span>
         </div>
       </div>
@@ -609,7 +610,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
               <div className="flex items-center gap-2">
                 <Database size={28} weight="duotone" className="text-primary hidden sm:block" />
                 <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  {t('brand.name')}
+                  {getBrandName(user?.role)}
                 </h1>
               </div>
             </div>

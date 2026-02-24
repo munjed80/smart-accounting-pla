@@ -27,17 +27,18 @@ def upgrade() -> None:
     if not enum_exists:
         op.execute("CREATE TYPE contactmessagestatus AS ENUM ('NEW', 'READ', 'RESOLVED')")
 
+    status_enum = postgresql.ENUM(
+        'NEW', 'READ', 'RESOLVED',
+        name='contactmessagestatus',
+        create_type=False,
+    )
+
     op.create_table(
         'contact_messages',
         sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column(
-            'status',
-            sa.Enum('NEW', 'READ', 'RESOLVED', name='contactmessagestatus', create_type=False),
-            nullable=False,
-            server_default='NEW',
-        ),
+        sa.Column('status', status_enum, nullable=False, server_default='NEW'),
         sa.Column('name', sa.String(length=255), nullable=True),
         sa.Column('email', sa.String(length=255), nullable=False),
         sa.Column('subject', sa.String(length=500), nullable=True),

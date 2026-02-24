@@ -7,6 +7,7 @@ Create Date: 2026-02-24 00:45:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import text
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
@@ -17,8 +18,14 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create enum type
-    op.execute("CREATE TYPE contactmessagestatus AS ENUM ('NEW', 'READ', 'RESOLVED')")
+    # Create enum type only if it doesn't already exist
+    bind = op.get_bind()
+    enum_exists = bind.execute(
+        text("SELECT 1 FROM pg_type WHERE typname = 'contactmessagestatus'")
+    ).scalar() is not None
+
+    if not enum_exists:
+        op.execute("CREATE TYPE contactmessagestatus AS ENUM ('NEW', 'READ', 'RESOLVED')")
 
     op.create_table(
         'contact_messages',
@@ -55,4 +62,3 @@ def downgrade() -> None:
     op.drop_index('ix_contact_messages_status', table_name='contact_messages')
     op.drop_index('ix_contact_messages_email', table_name='contact_messages')
     op.drop_table('contact_messages')
-    op.execute("DROP TYPE contactmessagestatus")

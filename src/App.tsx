@@ -34,6 +34,7 @@ import { ZZPTimeTrackingPage } from '@/components/ZZPTimeTrackingPage'
 import { ZZPAgendaPage } from '@/components/ZZPAgendaPage'
 import { ZZPCommitmentsOverviewPage } from '@/components/ZZPCommitmentsOverviewPage'
 import { ZZPLeaseLoansPage } from '@/components/ZZPLeaseLoansPage'
+import { ZZPDocumentInboxPage } from '@/components/ZZPDocumentInboxPage'
 import { ZZPSubscriptionsPage } from '@/components/ZZPSubscriptionsPage'
 import { ClientDossierPage } from '@/components/ClientDossierPage'
 import { BulkOperationsHistoryPage } from '@/components/BulkOperationsHistoryPage'
@@ -200,7 +201,7 @@ const AppContent = () => {
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
   const isSuperAdmin = user?.role === 'super_admin'
   const isAccountantOnly = user?.role === 'accountant'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'expenses' | 'time' | 'agenda' | 'obligations-overview' | 'lease-loans' | 'subscriptions' | 'admin'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'expenses' | 'time' | 'agenda' | 'obligations-overview' | 'lease-loans' | 'subscriptions' | 'documents' | 'admin'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
   // Onboarding state - tracks if user needs onboarding (no administrations for ZZP, no clients for accountants)
@@ -644,6 +645,8 @@ const AppContent = () => {
         return !isAccountant ? <ZZPLeaseLoansPage /> : <SmartDashboard />
       case 'subscriptions':
         return !isAccountant ? <ZZPSubscriptionsPage /> : <SmartDashboard />
+      case 'documents':
+        return !isAccountant ? <ZZPDocumentInboxPage /> : <SmartDashboard />
       case 'dashboard':
         return <SmartDashboard />
       case 'transactions':
@@ -682,6 +685,7 @@ const AppContent = () => {
       case 'obligations-overview': return 'Verplichtingen Overzicht'
       case 'lease-loans': return 'Lease & Leningen'
       case 'subscriptions': return 'Abonnementen'
+      case 'documents': return 'Documenten'
       case 'dashboard': return 'Overzicht'
       case 'transactions': return 'Transacties'
       case 'upload': return 'Upload'

@@ -996,3 +996,65 @@ class ZZPInsightsResponse(BaseModel):
     expense_breakdown: List[dict] = []  # Expenses by category
     revenue_trend: List[dict] = []  # Monthly revenue trend
     monthly_comparison: dict = {}
+
+
+# ============================================================================
+# ZZP Document Inbox Schemas
+# ============================================================================
+
+from enum import Enum as PyEnum
+
+
+class ZZPDocTypeEnum(str, PyEnum):
+    BON = "BON"
+    FACTUUR = "FACTUUR"
+    OVERIG = "OVERIG"
+
+
+class ZZPDocStatusEnum(str, PyEnum):
+    NEW = "NEW"
+    REVIEW = "REVIEW"
+    PROCESSED = "PROCESSED"
+    FAILED = "FAILED"
+
+
+class ZZPDocumentResponse(BaseModel):
+    """ZZP document response schema."""
+    id: UUID
+    administration_id: UUID
+    user_id: Optional[UUID] = None
+    filename: str
+    mime_type: str
+    storage_ref: str
+    doc_type: ZZPDocTypeEnum
+    status: ZZPDocStatusEnum
+    supplier: Optional[str] = None
+    amount_cents: Optional[int] = None
+    vat_rate: Optional[Decimal] = None
+    doc_date: Optional[date] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ZZPDocumentUpdate(BaseModel):
+    """Partial update for ZZP document metadata/status."""
+    doc_type: Optional[ZZPDocTypeEnum] = None
+    status: Optional[ZZPDocStatusEnum] = None
+    supplier: Optional[str] = Field(None, max_length=255)
+    amount_cents: Optional[int] = None
+    vat_rate: Optional[Decimal] = None
+    doc_date: Optional[date] = None
+
+
+class ZZPDocumentUploadResponse(BaseModel):
+    """Response after uploading one or more documents."""
+    documents: List[ZZPDocumentResponse]
+
+
+class ZZPDocumentCreateExpenseResponse(BaseModel):
+    """Response after converting document to expense."""
+    expense_id: UUID
+    document_id: UUID
+    message: str = "Uitgave opgeslagen en document gekoppeld."

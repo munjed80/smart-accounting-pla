@@ -4423,6 +4423,46 @@ export interface ZZPExpenseListResponse {
   total_vat_cents: number
 }
 
+// ZZP Document Inbox Types
+export type ZZPDocType = 'BON' | 'FACTUUR' | 'OVERIG'
+export type ZZPDocStatus = 'NEW' | 'REVIEW' | 'PROCESSED' | 'FAILED'
+
+export interface ZZPDocument {
+  id: string
+  administration_id: string
+  user_id?: string
+  filename: string
+  mime_type: string
+  storage_ref: string
+  doc_type: ZZPDocType
+  status: ZZPDocStatus
+  supplier?: string
+  amount_cents?: number
+  vat_rate?: number
+  doc_date?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ZZPDocumentUpdate {
+  doc_type?: ZZPDocType
+  status?: ZZPDocStatus
+  supplier?: string
+  amount_cents?: number
+  vat_rate?: number
+  doc_date?: string
+}
+
+export interface ZZPDocumentUploadResponse {
+  documents: ZZPDocument[]
+}
+
+export interface ZZPDocumentCreateExpenseResponse {
+  expense_id: string
+  document_id: string
+  message: string
+}
+
 // Time Entry Types
 export interface ZZPTimeEntry {
   id: string
@@ -4915,6 +4955,56 @@ export const zzpApi = {
         },
       })
       return response.data
+    },
+  },
+
+  // ------------ Document Inbox ------------
+  documents: {
+    upload: async (files: File[]): Promise<ZZPDocumentUploadResponse> => {
+      const formData = new FormData()
+      files.forEach(f => formData.append('files', f))
+      const response = await api.post<ZZPDocumentUploadResponse>('/zzp/documents/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      return response.data
+    },
+
+    list: async (options?: {
+      status?: ZZPDocStatus
+      type?: ZZPDocType
+      q?: string
+    }): Promise<ZZPDocument[]> => {
+      const params: Record<string, string> = {}
+      if (options?.status) params.status = options.status
+      if (options?.type) params.type = options.type
+      if (options?.q) params.q = options.q
+      const response = await api.get<ZZPDocument[]>('/zzp/documents', { params })
+      return response.data
+    },
+
+    get: async (documentId: string): Promise<ZZPDocument> => {
+      const response = await api.get<ZZPDocument>(`/zzp/documents/${documentId}`)
+      return response.data
+    },
+
+    update: async (documentId: string, data: ZZPDocumentUpdate): Promise<ZZPDocument> => {
+      const response = await api.patch<ZZPDocument>(`/zzp/documents/${documentId}`, data)
+      return response.data
+    },
+
+    createExpense: async (
+      documentId: string,
+      expenseData: ZZPExpenseCreate & { amount_cents: number }
+    ): Promise<ZZPDocumentCreateExpenseResponse> => {
+      const response = await api.post<ZZPDocumentCreateExpenseResponse>(
+        `/zzp/documents/${documentId}/create-expense`,
+        expenseData,
+      )
+      return response.data
+    },
+
+    delete: async (documentId: string): Promise<void> => {
+      await api.delete(`/zzp/documents/${documentId}`)
     },
   },
 

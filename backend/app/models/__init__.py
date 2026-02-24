@@ -43,6 +43,9 @@ from app.models.zzp import (
     ZZPQuote,
     ZZPQuoteLine,
     ZZPQuoteCounter,
+    ZZPDocument,
+    ZZPDocType,
+    ZZPDocStatus,
 )
 from app.models.financial_commitment import (
     FinancialCommitment,
@@ -128,6 +131,9 @@ __all__ = [
     "ZZPQuote",
     "ZZPQuoteLine",
     "ZZPQuoteCounter",
+    "ZZPDocument",
+    "ZZPDocType",
+    "ZZPDocStatus",
     "ZZPPayment",
     "ZZPPaymentAllocation",
     "PaymentStatus",

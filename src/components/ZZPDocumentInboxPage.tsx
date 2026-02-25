@@ -499,7 +499,9 @@ export const ZZPDocumentInboxPage = () => {
   const [convertDoc, setConvertDoc] = useState<ZZPDocument | null>(null)
   const [convertOpen, setConvertOpen] = useState(false)
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const pickerInputRef = useRef<HTMLInputElement>(null)
+  const [showUploadChooser, setShowUploadChooser] = useState(false)
 
   const loadDocs = useCallback(async () => {
     setLoading(true)
@@ -537,7 +539,8 @@ export const ZZPDocumentInboxPage = () => {
       toast.error(parseApiError(e))
     } finally {
       setUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
+      if (cameraInputRef.current) cameraInputRef.current.value = ''
+      if (pickerInputRef.current) pickerInputRef.current.value = ''
     }
   }
 
@@ -602,16 +605,23 @@ export const ZZPDocumentInboxPage = () => {
           </div>
           <div>
             <input
-              ref={fileInputRef}
+              ref={cameraInputRef}
               type="file"
-              accept=".pdf,.jpg,.jpeg,.png,.heic,.heif"
-              multiple
+              accept="image/*"
               capture="environment"
               className="hidden"
               onChange={e => handleUpload(e.target.files)}
             />
+            <input
+              ref={pickerInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              className="hidden"
+              onChange={e => handleUpload(e.target.files)}
+            />
             <Button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => setShowUploadChooser(true)}
               disabled={uploading}
               className="gap-2"
             >
@@ -622,6 +632,42 @@ export const ZZPDocumentInboxPage = () => {
             </Button>
           </div>
         </div>
+
+        {/* Upload chooser modal */}
+        {showUploadChooser && (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60"
+            onClick={() => setShowUploadChooser(false)}
+          >
+            <div
+              className="w-full sm:w-80 bg-card border border-border rounded-t-2xl sm:rounded-2xl p-4 space-y-2 shadow-xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <p className="text-sm font-semibold text-center mb-3">Document toevoegen</p>
+              <Button
+                variant="outline"
+                className="w-full gap-2 justify-start"
+                onClick={() => { setShowUploadChooser(false); cameraInputRef.current?.click() }}
+              >
+                <Image size={18} /> Scan met camera
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full gap-2 justify-start"
+                onClick={() => { setShowUploadChooser(false); pickerInputRef.current?.click() }}
+              >
+                <FileText size={18} /> Kies bestand (Foto's / Bestanden)
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={() => setShowUploadChooser(false)}
+              >
+                Annuleren
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Search */}
         <div className="relative">

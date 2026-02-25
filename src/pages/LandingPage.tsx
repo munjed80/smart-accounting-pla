@@ -195,25 +195,25 @@ export const LandingPage = () => {
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-primary/10">
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/15 via-background to-accent/10" />
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8 lg:py-32">
           <div className="mx-auto max-w-4xl text-center">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
               <Star className="h-3 w-3" />
               30 dagen gratis uitproberen — geen creditcard vereist
             </div>
-            <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">Boekhouden en compliance in één slim platform</h1>
-            <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">
+            <h1 className="text-3xl font-bold tracking-tight sm:text-5xl lg:text-6xl lg:tracking-[-0.02em]">Boekhouden en compliance in één slim platform</h1>
+            <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg lg:text-xl lg:leading-relaxed">
               Voor ZZP'ers én accountants. Facturen, uren, BTW-overzicht, samenwerking en audit — volledig geïntegreerd.
             </p>
             {/* Dual audience value props */}
             <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 max-w-2xl mx-auto text-left">
               <div className="rounded-lg border border-accent/20 bg-accent/5 p-3">
                 <p className="text-xs font-semibold text-accent uppercase tracking-wider mb-1">Voor ZZP'ers</p>
-                <p className="text-xs text-muted-foreground">Facturen, uitgaven, uren, agenda, BTW-aangifte en export — alles in één app.</p>
+                <p className="text-xs text-muted-foreground lg:text-sm">Facturen, uitgaven, uren, agenda, BTW-aangifte en export — alles in één app.</p>
               </div>
               <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
                 <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Voor accountants</p>
-                <p className="text-xs text-muted-foreground">Werklijst, audit trail, BTW-traceerbaarheid, PKI-signing en klantdossiers.</p>
+                <p className="text-xs text-muted-foreground lg:text-sm">Werklijst, audit trail, BTW-traceerbaarheid, PKI-signing en klantdossiers.</p>
               </div>
             </div>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -235,12 +235,12 @@ export const LandingPage = () => {
       <HowItWorksSection />
 
       {/* For ZZP */}
-      <section id="voor-zzp" className="py-14 sm:py-20">
+      <section id="voor-zzp" className="py-14 sm:py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-8 sm:mb-10">
             <p className="text-sm font-semibold text-accent uppercase tracking-wider mb-2">Voor ZZP'ers</p>
-            <h2 className="text-2xl font-bold sm:text-4xl">Alles wat een ZZP'er nodig heeft</h2>
-            <p className="mt-3 text-muted-foreground max-w-2xl">Van eerste factuur tot kwartaalaangifte: alles in één overzichtelijk platform.</p>
+            <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Alles wat een ZZP'er nodig heeft</h2>
+            <p className="mt-3 text-muted-foreground max-w-2xl lg:text-lg lg:leading-relaxed">Van eerste factuur tot kwartaalaangifte: alles in één overzichtelijk platform.</p>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {zzpFeatures.map((feature) => {
@@ -251,10 +251,10 @@ export const LandingPage = () => {
                     <div className="mb-2" style={{ color: 'oklch(0.72 0.18 150)' }}>
                       <Icon className="h-6 w-6" />
                     </div>
-                    <CardTitle className="text-base">{feature.title}</CardTitle>
+                    <CardTitle className="text-base lg:text-lg">{feature.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription>{feature.description}</CardDescription>
+                    <CardDescription className="lg:text-base">{feature.description}</CardDescription>
                   </CardContent>
                 </Card>
               )
@@ -270,12 +270,12 @@ export const LandingPage = () => {
       </section>
 
       {/* For Accountants */}
-      <section id="voor-accountants" className="bg-muted/40 py-14 sm:py-20">
+      <section id="voor-accountants" className="bg-muted/40 py-14 sm:py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-8">
             <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-2">Voor accountants &amp; kantoren</p>
-            <h2 className="text-2xl font-bold sm:text-4xl">Platform voor accountants</h2>
-            <p className="mt-3 text-muted-foreground max-w-2xl">
+            <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Platform voor accountants</h2>
+            <p className="mt-3 text-muted-foreground max-w-2xl lg:text-lg lg:leading-relaxed">
               Beheer meerdere klantdossiers, houd grip op deadlines en werk efficiënt samen met uw ZZP-klanten.
             </p>
           </div>
@@ -286,14 +286,14 @@ export const LandingPage = () => {
                 <div key={feature.title} className="flex flex-col gap-2 rounded-lg border border-border bg-background p-4">
                   <div className="flex items-center gap-2">
                     <Icon className="h-4 w-4 text-primary shrink-0" />
-                    <span className="text-sm font-medium">
+                    <span className="text-sm font-medium lg:text-base">
                       {feature.title}
                       {feature.beta && (
                         <span className="ml-2 text-xs text-muted-foreground font-normal">(coming soon)</span>
                       )}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground">{feature.description}</p>
+                  <p className="text-xs text-muted-foreground lg:text-sm">{feature.description}</p>
                 </div>
               )
             })}
@@ -307,9 +307,9 @@ export const LandingPage = () => {
       </section>
 
       {/* Testimonials */}
-      <section className="bg-muted/40 py-14 sm:py-20">
+      <section className="bg-muted/40 py-14 sm:py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold sm:text-4xl mb-10">Wat klanten zeggen</h2>
+          <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl mb-10">Wat klanten zeggen</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {testimonials.map((item) => (
               <Card key={item.author} className="border-border/80">
@@ -319,7 +319,7 @@ export const LandingPage = () => {
                       <Star key={i} className="h-3.5 w-3.5" style={{ color: 'var(--accent2)', fill: 'var(--accent2)' }} />
                     ))}
                   </div>
-                  <p className="text-sm text-muted-foreground">"{item.quote}"</p>
+                  <p className="text-sm text-muted-foreground lg:text-base lg:leading-relaxed">"{item.quote}"</p>
                   <div className="mt-4 flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary shrink-0">
                       {item.initials}
@@ -337,9 +337,9 @@ export const LandingPage = () => {
       </section>
 
       {/* Why this platform */}
-      <section className="py-14 sm:py-20">
+      <section className="py-14 sm:py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold sm:text-4xl">Waarom dit platform?</h2>
+          <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Waarom dit platform?</h2>
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {usps.map((usp) => {
               const Icon = usp.icon
@@ -349,7 +349,7 @@ export const LandingPage = () => {
                     <div className="mb-2 text-accent">
                       <Icon className="h-5 w-5" />
                     </div>
-                    <CardTitle className="text-lg">{usp.title}</CardTitle>
+                    <CardTitle className="text-lg lg:text-xl">{usp.title}</CardTitle>
                   </CardHeader>
                 </Card>
               )
@@ -359,10 +359,10 @@ export const LandingPage = () => {
       </section>
 
       {/* Pricing */}
-      <section id="prijzen" className="bg-gradient-to-b from-primary/5 to-muted/30 py-14 sm:py-20">
+      <section id="prijzen" className="bg-gradient-to-b from-primary/5 to-muted/30 py-14 sm:py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold sm:text-center sm:text-4xl mb-2">Prijzen</h2>
-          <p className="text-muted-foreground sm:text-center mb-10">Eenvoudig en transparant — geen verborgen kosten.</p>
+          <h2 className="text-2xl font-bold sm:text-center sm:text-4xl lg:text-5xl mb-2">Prijzen</h2>
+          <p className="text-muted-foreground sm:text-center mb-10 lg:text-lg">Eenvoudig en transparant — geen verborgen kosten.</p>
           <div className="mx-auto mt-8 grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-2">
             <Card className="border-primary/50 shadow-lg relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary to-accent" />
@@ -375,7 +375,7 @@ export const LandingPage = () => {
                 <p className="text-lg font-semibold">Daarna €6,95 <span className="text-sm font-normal text-muted-foreground">/ maand</span></p>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2 text-sm">
+                <ul className="space-y-2 text-sm lg:text-base">
                   {['Facturatie & klantbeheer', 'Urenregistratie', 'BTW-overzicht met drilldown', 'Uitgaven & bonnetjes', 'Bankimport', 'Mobiele app (PWA)', 'Accountant uitnodigen'].map((item) => (
                     <li key={item} className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-accent shrink-0" />
@@ -399,7 +399,7 @@ export const LandingPage = () => {
                 <p className="text-sm text-muted-foreground">Prijsafspraken op basis van klantvolume.</p>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2 text-sm">
+                <ul className="space-y-2 text-sm lg:text-base">
                   {['Multi-client hub', 'Werkqueue & beoordelingslijst', 'Audittrail & compliance', 'Periodebeheer', 'BTW-traceerbaarheid', 'Klantuitnodigingen'].map((item) => (
                     <li key={item} className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-primary shrink-0" />
@@ -422,10 +422,10 @@ export const LandingPage = () => {
       <FaqSection />
 
       {/* Help / Startgids */}
-      <section className="py-14 sm:py-16 border-t border-border/60">
+      <section className="py-14 sm:py-16 lg:py-24 border-t border-border/60">
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
-          <h2 className="text-xl font-bold sm:text-3xl mb-3">Hulp nodig om te starten?</h2>
-          <p className="text-muted-foreground mb-6 max-w-xl mx-auto">Onze uitgebreide startgids helpt u snel op weg — van account aanmaken tot BTW-aangifte.</p>
+          <h2 className="text-xl font-bold sm:text-3xl lg:text-4xl mb-3">Hulp nodig om te starten?</h2>
+          <p className="text-muted-foreground mb-6 max-w-xl mx-auto lg:text-lg">Onze uitgebreide startgids helpt u snel op weg — van account aanmaken tot BTW-aangifte.</p>
           <Button variant="outline" size="lg" onClick={() => navigateTo('/help')}>
             Bekijk de Startgids
             <ArrowRight className="ml-2 h-4 w-4" />
@@ -434,10 +434,10 @@ export const LandingPage = () => {
       </section>
 
       {/* Final CTA */}
-      <section className="bg-gradient-to-br from-primary/10 via-background to-accent/5 py-14 sm:py-20 border-t border-primary/10">
+      <section className="bg-gradient-to-br from-primary/10 via-background to-accent/5 py-14 sm:py-20 lg:py-28 border-t border-primary/10">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold sm:text-4xl">Klaar om te beginnen?</h2>
-          <p className="mt-4 text-muted-foreground">
+          <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Klaar om te beginnen?</h2>
+          <p className="mt-4 text-muted-foreground lg:text-lg lg:leading-relaxed">
             Start vandaag nog met uw gratis proefperiode van 30 dagen. Geen creditcard, geen verplichtingen.
           </p>
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">

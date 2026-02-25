@@ -31,7 +31,7 @@ export const HowItWorksSection = () => {
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-accent mb-3">WERKWIJZE</p>
             <h2 className="text-2xl font-bold sm:text-3xl lg:text-4xl mb-4">Hoe werkt het?</h2>
-            <p className="text-muted-foreground text-sm sm:text-base max-w-sm">
+            <p className="text-muted-foreground text-sm sm:text-base lg:text-lg max-w-sm lg:max-w-md">
               Van invoer tot BTW-aangifte — in drie heldere stappen.
             </p>
             <p className="mt-6 text-xs font-medium text-muted-foreground/60">
@@ -54,10 +54,10 @@ export const HowItWorksSection = () => {
                       </div>
                       <span className="text-[10px] font-bold tabular-nums text-muted-foreground/50">{stage.step}</span>
                     </div>
-                    <p className="text-sm font-semibold mb-2 leading-tight">{stage.title}</p>
+                    <p className="text-sm font-semibold lg:text-base mb-2 leading-tight">{stage.title}</p>
                     <ul className="space-y-1">
                       {stage.bullets.map((bullet) => (
-                        <li key={bullet} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                        <li key={bullet} className="flex items-start gap-1.5 text-xs text-muted-foreground lg:text-sm">
                           <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-accent" />
                           {bullet}
                         </li>

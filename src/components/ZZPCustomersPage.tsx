@@ -1149,6 +1149,8 @@ export const ZZPCustomersPage = () => {
         console.log('[Customer Save] Customer created successfully:', newCustomer.id)
         setNewlyCreatedCustomer(newCustomer)
         setShowCreateInvoiceCta(true)
+        // Emit onboarding event so the tour can auto-advance
+        window.dispatchEvent(new CustomEvent('onboarding:customer_created'))
       }
 
       // Reload customers list
@@ -1235,7 +1237,7 @@ export const ZZPCustomersPage = () => {
               {t('zzpCustomers.pageDescription')}
             </p>
           </div>
-          <Button onClick={openNewForm} className="gap-2 h-10 sm:h-11 w-full sm:w-auto">
+          <Button onClick={openNewForm} className="gap-2 h-10 sm:h-11 w-full sm:w-auto" data-onboarding="new-customer-btn">
             <Plus size={18} weight="bold" />
             {t('zzpCustomers.newCustomer')}
           </Button>

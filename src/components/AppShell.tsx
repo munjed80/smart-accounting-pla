@@ -5,6 +5,7 @@ import { useCloseOverlayOnRouteChange } from '@/hooks/useCloseOverlayOnRouteChan
 import { usePreventBodyScrollLock } from '@/hooks/usePreventBodyScrollLock'
 import { navigateTo } from '@/lib/navigation'
 import { getApiBaseUrl } from '@/lib/api'
+import { TourHelpButton } from '@/components/OnboardingTour'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -299,9 +300,10 @@ interface AppShellProps {
   children: ReactNode
   activeTab?: string
   onTabChange?: (tab: string) => void
+  onStartTour?: () => void
 }
 
-export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) => {
+export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppShellProps) => {
   const { user, logout } = useAuth()
   const { activeClient, pendingCount } = useActiveClient()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -526,6 +528,7 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
                   role="menuitem"
                   onClick={() => handleMenuClick(item)}
                   aria-current={isActive ? 'page' : undefined}
+                  data-onboarding={item.tabValue === 'settings' ? 'settings-menu' : undefined}
                   className={`
                     w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm
                     transition-colors duration-150
@@ -644,8 +647,11 @@ export const AppShell = ({ children, activeTab, onTabChange }: AppShellProps) =>
               </div>
             )}
 
-            {/* Right: Role Badge + Logout */}
+            {/* Right: Role Badge + Tour Help + Logout */}
             <div className="flex items-center gap-2 sm:gap-4">
+              {isZZP && onStartTour && (
+                <TourHelpButton onStart={onStartTour} />
+              )}
               <Badge variant="outline" className="capitalize text-xs sm:text-sm">
                 {user?.role === 'zzp' ? t('roles.zzp') : user?.role === 'accountant' ? t('roles.accountant') : user?.role}
               </Badge>

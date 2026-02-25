@@ -216,6 +216,8 @@ export const SettingsPage = () => {
       const saved = await zzpApi.profile.upsert(profileForm)
       setBusinessProfile(saved)
       toast.success(t('settings.businessProfileSaved'))
+      // Emit onboarding event so the tour can auto-advance
+      window.dispatchEvent(new CustomEvent('onboarding:settings_saved'))
     } catch (error) {
       console.error('Failed to save business profile:', error)
       toast.error(parseApiError(error))

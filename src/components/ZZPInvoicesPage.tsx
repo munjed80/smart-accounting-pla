@@ -1720,6 +1720,8 @@ const ZZPInvoicesPageContent = () => {
         // Create new
         await zzpApi.invoices.create(data)
         toast.success(t('zzpInvoices.invoiceSaved'))
+        // Emit onboarding event so the tour can auto-advance
+        window.dispatchEvent(new CustomEvent('onboarding:invoice_created'))
       }
 
       setIsFormOpen(false)
@@ -2121,7 +2123,7 @@ const ZZPInvoicesPageContent = () => {
               )}
               {t('zzpInvoices.generateInvoice')}
             </Button>
-            <Button onClick={openNewForm} className="gap-2 h-10 sm:h-11 w-full sm:w-auto" disabled={!hasActiveCustomers}>
+            <Button onClick={openNewForm} className="gap-2 h-10 sm:h-11 w-full sm:w-auto" disabled={!hasActiveCustomers} data-onboarding="new-invoice-btn">
               <Plus size={18} weight="bold" />
               {t('zzpInvoices.newInvoice')}
             </Button>

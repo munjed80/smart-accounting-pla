@@ -50,6 +50,8 @@ import { administrationApi, accountantClientApi, getApiBaseUrl } from '@/lib/api
 import { navigateTo } from '@/lib/navigation'
 import { pathToTab, tabToPath } from '@/lib/routing'
 import { cleanupOverlayPortals } from '@/hooks/useCloseOverlayOnRouteChange'
+import { useOnboardingTour } from '@/hooks/useOnboardingTour'
+import { OnboardingTour } from '@/components/OnboardingTour'
 import { Database } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -213,6 +215,12 @@ const AppContent = () => {
   
   // Track if we've set the initial tab based on role (to avoid resetting on every render)
   const [hasSetInitialTab, setHasSetInitialTab] = useState(false)
+
+  // Guided tour (ZZP-only, first-login)
+  const { tourState, startTour, nextStep, skip, neverShow } = useOnboardingTour(
+    user?.id,
+    user?.role,
+  )
 
   // Listen for URL changes and sync with tab
   useEffect(() => {
@@ -701,11 +709,20 @@ const AppContent = () => {
       <AppShell 
         activeTab={activeTab} 
         onTabChange={handleTabChange}
+        onStartTour={user?.role === 'zzp' ? startTour : undefined}
       >
         <DashboardErrorBoundary pageName={getPageName()} userRole={user?.role} apiEndpoint={getApiBaseUrl()}>
           {renderTabContent()}
         </DashboardErrorBoundary>
       </AppShell>
+      {user?.role === 'zzp' && (
+        <OnboardingTour
+          tourState={tourState}
+          onNext={nextStep}
+          onSkip={skip}
+          onNeverShow={neverShow}
+        />
+      )}
       <BootDiagnosticsBanner stage={bootStage} isLoading={isLoading} isCheckingOnboarding={isCheckingOnboarding} />
     </>
   )

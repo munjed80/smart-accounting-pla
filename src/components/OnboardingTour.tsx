@@ -87,7 +87,7 @@ export const OnboardingTour = ({ tourState, onNext, onSkip, onNeverShow }: Onboa
     if (!window.location.pathname.startsWith(path)) {
       navigateTo(path)
     }
-  }, [currentStep?.route])  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentStep])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track spotlight target position (re-measures on scroll/resize/route-change)
   const measure = useCallback(() => {

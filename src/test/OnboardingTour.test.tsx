@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { useOnboardingTour, TOUR_STEPS } from '../hooks/useOnboardingTour'
 import { OnboardingTour } from '../components/OnboardingTour'
 
@@ -281,7 +281,7 @@ describe('OnboardingTour', () => {
     expect(onSkip).toHaveBeenCalledOnce()
   })
 
-  it('shows correct step indicator for step 2', async () => {
+  it('shows correct step indicator for step 2', () => {
     render(
       <OnboardingTour
         tourState={{ ...defaultTourState, step: 1 }}

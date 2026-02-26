@@ -66,11 +66,13 @@ class NumberedCanvas(canvas.Canvas):
         canvas.Canvas.save(self)
         
     def draw_page_number(self, page_count):
-        """Add page number to footer."""
+        """Add page number and branding to footer."""
         self.setFont("Helvetica", 8)
         self.setFillColor(colors.grey)
         page_num_text = f"Pagina {self._pageNumber} van {page_count}"
         self.drawRightString(A4[0] - 2*cm, 1.5*cm, page_num_text)
+        footer_text = "Powered by MHM IT \u2022 zzpershub.nl"
+        self.drawCentredString(A4[0] / 2, 1.5*cm, footer_text)
 
 
 def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
@@ -168,6 +170,7 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         elements.append(Spacer(1, 0.5*cm))
         
         # From/To addresses
+        # Company address is shown ONLY in the header above; "Van" shows only the company name.
         # Build customer address
         customer_address = []
         if invoice.customer_address_street:
@@ -186,7 +189,7 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
                 Paragraph("<b>Aan</b>", small_style),
             ],
             [
-                Paragraph(f"<b>{invoice.seller_company_name or '-'}</b><br/>{company_text}", normal_style),
+                Paragraph(f"<b>{invoice.seller_company_name or '-'}</b>", normal_style),
                 Paragraph(f"<b>{invoice.customer_name or '-'}</b><br/>{customer_text}", normal_style),
             ],
         ]
@@ -204,8 +207,8 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         issue_date_str = format_date_nl(invoice.issue_date)
         due_date_str = format_date_nl(invoice.due_date) if invoice.due_date else "-"
         
+        # Invoice metadata: invoice number shown ONLY in the header above, not repeated here
         meta_data = [
-            ["Factuurnummer:", invoice.invoice_number],
             ["Factuurdatum:", issue_date_str],
             ["Vervaldatum:", due_date_str],
         ]
@@ -243,6 +246,12 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
             line_data,
             colWidths=[7*cm, 2*cm, 3*cm, 2*cm, 3*cm],
         )
+        # Build zebra-striping: stripe every 2nd data row (indices 2, 4, 6... where index 0 is the header).
+        # This matches the HTML template's tbody tr:nth-child(even) selector.
+        zebra_cmds = [
+            ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f8fafc'))
+            for i in range(2, len(line_data), 2)
+        ]
         lines_table.setStyle(TableStyle([
             # Header row
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
@@ -260,7 +269,7 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
             ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
             ('LINEBELOW', (0, 1), (-1, -2), 0.5, colors.HexColor('#e5e7eb')),
             ('LINEBELOW', (0, -1), (-1, -1), 2, colors.HexColor('#2563eb')),
-        ]))
+        ] + zebra_cmds))
         elements.append(lines_table)
         elements.append(Spacer(1, 0.5*cm))
         

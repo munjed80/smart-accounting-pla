@@ -257,6 +257,10 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                 border-bottom: 2px solid #2563eb;
             }}
             
+            .lines-table tbody tr:nth-child(even) {{
+                background: #f8fafc;
+            }}
+            
             /* Totals section */
             .totals {{
                 margin-left: auto;
@@ -318,6 +322,15 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                 border-left: 4px solid #eab308;
                 font-size: 9pt;
             }}
+            
+            .page-footer {{
+                margin-top: 30px;
+                padding-top: 10px;
+                border-top: 1px solid #e5e7eb;
+                text-align: center;
+                font-size: 8pt;
+                color: #aaa;
+            }}
         </style>
     </head>
     <body>
@@ -338,13 +351,12 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                 </div>
             </div>
             
-            <!-- Addresses -->
+            <!-- Addresses: company address is shown ONLY in the header above, not repeated here -->
             <div class="addresses">
                 <div class="address-block">
                     <div class="address-label">Van</div>
                     <div class="address-content">
                         <strong>{invoice.seller_company_name or '-'}</strong>
-                        {('<br>'.join(seller_address_parts)) if seller_address_parts else ''}
                     </div>
                 </div>
                 <div class="address-block">
@@ -356,12 +368,8 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                 </div>
             </div>
             
-            <!-- Invoice Meta -->
+            <!-- Invoice Meta: invoice number shown ONLY in the header above, not repeated here -->
             <div class="invoice-meta">
-                <div class="meta-row">
-                    <span class="meta-label">Factuurnummer:</span>
-                    <span class="meta-value">{invoice.invoice_number}</span>
-                </div>
                 <div class="meta-row">
                     <span class="meta-label">Factuurdatum:</span>
                     <span class="meta-value">{issue_date_str}</span>
@@ -425,6 +433,11 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                     <strong>Opmerkingen:</strong><br>
                     {invoice.notes}
                 </div>''' if invoice.notes else ''}
+            </div>
+            
+            <!-- Page footer: rendered once at the bottom of the document -->
+            <div class="page-footer">
+                Powered by MHM IT &bull; zzpershub.nl
             </div>
         </div>
     </body>

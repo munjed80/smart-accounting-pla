@@ -186,28 +186,6 @@ const defaultInvoiceFilters: InvoiceFilters = {
   customer_id: '',
 }
 
-// Helper to detect iOS devices (including iPadOS)
-function isIOS(): boolean {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-}
-
-// Helper to detect Android devices
-function isAndroid(): boolean {
-  return /Android/i.test(navigator.userAgent)
-}
-
-// Helper to detect mobile devices (iOS or Android)
-function isMobile(): boolean {
-  return isIOS() || isAndroid()
-}
-
-// Delay in ms before revoking PDF blob URL to ensure download/open completes
-const PDF_URL_REVOCATION_DELAY_MS = 30000
-// iOS requires longer delay due to slower blob URL loading
-const IOS_REVOCATION_DELAY_MULTIPLIER = 2
-// Delay before removing the anchor element from DOM after a click
-const ANCHOR_REMOVE_DELAY_MS = 100
 
 // Helper function to extract date part from ISO string
 const extractDatePart = (isoString: string | undefined): string => {
@@ -1783,115 +1761,24 @@ const ZZPInvoicesPageContent = () => {
     }
   }, [deletingInvoice, loadData])
 
-  // Handle PDF download - robust strategy for all browsers including mobile Safari/iOS.
-  //
-  // Strategy (in order of preference):
-  //   Non-iOS: blob + anchor click (seamless in-page download, no navigation)
-  //   iOS:
-  //     1. window.open with direct URL (opens PDF in new tab, doesn't navigate away)
-  //        Uses ?download=1&token=<jwt> so iOS Safari authenticates without custom headers.
-  //     2. window.location.href fallback (for contexts where window.open is blocked)
-  //        Navigates the current tab to the PDF URL; iOS 13+ will show a download sheet.
-  //     3. Blob → Web Share API (iOS 15.4+ file sharing, when both above are blocked)
-  //     4. Blob URL in new tab (last resort)
+  // Handle PDF download via window.location.assign so the download works correctly
+  // even when triggered from within a modal/overlay. The backend sends
+  // Content-Disposition: attachment, so the browser triggers a native download
+  // prompt without navigating away from the current SPA state.
   const handleDownloadPdf = useCallback(async (invoice: ZZPInvoice) => {
-    const filename = `${invoice.invoice_number || `INV-${invoice.id}`}.pdf`
-
-    console.log('[PDF Download] Starting download for invoice:', invoice.id, 'filename:', filename)
+    console.log('[PDF Download] Starting download for invoice:', invoice.id)
 
     try {
       setDownloadingInvoiceId(invoice.id)
       toast.info(t('zzpInvoices.pdfDownloading'))
 
-      // Build direct download URL (includes ?download=1&token=<jwt>)
+      // Build direct download URL (includes ?download=1&token=<jwt>).
+      // The backend sends Content-Disposition: attachment so window.location.assign
+      // triggers the native download prompt without navigating away from the SPA.
       const directUrl = zzpApi.invoices.getPdfUrl(invoice.id)
       console.log('[PDF Download] Direct URL constructed (token included)')
 
-      if (!isIOS()) {
-        // Non-iOS: prefer blob + anchor for a seamless in-page download.
-        console.log('[PDF Download] Non-iOS: using blob anchor download...')
-        const blob = await zzpApi.invoices.downloadPdf(invoice.id)
-        const pdfBlob = new Blob([blob], { type: 'application/pdf' })
-        console.log('[PDF Download] Blob received, size:', pdfBlob.size, 'bytes')
-        if (pdfBlob.size === 0) {
-          throw new Error(`Empty PDF blob received for invoice ${invoice.id}`)
-        }
-        const blobUrl = window.URL.createObjectURL(pdfBlob)
-        const link = document.createElement('a')
-        link.href = blobUrl
-        link.download = filename
-        link.rel = 'noopener noreferrer'
-        link.style.display = 'none'
-        document.body.appendChild(link)
-        link.click()
-        setTimeout(() => { document.body.removeChild(link) }, ANCHOR_REMOVE_DELAY_MS)
-        setTimeout(() => {
-          console.log('[PDF Download] Revoking blob URL after delay')
-          window.URL.revokeObjectURL(blobUrl)
-        }, PDF_URL_REVOCATION_DELAY_MS)
-        console.log('[PDF Download] Download initiated successfully')
-        toast.success(t('zzpInvoices.pdfDownloaded'))
-        return
-      }
-
-      // --- iOS Strategy 1: window.open with direct URL ---
-      // Opens the PDF in a new tab; the server's Content-Disposition:attachment
-      // header triggers iOS 13+ native download sheet.  window.open does NOT
-      // navigate the current page, so the rest of this function can still run
-      // as a fallback if the popup was blocked.
-      console.log('[PDF Download] iOS detected, trying window.open with direct URL...')
-      const newWindow = window.open(directUrl, '_blank', 'noopener,noreferrer')
-      if (newWindow) {
-        console.log('[PDF Download] Download initiated successfully via window.open')
-        toast.success(t('zzpInvoices.pdfDownloaded'))
-        return
-      }
-
-      // --- iOS Strategy 2: window.location.href ---
-      // window.open was blocked (rare when triggered by user gesture).
-      // Navigate the current tab to the PDF URL. iOS 13+ shows a download sheet
-      // before the page unloads, so the user can save the file.
-      console.log('[PDF Download] window.open blocked, falling back to window.location.href...')
-      window.location.href = directUrl
-      // After this line the browser begins navigation; subsequent code may still
-      // run briefly, but the page will unload before the fetch completes.
-      // We still attempt blob-based fallbacks below in case navigation also fails
-      // (e.g., in strict PWA offline mode).
-
-      // --- iOS Strategy 3: blob + Web Share API (iOS 15.4+) ---
-      console.log('[PDF Download] Fetching blob for share/tab fallback...')
-      const blob = await zzpApi.invoices.downloadPdf(invoice.id)
-      const pdfBlob = new Blob([blob], { type: 'application/pdf' })
-      console.log('[PDF Download] Blob received, size:', pdfBlob.size, 'bytes')
-      if (pdfBlob.size === 0) {
-        throw new Error(`Empty PDF blob received for invoice ${invoice.id}`)
-      }
-
-      if (navigator.share && typeof navigator.canShare === 'function') {
-        const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' })
-        if (navigator.canShare({ files: [pdfFile] })) {
-          console.log('[PDF Download] Sharing PDF via Web Share API...')
-          await navigator.share({ title: filename, files: [pdfFile] })
-          console.log('[PDF Download] Shared successfully via Web Share API')
-          toast.success(t('zzpInvoices.pdfDownloaded'))
-          return
-        }
-      }
-
-      // --- iOS Strategy 4: blob URL in new tab ---
-      const blobUrl = window.URL.createObjectURL(pdfBlob)
-      console.log('[PDF Download] Opening blob URL in new tab...')
-      const tabWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer')
-      if (!tabWindow) {
-        window.URL.revokeObjectURL(blobUrl)
-        console.error('[PDF Download] Popup blocked by browser')
-        toast.error(t('zzpInvoices.popupBlocked'))
-        return
-      }
-      setTimeout(() => {
-        console.log('[PDF Download] Revoking blob URL after iOS delay')
-        window.URL.revokeObjectURL(blobUrl)
-      }, PDF_URL_REVOCATION_DELAY_MS * IOS_REVOCATION_DELAY_MULTIPLIER)
+      window.location.assign(directUrl)
 
       console.log('[PDF Download] Download initiated successfully')
       toast.success(t('zzpInvoices.pdfDownloaded'))

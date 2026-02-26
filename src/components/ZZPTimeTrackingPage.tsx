@@ -6,11 +6,11 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { CalendarBlank, Clock, CurrencyEur, PencilSimple, Plus, Receipt, TrashSimple, WarningCircle } from '@phosphor-icons/react'
-import { WorkSession, getApiBaseUrl, zzpApi, ZZPCustomer, ZZPTimeEntry, ZZPTimeEntryCreate } from '@/lib/api'
+import { WorkSession, getApiBaseUrl, zzpApi, ZZPCustomer, ZZPTimeEntry, ZZPTimeEntryCreate, ZZPTimeEntryUpdate } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
 import { toast } from 'sonner'
 import { navigateTo } from '@/lib/navigation'
@@ -121,6 +121,9 @@ export const ZZPTimeTrackingPage = () => {
   const [activeSession, setActiveSession] = useState<WorkSession | null>(null)
   const [isClockActionLoading, setIsClockActionLoading] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [isStartSessionDialogOpen, setIsStartSessionDialogOpen] = useState(false)
+  const [startSessionForm, setStartSessionForm] = useState({ customer_id: '', description: '', hourly_rate: '' })
+  const [sessionMetadata, setSessionMetadata] = useState<{ customer_id: string; hourly_rate: string } | null>(null)
 
   const customerMap = useMemo(() => Object.fromEntries(customers.map((c) => [c.id, c.name])), [customers])
 
@@ -247,12 +250,14 @@ export const ZZPTimeTrackingPage = () => {
   const weeklyOpenMinutes = useMemo(() => totalMinutesForEntries(openEntries), [openEntries])
   const weeklyOpenHours = useMemo(() => minutesToHours(weeklyOpenMinutes), [weeklyOpenMinutes])
 
-  const handleClockIn = async () => {
+  const handleClockIn = async (customer_id: string, description: string, hourly_rate: string) => {
     setIsClockActionLoading(true)
     try {
-      const session = await zzpApi.workSessions.start()
+      const session = await zzpApi.workSessions.start({ note: description || undefined })
       setActiveSession(session)
-      toast.success('Inchecken gestart')
+      setSessionMetadata({ customer_id, hourly_rate })
+      setIsStartSessionDialogOpen(false)
+      toast.success('Sessie gestart')
     } catch (error) {
       toast.error(parseApiError(error))
     } finally {
@@ -264,8 +269,23 @@ export const ZZPTimeTrackingPage = () => {
     setIsClockActionLoading(true)
     try {
       const response = await zzpApi.workSessions.stop()
+      let timeEntry = response.time_entry
+
+      if (sessionMetadata && (sessionMetadata.customer_id || sessionMetadata.hourly_rate)) {
+        const updateData: ZZPTimeEntryUpdate = {}
+        if (sessionMetadata.customer_id) updateData.customer_id = sessionMetadata.customer_id
+        if (sessionMetadata.hourly_rate) updateData.hourly_rate = parseFloat(sessionMetadata.hourly_rate)
+        try {
+          const updateResult = await zzpApi.timeEntries.update(timeEntry.id, updateData)
+          if (updateResult.entry) timeEntry = updateResult.entry
+        } catch {
+          toast.warning('Uren toegevoegd, maar klant/tarief kon niet worden opgeslagen.')
+        }
+      }
+
       setActiveSession(null)
-      setOpenEntries((prev) => [response.time_entry, ...prev])
+      setSessionMetadata(null)
+      setOpenEntries((prev) => [timeEntry, ...prev])
       toast.success('Uitgecheckt en uren toegevoegd')
     } catch (error) {
       toast.error(parseApiError(error))
@@ -616,13 +636,78 @@ export const ZZPTimeTrackingPage = () => {
             <Button
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
               disabled={isClockActionLoading}
-              onClick={() => void handleClockIn()}
+              onClick={() => {
+                setStartSessionForm({ customer_id: '', description: '', hourly_rate: '' })
+                setIsStartSessionDialogOpen(true)
+              }}
             >
-              {isClockActionLoading ? 'Inchecken...' : 'Inchecken'}
+              Inchecken
             </Button>
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isStartSessionDialogOpen} onOpenChange={setIsStartSessionDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sessie starten</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Klant</Label>
+              <Select
+                value={startSessionForm.customer_id || NO_CUSTOMER}
+                onValueChange={(value) =>
+                  setStartSessionForm((prev) => ({ ...prev, customer_id: value === NO_CUSTOMER ? '' : value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecteer een klant..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CUSTOMER}>Geen klant</SelectItem>
+                  {customers.filter((c) => c.status === 'active').map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Omschrijving</Label>
+              <Input
+                placeholder="Wat ga je doen?"
+                value={startSessionForm.description}
+                onChange={(e) => setStartSessionForm((prev) => ({ ...prev, description: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tarief (€/uur)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={startSessionForm.hourly_rate}
+                onChange={(e) => setStartSessionForm((prev) => ({ ...prev, hourly_rate: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsStartSessionDialogOpen(false)}>
+              Annuleren
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              disabled={isClockActionLoading}
+              onClick={() =>
+                void handleClockIn(startSessionForm.customer_id, startSessionForm.description, startSessionForm.hourly_rate)
+              }
+            >
+              {isClockActionLoading ? 'Starten...' : 'Start Sessie'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">

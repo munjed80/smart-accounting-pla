@@ -43,14 +43,14 @@ def format_date_nl(date_obj) -> str:
 def generate_invoice_html(invoice: ZZPInvoice) -> str:
     """
     Generate HTML for an invoice.
-    
+
     Args:
         invoice: ZZPInvoice model with lines loaded
-        
+
     Returns:
         HTML string for the invoice
     """
-    # Build seller address
+    # Build seller address lines
     seller_address_parts = []
     if invoice.seller_address_street:
         seller_address_parts.append(invoice.seller_address_street)
@@ -60,8 +60,8 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
         )
     if invoice.seller_address_country and invoice.seller_address_country != "Nederland":
         seller_address_parts.append(invoice.seller_address_country)
-    
-    # Build customer address
+
+    # Build customer address lines
     customer_address_parts = []
     if invoice.customer_address_street:
         customer_address_parts.append(invoice.customer_address_street)
@@ -71,7 +71,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
         )
     if invoice.customer_address_country and invoice.customer_address_country != "Nederland":
         customer_address_parts.append(invoice.customer_address_country)
-    
+
     # Build invoice lines HTML
     lines_html = ""
     for line in invoice.lines:
@@ -84,11 +84,18 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
             <td class="total">{format_amount(line.line_total_cents)}</td>
         </tr>
         """
-    
+
     # Format dates
     issue_date_str = format_date_nl(invoice.issue_date)
     due_date_str = format_date_nl(invoice.due_date) if invoice.due_date else "-"
-    
+
+    # Seller contact line (email / phone)
+    seller_contact_parts = []
+    if invoice.seller_email:
+        seller_contact_parts.append(invoice.seller_email)
+    if invoice.seller_phone:
+        seller_contact_parts.append(invoice.seller_phone)
+
     html = f"""
     <!DOCTYPE html>
     <html lang="nl">
@@ -100,291 +107,348 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                 size: A4;
                 margin: 2cm;
             }}
-            
+
             * {{
                 box-sizing: border-box;
                 margin: 0;
                 padding: 0;
             }}
-            
+
             body {{
-                font-family: 'Helvetica', 'Arial', sans-serif;
+                font-family: Arial, Helvetica, sans-serif;
                 font-size: 10pt;
-                line-height: 1.5;
-                color: #1a1a1a;
+                line-height: 1.6;
+                color: #1a1a2e;
             }}
-            
+
             .invoice-container {{
                 max-width: 100%;
             }}
-            
-            /* Header section */
+
+            /* ── TOP HEADER ── */
             .header {{
                 display: flex;
                 justify-content: space-between;
-                margin-bottom: 30px;
+                align-items: flex-start;
+                margin-bottom: 36px;
                 padding-bottom: 20px;
-                border-bottom: 2px solid #2563eb;
+                border-bottom: 3px solid #1d4ed8;
             }}
-            
-            .company-info {{
+
+            /* Sender block – top left */
+            .sender-block {{
                 flex: 1;
             }}
-            
-            .company-name {{
-                font-size: 18pt;
-                font-weight: bold;
-                color: #2563eb;
-                margin-bottom: 5px;
+
+            .sender-name {{
+                font-size: 20pt;
+                font-weight: 700;
+                color: #1d4ed8;
+                letter-spacing: -0.5px;
+                margin-bottom: 4px;
             }}
-            
-            .company-details {{
-                font-size: 9pt;
-                color: #666;
+
+            .sender-details {{
+                font-size: 8.5pt;
+                color: #555;
+                line-height: 1.7;
             }}
-            
-            .invoice-title {{
+
+            /* "FACTUUR" word-mark – top right */
+            .factuur-wordmark {{
                 text-align: right;
             }}
-            
-            .invoice-title h1 {{
-                font-size: 24pt;
-                color: #2563eb;
+
+            .factuur-wordmark h1 {{
+                font-size: 26pt;
+                font-weight: 800;
+                color: #1d4ed8;
                 text-transform: uppercase;
-                letter-spacing: 2px;
+                letter-spacing: 4px;
+                line-height: 1;
             }}
-            
-            .invoice-number {{
-                font-size: 11pt;
-                color: #333;
-                margin-top: 5px;
-            }}
-            
-            /* Addresses section */
-            .addresses {{
+
+            /* ── BILLING ROW (client details left, invoice summary box right) ── */
+            .billing-row {{
                 display: flex;
                 justify-content: space-between;
-                margin-bottom: 30px;
+                align-items: flex-start;
+                margin-bottom: 32px;
             }}
-            
-            .address-block {{
-                width: 45%;
+
+            /* Client billing details */
+            .billing-to {{
+                flex: 1;
+                padding-right: 20px;
             }}
-            
-            .address-label {{
-                font-size: 8pt;
+
+            .billing-to-label {{
+                font-size: 7.5pt;
+                font-weight: 700;
                 text-transform: uppercase;
-                color: #666;
-                margin-bottom: 5px;
-                letter-spacing: 1px;
+                letter-spacing: 1.2px;
+                color: #888;
+                margin-bottom: 6px;
             }}
-            
-            .address-content {{
-                font-size: 10pt;
-            }}
-            
-            .address-content strong {{
-                display: block;
+
+            .billing-to-name {{
                 font-size: 11pt;
-                margin-bottom: 3px;
+                font-weight: 700;
+                color: #1a1a2e;
+                margin-bottom: 2px;
             }}
-            
-            /* Invoice meta */
-            .invoice-meta {{
-                background: #f8fafc;
-                padding: 15px;
-                border-radius: 5px;
-                margin-bottom: 30px;
+
+            .billing-to-address {{
+                font-size: 9pt;
+                color: #444;
+                line-height: 1.6;
             }}
-            
-            .meta-row {{
+
+            /* Invoice summary box */
+            .invoice-summary {{
+                width: 240px;
+                background: #f1f5fd;
+                border-radius: 8px;
+                padding: 14px 18px;
+                border-left: 4px solid #1d4ed8;
+            }}
+
+            .summary-row {{
                 display: flex;
                 justify-content: space-between;
-                padding: 5px 0;
-            }}
-            
-            .meta-label {{
-                color: #666;
+                align-items: baseline;
+                padding: 4px 0;
+                border-bottom: 1px solid #dde3f0;
                 font-size: 9pt;
             }}
-            
-            .meta-value {{
-                font-weight: 500;
+
+            .summary-row:last-child {{
+                border-bottom: none;
             }}
-            
-            /* Lines table */
+
+            .summary-label {{
+                color: #555;
+                white-space: nowrap;
+                margin-right: 12px;
+            }}
+
+            .summary-value {{
+                font-weight: 600;
+                color: #1a1a2e;
+                text-align: right;
+            }}
+
+            .summary-value.highlight {{
+                color: #1d4ed8;
+            }}
+
+            /* ── LINES TABLE ── */
             .lines-table {{
                 width: 100%;
                 border-collapse: collapse;
-                margin-bottom: 30px;
+                margin-bottom: 24px;
+                font-size: 9.5pt;
             }}
-            
+
+            .lines-table thead tr {{
+                background: #eef2fb;
+            }}
+
             .lines-table th {{
-                background: #2563eb;
-                color: white;
-                padding: 12px 10px;
+                padding: 10px 10px;
                 text-align: left;
-                font-size: 9pt;
+                font-size: 8pt;
+                font-weight: 700;
                 text-transform: uppercase;
-                letter-spacing: 0.5px;
+                letter-spacing: 0.6px;
+                color: #1d4ed8;
+                border-bottom: 2px solid #c7d2f0;
             }}
-            
-            .lines-table th:last-child,
-            .lines-table td:last-child {{
-                text-align: right;
-            }}
-            
+
             .lines-table th.quantity,
             .lines-table td.quantity,
             .lines-table th.vat,
             .lines-table td.vat {{
                 text-align: center;
             }}
-            
+
             .lines-table th.price,
             .lines-table td.price,
             .lines-table th.total,
             .lines-table td.total {{
                 text-align: right;
             }}
-            
+
             .lines-table td {{
-                padding: 12px 10px;
-                border-bottom: 1px solid #e5e7eb;
+                padding: 10px 10px;
+                border-bottom: 1px solid #e8ecf5;
+                color: #1a1a2e;
             }}
-            
-            .lines-table tr:last-child td {{
-                border-bottom: 2px solid #2563eb;
-            }}
-            
+
             .lines-table tbody tr:nth-child(even) {{
-                background: #f8fafc;
+                background: #f8faff;
             }}
-            
-            /* Totals section */
+
+            .lines-table tbody tr:last-child td {{
+                border-bottom: 2px solid #1d4ed8;
+            }}
+
+            /* ── TOTALS ── */
             .totals {{
                 margin-left: auto;
-                width: 300px;
+                width: 280px;
+                margin-bottom: 32px;
             }}
-            
+
             .totals-row {{
                 display: flex;
                 justify-content: space-between;
-                padding: 8px 0;
+                padding: 6px 0;
+                font-size: 9.5pt;
             }}
-            
+
             .totals-row.subtotal {{
-                border-top: 1px solid #e5e7eb;
+                border-top: 1px solid #e8ecf5;
+                color: #555;
             }}
-            
+
+            .totals-row.vat-row {{
+                color: #555;
+            }}
+
             .totals-row.total {{
-                border-top: 2px solid #2563eb;
-                font-size: 14pt;
-                font-weight: bold;
-                color: #2563eb;
-                padding-top: 12px;
+                border-top: 2px solid #1d4ed8;
+                margin-top: 4px;
+                padding-top: 10px;
+                font-size: 13pt;
+                font-weight: 700;
+                color: #1d4ed8;
             }}
-            
-            /* Footer section */
+
+            /* ── FOOTER ── */
             .footer {{
-                margin-top: 40px;
+                margin-top: 36px;
                 padding-top: 20px;
-                border-top: 1px solid #e5e7eb;
+                border-top: 1px solid #e8ecf5;
+                display: flex;
+                align-items: flex-start;
+                gap: 20px;
             }}
-            
+
+            /* Payment info box */
             .payment-info {{
+                flex: 1;
                 background: #f0fdf4;
-                padding: 15px;
-                border-radius: 5px;
+                padding: 16px 18px;
+                border-radius: 8px;
                 border-left: 4px solid #22c55e;
             }}
-            
+
             .payment-title {{
-                font-weight: bold;
-                margin-bottom: 10px;
+                font-size: 9pt;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.8px;
                 color: #166534;
+                margin-bottom: 10px;
             }}
-            
+
             .payment-details {{
-                font-size: 9pt;
+                font-size: 8.5pt;
+                color: #1a1a2e;
+                line-height: 1.8;
             }}
-            
-            .payment-details strong {{
-                display: inline-block;
-                width: 100px;
+
+            .payment-details .pd-row {{
+                display: flex;
+                gap: 6px;
             }}
-            
+
+            .payment-details .pd-label {{
+                color: #555;
+                min-width: 68px;
+            }}
+
+            .payment-details .pd-value {{
+                font-weight: 600;
+            }}
+
             .notes {{
-                margin-top: 20px;
-                padding: 15px;
+                flex: 1;
+                padding: 16px 18px;
                 background: #fefce8;
-                border-radius: 5px;
+                border-radius: 8px;
                 border-left: 4px solid #eab308;
-                font-size: 9pt;
+                font-size: 8.5pt;
+                color: #1a1a2e;
+                line-height: 1.7;
             }}
-            
+
+            .notes-title {{
+                font-size: 9pt;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.8px;
+                color: #713f12;
+                margin-bottom: 8px;
+            }}
+
+            /* Page footer */
             .page-footer {{
-                margin-top: 30px;
+                margin-top: 28px;
                 padding-top: 10px;
-                border-top: 1px solid #e5e7eb;
+                border-top: 1px solid #e8ecf5;
                 text-align: center;
-                font-size: 8pt;
-                color: #aaa;
+                font-size: 7.5pt;
+                color: #bbb;
             }}
         </style>
     </head>
     <body>
         <div class="invoice-container">
-            <!-- Header -->
+
+            <!-- ── HEADER ── -->
             <div class="header">
-                <div class="company-info">
-                    <div class="company-name">{invoice.seller_company_name or 'Bedrijfsnaam'}</div>
-                    <div class="company-details">
+                <div class="sender-block">
+                    <div class="sender-name">{invoice.seller_company_name or 'Bedrijfsnaam'}</div>
+                    <div class="sender-details">
                         {('<br>'.join(seller_address_parts)) if seller_address_parts else ''}
-                        {f'<br>{invoice.seller_email}' if invoice.seller_email else ''}
-                        {f'<br>{invoice.seller_phone}' if invoice.seller_phone else ''}
+                        {f'<br>{" &nbsp;·&nbsp; ".join(seller_contact_parts)}' if seller_contact_parts else ''}
                     </div>
                 </div>
-                <div class="invoice-title">
+                <div class="factuur-wordmark">
                     <h1>Factuur</h1>
-                    <div class="invoice-number">{invoice.invoice_number}</div>
                 </div>
             </div>
-            
-            <!-- Addresses: company address is shown ONLY in the header above, not repeated here -->
-            <div class="addresses">
-                <div class="address-block">
-                    <div class="address-label">Van</div>
-                    <div class="address-content">
-                        <strong>{invoice.seller_company_name or '-'}</strong>
+
+            <!-- ── BILLING ROW ── -->
+            <div class="billing-row">
+                <!-- Client billing details (left) -->
+                <div class="billing-to">
+                    <div class="billing-to-label">Factuur aan</div>
+                    {f'<div class="billing-to-name">{invoice.customer_name}</div>' if invoice.customer_name else ''}
+                    {f'<div class="billing-to-address">{("<br>".join(customer_address_parts))}</div>' if customer_address_parts else ''}
+                    {f'<div class="billing-to-address">BTW: {invoice.customer_btw_number}</div>' if invoice.customer_btw_number else ''}
+                </div>
+
+                <!-- Invoice summary box (right) -->
+                <div class="invoice-summary">
+                    <div class="summary-row">
+                        <span class="summary-label">Factuurnummer</span>
+                        <span class="summary-value highlight">{invoice.invoice_number}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Factuurdatum</span>
+                        <span class="summary-value">{issue_date_str}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Vervaldatum</span>
+                        <span class="summary-value">{due_date_str}</span>
                     </div>
                 </div>
-                <div class="address-block">
-                    <div class="address-label">Aan</div>
-                    <div class="address-content">
-                        <strong>{invoice.customer_name or '-'}</strong>
-                        {('<br>'.join(customer_address_parts)) if customer_address_parts else ''}
-                    </div>
-                </div>
             </div>
-            
-            <!-- Invoice Meta: invoice number shown ONLY in the header above, not repeated here -->
-            <div class="invoice-meta">
-                <div class="meta-row">
-                    <span class="meta-label">Factuurdatum:</span>
-                    <span class="meta-value">{issue_date_str}</span>
-                </div>
-                <div class="meta-row">
-                    <span class="meta-label">Vervaldatum:</span>
-                    <span class="meta-value">{due_date_str}</span>
-                </div>
-                {f'''<div class="meta-row">
-                    <span class="meta-label">Klant BTW-nummer:</span>
-                    <span class="meta-value">{invoice.customer_btw_number}</span>
-                </div>''' if invoice.customer_btw_number else ''}
-            </div>
-            
-            <!-- Lines Table -->
+
+            <!-- ── LINE ITEMS TABLE ── -->
             <table class="lines-table">
                 <thead>
                     <tr>
@@ -399,14 +463,14 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                     {lines_html}
                 </tbody>
             </table>
-            
-            <!-- Totals -->
+
+            <!-- ── TOTALS ── -->
             <div class="totals">
                 <div class="totals-row subtotal">
                     <span>Subtotaal</span>
                     <span>{format_amount(invoice.subtotal_cents)}</span>
                 </div>
-                <div class="totals-row">
+                <div class="totals-row vat-row">
                     <span>BTW</span>
                     <span>{format_amount(invoice.vat_total_cents)}</span>
                 </div>
@@ -415,35 +479,36 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                     <span>{format_amount(invoice.total_cents)}</span>
                 </div>
             </div>
-            
-            <!-- Footer -->
+
+            <!-- ── FOOTER ── -->
             <div class="footer">
                 <div class="payment-info">
                     <div class="payment-title">Betalingsgegevens</div>
                     <div class="payment-details">
-                        {f'<strong>IBAN:</strong> {invoice.seller_iban}<br>' if invoice.seller_iban else ''}
-                        <strong>T.n.v.:</strong> {invoice.seller_company_name or '-'}<br>
-                        <strong>Kenmerk:</strong> {invoice.invoice_number}<br>
-                        {f'<strong>KvK:</strong> {invoice.seller_kvk_number}<br>' if invoice.seller_kvk_number else ''}
-                        {f'<strong>BTW:</strong> {invoice.seller_btw_number}' if invoice.seller_btw_number else ''}
+                        {f'<div class="pd-row"><span class="pd-label">IBAN</span><span class="pd-value">{invoice.seller_iban}</span></div>' if invoice.seller_iban else ''}
+                        <div class="pd-row"><span class="pd-label">T.n.v.</span><span class="pd-value">{invoice.seller_company_name or '-'}</span></div>
+                        <div class="pd-row"><span class="pd-label">Kenmerk</span><span class="pd-value">{invoice.invoice_number}</span></div>
+                        {f'<div class="pd-row"><span class="pd-label">KvK</span><span class="pd-value">{invoice.seller_kvk_number}</span></div>' if invoice.seller_kvk_number else ''}
+                        {f'<div class="pd-row"><span class="pd-label">BTW-nr.</span><span class="pd-value">{invoice.seller_btw_number}</span></div>' if invoice.seller_btw_number else ''}
                     </div>
                 </div>
-                
+
                 {f'''<div class="notes">
-                    <strong>Opmerkingen:</strong><br>
+                    <div class="notes-title">Opmerkingen</div>
                     {invoice.notes}
                 </div>''' if invoice.notes else ''}
             </div>
-            
-            <!-- Page footer: rendered once at the bottom of the document -->
+
+            <!-- Page footer -->
             <div class="page-footer">
                 Powered by MHM IT &bull; zzpershub.nl
             </div>
+
         </div>
     </body>
     </html>
     """
-    
+
     return html
 
 

@@ -50,6 +50,7 @@ type EntryFormState = {
 }
 
 const INVOICE_MODE_STORAGE_KEY = 'uren_invoice_mode'
+const SESSION_METADATA_STORAGE_KEY = 'uren_session_metadata'
 
 const parseHours = (value: ZZPTimeEntry['hours']): number => Number(value || 0)
 
@@ -123,7 +124,19 @@ export const ZZPTimeTrackingPage = () => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [isStartSessionDialogOpen, setIsStartSessionDialogOpen] = useState(false)
   const [startSessionForm, setStartSessionForm] = useState({ customer_id: '', description: '', hourly_rate: '' })
-  const [sessionMetadata, setSessionMetadata] = useState<{ customer_id: string; hourly_rate: string } | null>(null)
+  const [sessionMetadata, setSessionMetadata] = useState<{ customer_id: string; description: string; hourly_rate: string } | null>(() => {
+    try {
+      const stored = localStorage.getItem(SESSION_METADATA_STORAGE_KEY)
+      if (!stored) return null
+      const parsed = JSON.parse(stored)
+      if (parsed && typeof parsed === 'object' && 'customer_id' in parsed && 'description' in parsed && 'hourly_rate' in parsed) {
+        return parsed as { customer_id: string; description: string; hourly_rate: string }
+      }
+      return null
+    } catch {
+      return null
+    }
+  })
 
   const customerMap = useMemo(() => Object.fromEntries(customers.map((c) => [c.id, c.name])), [customers])
 
@@ -226,6 +239,12 @@ export const ZZPTimeTrackingPage = () => {
     return () => window.clearInterval(intervalId)
   }, [activeSession])
 
+  useEffect(() => {
+    if (!loading && !activeSession) {
+      localStorage.removeItem(SESSION_METADATA_STORAGE_KEY)
+    }
+  }, [loading, activeSession])
+
   const filteredOpenEntries = useMemo(() => {
     return filterTimeEntries(openEntries, { ...filters, q: debouncedSearch, from: filters.from || periodStart, to: filters.to || periodEnd }, customerMap)
   }, [openEntries, filters, debouncedSearch, customerMap, periodStart, periodEnd])
@@ -255,7 +274,9 @@ export const ZZPTimeTrackingPage = () => {
     try {
       const session = await zzpApi.workSessions.start({ note: description || undefined })
       setActiveSession(session)
-      setSessionMetadata({ customer_id, hourly_rate })
+      const metadata = { customer_id, description, hourly_rate }
+      setSessionMetadata(metadata)
+      localStorage.setItem(SESSION_METADATA_STORAGE_KEY, JSON.stringify(metadata))
       setIsStartSessionDialogOpen(false)
       toast.success('Sessie gestart')
     } catch (error) {
@@ -271,9 +292,10 @@ export const ZZPTimeTrackingPage = () => {
       const response = await zzpApi.workSessions.stop()
       let timeEntry = response.time_entry
 
-      if (sessionMetadata && (sessionMetadata.customer_id || sessionMetadata.hourly_rate)) {
+      if (sessionMetadata && (sessionMetadata.customer_id || sessionMetadata.description || sessionMetadata.hourly_rate)) {
         const updateData: ZZPTimeEntryUpdate = {}
         if (sessionMetadata.customer_id) updateData.customer_id = sessionMetadata.customer_id
+        if (sessionMetadata.description) updateData.description = sessionMetadata.description
         if (sessionMetadata.hourly_rate) updateData.hourly_rate = parseFloat(sessionMetadata.hourly_rate)
         try {
           const updateResult = await zzpApi.timeEntries.update(timeEntry.id, updateData)
@@ -285,6 +307,7 @@ export const ZZPTimeTrackingPage = () => {
 
       setActiveSession(null)
       setSessionMetadata(null)
+      localStorage.removeItem(SESSION_METADATA_STORAGE_KEY)
       setOpenEntries((prev) => [timeEntry, ...prev])
       toast.success('Uitgecheckt en uren toegevoegd')
     } catch (error) {

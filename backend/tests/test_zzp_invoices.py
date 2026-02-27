@@ -687,6 +687,10 @@ class TestInvoicePdfContent:
         else:
             payment_section = ""
         
+        # Verify invoice number is explicitly shown in payment section
+        assert "Factuurnummer" in payment_section, "Factuurnummer label should be in payment details section"
+        assert "INV-TEST-001" in payment_section, "Invoice number should be in payment details section"
+
         # Verify KvK is in payment section
         assert "12345678" in payment_section, "KvK number should be in payment details section"
         assert "KvK" in payment_section, "KvK label should be in payment details section"

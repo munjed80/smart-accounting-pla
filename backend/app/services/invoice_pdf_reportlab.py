@@ -311,6 +311,7 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         if invoice.seller_iban:
             payment_info_parts.append(f"<b>IBAN:</b> {invoice.seller_iban}")
         payment_info_parts.append(f"<b>T.n.v.:</b> {invoice.seller_company_name or '-'}")
+        payment_info_parts.append(f"<b>Factuurnummer:</b> {invoice.invoice_number}")
         payment_info_parts.append(f"<b>Kenmerk:</b> {invoice.invoice_number}")
         
         # Add company registration details

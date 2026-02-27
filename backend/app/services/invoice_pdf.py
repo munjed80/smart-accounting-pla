@@ -487,6 +487,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                     <div class="payment-details">
                         {f'<div class="pd-row"><span class="pd-label">IBAN</span><span class="pd-value">{invoice.seller_iban}</span></div>' if invoice.seller_iban else ''}
                         <div class="pd-row"><span class="pd-label">T.n.v.</span><span class="pd-value">{invoice.seller_company_name or '-'}</span></div>
+                        <div class="pd-row"><span class="pd-label">Factuurnummer</span><span class="pd-value">{invoice.invoice_number}</span></div>
                         <div class="pd-row"><span class="pd-label">Kenmerk</span><span class="pd-value">{invoice.invoice_number}</span></div>
                         {f'<div class="pd-row"><span class="pd-label">KvK</span><span class="pd-value">{invoice.seller_kvk_number}</span></div>' if invoice.seller_kvk_number else ''}
                         {f'<div class="pd-row"><span class="pd-label">BTW-nr.</span><span class="pd-value">{invoice.seller_btw_number}</span></div>' if invoice.seller_btw_number else ''}

@@ -17,7 +17,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm, cm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.pdfgen import canvas
-from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
+from reportlab.lib.enums import TA_RIGHT
 
 from app.models.zzp import ZZPInvoice
 
@@ -68,10 +68,10 @@ class NumberedCanvas(canvas.Canvas):
     def draw_page_number(self, page_count):
         """Add page number and branding to footer."""
         self.setFont("Helvetica", 8)
-        self.setFillColor(colors.grey)
+        self.setFillColor(colors.HexColor('#6b7280'))
         page_num_text = f"Pagina {self._pageNumber} van {page_count}"
         self.drawRightString(A4[0] - 2*cm, 1.5*cm, page_num_text)
-        footer_text = "Powered by MHM IT \u2022 zzpershub.nl"
+        footer_text = "Deze factuur is digitaal gegenereerd via ZZPERSHUB"
         self.drawCentredString(A4[0] / 2, 1.5*cm, footer_text)
 
 
@@ -104,37 +104,73 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         # Build elements
         elements = []
         styles = getSampleStyleSheet()
+        primary = colors.HexColor('#0f172a')
+        accent = colors.HexColor('#2563eb')
+        border = colors.HexColor('#dbe3ee')
+        muted = colors.HexColor('#64748b')
+        light_bg = colors.HexColor('#f8fafc')
+        light_accent_bg = colors.HexColor('#eff6ff')
         
         # Custom styles
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
-            fontSize=24,
-            textColor=colors.HexColor('#2563eb'),
-            spaceAfter=6,
+            fontSize=26,
+            textColor=primary,
+            spaceAfter=4,
             alignment=TA_RIGHT,
+        )
+
+        company_name_style = ParagraphStyle(
+            'CompanyName',
+            parent=styles['Heading1'],
+            fontSize=18,
+            textColor=primary,
+            spaceAfter=2,
         )
         
         heading_style = ParagraphStyle(
             'CustomHeading',
             parent=styles['Heading2'],
-            fontSize=14,
-            textColor=colors.HexColor('#2563eb'),
-            spaceAfter=12,
+            fontSize=11,
+            textColor=muted,
+            spaceAfter=2,
         )
-        
-        normal_style = styles['Normal']
+
+        normal_style = ParagraphStyle(
+            'NormalText',
+            parent=styles['Normal'],
+            fontSize=10,
+            leading=14,
+            textColor=primary,
+        )
         small_style = ParagraphStyle(
             'Small',
             parent=styles['Normal'],
+            fontSize=8.5,
+            leading=11,
+            textColor=muted,
+        )
+
+        chip_style = ParagraphStyle(
+            'Chip',
+            parent=styles['Normal'],
             fontSize=8,
-            textColor=colors.grey,
+            textColor=accent,
+            alignment=TA_RIGHT,
         )
         
         # Header section with company name and invoice title
+        seller_name = invoice.seller_company_name or 'Bedrijfsnaam'
+        customer_name = invoice.customer_name or '-'
+
         header_data = [
             [
-                Paragraph(f"<b>{invoice.seller_company_name or 'Bedrijfsnaam'}</b>", heading_style),
+                Paragraph("<b>AFZENDER</b>", heading_style),
+                Paragraph("<b>FACTUUR</b>", chip_style),
+            ],
+            [
+                Paragraph(f"<b>{seller_name}</b>", company_name_style),
                 Paragraph("<b>FACTUUR</b>", title_style),
             ],
         ]
@@ -156,18 +192,20 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         company_text = "<br/>".join(company_details)
         
         header_data.append([
-            Paragraph(company_text, small_style),
-            Paragraph(f"<b>{invoice.invoice_number}</b>", normal_style),
+            Paragraph(company_text or "-", small_style),
+            Paragraph(f"<b>Nummer:</b> {invoice.invoice_number}", normal_style),
         ])
         
         header_table = Table(header_data, colWidths=[9*cm, 8*cm])
         header_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#2563eb')),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('LINEBELOW', (0, 1), (-1, 1), 1.5, accent),
+            ('TEXTCOLOR', (1, 0), (1, 0), accent),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ]))
         elements.append(header_table)
-        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Spacer(1, 0.35*cm))
         
         # From/To addresses
         # Company address is shown ONLY in the header above; "Van" shows only the company name.
@@ -185,23 +223,26 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         
         address_data = [
             [
-                Paragraph("<b>Van</b>", small_style),
-                Paragraph("<b>Aan</b>", small_style),
+                Paragraph("<b>Van</b>", heading_style),
+                Paragraph("<b>Aan</b>", heading_style),
             ],
             [
-                Paragraph(f"<b>{invoice.seller_company_name or '-'}</b>", normal_style),
-                Paragraph(f"<b>{invoice.customer_name or '-'}</b><br/>{customer_text}", normal_style),
+                Paragraph(f"<b>{seller_name}</b>", normal_style),
+                Paragraph(f"<b>{customer_name}</b><br/>{customer_text}", normal_style),
             ],
         ]
         
         address_table = Table(address_data, colWidths=[8.5*cm, 8.5*cm])
         address_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('TOPPADDING', (0, 0), (-1, 0), 0),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ('BACKGROUND', (0, 1), (-1, 1), light_bg),
+            ('BOX', (0, 1), (-1, 1), 1, border),
+            ('TOPPADDING', (0, 1), (-1, 1), 10),
+            ('BOTTOMPADDING', (0, 1), (-1, 1), 10),
+            ('LEFTPADDING', (0, 1), (-1, 1), 10),
         ]))
         elements.append(address_table)
-        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Spacer(1, 0.35*cm))
         
         # Invoice metadata
         issue_date_str = format_date_nl(invoice.issue_date)
@@ -209,28 +250,35 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         
         # Invoice metadata: invoice number shown ONLY in the header above, not repeated here
         meta_data = [
-            ["Factuurdatum:", issue_date_str],
-            ["Vervaldatum:", due_date_str],
+            ["Factuurdatum", issue_date_str, "Factuurnummer", invoice.invoice_number],
+            ["Vervaldatum", due_date_str, "Status", str(invoice.status).split('.')[-1].replace('_', ' ').title()],
         ]
-        
+
         if invoice.customer_btw_number:
-            meta_data.append(["Klant BTW-nummer:", invoice.customer_btw_number])
+            meta_data.append(["Klant BTW-nummer", invoice.customer_btw_number, "", ""])
+
+        if invoice.seller_btw_number:
+            meta_data.append(["Jouw BTW-nummer", invoice.seller_btw_number, "", ""])
         
-        meta_table = Table(meta_data, colWidths=[4*cm, 13*cm])
+        meta_table = Table(meta_data, colWidths=[3.5*cm, 5*cm, 3.5*cm, 5*cm])
         meta_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
-            ('TEXTCOLOR', (0, 0), (0, -1), colors.grey),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.white),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('BACKGROUND', (0, 0), (-1, -1), light_bg),
+            ('TEXTCOLOR', (0, 0), (-1, -1), primary),
+            ('TEXTCOLOR', (0, 0), (0, -1), muted),
+            ('TEXTCOLOR', (2, 0), (2, -1), muted),
+            ('BOX', (0, 0), (-1, -1), 1, border),
+            ('LINEBELOW', (0, 0), (-1, -2), 0.5, border),
+            ('TOPPADDING', (0, 0), (-1, -1), 7),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
             ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
         ]))
         elements.append(meta_table)
-        elements.append(Spacer(1, 0.8*cm))
+        elements.append(Spacer(1, 0.6*cm))
         
         # Invoice lines table
         line_data = [
-            ["Omschrijving", "Aantal", "Prijs", "BTW", "Totaal"]
+            ["Omschrijving", "Aantal", "Prijs p/st", "BTW", "Regeltotaal"]
         ]
         
         for line in invoice.lines:
@@ -254,7 +302,7 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         ]
         lines_table.setStyle(TableStyle([
             # Header row
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
+            ('BACKGROUND', (0, 0), (-1, 0), primary),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
@@ -267,11 +315,11 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
             ('FONTSIZE', (0, 1), (-1, -1), 10),
             ('TOPPADDING', (0, 0), (-1, -1), 10),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-            ('LINEBELOW', (0, 1), (-1, -2), 0.5, colors.HexColor('#e5e7eb')),
-            ('LINEBELOW', (0, -1), (-1, -1), 2, colors.HexColor('#2563eb')),
+            ('LINEBELOW', (0, 1), (-1, -2), 0.5, border),
+            ('LINEBELOW', (0, -1), (-1, -1), 1.5, accent),
         ] + zebra_cmds))
         elements.append(lines_table)
-        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Spacer(1, 0.35*cm))
         
         # Totals section (aligned to the right)
         # NOTE: Bold styling for the total row is applied via TableStyle below,
@@ -283,18 +331,20 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
             ["Totaal", format_amount(invoice.total_cents)],
         ]
         
-        totals_table = Table(totals_data, colWidths=[4*cm, 4*cm])
+        totals_table = Table(totals_data, colWidths=[4.5*cm, 3.5*cm])
         totals_table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
             ('FONTNAME', (0, 0), (-1, 1), 'Helvetica'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('LINEABOVE', (0, 0), (-1, 0), 1, colors.HexColor('#e5e7eb')),
-            ('LINEABOVE', (0, 2), (-1, 2), 2, colors.HexColor('#2563eb')),
+            ('BACKGROUND', (0, 0), (-1, -1), light_bg),
+            ('BOX', (0, 0), (-1, -1), 1, border),
+            ('LINEABOVE', (0, 0), (-1, 0), 1, border),
+            ('LINEABOVE', (0, 2), (-1, 2), 1.5, accent),
             ('FONTNAME', (0, 2), (-1, 2), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 2), (-1, 2), 12),
-            ('TEXTCOLOR', (0, 2), (-1, 2), colors.HexColor('#2563eb')),
+            ('TEXTCOLOR', (0, 2), (-1, 2), primary),
         ]))
         
         # Create wrapper table to align totals to the right
@@ -304,7 +354,7 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ]))
         elements.append(wrapper_table)
-        elements.append(Spacer(1, 1*cm))
+        elements.append(Spacer(1, 0.75*cm))
         
         # Payment information with company details
         payment_info_parts = []
@@ -325,8 +375,9 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         payment_data = [[Paragraph("<b>Betalingsgegevens</b><br/>" + payment_text, normal_style)]]
         payment_table = Table(payment_data, colWidths=[17*cm])
         payment_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f0fdf4')),
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#22c55e')),
+            ('BACKGROUND', (0, 0), (-1, -1), light_accent_bg),
+            ('BOX', (0, 0), (-1, -1), 1, border),
+            ('LINEBEFORE', (0, 0), (0, 0), 4, accent),
             ('LEFTPADDING', (0, 0), (-1, -1), 12),
             ('RIGHTPADDING', (0, 0), (-1, -1), 12),
             ('TOPPADDING', (0, 0), (-1, -1), 12),
@@ -340,8 +391,8 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
             notes_data = [[Paragraph(f"<b>Opmerkingen:</b><br/>{invoice.notes}", normal_style)]]
             notes_table = Table(notes_data, colWidths=[17*cm])
             notes_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#fefce8')),
-                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#eab308')),
+                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#fffbeb')),
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#fde68a')),
                 ('LEFTPADDING', (0, 0), (-1, -1), 12),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 12),
                 ('TOPPADDING', (0, 0), (-1, -1), 12),

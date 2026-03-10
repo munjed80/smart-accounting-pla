@@ -672,6 +672,7 @@ async def require_force_paywall(
         )
 
 
+def require_feature(feature: str):
     """
     Factory function to create a feature-specific entitlement guard.
     

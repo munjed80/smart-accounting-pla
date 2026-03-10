@@ -259,4 +259,55 @@ describe('SettingsPage', () => {
     // Check that the page rendered (not blank/crashed)
     expect(screen.getByText('Profielinformatie')).toBeInTheDocument()
   })
+
+  it('renders Upgrade to Pro button for ZZP trial users and wires onClick', async () => {
+    vi.mocked(api.administrationApi.list).mockResolvedValue([{ id: 'admin-1', name: 'Test' }] as any)
+    vi.mocked(api.zzpApi.profile.get).mockResolvedValue({} as any)
+    vi.mocked(api.subscriptionApi.activateSubscription).mockResolvedValue({
+      status: 'TRIALING',
+      in_trial: true,
+      trial_end_at: '2026-02-01T00:00:00Z',
+      scheduled: true,
+      provider_subscription_id: null,
+    })
+
+    renderWithClient(<SettingsPage />)
+
+    // Wait for subscription data to load
+    await waitFor(() => {
+      expect(screen.getByText('Upgrade to Pro')).toBeInTheDocument()
+    })
+
+    const upgradeButton = screen.getByText('Upgrade to Pro').closest('button')
+    expect(upgradeButton).not.toBeNull()
+    expect(upgradeButton).toHaveAttribute('type', 'button')
+    
+    // Clicking should call activateSubscription
+    upgradeButton!.click()
+    await waitFor(() => {
+      expect(api.subscriptionApi.activateSubscription).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('shows cancel confirmation dialog instead of window.confirm', async () => {
+    vi.mocked(api.administrationApi.list).mockResolvedValue([{ id: 'admin-1', name: 'Test' }] as any)
+    vi.mocked(api.zzpApi.profile.get).mockResolvedValue({} as any)
+
+    renderWithClient(<SettingsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Cancel Trial')).toBeInTheDocument()
+    })
+
+    const cancelButton = screen.getByText('Cancel Trial').closest('button')
+    expect(cancelButton).not.toBeNull()
+    expect(cancelButton).toHaveAttribute('type', 'button')
+
+    // Clicking should show confirmation dialog, NOT call cancelSubscription directly
+    cancelButton!.click()
+    await waitFor(() => {
+      expect(screen.getByText('Abonnement opzeggen')).toBeInTheDocument()
+    })
+    expect(api.subscriptionApi.cancelSubscription).not.toHaveBeenCalled()
+  })
 })

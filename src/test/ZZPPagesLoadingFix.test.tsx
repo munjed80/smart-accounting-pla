@@ -193,6 +193,7 @@ describe('SmartDashboard — no SubscriptionBanner', () => {
         days_left_trial: 10,
         status: 'TRIALING',
         plan_code: null,
+        force_paywall: false,
       },
       subscription: null,
       isLoading: false,
@@ -200,6 +201,7 @@ describe('SmartDashboard — no SubscriptionBanner', () => {
       refetch: vi.fn(),
       canUseFeature: () => true,
       isAccountantBypass: false,
+      forcePaywall: false,
     })
     vi.mocked(api.administrationApi.list).mockResolvedValue([])
   })

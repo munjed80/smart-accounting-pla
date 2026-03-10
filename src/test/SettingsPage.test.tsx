@@ -156,6 +156,7 @@ describe('SettingsPage', () => {
         days_left_trial: 0,
         status: 'ACTIVE',
         plan_code: 'zzp_basic',
+        force_paywall: false,
       },
       subscription: null,
       isLoading: false,
@@ -163,6 +164,7 @@ describe('SettingsPage', () => {
       refetch: vi.fn(),
       canUseFeature: vi.fn(() => true),
       isAccountantBypass: false,
+      forcePaywall: false,
     })
     
     // Mock usePushNotifications hook

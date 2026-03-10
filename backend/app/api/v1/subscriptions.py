@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.api.v1.deps import CurrentUser, get_current_user, require_zzp
 from app.models.administration import AdministrationMember
 from app.models.subscription import SubscriptionStatus
@@ -111,6 +112,7 @@ async def get_my_subscription(
         in_trial=entitlements.in_trial,
         can_use_pro_features=entitlements.can_use_pro_features,
         days_left_trial=entitlements.days_left_trial,
+        force_paywall=settings.billing_force_paywall,
     )
 
 
@@ -191,6 +193,7 @@ async def get_entitlements(
         days_left_trial=entitlements.days_left_trial,
         status=entitlements.status,
         plan_code=entitlements.plan_code,
+        force_paywall=settings.billing_force_paywall,
     )
 
 

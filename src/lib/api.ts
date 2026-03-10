@@ -5508,6 +5508,8 @@ export interface SubscriptionResponse {
   in_trial: boolean
   can_use_pro_features: boolean
   days_left_trial: number
+  // Force-paywall test mode flag (BILLING_FORCE_PAYWALL=true on backend)
+  force_paywall: boolean
 }
 
 export interface EntitlementResponse {
@@ -5517,6 +5519,8 @@ export interface EntitlementResponse {
   days_left_trial: number
   status: string
   plan_code: string | null
+  // Force-paywall test mode flag (BILLING_FORCE_PAYWALL=true on backend)
+  force_paywall: boolean
 }
 
 export interface StartTrialResponse {

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.core.security import oauth2_scheme, decode_token
 from app.core.roles import UserRole
 from app.models.user import User
@@ -553,7 +554,69 @@ async def require_zzp_entitlement(
         )
 
 
-def require_feature(feature: str):
+async def require_force_paywall(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    """
+    Guard: Block ZZP users without an ACTIVE subscription when BILLING_FORCE_PAYWALL=True.
+
+    - Accountants, admins, and super_admins are NOT blocked (bypass).
+    - Non-ZZP roles other than the above are not blocked (no subscription concept).
+    - If BILLING_FORCE_PAYWALL=False (default), this is a no-op.
+
+    Raises:
+        HTTP 402: If ZZP user is not ACTIVE and force-paywall mode is enabled.
+    """
+    from app.services.subscription_service import subscription_service
+
+    # Fast path: flag is disabled (default)
+    if not settings.billing_force_paywall:
+        return
+
+    # Accountants and admins bypass the paywall entirely
+    if current_user.role in SUBSCRIPTION_BYPASS_ROLES:
+        return
+
+    # Only ZZP users are subject to the paywall
+    if current_user.role != UserRole.ZZP.value:
+        return
+
+    # Get user's primary administration
+    result = await db.execute(
+        select(Administration)
+        .join(AdministrationMember)
+        .where(AdministrationMember.user_id == current_user.id)
+        .order_by(AdministrationMember.created_at.asc())
+    )
+    administration = result.scalar_one_or_none()
+
+    if not administration:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "code": "SUBSCRIPTION_REQUIRED",
+                "message": "Abonnement vereist om de app te gebruiken.",
+                "force_paywall": True,
+            },
+        )
+
+    # Compute entitlements – this also transitions expired trials to EXPIRED
+    entitlements = await subscription_service.compute_entitlements(db, administration.id)
+
+    # Only ACTIVE (paid) subscriptions are allowed under force-paywall mode
+    if not entitlements.is_paid:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "code": "SUBSCRIPTION_REQUIRED",
+                "message": "Abonnement vereist om de app te gebruiken.",
+                "status": entitlements.status,
+                "force_paywall": True,
+            },
+        )
+
+
     """
     Factory function to create a feature-specific entitlement guard.
     

@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, APIRouter, Request
@@ -11,7 +12,6 @@ from datetime import datetime, timezone
 from app.core.config import settings
 from app.core.database import engine
 from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta, zzp_customers, zzp_profile, zzp_invoices, zzp_expenses, zzp_time, zzp_calendar, zzp_work_sessions, zzp_bank, zzp_insights, zzp_quotes, zzp_dashboard, bookkeeping, client_data, zzp_payments, zzp_ledger, zzp_commitments, certificates, subscriptions, webhooks, contact_messages, zzp_documents
-
 logger = logging.getLogger(__name__)
 
 
@@ -168,6 +168,29 @@ async def verify_database_enums() -> None:
         raise
 
 
+async def _run_billing_maintenance_once() -> None:
+    """Run billing maintenance (enforce_trial_override) once using a fresh DB session."""
+    from app.services.billing_maintenance import enforce_trial_override
+    from app.core.database import async_session_maker
+
+    try:
+        async with async_session_maker() as db:
+            await enforce_trial_override(db)
+    except Exception:
+        logger.exception("Billing maintenance run failed (non-fatal)")
+
+
+async def _billing_maintenance_loop() -> None:
+    """
+    Periodic background task: run billing maintenance every 5 minutes.
+    Started from the lifespan context on application startup.
+    """
+    INTERVAL_SECONDS = 5 * 60  # 5 minutes
+    while True:
+        await asyncio.sleep(INTERVAL_SECONDS)
+        await _run_billing_maintenance_once()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -211,6 +234,16 @@ async def lifespan(app: FastAPI):
     from app.core.database import async_session_maker
     register_audit_hooks(async_session_maker)
     logger.info("Audit logging hooks registered")
+
+    # Billing maintenance: enforce trial override on startup and schedule periodic runs
+    await _run_billing_maintenance_once()
+    asyncio.create_task(_billing_maintenance_loop())
+    if settings.billing_force_paywall:
+        logger.warning(
+            "BILLING_FORCE_PAYWALL is ENABLED – ZZP users without ACTIVE subscription "
+            "are blocked. BILLING_TRIAL_OVERRIDE_DAYS=%s",
+            settings.billing_trial_override_days,
+        )
     
     logger.info("Application startup completed successfully")
 
@@ -282,22 +315,27 @@ api_v1_router.include_router(work_queue.router, prefix="/accountant", tags=["wor
 api_v1_router.include_router(bank.router, prefix="/accountant", tags=["bank-reconciliation"])
 api_v1_router.include_router(bookkeeping.router, prefix="/accountant", tags=["bookkeeping-ledger"])
 api_v1_router.include_router(client_data.router, prefix="/accountant", tags=["client-data-access"])
-api_v1_router.include_router(zzp.router, prefix="/zzp", tags=["zzp-client-consent"])
-api_v1_router.include_router(zzp_customers.router, prefix="/zzp", tags=["zzp-customers"])
-api_v1_router.include_router(zzp_profile.router, prefix="/zzp", tags=["zzp-business-profile"])
-api_v1_router.include_router(zzp_invoices.router, prefix="/zzp", tags=["zzp-invoices"])
-api_v1_router.include_router(zzp_expenses.router, prefix="/zzp", tags=["zzp-expenses"])
-api_v1_router.include_router(zzp_time.router, prefix="/zzp", tags=["zzp-time-tracking"])
-api_v1_router.include_router(zzp_calendar.router, prefix="/zzp", tags=["zzp-calendar"])
-api_v1_router.include_router(zzp_work_sessions.router, prefix="/zzp", tags=["zzp-work-sessions"])
-api_v1_router.include_router(zzp_bank.router, prefix="/zzp", tags=["zzp-bank-payments"])
-api_v1_router.include_router(zzp_insights.router, prefix="/zzp", tags=["zzp-ai-insights"])
-api_v1_router.include_router(zzp_quotes.router, prefix="/zzp", tags=["zzp-quotes"])
-api_v1_router.include_router(zzp_dashboard.router, prefix="/zzp", tags=["zzp-dashboard"])
-api_v1_router.include_router(zzp_payments.router, prefix="/zzp", tags=["zzp-payments"])
-api_v1_router.include_router(zzp_ledger.router, prefix="/zzp", tags=["zzp-ledger"])
-api_v1_router.include_router(zzp_commitments.router, prefix="/zzp", tags=["zzp-commitments"])
-api_v1_router.include_router(zzp_documents.router, prefix="/zzp", tags=["zzp-documents"])
+
+# ZZP routers – paywall dependency enforces BILLING_FORCE_PAYWALL for non-active ZZP users
+from fastapi import Depends
+from app.api.v1.deps import require_force_paywall
+_zzp_paywall_deps = [Depends(require_force_paywall)]
+api_v1_router.include_router(zzp.router, prefix="/zzp", tags=["zzp-client-consent"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_customers.router, prefix="/zzp", tags=["zzp-customers"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_profile.router, prefix="/zzp", tags=["zzp-business-profile"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_invoices.router, prefix="/zzp", tags=["zzp-invoices"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_expenses.router, prefix="/zzp", tags=["zzp-expenses"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_time.router, prefix="/zzp", tags=["zzp-time-tracking"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_calendar.router, prefix="/zzp", tags=["zzp-calendar"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_work_sessions.router, prefix="/zzp", tags=["zzp-work-sessions"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_bank.router, prefix="/zzp", tags=["zzp-bank-payments"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_insights.router, prefix="/zzp", tags=["zzp-ai-insights"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_quotes.router, prefix="/zzp", tags=["zzp-quotes"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_dashboard.router, prefix="/zzp", tags=["zzp-dashboard"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_payments.router, prefix="/zzp", tags=["zzp-payments"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_ledger.router, prefix="/zzp", tags=["zzp-ledger"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_commitments.router, prefix="/zzp", tags=["zzp-commitments"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_documents.router, prefix="/zzp", tags=["zzp-documents"], dependencies=_zzp_paywall_deps)
 api_v1_router.include_router(subscriptions.router, prefix="", tags=["subscriptions"])
 api_v1_router.include_router(webhooks.router, prefix="", tags=["webhooks"])
 api_v1_router.include_router(observability.router, prefix="/ops", tags=["observability"])

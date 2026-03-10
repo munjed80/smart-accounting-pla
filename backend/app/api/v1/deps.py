@@ -1,7 +1,7 @@
 from typing import Annotated, Optional, Tuple, List
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -555,24 +555,79 @@ async def require_zzp_entitlement(
 
 
 async def require_force_paywall(
-    current_user: Annotated[User, Depends(get_current_user)],
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
+    token: Optional[str] = Query(default=None),
 ) -> None:
     """
     Guard: Block ZZP users without an ACTIVE subscription when BILLING_FORCE_PAYWALL=True.
 
     - Accountants, admins, and super_admins are NOT blocked (bypass).
     - Non-ZZP roles other than the above are not blocked (no subscription concept).
-    - If BILLING_FORCE_PAYWALL=False (default), this is a no-op.
+    - If BILLING_FORCE_PAYWALL=False (default), this is a complete no-op (no auth required).
+
+    Supports two auth methods to match the PDF download endpoint:
+      1. Authorization: Bearer <jwt>  (standard API calls)
+      2. ?token=<jwt> query parameter  (iOS Safari / direct browser navigation)
 
     Raises:
+        HTTP 401: If force paywall is on and no valid token is provided.
         HTTP 402: If ZZP user is not ACTIVE and force-paywall mode is enabled.
     """
     from app.services.subscription_service import subscription_service
 
-    # Fast path: flag is disabled (default)
+    # Fast path: flag is disabled (default) – no auth check needed at all
     if not settings.billing_force_paywall:
         return
+
+    # Extract JWT from Authorization header or ?token= query param
+    jwt_token: Optional[str] = None
+    bearer = request.headers.get("Authorization", "")
+    if bearer.startswith("Bearer "):
+        jwt_token = bearer.split(" ", 1)[1]
+    elif token:
+        jwt_token = token
+
+    if not jwt_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    payload = decode_token(jwt_token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id_str = payload.get("sub")
+    if user_id_str is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        user_uuid = UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    result = await db.execute(select(User).where(User.id == user_uuid))
+    current_user = result.scalar_one_or_none()
+    if current_user is None or not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     # Accountants and admins bypass the paywall entirely
     if current_user.role in SUBSCRIPTION_BYPASS_ROLES:

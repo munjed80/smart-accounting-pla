@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.roles import UserRole
+from app.core.config import settings
 from app.models.subscription import Plan, Subscription, SubscriptionStatus
 from app.models.administration import Administration
 
@@ -112,7 +113,12 @@ class SubscriptionService:
         
         # Create new trial subscription
         now = datetime.now(timezone.utc)
-        trial_end = now + timedelta(days=plan.trial_days)
+        # Respect BILLING_TRIAL_OVERRIDE_DAYS if set (force-paywall test mode)
+        override_days = settings.billing_trial_override_days
+        if override_days is not None:
+            trial_end = now + timedelta(days=override_days)
+        else:
+            trial_end = now + timedelta(days=plan.trial_days)
         
         subscription = Subscription(
             administration_id=administration_id,

@@ -30,6 +30,10 @@ class SubscriptionResponse(BaseModel):
     in_trial: bool = Field(description="Whether subscription is in trial period")
     can_use_pro_features: bool = Field(description="Whether user can access pro features")
     days_left_trial: int = Field(description="Days remaining in trial (0 if not in trial)")
+    force_paywall: bool = Field(
+        default=False,
+        description="Whether force-paywall test mode is active (BILLING_FORCE_PAYWALL=true)",
+    )
     
     class Config:
         from_attributes = True
@@ -43,6 +47,10 @@ class EntitlementResponse(BaseModel):
     days_left_trial: int = Field(description="Days remaining in trial (0 if not in trial)")
     status: str = Field(description="Subscription status (TRIALING, ACTIVE, EXPIRED, etc.)")
     plan_code: Optional[str] = Field(None, description="Plan code (e.g., 'zzp_basic')")
+    force_paywall: bool = Field(
+        default=False,
+        description="Whether force-paywall test mode is active (BILLING_FORCE_PAYWALL=true)",
+    )
 
 
 class StartTrialRequest(BaseModel):

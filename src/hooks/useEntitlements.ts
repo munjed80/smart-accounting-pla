@@ -19,6 +19,8 @@ export interface UseEntitlementsResult {
   refetch: () => void
   canUseFeature: (feature: string) => boolean
   isAccountantBypass: boolean
+  /** True when BILLING_FORCE_PAYWALL=true is returned by the backend */
+  forcePaywall: boolean
 }
 
 /**
@@ -54,6 +56,7 @@ export const useEntitlements = (): UseEntitlementsResult => {
         days_left_trial: 0,
         status: 'ACCOUNTANT_BYPASS',
         plan_code: null,
+        force_paywall: false,
       },
       subscription: null,
       isLoading: false,
@@ -61,6 +64,7 @@ export const useEntitlements = (): UseEntitlementsResult => {
       refetch,
       canUseFeature: () => true,
       isAccountantBypass: true,
+      forcePaywall: false,
     }
   }
   
@@ -84,15 +88,17 @@ export const useEntitlements = (): UseEntitlementsResult => {
     days_left_trial: subscription.days_left_trial,
     status: subscription.status,
     plan_code: subscription.plan_code,
+    force_paywall: subscription.force_paywall ?? false,
   } : null
   
   return {
     entitlements,
-    subscription,
+    subscription: subscription ?? null,
     isLoading,
     error: error as Error | null,
     refetch,
     canUseFeature,
     isAccountantBypass: false,
+    forcePaywall: subscription?.force_paywall ?? false,
   }
 }

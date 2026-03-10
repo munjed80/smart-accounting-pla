@@ -99,6 +99,29 @@ class Settings(BaseSettings):
         """Check if Mollie integration is enabled."""
         return bool(self.MOLLIE_API_KEY and self.MOLLIE_API_KEY.strip())
     
+    # ==========================================
+    # Billing Force Paywall (temporary test mode)
+    # ==========================================
+    # BILLING_FORCE_PAYWALL=true:  Any ZZP user without ACTIVE subscription is blocked
+    #                               from using the app (except subscription page + logout).
+    #                               Accountants and super_admin are NOT blocked.
+    # BILLING_TRIAL_OVERRIDE_DAYS: If set, all TRIALING subscriptions get their trial_end_at
+    #                               shortened to now + N days (0 = immediate expiry).
+    #                               Also used for new subscriptions created while override is active.
+    # To revert: set BILLING_FORCE_PAYWALL=false, unset BILLING_TRIAL_OVERRIDE_DAYS, redeploy.
+    BILLING_FORCE_PAYWALL: bool = False
+    BILLING_TRIAL_OVERRIDE_DAYS: Optional[int] = None  # e.g. 0 or 1
+
+    @property
+    def billing_force_paywall(self) -> bool:
+        """Check if billing force-paywall mode is enabled."""
+        return bool(self.BILLING_FORCE_PAYWALL)
+
+    @property
+    def billing_trial_override_days(self) -> Optional[int]:
+        """Return trial override days if set, else None."""
+        return self.BILLING_TRIAL_OVERRIDE_DAYS
+
     class Config:
         env_file = ".env"
         case_sensitive = True

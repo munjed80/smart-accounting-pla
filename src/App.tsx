@@ -51,8 +51,9 @@ import { navigateTo } from '@/lib/navigation'
 import { pathToTab, tabToPath } from '@/lib/routing'
 import { cleanupOverlayPortals } from '@/hooks/useCloseOverlayOnRouteChange'
 import { useOnboardingTour } from '@/hooks/useOnboardingTour'
+import { useEntitlements } from '@/hooks/useEntitlements'
 import { OnboardingTour } from '@/components/OnboardingTour'
-import { Database } from '@phosphor-icons/react'
+import { Database, LockSimple } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 
@@ -198,6 +199,44 @@ const ForbiddenAdminAccess = () => (
   </div>
 )
 
+/**
+ * Full-screen paywall shown when BILLING_FORCE_PAYWALL=true and ZZP user has no ACTIVE subscription.
+ * Only allows navigation to /settings (subscription management) and logout.
+ */
+const ForcedPaywallScreen = ({ onGoToSettings, onLogout }: { onGoToSettings: () => void; onLogout: () => void }) => (
+  <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center p-4">
+    <div className="max-w-md w-full rounded-lg border bg-card p-8 space-y-5 text-center shadow-lg">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-orange-100">
+        <LockSimple className="h-7 w-7 text-orange-600" weight="fill" />
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-xl font-semibold">Abonnement vereist</h2>
+        <p className="text-sm text-muted-foreground">
+          Je proefperiode is verlopen of je hebt nog geen actief abonnement.
+          Activeer een abonnement om de app te blijven gebruiken.
+        </p>
+      </div>
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-left">
+        <p className="text-sm font-semibold text-blue-900 mb-1">ZZP Basic — €6,95/maand</p>
+        <ul className="space-y-1 text-xs text-blue-800">
+          <li>✓ Onbeperkt facturen</li>
+          <li>✓ BTW-aangifte via Digipoort</li>
+          <li>✓ Bankrekening koppeling</li>
+          <li>✓ Exports (PDF, CSV)</li>
+        </ul>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Button onClick={onGoToSettings} className="w-full bg-orange-600 hover:bg-orange-700">
+          Abonnement activeren
+        </Button>
+        <Button variant="outline" onClick={onLogout} className="w-full">
+          Uitloggen
+        </Button>
+      </div>
+    </div>
+  </div>
+)
+
 const AppContent = () => {
   const { user, isAuthenticated, isLoading, checkSession, logout } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
@@ -221,6 +260,9 @@ const AppContent = () => {
     user?.id,
     user?.role,
   )
+
+  // Subscription / force-paywall state (ZZP users only)
+  const { forcePaywall, subscription: paywallSubscription, isLoading: isLoadingPaywall } = useEntitlements()
 
   // Listen for URL changes and sync with tab
   useEffect(() => {
@@ -568,9 +610,36 @@ const AppContent = () => {
     )
   }
 
-  // Show client dossier page for accountants
-  if (route.type === 'client-dossier' && (isAccountant || isSuperAdmin)) {
+  // Force-paywall guard: block ZZP users without ACTIVE subscription when flag is active.
+  // Accountants and super_admins are never blocked.
+  // Allow /settings (subscription management) to pass through so user can activate.
+  const isSettingsPath = route.type === 'app' && route.path === '/settings'
+  const isZzpUser = user?.role === 'zzp'
+  const paywallActive =
+    isZzpUser &&
+    forcePaywall &&
+    !isLoadingPaywall &&
+    paywallSubscription !== null && // Subscription data loaded
+    !paywallSubscription.is_paid &&  // Not ACTIVE
+    !isSettingsPath                  // Allow settings page through
+
+  if (paywallActive) {
     return (
+      <ForcedPaywallScreen
+        onGoToSettings={() => {
+          setActiveTab('settings')
+          navigateTo('/settings')
+        }}
+        onLogout={() => {
+          logout()
+          navigateTo('/login')
+        }}
+      />
+    )
+  }
+
+  // Show client dossier page for accountants
+  if (route.type === 'client-dossier' && (isAccountant || isSuperAdmin)) {    return (
       <AppShell 
         activeTab="clients" 
         onTabChange={handleTabChange}

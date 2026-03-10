@@ -16,6 +16,16 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useAuth } from '@/lib/AuthContext'
 import { 
   administrationApi, 
@@ -70,6 +80,7 @@ export const SettingsPage = () => {
   const [isCanceling, setIsCanceling] = useState(false)
   const [isReactivating, setIsReactivating] = useState(false)
   const [isActivating, setIsActivating] = useState(false)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
   // Simplified subscription data from /subscription/me (ZZP users only)
   const isZzp = user?.role === 'zzp' && !isAccountantBypass
@@ -231,11 +242,12 @@ export const SettingsPage = () => {
   }
 
   // Subscription management handlers
-  const handleCancelSubscription = async () => {
-    if (!window.confirm('Weet je zeker dat je je abonnement wilt opzeggen? Het blijft actief tot het einde van de huidige periode.')) {
-      return
-    }
+  const handleCancelSubscription = () => {
+    setShowCancelConfirm(true)
+  }
 
+  const handleCancelSubscriptionConfirmed = async () => {
+    setShowCancelConfirm(false)
     setIsCanceling(true)
     try {
       const result = await subscriptionApi.cancelSubscription()
@@ -428,7 +440,7 @@ export const SettingsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
+    <div className="relative min-h-screen bg-gradient-to-br from-background via-secondary to-background">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))] pointer-events-none" />
       
       <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in duration-500">
@@ -1163,6 +1175,24 @@ export const SettingsPage = () => {
 
         </div>
       </div>
+
+      {/* Cancel subscription confirmation dialog */}
+      <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Abonnement opzeggen</AlertDialogTitle>
+            <AlertDialogDescription>
+              Weet je zeker dat je je abonnement wilt opzeggen? Het blijft actief tot het einde van de huidige periode.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelSubscriptionConfirmed} className="bg-destructive text-white hover:bg-destructive/90">
+              Opzeggen bevestigen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

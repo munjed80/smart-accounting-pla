@@ -217,7 +217,7 @@ const ForcedPaywallScreen = ({ onGoToSettings, onLogout }: { onGoToSettings: () 
         </p>
       </div>
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-left">
-        <p className="text-sm font-semibold text-blue-900 mb-1">ZZP Basic — €6,95/maand</p>
+        <p className="text-sm font-semibold text-blue-900 mb-1">ZZP Basic — €4,99/maand</p>
         <ul className="space-y-1 text-xs text-blue-800">
           <li>✓ Onbeperkt facturen</li>
           <li>✓ BTW-aangifte via Digipoort</li>

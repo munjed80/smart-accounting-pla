@@ -12,7 +12,7 @@ This document describes the subscription foundation for the ZZP accounting platf
 
 ### ZZP Basic Plan
 - **Plan Code**: `zzp_basic`
-- **Monthly Price**: €6.95
+- **Monthly Price**: €4.99
 - **Trial Period**: 30 days free
 - **Target Audience**: ZZP (freelancer) users only
 
@@ -281,7 +281,7 @@ When a user is blocked by an entitlement check, the API returns:
 
 ### Example Banner Messages
 - Trial Active: "Proefperiode actief — 15 dagen over"
-- Trial Expired: "Proefperiode afgelopen — activeer abonnement voor €6,95/maand"
+- Trial Expired: "Proefperiode afgelopen — activeer abonnement voor €4,99/maand"
 - Active: "Abonnement actief"
 - Canceled: "Abonnement geannuleerd — verlengd niet automatisch"
 

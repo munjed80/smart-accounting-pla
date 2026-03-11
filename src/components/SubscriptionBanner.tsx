@@ -28,6 +28,12 @@ export const SubscriptionBanner = () => {
     
     try {
       const result = await subscriptionApi.activateSubscription()
+
+      // Redirect to Mollie checkout for immediate payment
+      if (result.checkout_url) {
+        window.location.href = result.checkout_url
+        return
+      }
       
       // Refetch entitlements to update UI
       await refetch()

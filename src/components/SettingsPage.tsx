@@ -281,6 +281,11 @@ export const SettingsPage = () => {
     setIsActivating(true)
     try {
       const result = await subscriptionApi.activateSubscription()
+      if (result.checkout_url) {
+        // Redirect to Mollie checkout for immediate payment
+        window.location.href = result.checkout_url
+        return
+      }
       if (result.scheduled) {
         toast.success('Abonnement gepland', {
           description: `Je abonnement start automatisch na de proefperiode${result.trial_end_at ? ` op ${new Date(result.trial_end_at).toLocaleDateString('nl-NL')}` : ''}.`,

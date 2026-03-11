@@ -9,7 +9,7 @@ Handles:
 """
 import logging
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional, Dict, Any
 from uuid import UUID
@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dateutil import parser as dateutil_parser
 
 from app.core.config import settings
-from app.models.subscription import Subscription, SubscriptionStatus, WebhookEvent
+from app.models.subscription import Subscription, SubscriptionStatus, WebhookEvent, Plan
 from app.models.administration import Administration
 from app.models.user import User
 from app.models.audit_log import AuditLog
@@ -143,42 +143,66 @@ class MollieSubscriptionService:
     ) -> Dict[str, Any]:
         """
         Activate Mollie subscription for a user.
-        
-        Creates a scheduled subscription that starts after the trial period.
+
+        If the trial is still active:
+            Creates a scheduled subscription that starts after the trial period.
+            Returns checkout_url=None (no immediate payment needed).
+
+        If trial has expired or trial_days=0:
+            Creates a Mollie first-payment checkout session so the user can pay
+            immediately.  Returns checkout_url which the frontend must redirect to.
+
         Idempotent - returns existing subscription status if already activated.
-        
+
         Args:
             db: Database session
             user: User object
             administration_id: Administration UUID
-        
+
         Returns:
-            Dict with status information
-        
+            Dict with status information (including optional checkout_url)
+
         Raises:
             MollieError: If subscription creation fails
         """
         # Ensure trial started
         subscription = await subscription_service.ensure_trial_started(db, administration_id)
-        
+
         # Get administration
         admin_result = await db.execute(
             select(Administration).where(Administration.id == administration_id)
         )
         administration = admin_result.scalar_one_or_none()
-        
+
         if not administration:
             raise ValueError(f"Administration {administration_id} not found")
-        
+
+        # Determine whether the trial is still active
+        now = datetime.now(timezone.utc)
+        trial_end_aware = subscription.trial_end_at
+        if trial_end_aware and trial_end_aware.tzinfo is None:
+            trial_end_aware = trial_end_aware.replace(tzinfo=timezone.utc)
+        trial_active = bool(trial_end_aware and now < trial_end_aware)
+
+        # Check plan trial_days to detect zero-trial plans
+        plan_result = await db.execute(
+            select(Plan).where(Plan.id == subscription.plan_id)
+        )
+        plan = plan_result.scalar_one_or_none()
+        trial_days = plan.trial_days if plan else 30
+
+        # Decide flow: immediate checkout vs. scheduled subscription
+        need_immediate_checkout = not trial_active or trial_days == 0
+
         # Check if already activated (idempotent)
         if subscription.provider_subscription_id:
             logger.info(
                 f"Subscription {subscription.id} already activated with Mollie: "
                 f"{subscription.provider_subscription_id}"
             )
-            
+
             scheduled = self._is_subscription_scheduled(subscription)
-            
+
             # Generate appropriate message
             if subscription.status == SubscriptionStatus.ACTIVE:
                 message_nl = "Abonnement is actief."
@@ -186,30 +210,92 @@ class MollieSubscriptionService:
                 message_nl = "Abonnement gepland. Start na proefperiode."
             else:
                 message_nl = f"Abonnement status: {subscription.status.value}"
-            
+
             return {
                 "status": subscription.status.value,
                 "in_trial": subscription.status == SubscriptionStatus.TRIALING,
                 "trial_end_at": subscription.trial_end_at.isoformat() if subscription.trial_end_at else None,
                 "scheduled": scheduled,
                 "provider_subscription_id": subscription.provider_subscription_id,
+                "checkout_url": None,
                 "message_nl": message_nl,
             }
-        
+
         # Ensure Mollie customer exists
         customer_id = await self.ensure_mollie_customer(
             db, user, administration, subscription
         )
-        
+
+        # Build webhook URL
+        webhook_url = self._get_webhook_url()
+
+        if need_immediate_checkout:
+            # --- Immediate checkout flow ---
+            # Create a first-payment so the user is charged right away.
+            redirect_url = self._get_payment_redirect_url()
+            async with MollieClient() as mollie:
+                payment_data = await mollie.create_payment(
+                    amount=ZZP_BASIC_PRICE,
+                    currency=ZZP_BASIC_CURRENCY,
+                    description=ZZP_BASIC_DESCRIPTION,
+                    redirect_url=redirect_url,
+                    webhook_url=webhook_url,
+                    customer_id=customer_id,
+                    sequence_type="first",
+                    metadata={
+                        "administration_id": str(administration_id),
+                        "subscription_id": str(subscription.id),
+                        "payment_type": "first",
+                    },
+                )
+
+            checkout_url = (
+                payment_data.get("_links", {}).get("checkout", {}).get("href")
+                or payment_data.get("_links", {}).get("checkoutUrl", {}).get("href")
+            )
+            payment_id = payment_data.get("id")
+
+            logger.info(
+                "Created Mollie first-payment %s for subscription %s, checkout_url present: %s",
+                payment_id,
+                subscription.id,
+                bool(checkout_url),
+            )
+
+            # Audit log
+            audit = AuditLog(
+                client_id=administration_id,
+                entity_type="subscription",
+                entity_id=subscription.id,
+                action="SUBSCRIPTION_CHECKOUT_CREATED",
+                user_id=user.id,
+                user_role=user.role,
+                new_value={
+                    "mollie_payment_id": payment_id,
+                    "amount": str(ZZP_BASIC_PRICE),
+                    "currency": ZZP_BASIC_CURRENCY,
+                },
+            )
+            db.add(audit)
+            await db.commit()
+
+            return {
+                "status": subscription.status.value,
+                "in_trial": subscription.status == SubscriptionStatus.TRIALING,
+                "trial_end_at": subscription.trial_end_at.isoformat() if subscription.trial_end_at else None,
+                "scheduled": False,
+                "provider_subscription_id": None,
+                "checkout_url": checkout_url,
+                "message_nl": "Betaling starten. Je wordt doorgestuurd naar de betaalpagina.",
+            }
+
+        # --- Scheduled subscription flow (trial still active) ---
         # Determine start date (trial_end_at date)
         start_date = None
         if subscription.trial_end_at:
             # Convert to date (Mollie expects date, not datetime)
             start_date = subscription.trial_end_at.date()
-        
-        # Build webhook URL
-        webhook_url = self._get_webhook_url()
-        
+
         # Create Mollie subscription
         async with MollieClient() as mollie:
             subscription_data = await mollie.create_subscription(
@@ -225,18 +311,18 @@ class MollieSubscriptionService:
                     "subscription_id": str(subscription.id),
                 }
             )
-        
+
         # Store subscription ID
         subscription.provider_subscription_id = subscription_data["id"]
-        
+
         await db.commit()
         await db.refresh(subscription)
-        
+
         logger.info(
             f"Created Mollie subscription {subscription_data['id']} "
             f"for subscription {subscription.id}, starts at {start_date}"
         )
-        
+
         # Audit log
         audit = AuditLog(
             client_id=administration_id,
@@ -254,10 +340,10 @@ class MollieSubscriptionService:
         )
         db.add(audit)
         await db.commit()
-        
+
         # Determine response
         scheduled = self._is_subscription_scheduled(subscription)
-        
+
         # Generate appropriate message
         if scheduled:
             message_nl = "Abonnement gepland. Start na proefperiode."
@@ -265,13 +351,14 @@ class MollieSubscriptionService:
             message_nl = "Abonnement is actief."
         else:
             message_nl = f"Abonnement status: {subscription.status.value}"
-        
+
         return {
             "status": subscription.status.value,
             "in_trial": subscription.status == SubscriptionStatus.TRIALING,
             "trial_end_at": subscription.trial_end_at.isoformat() if subscription.trial_end_at else None,
             "scheduled": scheduled,
             "provider_subscription_id": subscription_data["id"],
+            "checkout_url": None,
             "message_nl": message_nl,
         }
     
@@ -582,7 +669,6 @@ class MollieSubscriptionService:
         
         # Determine start date (start immediately or tomorrow)
         # Mollie requires future date for new subscriptions, so we start tomorrow
-        from datetime import timedelta
         start_date = (datetime.now(timezone.utc) + timedelta(days=1)).date()
         
         # Build webhook URL
@@ -770,38 +856,89 @@ class MollieSubscriptionService:
         db: AsyncSession,
         payment_data: Dict[str, Any],
     ) -> None:
-        """Process payment webhook data"""
+        """Process payment webhook data.
+
+        Handles both recurring-subscription payments (where subscriptionId is present)
+        and first-payments created for immediate checkout (where subscriptionId is absent
+        but metadata.subscription_id identifies our internal subscription).
+        """
         payment_id = payment_data.get("id")
         status = payment_data.get("status")
         subscription_id = payment_data.get("subscriptionId")
-        
-        logger.info(f"Processing payment webhook: {payment_id}, status={status}")
-        
-        if not subscription_id:
-            logger.warning(f"Payment {payment_id} has no subscription ID")
-            return
-        
-        # Find subscription
-        result = await db.execute(
-            select(Subscription)
-            .where(Subscription.provider_subscription_id == subscription_id)
+        sequence_type = payment_data.get("sequenceType", "oneoff")
+
+        logger.info(
+            "Processing payment webhook: payment_id=%s status=%s sequenceType=%s subscriptionId=%s",
+            payment_id,
+            status,
+            sequence_type,
+            subscription_id,
         )
-        subscription = result.scalar_one_or_none()
-        
-        if not subscription:
-            logger.error(f"Subscription not found for payment webhook: {subscription_id}")
-            return
-        
-        # Update subscription status based on payment status
+
+        # --- Locate the internal subscription ---
+        subscription: Optional[Subscription] = None
+
+        if subscription_id:
+            # Recurring payment linked to a known Mollie subscription
+            result = await db.execute(
+                select(Subscription)
+                .where(Subscription.provider_subscription_id == subscription_id)
+            )
+            subscription = result.scalar_one_or_none()
+
+            if not subscription:
+                logger.error(f"Subscription not found for payment webhook: {subscription_id}")
+                return
+        else:
+            # First-payment (sequenceType="first") – look up via metadata
+            metadata = payment_data.get("metadata") or {}
+            internal_sub_id = metadata.get("subscription_id")
+            if internal_sub_id:
+                try:
+                    result = await db.execute(
+                        select(Subscription)
+                        .where(Subscription.id == UUID(internal_sub_id))
+                    )
+                    subscription = result.scalar_one_or_none()
+                except Exception:
+                    pass
+
+            if not subscription:
+                # Fallback: try to find by customer ID
+                customer_id = payment_data.get("customerId")
+                if customer_id:
+                    result = await db.execute(
+                        select(Subscription)
+                        .where(Subscription.provider_customer_id == customer_id)
+                    )
+                    subscription = result.scalar_one_or_none()
+
+            if not subscription:
+                logger.warning(
+                    "Payment %s has no subscriptionId and no matching internal subscription – ignoring",
+                    payment_id,
+                )
+                return
+
+        # --- Update subscription status based on payment status ---
         if status == "paid":
             subscription.status = SubscriptionStatus.ACTIVE
-            
-            # Set current period (if available in payment data)
-            # Note: Mollie doesn't return period in payment data directly
-            # We'll rely on subscription webhooks for period updates
-            
-            logger.info(f"Payment paid, activated subscription {subscription.id}")
-            
+
+            logger.info(
+                "Payment paid (sequenceType=%s), activated subscription %s",
+                sequence_type,
+                subscription.id,
+            )
+
+            # For first-payments: create a recurring Mollie subscription so future charges
+            # happen automatically.  We do this only when there is no subscription ID yet.
+            if sequence_type == "first" and not subscription.provider_subscription_id:
+                await self._create_recurring_subscription_after_first_payment(
+                    db=db,
+                    subscription=subscription,
+                    payment_data=payment_data,
+                )
+
             # Audit log
             audit = AuditLog(
                 client_id=subscription.administration_id,
@@ -813,16 +950,17 @@ class MollieSubscriptionService:
                 new_value={
                     "mollie_payment_id": payment_id,
                     "status": status,
-                }
+                    "sequence_type": sequence_type,
+                },
             )
             db.add(audit)
-        
+
         elif status in ["failed", "expired", "canceled"]:
             # Payment failed - mark as PAST_DUE
             subscription.status = SubscriptionStatus.PAST_DUE
-            
+
             logger.warning(f"Payment failed for subscription {subscription.id}: {status}")
-            
+
             # Audit log
             audit = AuditLog(
                 client_id=subscription.administration_id,
@@ -837,16 +975,16 @@ class MollieSubscriptionService:
                 }
             )
             db.add(audit)
-        
+
         elif status in ["pending", "open"]:
             # Payment pending - check trial status
             now = datetime.now(timezone.utc)
-            
+
             # Ensure trial_end_at is timezone-aware
             trial_end_aware = subscription.trial_end_at
             if trial_end_aware and trial_end_aware.tzinfo is None:
                 trial_end_aware = trial_end_aware.replace(tzinfo=timezone.utc)
-            
+
             if trial_end_aware and now < trial_end_aware:
                 # Still in trial, keep TRIALING status
                 logger.info(f"Payment pending for subscription {subscription.id}, still in trial")
@@ -854,6 +992,84 @@ class MollieSubscriptionService:
                 # Trial expired, mark as PAST_DUE
                 subscription.status = SubscriptionStatus.PAST_DUE
                 logger.warning(f"Payment pending but trial expired for subscription {subscription.id}")
+
+    async def _create_recurring_subscription_after_first_payment(
+        self,
+        db: AsyncSession,
+        subscription: Subscription,
+        payment_data: Dict[str, Any],
+    ) -> None:
+        """
+        After a successful first-payment, create a recurring Mollie subscription
+        so that future charges are automatic.
+
+        Args:
+            db: Database session
+            subscription: Internal subscription object (already ACTIVE)
+            payment_data: Mollie payment data for the first payment
+        """
+        customer_id = subscription.provider_customer_id or payment_data.get("customerId")
+        if not customer_id:
+            logger.warning(
+                "Cannot create recurring subscription after first payment: no customer ID for subscription %s",
+                subscription.id,
+            )
+            return
+
+        # Start recurring billing from tomorrow (first charge already happened today)
+        start_date = (datetime.now(timezone.utc) + timedelta(days=1)).date()
+        webhook_url = self._get_webhook_url()
+
+        try:
+            async with MollieClient() as mollie:
+                sub_data = await mollie.create_subscription(
+                    customer_id=customer_id,
+                    amount=ZZP_BASIC_PRICE,
+                    currency=ZZP_BASIC_CURRENCY,
+                    interval=ZZP_BASIC_INTERVAL,
+                    description=ZZP_BASIC_DESCRIPTION,
+                    webhook_url=webhook_url,
+                    start_date=start_date,
+                    metadata={
+                        "administration_id": str(subscription.administration_id),
+                        "subscription_id": str(subscription.id),
+                    },
+                )
+
+            subscription.provider_subscription_id = sub_data["id"]
+            # customer_id may not be set yet if it came from payment_data
+            if not subscription.provider_customer_id:
+                subscription.provider_customer_id = customer_id
+
+            logger.info(
+                "Created recurring Mollie subscription %s after first-payment for subscription %s",
+                sub_data["id"],
+                subscription.id,
+            )
+
+            # Audit log
+            audit = AuditLog(
+                client_id=subscription.administration_id,
+                entity_type="subscription",
+                entity_id=subscription.id,
+                action="SUBSCRIPTION_RECURRING_CREATED",
+                user_id=None,
+                user_role="system",
+                new_value={
+                    "mollie_subscription_id": sub_data["id"],
+                    "start_date": start_date.isoformat(),
+                    "first_payment_id": payment_data.get("id"),
+                },
+            )
+            db.add(audit)
+
+        except Exception as exc:
+            # Non-fatal: subscription is already ACTIVE; recurring will need manual fix.
+            logger.error(
+                "Failed to create recurring Mollie subscription after first-payment for subscription %s: %s",
+                subscription.id,
+                exc,
+            )
     
     async def _process_subscription_webhook(
         self,
@@ -953,6 +1169,21 @@ class MollieSubscriptionService:
         # Fallback without secret (not recommended for production)
         logger.warning("MOLLIE_WEBHOOK_SECRET not configured - webhook URL without secret")
         return f"{public_url}/api/v1/webhooks/mollie"
+
+    def _get_payment_redirect_url(self) -> str:
+        """
+        Get the frontend URL to redirect the user to after Mollie payment.
+
+        Returns:
+            str: Frontend redirect URL (settings page)
+        """
+        frontend_url = getattr(settings, "FRONTEND_URL", None) or settings.APP_URL
+
+        # Remove trailing slash
+        if frontend_url.endswith("/"):
+            frontend_url = frontend_url[:-1]
+
+        return f"{frontend_url}/settings?payment=complete"
 
 
 # Singleton instance

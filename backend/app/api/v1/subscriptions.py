@@ -204,12 +204,16 @@ async def activate_subscription(
 ):
     """
     Activate Mollie subscription for the current user.
-    
-    Creates a scheduled subscription that starts after the trial period.
-    Idempotent - returns existing subscription status if already activated.
-    
+
+    Always creates a Mollie first-payment checkout and returns a checkout_url.
+    The frontend must redirect the browser to checkout_url immediately so the
+    user can complete payment on the Mollie payment page.
+
+    Idempotent for already-ACTIVE subscriptions (returns existing status without
+    a new checkout URL).
+
     Returns:
-        ActivateSubscriptionResponse with status and scheduled flag
+        ActivateSubscriptionResponse with checkout_url for Mollie redirect
     """
     from app.services.mollie_subscription_service import mollie_subscription_service
     from app.integrations.mollie.client import MollieError

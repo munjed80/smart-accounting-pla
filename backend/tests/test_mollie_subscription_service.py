@@ -137,8 +137,8 @@ async def test_ensure_mollie_customer_is_idempotent(db_session):
 
 
 @pytest.mark.asyncio
-async def test_activate_subscription_creates_scheduled_subscription(db_session):
-    """Test that activate_subscription creates a scheduled Mollie subscription"""
+async def test_activate_subscription_creates_immediate_checkout_during_trial(db_session):
+    """Test that activate_subscription always creates an immediate checkout, even during trial"""
     # Create test data
     user = User(
         email="test@example.com",
@@ -167,7 +167,7 @@ async def test_activate_subscription_creates_scheduled_subscription(db_session):
     db_session.add(plan)
     await db_session.commit()
     
-    # Create subscription with trial ending in future
+    # Create subscription with trial ending in future (still in trial)
     trial_end = datetime.now(timezone.utc) + timedelta(days=15)
     subscription = Subscription(
         administration_id=admin.id,
@@ -181,18 +181,20 @@ async def test_activate_subscription_creates_scheduled_subscription(db_session):
     db_session.add(subscription)
     await db_session.commit()
     
-    # Mock Mollie client
+    # Mock Mollie client – now expects create_payment (not create_subscription)
     mock_customer_data = {"id": "cst_test123"}
-    mock_subscription_data = {
-        "id": "sub_test123",
-        "status": "active",
-        "startDate": trial_end.date().isoformat(),
+    mock_payment_data = {
+        "id": "tr_test123",
+        "status": "open",
+        "_links": {
+            "checkout": {"href": "https://www.mollie.com/checkout/test123"}
+        },
     }
     
     with patch("app.integrations.mollie.client.MollieClient.create_customer",
                return_value=mock_customer_data), \
-         patch("app.integrations.mollie.client.MollieClient.create_subscription",
-               return_value=mock_subscription_data):
+         patch("app.integrations.mollie.client.MollieClient.create_payment",
+               return_value=mock_payment_data):
         
         result = await mollie_subscription_service.activate_subscription(
             db=db_session,
@@ -200,15 +202,17 @@ async def test_activate_subscription_creates_scheduled_subscription(db_session):
             administration_id=admin.id,
         )
         
+        # Should always return an immediate checkout URL
+        assert result["checkout_url"] == "https://www.mollie.com/checkout/test123"
+        assert result["scheduled"] is False
         assert result["status"] == "TRIALING"
-        assert result["scheduled"] is True
         assert result["in_trial"] is True
-        assert result["provider_subscription_id"] == "sub_test123"
+        assert result["provider_subscription_id"] is None
 
 
 @pytest.mark.asyncio
-async def test_activate_subscription_is_idempotent(db_session):
-    """Test that activate_subscription is idempotent"""
+async def test_activate_subscription_is_idempotent_for_active(db_session):
+    """Test that activate_subscription is idempotent for already-ACTIVE subscriptions"""
     # Create test data
     user = User(
         email="test@example.com",
@@ -237,16 +241,15 @@ async def test_activate_subscription_is_idempotent(db_session):
     db_session.add(plan)
     await db_session.commit()
     
-    # Create subscription already activated
-    trial_end = datetime.now(timezone.utc) + timedelta(days=15)
+    # Create subscription that is already ACTIVE (fully paid)
     subscription = Subscription(
         administration_id=admin.id,
         plan_id=plan.id,
         plan_code=plan.code,
-        status=SubscriptionStatus.TRIALING,
-        trial_start_at=datetime.now(timezone.utc),
-        trial_end_at=trial_end,
-        starts_at=datetime.now(timezone.utc),
+        status=SubscriptionStatus.ACTIVE,
+        trial_start_at=datetime.now(timezone.utc) - timedelta(days=30),
+        trial_end_at=datetime.now(timezone.utc) - timedelta(days=1),
+        starts_at=datetime.now(timezone.utc) - timedelta(days=1),
         provider="mollie",
         provider_customer_id="cst_existing123",
         provider_subscription_id="sub_existing123",
@@ -254,13 +257,15 @@ async def test_activate_subscription_is_idempotent(db_session):
     db_session.add(subscription)
     await db_session.commit()
     
-    # Should not call Mollie API
+    # Should not call Mollie API – returns active status immediately
     result = await mollie_subscription_service.activate_subscription(
         db=db_session,
         user=user,
         administration_id=admin.id,
     )
     
-    # Should return existing subscription
-    assert result["provider_subscription_id"] == "sub_existing123"
-    assert result["scheduled"] is True
+    # Should return existing active subscription without checkout_url
+    assert result["status"] == "ACTIVE"
+    assert result["checkout_url"] is None
+    assert result["scheduled"] is False
+    assert result["in_trial"] is False

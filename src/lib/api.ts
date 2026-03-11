@@ -5596,9 +5596,10 @@ export const subscriptionApi = {
   },
 
   /**
-   * Activate Mollie subscription (Phase 2).
-   * Creates a scheduled subscription that starts after the trial period.
-   * Idempotent - returns existing subscription status if already activated.
+   * Activate Mollie subscription (Upgrade to Pro).
+   * Creates a Mollie first-payment checkout and returns checkout_url.
+   * The caller must redirect `window.location.href = result.checkout_url`.
+   * Idempotent for already-ACTIVE subscriptions (returns existing status).
    */
   activateSubscription: async (): Promise<ActivateSubscriptionResponse> => {
     const response = await api.post('/me/subscription/activate', {})

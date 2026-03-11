@@ -22,7 +22,7 @@ TEST_WEBHOOK_SECRET = "test_webhook_secret_12345"
 
 
 @pytest.mark.asyncio
-async def test_activate_endpoint_creates_customer_and_subscription(
+async def test_activate_endpoint_creates_customer_and_immediate_checkout(
     async_client: AsyncClient,
     auth_headers: dict,
     test_user: User,
@@ -30,7 +30,7 @@ async def test_activate_endpoint_creates_customer_and_subscription(
     test_zzp_plan: Plan,
     db_session,
 ):
-    """Test that activate endpoint creates Mollie customer and subscription"""
+    """Test that activate endpoint always creates Mollie customer and immediate checkout"""
     # Mock Mollie client responses
     mock_customer = {
         "id": "cst_test123",
@@ -38,21 +38,23 @@ async def test_activate_endpoint_creates_customer_and_subscription(
         "email": test_user.email,
     }
     
-    mock_subscription = {
-        "id": "sub_test123",
-        "status": "active",
+    mock_payment = {
+        "id": "tr_test123",
+        "status": "open",
         "amount": {"value": "6.95", "currency": "EUR"},
-        "interval": "1 month",
         "description": "ZZP Basic abonnement",
+        "_links": {
+            "checkout": {"href": "https://www.mollie.com/checkout/test123"}
+        },
     }
     
     with patch("app.integrations.mollie.client.MollieClient.create_customer") as mock_create_customer, \
-         patch("app.integrations.mollie.client.MollieClient.create_subscription") as mock_create_subscription, \
+         patch("app.integrations.mollie.client.MollieClient.create_payment") as mock_create_payment, \
          patch("app.services.mollie_subscription_service.settings.MOLLIE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET):
         
         # Configure mocks
         mock_create_customer.return_value = mock_customer
-        mock_create_subscription.return_value = mock_subscription
+        mock_create_payment.return_value = mock_payment
         
         # Call activate endpoint
         response = await async_client.post(
@@ -66,27 +68,26 @@ async def test_activate_endpoint_creates_customer_and_subscription(
         
         assert data["status"] == "TRIALING"
         assert data["in_trial"] is True
-        assert data["scheduled"] is True
-        assert data["provider_subscription_id"] == "sub_test123"
-        assert data["message_nl"] == "Abonnement gepland. Start na proefperiode."
+        assert data["scheduled"] is False
+        assert data["checkout_url"] == "https://www.mollie.com/checkout/test123"
+        assert data["message_nl"] == "Betaling starten. Je wordt doorgestuurd naar de betaalpagina."
         
         # Verify customer was created
         mock_create_customer.assert_called_once()
         
-        # Verify subscription was created with correct parameters
-        mock_create_subscription.assert_called_once()
-        call_kwargs = mock_create_subscription.call_args.kwargs
+        # Verify first-payment was created with correct parameters
+        mock_create_payment.assert_called_once()
+        call_kwargs = mock_create_payment.call_args.kwargs
         assert call_kwargs["customer_id"] == "cst_test123"
         assert call_kwargs["amount"] == Decimal("6.95")
         assert call_kwargs["currency"] == "EUR"
-        assert call_kwargs["interval"] == "1 month"
-        assert call_kwargs["description"] == "ZZP Basic abonnement"
+        assert call_kwargs["sequence_type"] == "first"
         # Webhook URL should include secret
         assert "?secret=" in call_kwargs["webhook_url"]
 
 
 @pytest.mark.asyncio
-async def test_activate_endpoint_is_idempotent(
+async def test_activate_endpoint_is_idempotent_for_active(
     async_client: AsyncClient,
     auth_headers: dict,
     test_user: User,
@@ -94,17 +95,19 @@ async def test_activate_endpoint_is_idempotent(
     test_zzp_plan: Plan,
     db_session,
 ):
-    """Test that activate endpoint is idempotent - returns existing subscription"""
-    # Create existing subscription with Mollie IDs
+    """Test that activate endpoint is idempotent for already-ACTIVE subscriptions"""
+    # Create existing ACTIVE subscription (already paid)
     now = datetime.now(timezone.utc)
     subscription = Subscription(
         administration_id=test_administration.id,
         plan_id=test_zzp_plan.id,
         plan_code=test_zzp_plan.code,
-        status=SubscriptionStatus.TRIALING,
-        trial_start_at=now,
-        trial_end_at=now + timedelta(days=30),
-        starts_at=now,
+        status=SubscriptionStatus.ACTIVE,
+        trial_start_at=now - timedelta(days=60),
+        trial_end_at=now - timedelta(days=30),
+        current_period_start=now - timedelta(days=15),
+        current_period_end=now + timedelta(days=15),
+        starts_at=now - timedelta(days=60),
         provider="mollie",
         provider_customer_id="cst_existing",
         provider_subscription_id="sub_existing",
@@ -112,9 +115,9 @@ async def test_activate_endpoint_is_idempotent(
     db_session.add(subscription)
     await db_session.commit()
     
-    # Mock should NOT be called
+    # Mock should NOT be called for an already-active subscription
     with patch("app.integrations.mollie.client.MollieClient.create_customer") as mock_create_customer, \
-         patch("app.integrations.mollie.client.MollieClient.create_subscription") as mock_create_subscription:
+         patch("app.integrations.mollie.client.MollieClient.create_payment") as mock_create_payment:
         
         # Call activate endpoint
         response = await async_client.post(
@@ -126,13 +129,14 @@ async def test_activate_endpoint_is_idempotent(
         assert response.status_code == 200
         data = response.json()
         
-        assert data["status"] == "TRIALING"
-        assert data["provider_subscription_id"] == "sub_existing"
-        assert data["scheduled"] is True
+        assert data["status"] == "ACTIVE"
+        assert data["in_trial"] is False
+        assert data["scheduled"] is False
+        assert data["checkout_url"] is None
         
-        # Verify no new customer/subscription created
+        # Verify no new customer/payment created
         mock_create_customer.assert_not_called()
-        mock_create_subscription.assert_not_called()
+        mock_create_payment.assert_not_called()
 
 
 @pytest.mark.asyncio

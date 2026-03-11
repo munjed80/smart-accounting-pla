@@ -190,24 +190,32 @@ async def test_activate_subscription_creates_immediate_checkout_during_trial(db_
             "checkout": {"href": "https://www.mollie.com/checkout/test123"}
         },
     }
-    
+
     with patch("app.integrations.mollie.client.MollieClient.create_customer",
                return_value=mock_customer_data), \
          patch("app.integrations.mollie.client.MollieClient.create_payment",
-               return_value=mock_payment_data):
-        
+               return_value=mock_payment_data) as mock_create_payment:
+
         result = await mollie_subscription_service.activate_subscription(
             db=db_session,
             user=user,
             administration_id=admin.id,
         )
-        
+
         # Should always return an immediate checkout URL
         assert result["checkout_url"] == "https://www.mollie.com/checkout/test123"
         assert result["scheduled"] is False
         assert result["status"] == "TRIALING"
         assert result["in_trial"] is True
         assert result["provider_subscription_id"] is None
+
+        # iDEAL fix: locale=nl_NL must be sent so Mollie shows iDEAL in the checkout
+        _, kwargs = mock_create_payment.call_args
+        assert kwargs.get("locale") == "nl_NL", (
+            "locale='nl_NL' must be passed to create_payment so iDEAL appears "
+            "in the Mollie checkout for Dutch ZZP subscribers"
+        )
+        assert kwargs.get("sequence_type") == "first"
 
 
 @pytest.mark.asyncio

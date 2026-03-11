@@ -62,9 +62,9 @@ class AuditLog(Base):
     
     # Action tracking
     action: Mapped[str] = mapped_column(
-        String(20),
+        String(100),
         nullable=False,
-        comment="Action performed (create, update, delete, validate, finalize)"
+        comment="Action performed (e.g., create, update, delete, SUBSCRIPTION_CHECKOUT_CREATED)"
     )
     
     # User information (nullable for system jobs)

@@ -4,20 +4,20 @@ const stages = [
   {
     icon: Upload,
     step: '01',
-    title: 'ZZP invoer',
-    bullets: ['Facturen, uitgaven en uren', 'Documenten uploaden'],
+    title: 'Voer in',
+    bullets: ['Facturen en klanten', 'Uren en uitgaven invoeren'],
   },
   {
     icon: ShieldCheck,
     step: '02',
-    title: 'Verwerking & controle',
-    bullets: ['Validatie + categorisatie', 'BTW-rubrieken en audit trail'],
+    title: 'Overzicht & controle',
+    bullets: ['Btw-overzicht per periode', 'Alles gecheckt, niets vergeten'],
   },
   {
     icon: FileCheck,
     step: '03',
-    title: 'Boekhouder uitvoer',
-    bullets: ['BTW-aangifte en rapporten', 'Exports (PDF/CSV/JSON)'],
+    title: 'Verstuur & exporteer',
+    bullets: ['Facturen direct per e-mail', 'Exporteer PDF, CSV of JSON'],
   },
 ]
 
@@ -32,10 +32,10 @@ export const HowItWorksSection = () => {
             <p className="text-xs font-semibold uppercase tracking-widest text-accent mb-3">WERKWIJZE</p>
             <h2 className="text-2xl font-bold sm:text-3xl lg:text-4xl mb-4">Hoe werkt het?</h2>
             <p className="text-muted-foreground text-sm sm:text-base lg:text-lg max-w-sm lg:max-w-md">
-              Van invoer tot BTW-aangifte — in drie heldere stappen.
+              Van eerste factuur tot btw-overzicht — in drie eenvoudige stappen.
             </p>
             <p className="mt-6 text-xs font-medium text-muted-foreground/60">
-              Altijd traceerbaar. Altijd controleerbaar.
+              Snel gestart. Altijd overzichtelijk.
             </p>
           </div>
 

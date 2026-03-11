@@ -7,75 +7,86 @@ type FaqItem = {
 }
 
 const faqItems: FaqItem[] = [
-  // Getting started
+  // ZZP-first questions
+  {
+    question: 'Hoe maak ik gratis een factuur?',
+    answer:
+      "Maak een gratis account aan op ZZPers Hub — geen creditcard nodig. Ga daarna naar 'Facturen' en klik op '+ Nieuwe factuur'. Vul de klantgegevens in, voeg regelitems toe met omschrijving en bedrag, kies het btw-tarief en klik op 'Versturen'. Jouw professionele factuur wordt direct als PDF verstuurd naar de klant.",
+  },
+  {
+    question: "Is ZZPers Hub geschikt voor zzp'ers?",
+    answer:
+      "Ja, ZZPers Hub is speciaal gemaakt voor zzp'ers, freelancers en zelfstandige ondernemers in Nederland. Je maakt snel professionele facturen, beheert klanten, registreert uren en houdt je btw-overzicht bij — zonder boekhoudkennis en zonder gedoe.",
+  },
+  {
+    question: 'Kan ik klanten beheren?',
+    answer:
+      "Ja. Via 'Klanten' voeg je klanten toe met naam, e-mailadres, KvK-nummer en factuuradres. Opgeslagen klanten zijn direct beschikbaar bij het aanmaken van facturen en uren. Je kunt klantgegevens altijd aanpassen via het klantprofiel.",
+  },
+  {
+    question: 'Kan ik uren registreren?',
+    answer:
+      "Ja. Via 'Uren' kun je uren op twee manieren bijhouden: handmatig (datum, klant, aantal uren) of via de ingebouwde timer (start en stop). Geregistreerde uren kun je direct omzetten in factuurregels.",
+  },
+  {
+    question: 'Kan ik bonnetjes uploaden?',
+    answer:
+      "Ja. Bij elke uitgave kun je een foto of PDF van het bonnetje uploaden via de knop 'Bijlage toevoegen'. De uitgave en het bonnetje worden meegenomen in je btw-overzicht en zijn opvraagbaar voor je boekhouder.",
+  },
+  {
+    question: 'Kan ik later met mijn boekhouder samenwerken?',
+    answer:
+      "Ja. Via 'Boekhouder' in het menu nodig je je accountant of boekhouder uit met diens e-mailadres. Na acceptatie krijgt de boekhouder leestoegang tot jouw dossier. Je behoudt altijd de controle en kunt de toegang op elk moment intrekken.",
+  },
+  {
+    question: 'Wat kost het na de proefperiode?',
+    answer:
+      'De eerste 30 dagen zijn volledig gratis — geen creditcard nodig bij aanmelding. Daarna is ZZPers Hub €4,99 per maand. Je kunt op elk moment opzeggen; er zijn geen opzegtermijnen of verborgen kosten.',
+  },
+  // Getting started (detail)
   {
     question: 'Hoe maak ik mijn eerste factuur aan?',
     answer:
-      'Ga naar "Facturen" in het zijmenu en klik op "+ Nieuwe factuur". Vul de klantgegevens in (of selecteer een bestaande klant), voeg regelitems toe met omschrijving, aantal en bedrag, en kies het BTW-tarief (21%, 9% of 0%). Klik op "Opslaan als concept" om op te slaan, of op "Versturen" om de factuur direct als PDF naar de klant te e-mailen.',
-  },
-  {
-    question: 'Hoe voeg ik klanten toe?',
-    answer:
-      'Open "Klanten" in het zijmenu en klik op "+ Klant toevoegen". Vul de bedrijfsnaam of naam, e-mailadres, KvK-nummer en factuuradres in. Opgeslagen klanten zijn direct beschikbaar bij het aanmaken van facturen en uren. U kunt klantgegevens later altijd aanpassen via het klantprofiel.',
-  },
-  {
-    question: 'Hoe registreer ik uren (handmatig en via check-in)?',
-    answer:
-      'Via "Uren" in het menu kunt u uren op twee manieren bijhouden. Handmatig: klik op "+ Urenboeking", kies datum, klant/project en voer het aantal uren in. Via check-in/check-out: klik op "Start timer" als u begint en op "Stop timer" als u klaar bent — de duur wordt automatisch berekend. Beide methoden laten u uren direct koppelen aan een klant en omzetten in een factuur.',
+      "Ga naar 'Facturen' in het zijmenu en klik op '+ Nieuwe factuur'. Vul de klantgegevens in (of selecteer een bestaande klant), voeg regelitems toe met omschrijving, aantal en bedrag, en kies het btw-tarief (21%, 9% of 0%). Klik op 'Opslaan als concept' om op te slaan, of op 'Versturen' om de factuur direct als PDF naar de klant te e-mailen.",
   },
   {
     question: 'Hoe voeg ik uitgaven toe en upload ik bonnetjes?',
     answer:
-      'Ga naar "Uitgaven" en klik op "+ Nieuwe uitgave". Vul de leverancier, datum, bedrag en BTW-tarief in. Upload een foto of PDF van het bonnetje via de knop "Bijlage toevoegen". De uitgave wordt meegenomen in uw BTW-overzicht en winst- en verliesrekening. Geüploade bijlagen zijn opvraagbaar voor uw accountant.',
+      "Ga naar 'Uitgaven' en klik op '+ Nieuwe uitgave'. Vul de leverancier, datum, bedrag en btw-tarief in. Upload een foto of PDF van het bonnetje via de knop 'Bijlage toevoegen'. De uitgave wordt meegenomen in je btw-overzicht.",
   },
   // VAT
   {
-    question: 'Wat laat het BTW-overzicht zien?',
+    question: 'Wat laat het btw-overzicht zien?',
     answer:
-      'Het BTW-overzicht toont per aangifte-periode (kwartaal of maand) hoeveel BTW u heeft gefactureerd (te betalen BTW), hoeveel BTW u heeft betaald op zakelijke kosten (terug te vorderen BTW) en het saldo (het te betalen of terug te vorderen bedrag). U ziet ook een uitsplitsing per BTW-tarief (21%, 9%, 0%).',
-  },
-  {
-    question: 'Hoe werkt de BTW-drilldown en wat zijn rubrieken?',
-    answer:
-      'Klik op een BTW-rubriek in het overzicht om te zien welke facturen en uitgaven bijdragen aan dat bedrag. Rubrieken zijn de vakjes van het Nederlandse BTW-aangifteformulier (bijv. rubriek 1a voor 21% BTW). Door de drilldown kunt u zelf controleren of elk bedrag klopt voordat u aangifte doet — dit is de volledige traceerbaarheid die het platform biedt.',
+      'Het btw-overzicht toont per aangifteperiode (kwartaal of maand) hoeveel btw je hebt gefactureerd (te betalen btw), hoeveel btw je hebt betaald op zakelijke kosten (terug te vorderen btw) en het saldo. Je ziet ook een uitsplitsing per btw-tarief (21%, 9%, 0%).',
   },
   {
     question: 'Wat betekent "concept" bij facturen?',
     answer:
-      'Een factuur met de status "concept" is opgeslagen maar nog niet verzonden of definitief gemaakt. U kunt een concept nog volledig aanpassen: bedragen, klant, regelitems. Zodra u de factuur verstuurt of definitief markeert, wordt een volgnummer toegewezen en kan de factuur niet meer worden gewijzigd (conform boekhoudregels). Concepten tellen niet mee in uw BTW-aangifte.',
+      'Een factuur met de status "concept" is opgeslagen maar nog niet verzonden of definitief gemaakt. Je kunt een concept nog volledig aanpassen. Zodra je de factuur verstuurt of definitief markeert, wordt een volgnummer toegewezen en kan de factuur niet meer worden gewijzigd (conform boekhoudregels). Concepten tellen niet mee in je btw-aangifte.',
   },
   // Collaboration
   {
     question: 'Hoe nodig ik mijn accountant uit?',
     answer:
-      'Ga naar "Boekhouder" in uw zijmenu en klik op "Accountant toevoegen". Voer het e-mailadres van uw accountant in. Uw accountant ontvangt een uitnodiging en, na acceptatie, machtiging om uw dossier in te zien. Dit werkt als een digitale machtiging (vergelijkbaar met een volmacht): u geeft expliciet toestemming en kunt die op elk moment intrekken via dezelfde pagina.',
-  },
-  {
-    question: 'Wat kan mijn accountant zien en doen?',
-    answer:
-      'Uw accountant heeft leestoegang tot uw facturen, uitgaven, urenregistraties en BTW-gegevens. De accountant kan aantekeningen maken en kwesties aanmaken (bijv. ontbrekende bonnetjes) die u vervolgens kunt oplossen. De accountant kan geen facturen namens u versturen of gegevens verwijderen. Alle acties van uw accountant worden gelogd in het audittrail.',
+      "Ga naar 'Boekhouder' in je zijmenu en klik op 'Accountant toevoegen'. Voer het e-mailadres van je accountant in. Je accountant ontvangt een uitnodiging en, na acceptatie, leestoegang tot je dossier. Je kunt de toegang op elk moment intrekken via dezelfde pagina.",
   },
   // Payments
   {
     question: 'Hoe werkt de gratis proefperiode?',
     answer:
-      'U krijgt 30 dagen gratis toegang tot alle functies, zonder creditcard bij aanmelding. Na 30 dagen wordt uw account automatisch beperkt tot alleen-lezen modus tenzij u een abonnement activeert. Uw gegevens blijven bewaard. U ontvangt een herinnering per e-mail voor het einde van de proefperiode.',
+      'Je krijgt 30 dagen gratis toegang tot alle functies, zonder creditcard bij aanmelding. Na 30 dagen wordt je account automatisch beperkt tot alleen-lezen modus tenzij je een abonnement activeert. Je gegevens blijven bewaard. Je ontvangt een herinnering per e-mail voor het einde van de proefperiode.',
   },
   {
     question: 'Hoe activeer of annuleer ik mijn abonnement?',
     answer:
-      'Ga naar "Instellingen" → "Abonnement" om uw abonnement te activeren. De betaling verloopt via Mollie (iDEAL, creditcard). U kunt op elk moment opzeggen via dezelfde pagina; uw toegang blijft actief tot het einde van de betaalde periode. Er zijn geen opzegtermijnen of boetes.',
+      "Ga naar 'Instellingen' → 'Abonnement' om je abonnement te activeren. De betaling verloopt via Mollie (iDEAL, creditcard). Je kunt op elk moment opzeggen via dezelfde pagina; je toegang blijft actief tot het einde van de betaalde periode. Er zijn geen opzegtermijnen of boetes.",
   },
   // Data/export
   {
     question: 'Hoe exporteer ik mijn gegevens (CSV/JSON)?',
     answer:
-      'Via "Instellingen" → "Gegevensexport" kunt u uw facturen, uitgaven en urenboekingen exporteren als CSV-bestand (compatibel met Excel) of als JSON. Selecteer het gewenste datumbereik en klik op "Exporteren". De download start direct in uw browser.',
-  },
-  {
-    question: 'Waar worden back-ups opgeslagen?',
-    answer:
-      'Smart Accounting slaat uw gegevens op beveiligde servers op. Er zijn geen automatische back-updownloads — back-ups worden beheerd door de hostingprovider. Wilt u zelf een kopie van uw gegevens bewaren, gebruik dan de exportfunctie (CSV/JSON) en sla het bestand lokaal op. Dit is de enige manier om zelf een offline kopie te hebben.',
+      "Via 'Instellingen' → 'Gegevensexport' kun je facturen, uitgaven en urenboekingen exporteren als CSV-bestand (compatibel met Excel) of als JSON. Selecteer het gewenste datumbereik en klik op 'Exporteren'. De download start direct in je browser.",
   },
 ]
 
@@ -90,7 +101,7 @@ export const FaqSection = () => {
     <section id="faq" className="py-14 sm:py-20">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <h2 className="text-2xl font-bold sm:text-4xl mb-2">Veelgestelde vragen</h2>
-        <p className="text-muted-foreground mb-10">Alles wat u wilt weten over het gebruik van Smart Accounting.</p>
+        <p className="text-muted-foreground mb-10">Alles wat je wilt weten over gratis facturen maken en ZZPers Hub.</p>
 
         <div className="space-y-2">
           {faqItems.map((item, index) => (

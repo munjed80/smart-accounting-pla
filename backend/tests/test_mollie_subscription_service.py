@@ -37,7 +37,7 @@ async def test_ensure_mollie_customer_creates_new_customer(db_session):
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
-        price_monthly=4.99,
+        price_monthly=6.95,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -101,7 +101,7 @@ async def test_ensure_mollie_customer_is_idempotent(db_session):
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
-        price_monthly=4.99,
+        price_monthly=6.95,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -158,7 +158,7 @@ async def test_activate_subscription_creates_immediate_checkout_during_trial(db_
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
-        price_monthly=4.99,
+        price_monthly=6.95,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -240,7 +240,7 @@ async def test_activate_subscription_is_idempotent_for_active(db_session):
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
-        price_monthly=4.99,
+        price_monthly=6.95,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,

@@ -49,7 +49,7 @@ export const TermsPage = () => {
             <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground leading-relaxed">
               <li>Nieuwe gebruikers ontvangen een gratis proefperiode van 30 dagen met toegang tot alle functies.</li>
               <li>Na afloop van de proefperiode is een betaald abonnement vereist voor voortgezet gebruik.</li>
-              <li>Het abonnement voor ZZP-gebruikers bedraagt €4,99 per maand (excl. BTW), maandelijks opzegbaar.</li>
+              <li>Het abonnement voor ZZP-gebruikers bedraagt €6,95 per maand (excl. BTW), maandelijks opzegbaar.</li>
               <li>Accountants/kantoren: prijsafspraken worden individueel vastgesteld.</li>
               <li>Bij niet-betaling wordt de toegang beperkt tot alleen-lezen; gegevens blijven bewaard.</li>
             </ul>

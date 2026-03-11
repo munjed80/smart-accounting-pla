@@ -71,7 +71,7 @@ async def test_create_subscription_success():
         "status": "active",
         "amount": {
             "currency": "EUR",
-            "value": "4.99"
+            "value": "6.95"
         },
         "interval": "1 month",
         "startDate": "2026-03-20",
@@ -81,7 +81,7 @@ async def test_create_subscription_success():
         async with MollieClient(api_key="test_key") as client:
             result = await client.create_subscription(
                 customer_id="cst_test123",
-                amount=Decimal("4.99"),
+                amount=Decimal("6.95"),
                 currency="EUR",
                 interval="1 month",
                 description="ZZP Basic",
@@ -101,7 +101,7 @@ async def test_create_subscription_without_api_key():
     with pytest.raises(MollieError) as exc_info:
         await client.create_subscription(
             customer_id="cst_test123",
-            amount=Decimal("4.99"),
+            amount=Decimal("6.95"),
             currency="EUR",
             interval="1 month",
             description="Test",
@@ -122,7 +122,7 @@ async def test_get_payment_success():
         "status": "paid",
         "amount": {
             "currency": "EUR",
-            "value": "4.99"
+            "value": "6.95"
         },
         "subscriptionId": "sub_test123",
     }
@@ -170,7 +170,7 @@ async def test_get_subscription_success():
         "status": "active",
         "amount": {
             "currency": "EUR",
-            "value": "4.99"
+            "value": "6.95"
         },
     }
     

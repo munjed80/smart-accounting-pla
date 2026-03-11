@@ -35,7 +35,7 @@ async def _make_plan(db_session) -> Plan:
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
-        price_monthly=4.99,
+        price_monthly=6.95,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,

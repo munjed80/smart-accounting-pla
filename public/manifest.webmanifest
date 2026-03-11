@@ -1,7 +1,7 @@
 {
-  "name": "Smart Accounting Platform",
-  "short_name": "Smart Accounting",
-  "description": "Professioneel boekhoudplatform voor ZZP'ers en accountants",
+  "name": "ZZPers Hub",
+  "short_name": "ZZPers Hub",
+  "description": "Gratis factuur maken voor zzp'ers. Professionele facturen, klantenbeheer, urenregistratie en btw-overzicht.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -41,7 +41,7 @@ async def test_activate_endpoint_creates_customer_and_immediate_checkout(
     mock_payment = {
         "id": "tr_test123",
         "status": "open",
-        "amount": {"value": "6.95", "currency": "EUR"},
+        "amount": {"value": "4.99", "currency": "EUR"},
         "description": "ZZP Basic abonnement",
         "_links": {
             "checkout": {"href": "https://www.mollie.com/checkout/test123"}
@@ -79,7 +79,7 @@ async def test_activate_endpoint_creates_customer_and_immediate_checkout(
         mock_create_payment.assert_called_once()
         call_kwargs = mock_create_payment.call_args.kwargs
         assert call_kwargs["customer_id"] == "cst_test123"
-        assert call_kwargs["amount"] == Decimal("6.95")
+        assert call_kwargs["amount"] == Decimal("4.99")
         assert call_kwargs["currency"] == "EUR"
         assert call_kwargs["sequence_type"] == "first"
         # Webhook URL should include secret
@@ -730,7 +730,7 @@ async def test_reactivate_canceled_subscription_creates_new(
     mock_new_subscription = {
         "id": "sub_new123",
         "status": "active",
-        "amount": {"value": "6.95", "currency": "EUR"},
+        "amount": {"value": "4.99", "currency": "EUR"},
         "interval": "1 month",
     }
     

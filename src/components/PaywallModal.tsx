@@ -92,7 +92,7 @@ export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallM
           <div className="flex items-start gap-3">
             <Sparkles className="h-5 w-5 text-blue-600 mt-0.5" />
             <div>
-              <h4 className="font-semibold text-blue-900 mb-2">ZZP Basic - €6,95/maand</h4>
+              <h4 className="font-semibold text-blue-900 mb-2">ZZP Basic - €4,99/maand</h4>
               <ul className="space-y-1.5 text-sm text-blue-800">
                 <li className="flex items-center gap-2">
                   <span className="text-blue-600">✓</span>

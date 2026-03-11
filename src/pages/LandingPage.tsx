@@ -133,7 +133,7 @@ export const LandingPage = () => {
       }
       tag.setAttribute(
         'content',
-        "Boekhouden en compliance in één slim platform voor ZZP'ers en accountants. Start met 30 dagen gratis, daarna €6,95 per maand voor ZZP.",
+        "Boekhouden en compliance in één slim platform voor ZZP'ers en accountants. Start met 30 dagen gratis, daarna €4,99 per maand voor ZZP.",
       )
     }
 
@@ -225,7 +225,7 @@ export const LandingPage = () => {
                 Inloggen
               </Button>
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">30 dagen gratis, daarna €6,95 per maand. Geen verplichtingen.</p>
+            <p className="mt-3 text-sm text-muted-foreground">30 dagen gratis, daarna €4,99 per maand. Geen verplichtingen.</p>
             <p className="mt-2 text-sm font-medium" style={{ color: 'var(--accent2)' }}>Binnen 60 seconden gestart.</p>
           </div>
         </div>
@@ -372,7 +372,7 @@ export const LandingPage = () => {
                   <p className="text-3xl font-bold text-primary">Gratis</p>
                   <p className="text-sm text-muted-foreground">eerste 30 dagen</p>
                 </div>
-                <p className="text-lg font-semibold">Daarna €6,95 <span className="text-sm font-normal text-muted-foreground">/ maand</span></p>
+                <p className="text-lg font-semibold">Daarna €4,99 <span className="text-sm font-normal text-muted-foreground">/ maand</span></p>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm lg:text-base">

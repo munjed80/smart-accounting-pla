@@ -72,7 +72,7 @@ export const LandingPage = () => {
       }
       tag.setAttribute(
         'content',
-        'Smart Accounting helpt ZZP’ers en accountants met auditbare boekhouding, PWA mobiel werken, PKI-ondertekende BTW-submissies en transparante prijzen vanaf €6,95 per maand.',
+        'Smart Accounting helpt ZZP’ers en accountants met auditbare boekhouding, PWA mobiel werken, PKI-ondertekende BTW-submissies en transparante prijzen vanaf €4,99 per maand.',
       )
     }
 
@@ -139,7 +139,7 @@ export const LandingPage = () => {
     { icon: <Scale className="h-5 w-5" />, title: 'Compliance', text: 'BTW-processen met PKI-signing en period lock-ondersteuning.' },
     { icon: <ShieldCheck className="h-5 w-5" />, title: 'Security-first', text: 'Toegangsbeheer, logging en veilige standaardinstellingen.' },
     { icon: <Smartphone className="h-5 w-5" />, title: 'Mobile-ready', text: 'PWA-ervaring op mobiel en desktop, inclusief offline flow.' },
-    { icon: <Euro className="h-5 w-5" />, title: 'Transparent pricing', text: 'Duidelijk tarief voor ZZP vanaf €6,95 per maand.' },
+    { icon: <Euro className="h-5 w-5" />, title: 'Transparent pricing', text: 'Duidelijk tarief voor ZZP vanaf €4,99 per maand.' },
   ]
 
   return (
@@ -195,7 +195,7 @@ export const LandingPage = () => {
 
           <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
             <Button size="lg" className="px-8 py-6 text-lg" onClick={() => navigateTo('/login')}>
-              Start voor €6,95 / maand
+              Start voor €4,99 / maand
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             <Button
@@ -306,7 +306,7 @@ export const LandingPage = () => {
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl">ZZP</CardTitle>
                 <div>
-                  <span className="text-5xl font-extrabold text-primary">€6,95</span>
+                  <span className="text-5xl font-extrabold text-primary">€4,99</span>
                   <span className="text-muted-foreground"> / maand</span>
                 </div>
               </CardHeader>
@@ -320,7 +320,7 @@ export const LandingPage = () => {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button className="w-full" onClick={() => navigateTo('/login')}>Start voor €6,95</Button>
+                <Button className="w-full" onClick={() => navigateTo('/login')}>Start voor €4,99</Button>
               </CardFooter>
             </Card>
 

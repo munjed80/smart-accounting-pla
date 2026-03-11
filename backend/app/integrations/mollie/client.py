@@ -207,7 +207,7 @@ class MollieClient:
         
         Args:
             customer_id: Mollie customer ID
-            amount: Subscription amount (e.g., Decimal("6.95"))
+            amount: Subscription amount (e.g., Decimal("4.99"))
             currency: Currency code (e.g., "EUR")
             interval: Interval string (e.g., "1 month")
             description: Subscription description
@@ -362,7 +362,7 @@ class MollieClient:
         Create a Mollie payment.
 
         Args:
-            amount: Payment amount (e.g., Decimal("6.95"))
+            amount: Payment amount (e.g., Decimal("4.99"))
             currency: Currency code (e.g., "EUR")
             description: Payment description
             redirect_url: URL to redirect user after payment

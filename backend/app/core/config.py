@@ -93,6 +93,8 @@ class Settings(BaseSettings):
     MOLLIE_API_KEY: Optional[str] = None  # Mollie API key (test_xxx or live_xxx)
     MOLLIE_WEBHOOK_SECRET: Optional[str] = None  # Webhook secret for verification
     APP_PUBLIC_URL: Optional[str] = None  # Public URL for webhooks (e.g., https://yourdomain.com)
+    MOLLIE_LOCALE: str = "nl_NL"  # BCP-47 locale sent to Mollie checkout; controls which payment
+                                   # methods are shown. "nl_NL" makes iDEAL visible for Dutch users.
     
     @property
     def mollie_enabled(self) -> bool:

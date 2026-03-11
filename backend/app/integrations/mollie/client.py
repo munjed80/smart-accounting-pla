@@ -356,6 +356,7 @@ class MollieClient:
         customer_id: Optional[str] = None,
         sequence_type: str = "oneoff",
         metadata: Optional[Dict[str, Any]] = None,
+        locale: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Create a Mollie payment.
@@ -369,6 +370,10 @@ class MollieClient:
             customer_id: Optional Mollie customer ID (required for sequenceType "first")
             sequence_type: "oneoff", "first", or "recurring"
             metadata: Optional metadata dict
+            locale: BCP-47 locale string (e.g., "nl_NL"). Affects which payment
+                methods Mollie shows. Pass "nl_NL" for Dutch customers to ensure
+                iDEAL appears in the checkout. Without this, Mollie may auto-detect
+                a non-Dutch locale and hide iDEAL.
 
         Returns:
             Dict with payment data including `_links.checkout.href`
@@ -396,12 +401,28 @@ class MollieClient:
         if metadata:
             payload["metadata"] = metadata
 
+        if locale:
+            payload["locale"] = locale
+
         try:
-            logger.info(
-                "Creating Mollie payment: amount=%s %s sequenceType=%s",
+            # Debug log: show full payload sent to Mollie (no secrets – API key
+            # is only in the Authorization header, not in the payload).
+            logger.debug(
+                "Mollie create_payment payload: amount=%s %s sequenceType=%s "
+                "locale=%s customerId=%s metadata=%s",
                 amount,
                 currency,
                 sequence_type,
+                locale,
+                customer_id,
+                metadata,
+            )
+            logger.info(
+                "Creating Mollie payment: amount=%s %s sequenceType=%s locale=%s",
+                amount,
+                currency,
+                sequence_type,
+                locale,
             )
 
             response = await self.client.post("/payments", json=payload)

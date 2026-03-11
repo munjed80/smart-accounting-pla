@@ -221,6 +221,13 @@ class MollieSubscriptionService:
                 webhook_url=webhook_url,
                 customer_id=customer_id,
                 sequence_type="first",
+                # locale is required so Mollie shows iDEAL in the checkout.
+                # iDEAL is only available when Mollie detects a Dutch locale; without
+                # this parameter Mollie may auto-detect a non-Dutch locale and hide it.
+                # Note: for iDEAL to work in the recurring flow SEPA Direct Debit must
+                # also be enabled on the Mollie profile (iDEAL first-payment creates a
+                # SEPA mandate used for subsequent recurring charges).
+                locale=settings.MOLLIE_LOCALE,
                 metadata={
                     "administration_id": str(administration_id),
                     "subscription_id": str(subscription.id),

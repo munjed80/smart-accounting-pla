@@ -346,6 +346,79 @@ class MollieClient:
             logger.error(f"HTTP error canceling Mollie subscription: {e}")
             raise MollieError(f"Network error canceling Mollie subscription: {e}")
     
+    async def create_payment(
+        self,
+        amount: Decimal,
+        currency: str,
+        description: str,
+        redirect_url: str,
+        webhook_url: str,
+        customer_id: Optional[str] = None,
+        sequence_type: str = "oneoff",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a Mollie payment.
+
+        Args:
+            amount: Payment amount (e.g., Decimal("6.95"))
+            currency: Currency code (e.g., "EUR")
+            description: Payment description
+            redirect_url: URL to redirect user after payment
+            webhook_url: Webhook URL for payment status notifications
+            customer_id: Optional Mollie customer ID (required for sequenceType "first")
+            sequence_type: "oneoff", "first", or "recurring"
+            metadata: Optional metadata dict
+
+        Returns:
+            Dict with payment data including `_links.checkout.href`
+
+        Raises:
+            MollieError: If payment creation fails
+        """
+        if not self.api_key:
+            raise MollieError("Mollie API key not configured")
+
+        payload: Dict[str, Any] = {
+            "amount": {
+                "currency": currency,
+                "value": f"{amount:.2f}",
+            },
+            "description": description,
+            "redirectUrl": redirect_url,
+            "webhookUrl": webhook_url,
+            "sequenceType": sequence_type,
+        }
+
+        if customer_id:
+            payload["customerId"] = customer_id
+
+        if metadata:
+            payload["metadata"] = metadata
+
+        try:
+            logger.info(
+                "Creating Mollie payment: amount=%s %s sequenceType=%s",
+                amount,
+                currency,
+                sequence_type,
+            )
+
+            response = await self.client.post("/payments", json=payload)
+
+            if response.status_code != 201:
+                self._handle_error(response, "create_payment")
+
+            payment_data = response.json()
+
+            logger.info("Created Mollie payment: %s", payment_data.get("id"))
+
+            return payment_data
+
+        except httpx.HTTPError as e:
+            logger.error("HTTP error creating Mollie payment: %s", e)
+            raise MollieError(f"Network error creating Mollie payment: {e}")
+
     async def get_payment(self, payment_id: str) -> Dict[str, Any]:
         """
         Get a Mollie payment by ID.

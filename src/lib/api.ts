@@ -5537,6 +5537,7 @@ export interface ActivateSubscriptionResponse {
   trial_end_at: string | null
   scheduled: boolean
   provider_subscription_id: string | null
+  checkout_url: string | null
 }
 
 export interface CancelSubscriptionResponse {

@@ -142,17 +142,19 @@ export const LandingPage = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <span className="flex items-center gap-2 text-lg font-bold text-primary sm:text-xl">
-              <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true" className="shrink-0">
-                <rect x="3" y="1" width="13" height="17" rx="2" stroke="currentColor" strokeWidth="1.6" />
-                <path d="M6 6h7M6 10h7M6 14h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                <circle cx="17" cy="16" r="4" fill="oklch(0.72 0.18 150)" />
+      <nav className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="mx-auto flex h-[3.75rem] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <span className="flex items-center gap-2.5 select-none">
+            <span className="logo-icon-container relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/25 to-accent/20 ring-1 ring-primary/30">
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true" className="text-primary">
+                <rect x="3" y="1" width="13" height="17" rx="2" stroke="currentColor" strokeWidth="1.7" />
+                <path d="M6 6h7M6 10h7M6 14h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <circle cx="17" cy="16" r="4" fill="var(--accent)" />
                 <text x="17" y="19.5" textAnchor="middle" fontSize="5.5" fontWeight="700" fill="white" fontFamily="system-ui">€</text>
               </svg>
-              ZZPers Hub
             </span>
+            <span className="brand-shimmer text-lg font-bold sm:text-xl">ZZPers Hub</span>
+          </span>
 
           <div className="hidden items-center space-x-8 md:flex">
             {navigation.map((item) => (
@@ -194,38 +196,59 @@ export const LandingPage = () => {
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-primary/10">
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/15 via-background to-accent/10" />
+        <div className="hero-glow-bg absolute inset-0 -z-10" />
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8 lg:py-32">
           <div className="mx-auto max-w-4xl text-center">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
-              <Star className="h-3 w-3" />
-              30 dagen gratis uitproberen — geen creditcard vereist
+            {/* Premium badge */}
+            <div className="hero-badge-premium mb-6 inline-flex items-center gap-2 rounded-full border border-accent/45 bg-accent/10 px-4 py-1.5 text-xs font-semibold text-accent shadow-[inset_0_1px_0_oklch(1_0_0/0.08),0_1px_8px_oklch(0_0_0/0.25)] backdrop-blur-sm">
+              <Star className="h-3.5 w-3.5 shrink-0 fill-current opacity-90" />
+              <span>30 dagen gratis uitproberen — geen creditcard vereist</span>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight sm:text-5xl lg:text-6xl lg:tracking-[-0.02em]">
-              Gratis factuur maken<br className="hidden sm:block" /> voor zzp'ers
+            {/* Headline */}
+            <h1 className="text-4xl font-extrabold leading-[1.15] tracking-tight sm:text-5xl lg:text-6xl lg:tracking-[-0.03em]">
+              <span className="block">Gratis factuur maken</span>
+              <span className="hero-gradient-text block">voor zzp'ers</span>
             </h1>
-            <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg lg:text-xl lg:leading-relaxed">
+            {/* Subtitle */}
+            <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg lg:mt-6 lg:max-w-2xl lg:text-xl lg:leading-[1.7]">
               Maak professionele facturen, beheer klanten, registreer uren en houd overzicht — allemaal op één plek. Eenvoudig, snel en mobiel.
             </p>
             {/* ZZP feature highlights */}
-            <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <div className="mt-7 flex flex-wrap justify-center gap-2">
               {['Facturen', 'Klanten', 'Uren', 'Uitgaven', 'BTW-overzicht', 'Mobiel'].map((label) => (
-                <span key={label} className="inline-flex items-center gap-1.5 rounded-full border border-accent/25 bg-accent/8 px-3 py-1 text-xs font-medium text-accent/90">
-                  <CheckCircle className="h-3 w-3" />
+                <span key={label} className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3.5 py-1.5 text-xs font-semibold text-accent/95 shadow-[inset_0_1px_0_oklch(1_0_0/0.06)] transition-all duration-150 hover:border-accent/50 hover:bg-accent/15 hover:shadow-[0_0_8px_oklch(0.75_0.22_150/0.2)]">
+                  <CheckCircle className="h-3 w-3 shrink-0" />
                   {label}
                 </span>
               ))}
             </div>
+            {/* CTA buttons */}
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Button size="lg" className="w-full max-w-sm sm:w-auto" onClick={() => navigateTo('/login')}>
+              <Button
+                size="lg"
+                className="btn-premium-glow w-full max-w-sm sm:w-auto"
+                onClick={() => navigateTo('/login')}
+              >
                 Start gratis
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-              <Button size="lg" variant="outline" className="w-full max-w-sm sm:w-auto" onClick={() => navigateTo('/login')}>
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full max-w-sm border-border/60 transition-colors hover:border-primary/40 hover:bg-primary/5 sm:w-auto"
+                onClick={() => navigateTo('/login')}
+              >
                 Inloggen
               </Button>
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">30 dagen gratis, daarna €4,99 per maand. Geen verplichtingen.</p>
-            <p className="mt-2 text-sm font-medium" style={{ color: 'var(--accent2)' }}>Binnen 60 seconden gestart.</p>
+            {/* Helper text */}
+            <div className="mt-5 space-y-1.5">
+              <p className="text-sm text-muted-foreground">30 dagen gratis, daarna €4,99 per maand. Geen verplichtingen.</p>
+              <p className="flex items-center justify-center gap-1.5 text-sm font-semibold" style={{ color: 'var(--accent2)' }}>
+                <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+                Binnen 60 seconden gestart.
+              </p>
+            </div>
           </div>
         </div>
       </section>

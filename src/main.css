@@ -200,3 +200,87 @@
     @apply overflow-x-hidden;
   }
 }
+
+/* ── Premium landing page utilities ───────────────────────────────────── */
+
+@keyframes brand-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes badge-pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.75 0.22 150 / 0); }
+  50%       { box-shadow: 0 0 12px 2px oklch(0.75 0.22 150 / 0.18); }
+}
+
+/* Animated shimmer wordmark */
+.brand-shimmer {
+  background: linear-gradient(
+    90deg,
+    oklch(0.65 0.25 265) 0%,
+    oklch(0.75 0.22 150) 25%,
+    oklch(0.88 0.12 200) 45%,
+    oklch(0.75 0.22 150) 55%,
+    oklch(0.65 0.25 265) 80%,
+    oklch(0.75 0.22 150) 100%
+  );
+  background-size: 250% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: brand-shimmer 5s linear infinite;
+}
+
+/* Gradient text for hero headline accent */
+.hero-gradient-text {
+  background: linear-gradient(
+    100deg,
+    oklch(0.65 0.25 265) 0%,
+    oklch(0.72 0.20 200) 40%,
+    oklch(0.75 0.22 150) 100%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Premium glow primary button */
+.btn-premium-glow {
+  background: linear-gradient(135deg, var(--primary) 0%, color-mix(in srgb, var(--primary) 85%, var(--accent)) 100%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary) 40%, transparent),
+    0 4px 20px color-mix(in srgb, var(--primary) 35%, transparent),
+    0 1px 3px oklch(0 0 0 / 0.4),
+    inset 0 1px 0 oklch(1 0 0 / 0.12);
+  transition: box-shadow 0.2s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+.btn-premium-glow:hover {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary) 50%, transparent),
+    0 6px 28px color-mix(in srgb, var(--primary) 45%, transparent),
+    0 2px 6px oklch(0 0 0 / 0.4),
+    inset 0 1px 0 oklch(1 0 0 / 0.15);
+  transform: translateY(-1px);
+}
+.btn-premium-glow:active {
+  transform: translateY(0);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary) 40%, transparent),
+    0 2px 10px color-mix(in srgb, var(--primary) 30%, transparent),
+    inset 0 1px 0 oklch(1 0 0 / 0.1);
+}
+
+/* Premium hero badge */
+.hero-badge-premium {
+  animation: badge-pulse-glow 4s ease-in-out infinite;
+}
+
+/* Radial glow overlay in hero section – uses design token */
+.hero-glow-bg {
+  background: radial-gradient(ellipse 80% 50% at 50% -10%, color-mix(in srgb, var(--primary) 12%, transparent), transparent);
+}
+
+/* Logo icon container glow – uses design token */
+.logo-icon-container {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--primary) 20%, transparent);
+}

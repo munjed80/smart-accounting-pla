@@ -46,15 +46,19 @@ export const PrivacyPage = () => {
 
           <section>
             <h2 className="text-xl font-semibold mb-3">2. Welke gegevens verwerken wij?</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+              Afhankelijk van hoe u gebruikmaakt van ZZPers Hub verwerken wij de volgende categorieën persoonsgegevens:
+            </p>
             <ul className="list-disc pl-5 space-y-1 text-muted-foreground text-sm leading-relaxed">
-              <li>Accountgegevens: naam, e-mailadres, wachtwoord (gehasht), rol (ZZP/accountant).</li>
-              <li>Bedrijfsgegevens: handelsnaam, KvK-nummer, BTW-nummer, factuuradres.</li>
-              <li>Facturen en klantgegevens: factuurbedragen, BTW, relatiebeheer.</li>
-              <li>Uitgaven en bonnetjes: bedragen, omschrijvingen, geüploade documenten.</li>
-              <li>Urenregistraties: datum, duur, project/klant.</li>
-              <li>Abonnements- en betalingsstatus (via Mollie).</li>
-              <li>Gebruikslogboeken en audittrail: tijdstempels van acties in de applicatie.</li>
-              <li>Technische gegevens: IP-adres (tijdelijk), browsertype, sessie-ID.</li>
+              <li><strong className="text-foreground">Accountgegevens:</strong> naam, e-mailadres, wachtwoord (gehasht), rol (ZZP/accountant) en registratiedatum.</li>
+              <li><strong className="text-foreground">Bedrijfsgegevens:</strong> handelsnaam, KvK-nummer, BTW-nummer, factuuradres en IBAN.</li>
+              <li><strong className="text-foreground">Klant- en factuurgegevens:</strong> naam en adresgegevens van uw klanten, factuurbedragen, BTW-specificaties en betalingsstatus.</li>
+              <li><strong className="text-foreground">Uitgaven en bonnetjes:</strong> bedragen, omschrijvingen, categorisering en eventueel geüploade scanbijlagen.</li>
+              <li><strong className="text-foreground">Urenregistraties:</strong> datum, duur, omschrijving en gekoppeld project of klant.</li>
+              <li><strong className="text-foreground">Contactformuliergegevens:</strong> naam, e-mailadres en de inhoud van het bericht dat u via het contactformulier verstuurt.</li>
+              <li><strong className="text-foreground">Betaalgerelateerde gegevens:</strong> abonnementsstatus, betaalhistorie en betalingsreferenties. Kaartgegevens worden nooit door ZZPers Hub verwerkt; betalingen verlopen via Mollie B.V. (PCI-DSS gecertificeerd).</li>
+              <li><strong className="text-foreground">Gebruikslogboeken en audittrail:</strong> tijdstempels van acties in de applicatie (ten behoeve van beveiliging en accountant-samenwerking).</li>
+              <li><strong className="text-foreground">Technische gegevens:</strong> IP-adres (tijdelijk geanonimiseerd), browsertype en sessie-ID.</li>
             </ul>
           </section>
 
@@ -91,7 +95,22 @@ export const PrivacyPage = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">6. Uw rechten</h2>
+            <h2 className="text-xl font-semibold mb-3">6. Cookies en analyse</h2>
+            <p className="text-muted-foreground text-sm leading-relaxed mb-2">
+              ZZPers Hub maakt gebruik van cookies en vergelijkbare technieken. Wij onderscheiden de volgende categorieën:
+            </p>
+            <ul className="list-disc pl-5 space-y-1 text-muted-foreground text-sm leading-relaxed">
+              <li><strong className="text-foreground">Functionele cookies:</strong> Noodzakelijk voor de werking van het platform (ingelogd blijven, sessiebeveiliging). Deze cookies vereisen geen toestemming.</li>
+              <li><strong className="text-foreground">Analytische cookies:</strong> Wij gebruiken privacyvriendelijke webanalyse om het gebruik van de applicatie te begrijpen en te verbeteren. Analytische cookies worden alleen geplaatst na uw uitdrukkelijke toestemming via de cookiebanner.</li>
+              <li><strong className="text-foreground">Marketing-cookies:</strong> Wij plaatsen momenteel geen marketing- of tracking-cookies van derden.</li>
+            </ul>
+            <p className="text-muted-foreground text-sm leading-relaxed mt-2">
+              U kunt uw cookietoestemming te allen tijde intrekken via de cookiebanner of de instellingen van uw browser. Raadpleeg ook ons uitgebreide <button onClick={() => navigateTo('/cookies')} className="underline hover:text-foreground">Cookiebeleid</button> voor specifieke bewaartermijnen per cookie.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold mb-3">7. Uw rechten</h2>
             <p className="text-muted-foreground text-sm leading-relaxed mb-2">Op grond van de AVG heeft u de volgende rechten:</p>
             <ul className="list-disc pl-5 space-y-1 text-muted-foreground text-sm leading-relaxed">
               <li><strong className="text-foreground">Inzage:</strong> U kunt opvragen welke gegevens wij over u verwerken.</li>
@@ -107,14 +126,14 @@ export const PrivacyPage = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">7. Beveiliging</h2>
+            <h2 className="text-xl font-semibold mb-3">8. Beveiliging</h2>
             <p className="text-muted-foreground text-sm leading-relaxed">
               Wij nemen passende technische en organisatorische maatregelen om uw persoonsgegevens te beveiligen, waaronder versleutelde opslag van wachtwoorden, HTTPS-verbindingen, toegangscontrole en regelmatige beveiligingscontroles. Wij claimen geen specifieke certificeringen.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">8. Wijzigingen</h2>
+            <h2 className="text-xl font-semibold mb-3">9. Wijzigingen</h2>
             <p className="text-muted-foreground text-sm leading-relaxed">
               Wij kunnen dit privacybeleid van tijd tot tijd aanpassen. De datum "Laatste update" bovenaan de pagina geeft aan wanneer de meest recente versie is gepubliceerd. Bij wezenlijke wijzigingen informeren wij u per e-mail.
             </p>

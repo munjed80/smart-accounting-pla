@@ -6,6 +6,11 @@ type FaqItem = {
   answer: string
 }
 
+type FaqSectionProps = {
+  /** When false, the section heading and subtitle are hidden (used on standalone /faq page). Defaults to true. */
+  showHeading?: boolean
+}
+
 const faqItems: FaqItem[] = [
   // ZZP-first questions
   {
@@ -90,7 +95,7 @@ const faqItems: FaqItem[] = [
   },
 ]
 
-export const FaqSection = () => {
+export const FaqSection = ({ showHeading = true }: FaqSectionProps) => {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   const toggle = (index: number) => {
@@ -100,8 +105,12 @@ export const FaqSection = () => {
   return (
     <section id="faq" className="py-14 sm:py-20">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-        <h2 className="text-2xl font-bold sm:text-4xl mb-2">Veelgestelde vragen</h2>
-        <p className="text-muted-foreground mb-10">Alles wat je wilt weten over gratis facturen maken en ZZPers Hub.</p>
+        {showHeading && (
+          <>
+            <h2 className="text-2xl font-bold sm:text-4xl mb-2">Veelgestelde vragen</h2>
+            <p className="text-muted-foreground mb-10">Alles wat je wilt weten over gratis facturen maken en ZZPers Hub.</p>
+          </>
+        )}
 
         <div className="space-y-2">
           {faqItems.map((item, index) => (

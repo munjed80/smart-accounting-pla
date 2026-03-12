@@ -31,11 +31,11 @@ export const MarketingFooter = () => {
             <a href="/#voor-accountants" className="block text-muted-foreground hover:text-foreground transition-colors">
               Voor boekhouders
             </a>
-            <a href="/#prijzen" className="block text-muted-foreground hover:text-foreground transition-colors">
+            <a href="/prijzen" className="block text-muted-foreground hover:text-foreground transition-colors">
               Pakketten
             </a>
             <button
-              onClick={() => navigateTo('/help')}
+              onClick={() => navigateTo('/faq')}
               className="block text-muted-foreground hover:text-foreground transition-colors text-left"
             >
               FAQ / Startgids

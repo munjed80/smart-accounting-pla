@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { navigateTo } from '@/lib/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -31,6 +31,17 @@ export const ContactPage = () => {
   const [submitted, setSubmitted] = useState(false)
   const [errors, setErrors] = useState<ContactFormErrors>({})
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    document.title = 'Contact | ZZPers Hub'
+    let tag = document.querySelector('meta[name="description"]')
+    if (!tag) {
+      tag = document.createElement('meta')
+      tag.setAttribute('name', 'description')
+      document.head.appendChild(tag)
+    }
+    tag.setAttribute('content', 'Neem contact op met ZZPers Hub. Vragen over ons gratis factuurprogramma voor zzp\'ers? Wij reageren binnen één werkdag.')
+  }, [])
 
   const validate = (): boolean => {
     const newErrors: ContactFormErrors = {}
@@ -79,7 +90,7 @@ export const ContactPage = () => {
       <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <button onClick={() => navigateTo('/')} className="text-lg font-bold text-primary hover:opacity-80 transition-opacity">
-            Smart Accounting
+            ZZPers Hub
           </button>
           <Button variant="ghost" onClick={() => navigateTo('/login')}>Inloggen</Button>
         </div>

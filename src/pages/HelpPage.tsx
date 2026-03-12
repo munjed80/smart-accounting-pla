@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { navigateTo } from '@/lib/navigation'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronUp } from 'lucide-react'
@@ -128,6 +128,17 @@ const helpSections: HelpSection[] = [
 export const HelpPage = () => {
   const [openSection, setOpenSection] = useState<string | null>('aan-de-slag')
 
+  useEffect(() => {
+    document.title = 'FAQ & Startgids | ZZPers Hub'
+    let tag = document.querySelector('meta[name="description"]')
+    if (!tag) {
+      tag = document.createElement('meta')
+      tag.setAttribute('name', 'description')
+      document.head.appendChild(tag)
+    }
+    tag.setAttribute('content', 'Veelgestelde vragen en startgids voor ZZPers Hub. Leer hoe u gratis facturen maakt, klanten beheert en uren registreert.')
+  }, [])
+
   const toggle = (id: string) => {
     setOpenSection((prev) => (prev === id ? null : id))
   }
@@ -137,7 +148,7 @@ export const HelpPage = () => {
       <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <button onClick={() => navigateTo('/')} className="text-lg font-bold text-primary hover:opacity-80 transition-opacity">
-            Smart Accounting
+            ZZPers Hub
           </button>
           <Button variant="ghost" onClick={() => navigateTo('/login')}>Inloggen</Button>
         </div>
@@ -146,7 +157,7 @@ export const HelpPage = () => {
       <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
         <h1 className="text-3xl font-bold mb-2">Startgids & Help</h1>
         <p className="text-sm text-muted-foreground mb-10">
-          Alles wat u nodig heeft om snel aan de slag te gaan met Smart Accounting.
+          Alles wat u nodig heeft om snel aan de slag te gaan met ZZPers Hub.
         </p>
 
         <div className="space-y-2">

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { navigateTo } from '@/lib/navigation'
 import { Button } from '@/components/ui/button'
 import { MarketingFooter } from '@/components/marketing/Footer'
@@ -5,12 +6,23 @@ import { MarketingFooter } from '@/components/marketing/Footer'
 const LAST_UPDATED = '23 februari 2026'
 
 export const DisclaimerPage = () => {
+  useEffect(() => {
+    document.title = 'Disclaimer | ZZPers Hub'
+    let tag = document.querySelector('meta[name="description"]')
+    if (!tag) {
+      tag = document.createElement('meta')
+      tag.setAttribute('name', 'description')
+      document.head.appendChild(tag)
+    }
+    tag.setAttribute('content', 'Disclaimer van ZZPers Hub. Lees de voorwaarden rondom aansprakelijkheid en het gebruik van ons factuurprogramma voor zzp\'ers.')
+  }, [])
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <button onClick={() => navigateTo('/')} className="text-lg font-bold text-primary hover:opacity-80 transition-opacity">
-            Smart Accounting
+            ZZPers Hub
           </button>
           <Button variant="ghost" onClick={() => navigateTo('/login')}>Inloggen</Button>
         </div>
@@ -25,7 +37,7 @@ export const DisclaimerPage = () => {
           <section>
             <h2 className="text-xl font-semibold mb-3">1. Geen fiscaal advies</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Smart Accounting is een administratie- en boekhoudplatform. De inhoud van dit platform en alle gegenereerde rapporten, overzichten en berekeningen zijn uitsluitend bedoeld als hulpmiddel voor uw administratie. Het platform vervangt geen fiscaal adviseur, belastingadviseur of accountant. Voor fiscaal advies dient u een erkende adviseur te raadplegen.
+              ZZPers Hub is een administratie- en boekhoudplatform. De inhoud van dit platform en alle gegenereerde rapporten, overzichten en berekeningen zijn uitsluitend bedoeld als hulpmiddel voor uw administratie. Het platform vervangt geen fiscaal adviseur, belastingadviseur of accountant. Voor fiscaal advies dient u een erkende adviseur te raadplegen.
             </p>
           </section>
 

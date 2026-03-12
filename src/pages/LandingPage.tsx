@@ -134,9 +134,9 @@ export const LandingPage = () => {
 
   const navigation = [
     { name: 'Facturen & functies', href: '#voor-zzp' },
-    { name: 'Prijzen', href: '#prijzen' },
+    { name: 'Pakketten', href: '#prijzen' },
     { name: 'FAQ', href: '#faq' },
-    { name: 'Help', href: '/help' },
+    { name: 'Contact', href: '/contact' },
   ]
 
   return (
@@ -156,7 +156,7 @@ export const LandingPage = () => {
             <span className="brand-shimmer text-lg font-bold sm:text-xl">ZZPers Hub</span>
           </span>
 
-          <div className="hidden items-center space-x-8 md:flex">
+          <div className="hidden items-center space-x-6 md:flex">
             {navigation.map((item) => (
               <a key={item.name} href={item.href} className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
                 {item.name}
@@ -164,6 +164,9 @@ export const LandingPage = () => {
             ))}
             <Button variant="ghost" onClick={() => navigateTo('/login')}>
               Inloggen
+            </Button>
+            <Button size="sm" onClick={() => navigateTo('/login')}>
+              Start gratis
             </Button>
           </div>
 
@@ -188,6 +191,9 @@ export const LandingPage = () => {
             ))}
             <Button variant="ghost" className="mt-2 w-full justify-start" onClick={() => navigateTo('/login')}>
               Inloggen
+            </Button>
+            <Button className="mt-2 w-full" onClick={() => navigateTo('/login')}>
+              Start gratis
             </Button>
           </div>
         )}

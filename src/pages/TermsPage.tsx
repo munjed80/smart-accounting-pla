@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { navigateTo } from '@/lib/navigation'
 import { Button } from '@/components/ui/button'
 import { MarketingFooter } from '@/components/marketing/Footer'
@@ -5,12 +6,23 @@ import { MarketingFooter } from '@/components/marketing/Footer'
 const LAST_UPDATED = '23 februari 2026'
 
 export const TermsPage = () => {
+  useEffect(() => {
+    document.title = 'Algemene voorwaarden | ZZPers Hub'
+    let tag = document.querySelector('meta[name="description"]')
+    if (!tag) {
+      tag = document.createElement('meta')
+      tag.setAttribute('name', 'description')
+      document.head.appendChild(tag)
+    }
+    tag.setAttribute('content', 'Algemene voorwaarden van ZZPers Hub. Lees de gebruiksvoorwaarden voor ons gratis factuurprogramma voor zzp\'ers.')
+  }, [])
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <button onClick={() => navigateTo('/')} className="text-lg font-bold text-primary hover:opacity-80 transition-opacity">
-            Smart Accounting
+            ZZPers Hub
           </button>
           <Button variant="ghost" onClick={() => navigateTo('/login')}>Inloggen</Button>
         </div>
@@ -26,7 +38,7 @@ export const TermsPage = () => {
           <section>
             <h2 className="text-xl font-semibold mb-3">1. Partijen</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Deze voorwaarden zijn van toepassing op de overeenkomst tussen MHM IT (hierna "aanbieder") en u als gebruiker (hierna "gebruiker") van het platform Smart Accounting.
+              Deze voorwaarden zijn van toepassing op de overeenkomst tussen MHM IT (hierna "aanbieder") en u als gebruiker (hierna "gebruiker") van het platform ZZPers Hub.
             </p>
             <address className="not-italic mt-3 text-sm text-muted-foreground leading-relaxed">
               MHM IT<br />
@@ -40,7 +52,7 @@ export const TermsPage = () => {
           <section>
             <h2 className="text-xl font-semibold mb-3">2. De dienst</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Smart Accounting is een online boekhoudplatform voor ZZP'ers en accountants. De dienst omvat facturatie, urenregistratie, uitgavenbeheer, BTW-overzichten en samenwerkingsfuncties voor accountants. De aanbieder levert de dienst als Software-as-a-Service (SaaS) en is geen belastingadviseur.
+              ZZPers Hub is een online boekhoudplatform voor ZZP'ers en accountants. De dienst omvat facturatie, urenregistratie, uitgavenbeheer, BTW-overzichten en samenwerkingsfuncties voor accountants. De aanbieder levert de dienst als Software-as-a-Service (SaaS) en is geen belastingadviseur.
             </p>
           </section>
 

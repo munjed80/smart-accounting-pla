@@ -92,8 +92,6 @@ import {
   ZZPQuoteCreate,
   ZZPQuoteLineCreate,
   ZZPCustomer,
-  ZZPBusinessProfile,
-  getApiBaseUrl,
   QuoteStatus,
 } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
@@ -124,6 +122,9 @@ function formatDate(isoDate: string | null | undefined): string {
     day: 'numeric',
   }).format(parsedDate)
 }
+
+/** Default number of days a quote remains valid after its issue date. */
+const DEFAULT_QUOTE_VALIDITY_DAYS = 30
 
 const getStatusCodeFromError = (error: unknown): number | null => {
   if (error instanceof ApiHttpError && error.statusCode) return error.statusCode
@@ -414,9 +415,9 @@ const QuoteFormDialog = ({
       } else {
         setCustomerId('')
         setIssueDate(extractDatePart(new Date().toISOString()))
-        // Default valid_until: 30 days from now
+        // Default valid_until: DEFAULT_QUOTE_VALIDITY_DAYS days from now
         const validDate = new Date()
-        validDate.setDate(validDate.getDate() + 30)
+        validDate.setDate(validDate.getDate() + DEFAULT_QUOTE_VALIDITY_DAYS)
         setValidUntil(extractDatePart(validDate.toISOString()))
         setTitle('')
         setNotes('')

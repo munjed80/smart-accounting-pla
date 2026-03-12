@@ -321,6 +321,23 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
   const isAlreadyReady = selectedPeriod?.status === 'READY_FOR_FILING'
   const canMarkReady = !!selectedPeriodId && !isMarkingReady && redCount === 0 && !!report && !isAlreadyReady
 
+  const getMarkReadyTitle = () => {
+    if (!selectedPeriodId) return 'Selecteer eerst een periode'
+    if (redCount > 0) return `${redCount} blokkerende fout${redCount !== 1 ? 'en' : ''} \u2013 los deze eerst op`
+    if (isAlreadyReady) return 'Periode is al klaar voor indiening'
+    if (!report) return 'Laad eerst een overzicht'
+    return undefined
+  }
+
+  type StatusTone = 'neutral' | 'red' | 'amber' | 'green' | 'blue'
+  const getPeriodStatusTone = (): StatusTone => {
+    if (isAlreadyReady) return 'green'
+    if (redCount > 0) return 'red'
+    if (yellowCount > 0) return 'amber'
+    if (report) return 'blue'
+    return 'neutral'
+  }
+
   return (
     <div className="space-y-6">
       {/* Control panel */}
@@ -401,17 +418,7 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
               variant={isAlreadyReady ? 'secondary' : 'default'}
               onClick={handleMarkReady}
               disabled={!canMarkReady}
-              title={
-                !selectedPeriodId
-                  ? 'Selecteer eerst een periode'
-                  : redCount > 0
-                    ? `${redCount} blokkerende fout${redCount !== 1 ? 'en' : ''} – los deze eerst op`
-                    : isAlreadyReady
-                      ? 'Periode is al klaar voor indiening'
-                      : !report
-                        ? 'Laad eerst een overzicht'
-                        : undefined
-              }
+              title={getMarkReadyTitle()}
             >
               {isMarkingReady ? (
                 <Spinner size={16} className="mr-2 animate-spin" />
@@ -474,12 +481,7 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
                 icon={<CalendarBlank size={14} />}
                 label="Status periode"
                 value={selectedPeriod ? (PERIOD_STATUS_LABELS[selectedPeriod.status] ?? selectedPeriod.status) : '—'}
-                tone={
-                  isAlreadyReady ? 'green' :
-                  redCount > 0 ? 'red' :
-                  yellowCount > 0 ? 'amber' :
-                  report ? 'blue' : 'neutral'
-                }
+                tone={getPeriodStatusTone()}
               />
             </div>
           )}
@@ -624,7 +626,7 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
                 )}
               </CardTitle>
               <CardDescription>
-                Rode fouten blokkeren &quot;Markeer als klaar&quot;. Gele waarschuwingen zijn toegestaan maar vereisen controle.
+                Rode fouten blokkeren "Markeer als klaar". Gele waarschuwingen zijn toegestaan maar vereisen controle.
               </CardDescription>
             </CardHeader>
             <CardContent>

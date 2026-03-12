@@ -32,7 +32,7 @@ export const MarketingFooter = () => {
               Voor boekhouders
             </a>
             <a href="/#prijzen" className="block text-muted-foreground hover:text-foreground transition-colors">
-              Prijzen
+              Pakketten
             </a>
             <button
               onClick={() => navigateTo('/help')}
@@ -40,9 +40,18 @@ export const MarketingFooter = () => {
             >
               FAQ / Startgids
             </button>
-            <span className="block text-muted-foreground/50 cursor-default select-none">
-              Status <span className="text-xs">(binnenkort)</span>
-            </span>
+            <button
+              onClick={() => navigateTo('/login')}
+              className="block text-muted-foreground hover:text-foreground transition-colors text-left"
+            >
+              Inloggen
+            </button>
+            <button
+              onClick={() => navigateTo('/login')}
+              className="block text-muted-foreground hover:text-foreground transition-colors text-left"
+            >
+              Start gratis
+            </button>
           </div>
 
           {/* Column 2: Legal */}

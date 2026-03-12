@@ -16,6 +16,8 @@ import { TermsPage } from '@/pages/TermsPage'
 import { DisclaimerPage } from '@/pages/DisclaimerPage'
 import { ContactPage } from '@/pages/ContactPage'
 import { HelpPage } from '@/pages/HelpPage'
+import { FaqPage } from '@/pages/FaqPage'
+import { PrijzenPage } from '@/pages/PrijzenPage'
 import { SmartDashboard } from '@/components/SmartDashboard'
 import { AccountantHomePage } from '@/components/AccountantHomePage'
 import { AccountantReviewQueuePage } from '@/components/AccountantReviewQueuePage'
@@ -96,6 +98,8 @@ type Route =
   | { type: 'legal'; page: 'privacy' | 'cookies' | 'terms' | 'disclaimer' }
   | { type: 'contact' }
   | { type: 'help' }
+  | { type: 'faq' }
+  | { type: 'prijzen' }
   | { type: 'client-dossier'; clientId: string; tab: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'bookkeeping' | 'periods' | 'decisions' | 'audit' | 'commitments' }
   | { type: 'bulk-operations-history' }
   | { type: 'bank-reconciliation' }
@@ -156,8 +160,16 @@ const getRouteFromURL = (): Route => {
     return { type: 'contact' }
   }
   
-  if (path === '/help' || path === '/faq') {
+  if (path === '/faq') {
+    return { type: 'faq' }
+  }
+
+  if (path === '/help') {
     return { type: 'help' }
+  }
+
+  if (path === '/prijzen') {
+    return { type: 'prijzen' }
   }
   
   if (path === '/onboarding') {
@@ -495,6 +507,14 @@ const AppContent = () => {
 
   if (route.type === 'help') {
     return <HelpPage />
+  }
+
+  if (route.type === 'faq') {
+    return <FaqPage />
+  }
+
+  if (route.type === 'prijzen') {
+    return <PrijzenPage />
   }
 
 

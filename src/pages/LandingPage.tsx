@@ -122,8 +122,8 @@ export const LandingPage = () => {
 
   const navigation = [
     { name: 'Facturen & functies', href: '#voor-zzp' },
-    { name: 'Pakketten', href: '#prijzen' },
-    { name: 'FAQ', href: '#faq' },
+    { name: 'Pakketten', href: '/prijzen' },
+    { name: 'FAQ', href: '/faq' },
     { name: 'Contact', href: '/contact' },
   ]
 

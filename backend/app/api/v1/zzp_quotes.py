@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Annotated, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -38,6 +38,7 @@ from app.schemas.zzp import (
     QuoteConvertToInvoiceResponse,
 )
 from app.api.v1.deps import CurrentUser, require_zzp
+from app.services.invoice_pdf_reportlab import generate_quote_pdf_reportlab, get_quote_pdf_filename
 
 router = APIRouter()
 
@@ -737,3 +738,46 @@ async def delete_quote(
     
     await db.delete(quote)
     await db.commit()
+
+
+@router.get(
+    "/quotes/{quote_id}/pdf",
+    summary="Download quote PDF",
+    description="Generate and download a PDF for the specified quote."
+)
+async def get_quote_pdf(
+    quote_id: UUID,
+    request: Request,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    download: Optional[bool] = Query(False),
+) -> Response:
+    """Download quote as PDF."""
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
+
+    result = await db.execute(
+        select(ZZPQuote)
+        .where(ZZPQuote.id == quote_id)
+        .where(ZZPQuote.administration_id == administration.id)
+        .options(selectinload(ZZPQuote.lines))
+    )
+    quote = result.scalar_one_or_none()
+
+    if not quote:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "QUOTE_NOT_FOUND", "message": "Offerte niet gevonden."}
+        )
+
+    pdf_bytes = generate_quote_pdf_reportlab(quote)
+    filename = get_quote_pdf_filename(quote)
+
+    disposition = "attachment" if download else "inline"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'{disposition}; filename="{filename}"',
+        },
+    )

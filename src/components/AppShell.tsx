@@ -183,6 +183,14 @@ const menuItems: MenuItem[] = [
     rolesAllowed: ['zzp'],
     section: 'main',
   },
+  // 3b. Offertes (Quotes)
+  {
+    label: t('sidebar.offertes'),
+    tabValue: 'offertes',
+    icon: <FileText size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
   // 4. Uitgaven (Expenses)
   {
     label: t('sidebar.uitgaven'),

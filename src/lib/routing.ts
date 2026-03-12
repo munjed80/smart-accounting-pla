@@ -45,6 +45,8 @@ export const pathToTab = (path: string, isAccountant: boolean, isSuperAdmin = fa
       return 'customers'
     case '/zzp/invoices':
       return 'invoices'
+    case '/zzp/offertes':
+      return 'offertes'
     case '/zzp/expenses':
       return 'expenses'
     case '/zzp/time':
@@ -103,6 +105,8 @@ export const tabToPath = (tab: string, isAccountant: boolean, isSuperAdmin = fal
       return '/zzp/customers'
     case 'invoices':
       return '/zzp/invoices'
+    case 'offertes':
+      return '/zzp/offertes'
     case 'expenses':
       return '/zzp/expenses'
     case 'time':

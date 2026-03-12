@@ -19,7 +19,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.pdfgen import canvas
 from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
 
-from app.models.zzp import ZZPInvoice
+from app.models.zzp import ZZPInvoice, ZZPQuote
 
 logger = logging.getLogger(__name__)
 
@@ -530,3 +530,429 @@ def get_invoice_pdf_filename(invoice: ZZPInvoice) -> str:
         Filename string (e.g., "INV-2026-0001.pdf")
     """
     return f"{invoice.invoice_number}.pdf"
+
+
+def generate_quote_pdf_reportlab(quote: ZZPQuote) -> bytes:
+    """
+    Generate a professional Dutch ZZP offerte (quote) PDF using ReportLab.
+
+    Reuses the same layout as the invoice PDF but with offerte-specific
+    labels and fields (OFFERTE title, Geldigheidsdatum instead of Vervaldatum,
+    offerte number, and an acceptance section instead of payment details).
+
+    Args:
+        quote: ZZPQuote model with lines pre-loaded.
+
+    Returns:
+        Raw PDF bytes.
+
+    Raises:
+        RuntimeError: If PDF generation fails.
+    """
+    try:
+        buffer = io.BytesIO()
+
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=20 * mm,
+            leftMargin=20 * mm,
+            topMargin=20 * mm,
+            bottomMargin=22 * mm,
+        )
+
+        elements: list = []
+        base = getSampleStyleSheet()
+
+        # ── Typography (same as invoice) ──────────────────────────────────────
+        s_company_name = _make_style(
+            base, "RL_Q_CompanyName",
+            fontSize=18, fontName="Helvetica-Bold",
+            textColor=_C_BLUE, leading=22, spaceAfter=2,
+        )
+        s_company_detail = _make_style(
+            base, "RL_Q_CompanyDetail",
+            fontSize=8, textColor=_C_MUTED, leading=12,
+        )
+        s_doc_title = _make_style(
+            base, "RL_Q_DocTitle",
+            fontSize=30, fontName="Helvetica-Bold",
+            textColor=_C_BLUE, alignment=TA_RIGHT, leading=34, spaceAfter=6,
+        )
+        s_meta_label = _make_style(
+            base, "RL_Q_MetaLabel",
+            fontSize=8, textColor=_C_MUTED, alignment=TA_RIGHT,
+        )
+        s_meta_value = _make_style(
+            base, "RL_Q_MetaValue",
+            fontSize=8, fontName="Helvetica-Bold",
+            textColor=_C_TEXT, alignment=TA_RIGHT,
+        )
+        s_section_label = _make_style(
+            base, "RL_Q_SectionLabel",
+            fontSize=7, fontName="Helvetica-Bold",
+            textColor=_C_MUTED, spaceAfter=2,
+        )
+        s_customer_name = _make_style(
+            base, "RL_Q_CustomerName",
+            fontSize=12, fontName="Helvetica-Bold",
+            textColor=_C_TEXT, spaceAfter=2,
+        )
+        s_customer_addr = _make_style(
+            base, "RL_Q_CustomerAddr",
+            fontSize=9, textColor=colors.HexColor("#475569"), leading=14,
+        )
+        s_intro = _make_style(
+            base, "RL_Q_Intro",
+            fontSize=9, textColor=_C_MUTED, leading=14,
+        )
+        s_th = _make_style(
+            base, "RL_Q_TH",
+            fontSize=8, fontName="Helvetica-Bold",
+            textColor=colors.white, alignment=TA_LEFT,
+        )
+        s_th_r = _make_style(
+            base, "RL_Q_TH_R",
+            fontSize=8, fontName="Helvetica-Bold",
+            textColor=colors.white, alignment=TA_RIGHT,
+        )
+        s_th_c = _make_style(
+            base, "RL_Q_TH_C",
+            fontSize=8, fontName="Helvetica-Bold",
+            textColor=colors.white, alignment=TA_CENTER,
+        )
+        s_td = _make_style(
+            base, "RL_Q_TD",
+            fontSize=9, textColor=_C_TEXT, leading=13,
+        )
+        s_td_r = _make_style(
+            base, "RL_Q_TD_R",
+            fontSize=9, textColor=_C_TEXT, alignment=TA_RIGHT,
+        )
+        s_td_c = _make_style(
+            base, "RL_Q_TD_C",
+            fontSize=9, textColor=_C_TEXT, alignment=TA_CENTER,
+        )
+        s_totals_lbl = _make_style(
+            base, "RL_Q_TotalsLbl",
+            fontSize=9, textColor=_C_MUTED, alignment=TA_RIGHT,
+        )
+        s_totals_val = _make_style(
+            base, "RL_Q_TotalsVal",
+            fontSize=9, textColor=_C_TEXT, alignment=TA_RIGHT,
+        )
+        s_grand_lbl = _make_style(
+            base, "RL_Q_GrandLbl",
+            fontSize=13, fontName="Helvetica-Bold",
+            textColor=_C_BLUE, alignment=TA_RIGHT,
+        )
+        s_grand_val = _make_style(
+            base, "RL_Q_GrandVal",
+            fontSize=13, fontName="Helvetica-Bold",
+            textColor=_C_BLUE, alignment=TA_RIGHT,
+        )
+        s_accept_title = _make_style(
+            base, "RL_Q_AcceptTitle",
+            fontSize=8.5, fontName="Helvetica-Bold",
+            textColor=_C_BLUE, spaceAfter=4,
+        )
+        s_accept_body = _make_style(
+            base, "RL_Q_AcceptBody",
+            fontSize=8.5, textColor=_C_TEXT,
+        )
+        s_notes_title = _make_style(
+            base, "RL_Q_NotesTitle",
+            fontSize=8.5, fontName="Helvetica-Bold",
+            textColor=_C_YELLOW, spaceAfter=4,
+        )
+        s_notes_body = _make_style(
+            base, "RL_Q_NotesBody",
+            fontSize=9, textColor=_C_TEXT, leading=14,
+        )
+
+        # ── Dates ─────────────────────────────────────────────────────────────
+        issue_date_str = format_date_nl(quote.issue_date)
+        valid_until_str = format_date_nl(quote.valid_until) if quote.valid_until else "\u2014"
+
+        # ── Company details block (left column of header) ──────────────────────
+        company_name = quote.seller_company_name or "Uw Bedrijfsnaam"
+        company_lines: List[str] = []
+        if quote.seller_address_street:
+            company_lines.append(quote.seller_address_street)
+        postal_city = " ".join(filter(None, [
+            quote.seller_address_postal_code, quote.seller_address_city
+        ]))
+        if postal_city:
+            company_lines.append(postal_city)
+        if quote.seller_address_country and quote.seller_address_country.lower() != "nederland":
+            company_lines.append(quote.seller_address_country)
+        if quote.seller_kvk_number:
+            company_lines.append(f"KvK {quote.seller_kvk_number}")
+        if quote.seller_btw_number:
+            company_lines.append(f"BTW {quote.seller_btw_number}")
+        contact = "  \u00b7  ".join(filter(None, [quote.seller_email, quote.seller_phone]))
+        if contact:
+            company_lines.append(contact)
+
+        company_detail_text = "<br/>".join(company_lines)
+
+        # ── Header: company (left) + OFFERTE + meta (right) ───────────────────
+        left_rows: list = [[Paragraph(company_name, s_company_name)]]
+        if company_detail_text:
+            left_rows.append([Paragraph(company_detail_text, s_company_detail)])
+
+        left_inner = Table(left_rows, colWidths=[_LEFT_COL])
+        left_inner.setStyle(TableStyle([
+            ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ]))
+
+        meta_rows = [
+            [Paragraph("Offertedatum",  s_meta_label), Paragraph(issue_date_str,   s_meta_value)],
+            [Paragraph("Geldig tot",    s_meta_label), Paragraph(valid_until_str,   s_meta_value)],
+            [Paragraph("Offertenummer", s_meta_label), Paragraph(quote.quote_number, s_meta_value)],
+        ]
+        meta_tbl = Table(meta_rows, colWidths=[38 * mm, 32 * mm])
+        meta_tbl.setStyle(TableStyle([
+            ("ALIGN",         (0, 0), (-1, -1), "RIGHT"),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+            ("LINEABOVE",     (0, 2), (-1, 2), 0.5, _C_SEP),
+        ]))
+
+        right_inner = Table(
+            [[Paragraph("OFFERTE", s_doc_title)], [meta_tbl]],
+            colWidths=[_RIGHT_COL],
+        )
+        right_inner.setStyle(TableStyle([
+            ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ]))
+
+        header_tbl = Table([[left_inner, right_inner]], colWidths=[_LEFT_COL, _RIGHT_COL])
+        header_tbl.setStyle(TableStyle([
+            ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ]))
+
+        elements.append(header_tbl)
+        elements.append(Spacer(1, 4 * mm))
+        elements.append(HRFlowable(width=_PAGE_W, thickness=2, color=_C_BLUE, spaceAfter=10))
+
+        # ── Customer section ──────────────────────────────────────────────────
+        cust_addr_lines: List[str] = []
+        if quote.customer_address_street:
+            cust_addr_lines.append(quote.customer_address_street)
+        cust_postal_city = " ".join(filter(None, [
+            quote.customer_address_postal_code, quote.customer_address_city
+        ]))
+        if cust_postal_city:
+            cust_addr_lines.append(cust_postal_city)
+        if quote.customer_address_country and quote.customer_address_country.lower() != "nederland":
+            cust_addr_lines.append(quote.customer_address_country)
+
+        elements.append(Paragraph("OFFERTE VOOR", s_section_label))
+        elements.append(Paragraph(quote.customer_name or "\u2014", s_customer_name))
+        if cust_addr_lines:
+            elements.append(Paragraph("<br/>".join(cust_addr_lines), s_customer_addr))
+        if quote.customer_btw_number:
+            elements.append(Paragraph(f"BTW: {quote.customer_btw_number}", s_customer_addr))
+
+        if quote.title:
+            elements.append(Spacer(1, 4 * mm))
+            elements.append(Paragraph(f"Onderwerp: {quote.title}", s_customer_addr))
+
+        elements.append(Spacer(1, 8 * mm))
+
+        # ── Intro line ────────────────────────────────────────────────────────
+        elements.append(Paragraph(
+            "Graag bieden wij u de volgende offerte aan voor de gevraagde diensten.",
+            s_intro,
+        ))
+        elements.append(Spacer(1, 6 * mm))
+
+        # ── Quote lines table ─────────────────────────────────────────────────
+        col_w = [76 * mm, 22 * mm, 28 * mm, 16 * mm, 28 * mm]
+
+        line_data = [[
+            Paragraph("Omschrijving", s_th),
+            Paragraph("Aantal",       s_th_c),
+            Paragraph("Tarief",       s_th_r),
+            Paragraph("BTW",          s_th_c),
+            Paragraph("Bedrag",       s_th_r),
+        ]]
+
+        for line in quote.lines:
+            qty_str = format_quantity_nl(line.quantity)
+            vat_str = f"{float(line.vat_rate):g}%"
+            line_data.append([
+                Paragraph(line.description,                     s_td),
+                Paragraph(qty_str,                              s_td_c),
+                Paragraph(format_amount(line.unit_price_cents), s_td_r),
+                Paragraph(vat_str,                              s_td_c),
+                Paragraph(format_amount(line.line_total_cents), s_td_r),
+            ])
+
+        zebra_cmds = [
+            ("BACKGROUND", (0, i), (-1, i), _C_ROW_ALT)
+            for i in range(2, len(line_data), 2)
+        ]
+
+        lines_tbl = Table(line_data, colWidths=col_w, repeatRows=1)
+        lines_tbl.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, 0), _C_BLUE),
+            ("TOPPADDING",    (0, 0), (-1, 0), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+            ("LEFTPADDING",   (0, 0), (-1, 0), 8),
+            ("RIGHTPADDING",  (0, 0), (-1, 0), 8),
+            ("FONTNAME",      (0, 1), (-1, -1), "Helvetica"),
+            ("FONTSIZE",      (0, 1), (-1, -1), 9),
+            ("TOPPADDING",    (0, 1), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 8),
+            ("LEFTPADDING",   (0, 1), (-1, -1), 8),
+            ("RIGHTPADDING",  (0, 1), (-1, -1), 8),
+            ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+            ("LINEBELOW",     (0, 1), (-1, -2), 0.5, _C_SEP),
+            ("LINEBELOW",     (0, -1), (-1, -1), 1.5, _C_BLUE),
+        ] + zebra_cmds))
+
+        elements.append(lines_tbl)
+        elements.append(Spacer(1, 4 * mm))
+
+        # ── Totals (right-aligned) ────────────────────────────────────────────
+        totals_inner_w = [36 * mm, 34 * mm]
+
+        totals_data = [
+            [Paragraph("Subtotaal", s_totals_lbl), Paragraph(format_amount(quote.subtotal_cents), s_totals_val)],
+            [Paragraph("BTW",       s_totals_lbl), Paragraph(format_amount(quote.vat_total_cents), s_totals_val)],
+            [Paragraph("Totaal",    s_grand_lbl),  Paragraph(format_amount(quote.total_cents),     s_grand_val)],
+        ]
+
+        totals_tbl = Table(totals_data, colWidths=totals_inner_w)
+        totals_tbl.setStyle(TableStyle([
+            ("ALIGN",         (0, 0), (-1, -1), "RIGHT"),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+            ("LINEABOVE",     (0, 2), (-1, 2), 1.5, _C_BLUE),
+            ("BACKGROUND",    (0, 2), (-1, 2), _C_BLUE_LIGHT),
+            ("LINEBELOW",     (0, 0), (-1, 1), 0.5, _C_SEP),
+        ]))
+
+        totals_wrapper = Table([["", totals_tbl]], colWidths=[_LEFT_COL, _RIGHT_COL])
+        totals_wrapper.setStyle(TableStyle([
+            ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ]))
+
+        elements.append(totals_wrapper)
+        elements.append(Spacer(1, 10 * mm))
+
+        # ── Acceptance section ────────────────────────────────────────────────
+        accept_rows: list = []
+        accept_rows.append([Paragraph("Offertenummer", s_accept_body), Paragraph(quote.quote_number, s_accept_body)])
+        if quote.valid_until:
+            accept_rows.append([Paragraph("Geldig tot", s_accept_body), Paragraph(valid_until_str, s_accept_body)])
+        if quote.seller_company_name:
+            accept_rows.append([Paragraph("Aangeboden door", s_accept_body), Paragraph(quote.seller_company_name, s_accept_body)])
+
+        if accept_rows:
+            accept_inner = Table(accept_rows, colWidths=[45 * mm, 101 * mm])
+            accept_inner.setStyle(TableStyle([
+                ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING",    (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+            ]))
+
+            accept_box = Table(
+                [[Paragraph("OFFERTE INFORMATIE", s_accept_title)], [accept_inner]],
+                colWidths=[_PAGE_W],
+            )
+            accept_box.setStyle(TableStyle([
+                ("BACKGROUND",    (0, 0), (-1, -1), _C_BLUE_LIGHT),
+                ("LINEABOVE",     (0, 0), (-1, 0),  2, _C_BLUE),
+                ("TOPPADDING",    (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+                ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+            ]))
+            elements.append(accept_box)
+
+        # ── Notes ─────────────────────────────────────────────────────────────
+        if quote.notes:
+            elements.append(Spacer(1, 6 * mm))
+            notes_box = Table(
+                [[Paragraph("OPMERKINGEN", s_notes_title)], [Paragraph(quote.notes, s_notes_body)]],
+                colWidths=[_PAGE_W],
+            )
+            notes_box.setStyle(TableStyle([
+                ("BACKGROUND",    (0, 0), (-1, -1), _C_YELLOW_BG),
+                ("LINEABOVE",     (0, 0), (-1, 0),  2, _C_YELLOW),
+                ("TOPPADDING",    (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+                ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+            ]))
+            elements.append(notes_box)
+
+        # ── Terms ─────────────────────────────────────────────────────────────
+        if quote.terms:
+            elements.append(Spacer(1, 6 * mm))
+            terms_box = Table(
+                [[Paragraph("VOORWAARDEN", s_notes_title)], [Paragraph(quote.terms, s_notes_body)]],
+                colWidths=[_PAGE_W],
+            )
+            terms_box.setStyle(TableStyle([
+                ("BACKGROUND",    (0, 0), (-1, -1), _C_YELLOW_BG),
+                ("LINEABOVE",     (0, 0), (-1, 0),  2, _C_YELLOW),
+                ("TOPPADDING",    (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+                ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+            ]))
+            elements.append(terms_box)
+
+        # ── Render ────────────────────────────────────────────────────────────
+        doc.build(elements, canvasmaker=NumberedCanvas)
+
+        buffer.seek(0)
+        return buffer.read()
+
+    except Exception as e:
+        logger.error(
+            f"Failed to generate PDF for quote {quote.quote_number}: {e}",
+            exc_info=True,
+        )
+        raise RuntimeError("PDF generation failed. Please try again later.") from e
+
+
+def get_quote_pdf_filename(quote: ZZPQuote) -> str:
+    """
+    Generate a filename for the quote PDF.
+
+    Args:
+        quote: ZZPQuote model
+
+    Returns:
+        Filename string (e.g., "OFF-2026-0001.pdf")
+    """
+    return f"{quote.quote_number}.pdf"

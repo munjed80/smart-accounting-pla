@@ -5,19 +5,44 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { getErrorMessage, periodApi, vatApi, type Period, type VATAnomaly, type VATReportResponse, type ICPReportResponse } from '@/lib/api'
-import { ArrowsClockwise, CheckCircle, DownloadSimple, FileArrowDown, Globe, Warning, WarningCircle, Eye, ArrowClockwise } from '@phosphor-icons/react'
+import {
+  ArrowsClockwise,
+  CheckCircle,
+  DownloadSimple,
+  FileArrowDown,
+  Globe,
+  Warning,
+  WarningCircle,
+  Eye,
+  ArrowClockwise,
+  CurrencyEur,
+  CalendarBlank,
+  FileText,
+  Spinner,
+  XCircle,
+} from '@phosphor-icons/react'
 import { BTWBoxDrilldown } from './BTWBoxDrilldown'
 import { VATSubmissionHistory } from './VATSubmissionHistory'
 import { navigateTo } from '@/lib/navigation'
 
-const BOX_ORDER = ['1a', '1b', '1c', '1d', '2a', '3a', '3b', '3c', '4a', '4b', '5a', '5b', '5c', '5d', '5e', '5f', '5g'] as const
+// Box groups per Belastingdienst layout
+const BOX_GROUPS: Record<string, string[]> = {
+  'Binnenlandse prestaties': ['1a', '1b', '1c', '1d', '1e'],
+  'EU-transacties': ['2a', '3a', '3b'],
+  'Verlegging / inkoop': ['4a', '4b'],
+  'Berekening (5a–5g)': ['5a', '5b', '5c', '5d', '5e', '5f', '5g'],
+}
 
-const formatMoney = (value: string | number) => new Intl.NumberFormat('nl-NL', {
-  style: 'currency',
-  currency: 'EUR',
-}).format(typeof value === 'string' ? Number(value) : value)
+const ALL_BOX_CODES = Object.values(BOX_GROUPS).flat()
+
+const formatMoney = (value: string | number) =>
+  new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(
+    typeof value === 'string' ? Number(value) : value
+  )
 
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob)
@@ -28,11 +53,110 @@ const downloadBlob = (blob: Blob, filename: string) => {
   URL.revokeObjectURL(url)
 }
 
-const anomalyTone = (severity: VATAnomaly['severity']) => {
-  if (severity === 'RED') return 'bg-red-500/10 border-red-500/40 text-red-700 dark:text-red-400'
-  return 'bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-400'
+const PERIOD_STATUS_LABELS: Record<string, string> = {
+  OPEN: 'Concept',
+  REVIEW: 'In review',
+  READY_FOR_FILING: 'Klaar voor indiening',
+  FINALIZED: 'Afgerond',
+  LOCKED: 'Vergrendeld',
 }
 
+// Status card component for the summary row
+const StatusCard = ({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string | number
+  tone: 'neutral' | 'red' | 'amber' | 'green' | 'blue'
+}) => {
+  const toneClasses = {
+    neutral: 'bg-muted/50 border-border',
+    red: 'bg-red-500/10 border-red-500/30',
+    amber: 'bg-amber-500/10 border-amber-500/30',
+    green: 'bg-green-500/10 border-green-500/30',
+    blue: 'bg-blue-500/10 border-blue-500/30',
+  }
+  const valueClasses = {
+    neutral: 'text-foreground',
+    red: 'text-red-700 dark:text-red-400',
+    amber: 'text-amber-700 dark:text-amber-400',
+    green: 'text-green-700 dark:text-green-400',
+    blue: 'text-blue-700 dark:text-blue-400',
+  }
+  return (
+    <div className={`flex-1 min-w-[140px] rounded-lg border p-4 ${toneClasses[tone]}`}>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+        {icon}
+        {label}
+      </div>
+      <div className={`text-xl font-semibold ${valueClasses[tone]}`}>{value}</div>
+    </div>
+  )
+}
+
+// Anomaly row component
+const AnomalyRow = ({ anomaly }: { anomaly: VATAnomaly }) => {
+  const isRed = anomaly.severity === 'RED'
+  return (
+    <div
+      className={`rounded-lg border p-4 ${
+        isRed
+          ? 'bg-red-500/10 border-red-500/30'
+          : 'bg-amber-500/10 border-amber-500/30'
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        {isRed ? (
+          <WarningCircle size={18} weight="fill" className="mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
+        ) : (
+          <Warning size={18} weight="fill" className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`font-medium ${isRed ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}`}>
+              {anomaly.title}
+            </span>
+            <code className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+              {anomaly.code}
+            </code>
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">{anomaly.description}</p>
+          {anomaly.suggested_fix && (
+            <p className="text-xs mt-1.5 text-muted-foreground">
+              <span className="font-medium">Suggestie:</span> {anomaly.suggested_fix}
+            </p>
+          )}
+          {anomaly.amount_discrepancy && (
+            <p className="text-xs mt-1 text-muted-foreground">
+              <span className="font-medium">Verschil:</span> {formatMoney(anomaly.amount_discrepancy)}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Skeleton loading state
+const LoadingSkeleton = () => (
+  <div className="space-y-4">
+    <div className="flex gap-4">
+      <Skeleton className="h-24 flex-1 rounded-lg" />
+      <Skeleton className="h-24 flex-1 rounded-lg" />
+      <Skeleton className="h-24 flex-1 rounded-lg" />
+      <Skeleton className="h-24 flex-1 rounded-lg" />
+    </div>
+    <Skeleton className="h-8 w-48" />
+    <Skeleton className="h-64 w-full rounded-lg" />
+    <Skeleton className="h-40 w-full rounded-lg" />
+  </div>
+)
+
+// Main component
 export const ClientVatTab = ({ clientId }: { clientId: string }) => {
   const [periods, setPeriods] = useState<Period[]>([])
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>('')
@@ -42,13 +166,23 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
   const [isLoading, setIsLoading] = useState(false)
   const [isValidating, setIsValidating] = useState(false)
   const [isMarkingReady, setIsMarkingReady] = useState(false)
+  const [isPdfLoading, setIsPdfLoading] = useState(false)
+  const [isBtwXmlLoading, setIsBtwXmlLoading] = useState(false)
+  const [isIcpXmlLoading, setIsIcpXmlLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  
+
   // Drilldown state
   const [drilldownOpen, setDrilldownOpen] = useState(false)
   const [drilldownBoxCode, setDrilldownBoxCode] = useState<string>('')
   const [drilldownBoxName, setDrilldownBoxName] = useState<string>('')
+
+  const selectedPeriod = useMemo(
+    () => periods.find((p) => p.id === selectedPeriodId) ?? null,
+    [periods, selectedPeriodId]
+  )
+  const redCount = useMemo(() => anomalies.filter((a) => a.severity === 'RED').length, [anomalies])
+  const yellowCount = useMemo(() => anomalies.filter((a) => a.severity === 'YELLOW').length, [anomalies])
 
   const loadPeriods = async () => {
     try {
@@ -88,17 +222,19 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
   useEffect(() => {
     if (selectedPeriodId) {
       loadReport(selectedPeriodId)
+    } else {
+      setReport(null)
+      setIcpReport(null)
+      setAnomalies([])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPeriodId])
-
-  const redCount = useMemo(() => anomalies.filter((a) => a.severity === 'RED').length, [anomalies])
-  const yellowCount = useMemo(() => anomalies.filter((a) => a.severity === 'YELLOW').length, [anomalies])
 
   const handleValidate = async () => {
     if (!selectedPeriodId) return
     try {
       setIsValidating(true)
+      setMessage(null)
       setError(null)
       const response = await vatApi.validate(clientId, selectedPeriodId)
       setAnomalies(response.anomalies)
@@ -115,9 +251,9 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
     if (!report) return
     const rows = [
       ['rubriek', 'omschrijving', 'omzet', 'btw'],
-      ...BOX_ORDER.map((code) => {
+      ...ALL_BOX_CODES.map((code) => {
         const box = report.boxes[code]
-        return [code, box?.box_name || '', box?.turnover_amount || '0.00', box?.vat_amount || '0.00']
+        return [code, box?.box_name ?? '', box?.turnover_amount ?? '0.00', box?.vat_amount ?? '0.00']
       }),
     ]
     const csv = rows.map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -127,34 +263,42 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
   const handleExportPdf = async () => {
     if (!selectedPeriodId || !report) return
     try {
+      setIsPdfLoading(true)
+      setError(null)
       const blob = await vatApi.downloadPdf(clientId, selectedPeriodId)
       downloadBlob(blob, `btw-overzicht-${report.period_name}.pdf`)
     } catch (err) {
       setError(getErrorMessage(err))
+    } finally {
+      setIsPdfLoading(false)
     }
   }
 
-  const handleDownloadBtwSubmissionPackage = async () => {
+  const handleDownloadBtwXml = async () => {
     if (!selectedPeriodId || !report) return
     try {
+      setIsBtwXmlLoading(true)
       setError(null)
       const blob = await vatApi.downloadBtwSubmissionPackage(clientId, selectedPeriodId)
-      const filename = `btw-aangifte-${report.period_name}-${report.start_date}.xml`
-      downloadBlob(blob, filename)
+      downloadBlob(blob, `btw-aangifte-${report.period_name}-${report.start_date}.xml`)
     } catch (err) {
       setError(getErrorMessage(err))
+    } finally {
+      setIsBtwXmlLoading(false)
     }
   }
 
-  const handleDownloadIcpSubmissionPackage = async () => {
+  const handleDownloadIcpXml = async () => {
     if (!selectedPeriodId || !report) return
     try {
+      setIsIcpXmlLoading(true)
       setError(null)
       const blob = await vatApi.downloadIcpSubmissionPackage(clientId, selectedPeriodId)
-      const filename = `icp-opgaaf-${report.period_name}-${report.start_date}.xml`
-      downloadBlob(blob, filename)
+      downloadBlob(blob, `icp-opgaaf-${report.period_name}-${report.start_date}.xml`)
     } catch (err) {
       setError(getErrorMessage(err))
+    } finally {
+      setIsIcpXmlLoading(false)
     }
   }
 
@@ -162,6 +306,7 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
     if (!selectedPeriodId) return
     try {
       setIsMarkingReady(true)
+      setMessage(null)
       setError(null)
       const response = await periodApi.updateStatus(clientId, selectedPeriodId, { status: 'READY_FOR_FILING' })
       setMessage(response.message)
@@ -173,51 +318,120 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
     }
   }
 
+  const isAlreadyReady = selectedPeriod?.status === 'READY_FOR_FILING'
+  const canMarkReady = !!selectedPeriodId && !isMarkingReady && redCount === 0 && !!report && !isAlreadyReady
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Control panel */}
       <Card>
         <CardHeader>
-          <CardTitle>BTW-aangifte</CardTitle>
-          <CardDescription>Genereer een concept, valideer afwijkingen, exporteer en markeer de periode als klaar voor handmatige indiening.</CardDescription>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <CurrencyEur size={22} weight="duotone" />
+            BTW-aangifte
+          </CardTitle>
+          <CardDescription>
+            Selecteer een periode, valideer de gegevens, exporteer het overzicht en markeer de
+            periode als klaar voor handmatige indiening bij de Belastingdienst.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
+          {/* Row 1: period selector + action buttons */}
           <div className="flex flex-wrap items-end gap-3">
-            <div className="w-full max-w-xs space-y-2">
-              <Label>Periode</Label>
+            <div className="min-w-[220px] space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <CalendarBlank size={13} />
+                Periode
+              </Label>
               <Select value={selectedPeriodId} onValueChange={setSelectedPeriodId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecteer periode" />
+                  <SelectValue placeholder="Selecteer periode…" />
                 </SelectTrigger>
                 <SelectContent>
                   {periods.map((period) => (
-                    <SelectItem value={period.id} key={period.id}>{period.name} ({period.period_type})</SelectItem>
+                    <SelectItem value={period.id} key={period.id}>
+                      {period.name} <span className="text-muted-foreground">({period.period_type})</span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" onClick={handleValidate} disabled={!selectedPeriodId || isValidating}>
-              <ArrowsClockwise size={16} className="mr-2" />
-              {isValidating ? 'Valideren...' : 'Valideren'}
+
+            <Button
+              onClick={handleValidate}
+              disabled={!selectedPeriodId || isValidating || isLoading}
+              title={!selectedPeriodId ? 'Selecteer eerst een periode' : undefined}
+            >
+              {isValidating ? (
+                <Spinner size={16} className="mr-2 animate-spin" />
+              ) : (
+                <ArrowsClockwise size={16} className="mr-2" />
+              )}
+              {isValidating ? 'Valideren…' : 'Valideren'}
             </Button>
-            <Button variant="outline" onClick={handleExportPdf} disabled={!report}>
-              <DownloadSimple size={16} className="mr-2" />Download BTW overzicht (PDF)
+
+            <Separator orientation="vertical" className="h-9 hidden sm:block" />
+
+            <Button
+              variant="outline"
+              onClick={handleExportPdf}
+              disabled={!report || isPdfLoading}
+              title={!report ? 'Laad eerst een overzicht' : undefined}
+            >
+              {isPdfLoading ? (
+                <Spinner size={16} className="mr-2 animate-spin" />
+              ) : (
+                <DownloadSimple size={16} className="mr-2" />
+              )}
+              Download PDF
             </Button>
-            <Button variant="outline" onClick={handleExportCsv} disabled={!report}>
-              <FileArrowDown size={16} className="mr-2" />Export CSV
+            <Button
+              variant="outline"
+              onClick={handleExportCsv}
+              disabled={!report}
+              title={!report ? 'Laad eerst een overzicht' : undefined}
+            >
+              <FileArrowDown size={16} className="mr-2" />
+              Export CSV
             </Button>
-            <Button onClick={handleMarkReady} disabled={!selectedPeriodId || isMarkingReady || redCount > 0}>
-              <CheckCircle size={16} className="mr-2" />
-              {isMarkingReady ? 'Opslaan...' : 'Markeer als klaar'}
+
+            <Separator orientation="vertical" className="h-9 hidden sm:block" />
+
+            <Button
+              variant={isAlreadyReady ? 'secondary' : 'default'}
+              onClick={handleMarkReady}
+              disabled={!canMarkReady}
+              title={
+                !selectedPeriodId
+                  ? 'Selecteer eerst een periode'
+                  : redCount > 0
+                    ? `${redCount} blokkerende fout${redCount !== 1 ? 'en' : ''} – los deze eerst op`
+                    : isAlreadyReady
+                      ? 'Periode is al klaar voor indiening'
+                      : !report
+                        ? 'Laad eerst een overzicht'
+                        : undefined
+              }
+            >
+              {isMarkingReady ? (
+                <Spinner size={16} className="mr-2 animate-spin" />
+              ) : (
+                <CheckCircle size={16} className="mr-2" weight={isAlreadyReady ? 'fill' : 'regular'} />
+              )}
+              {isAlreadyReady ? 'Klaar voor indiening' : isMarkingReady ? 'Opslaan…' : 'Markeer als klaar'}
             </Button>
           </div>
 
+          {/* Row 2: feedback messages */}
           {error && (
             <Alert className="bg-destructive/10 border-destructive/40">
+              <XCircle className="h-4 w-4" />
               <AlertTitle className="flex items-center justify-between">
-                <span>Fout bij BTW workflow</span>
+                <span>Fout</span>
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="h-6 px-2"
                   onClick={() => {
                     setError(null)
                     if (selectedPeriodId) {
@@ -227,8 +441,8 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
                     }
                   }}
                 >
-                  <ArrowClockwise size={16} className="mr-2" />
-                  Opnieuw proberen
+                  <ArrowClockwise size={14} className="mr-1" />
+                  Opnieuw
                 </Button>
               </AlertTitle>
               <AlertDescription>{error}</AlertDescription>
@@ -236,180 +450,319 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
           )}
           {message && (
             <Alert className="bg-blue-500/10 border-blue-500/40">
-              <AlertTitle>Status</AlertTitle>
+              <CheckCircle className="h-4 w-4 text-blue-500" />
               <AlertDescription>{message}</AlertDescription>
             </Alert>
           )}
 
-          <div className="flex gap-2">
-            <Badge variant={redCount > 0 ? 'destructive' : 'outline'}>{redCount} blokkerend</Badge>
-            <Badge variant="outline" className="bg-amber-500/10 border-amber-500/40">{yellowCount} waarschuwingen</Badge>
-            {report && <Badge variant="outline">Netto 5g: {formatMoney(report.net_vat)}</Badge>}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Submission Packages Section */}
-      {report && (
-        <Card className="bg-blue-500/5 border-blue-500/20">
-          <CardHeader>
-            <CardTitle>Indienbestanden (Phase A)</CardTitle>
-            <CardDescription>
-              Download XML-bestanden voor handmatige indiening bij de Belastingdienst.
-              {redCount > 0 && ' Let op: Los eerst blokkerende fouten op voordat je indient.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-3">
-              <Button 
-                variant="default" 
-                onClick={handleDownloadBtwSubmissionPackage}
-                disabled={redCount > 0}
-              >
-                <FileArrowDown size={20} className="mr-2" />
-                Download BTW indienbestand (XML)
-              </Button>
-              {icpReport && icpReport.entries.length > 0 && (
-                <Button 
-                  variant="outline" 
-                  onClick={handleDownloadIcpSubmissionPackage}
-                  disabled={redCount > 0}
-                >
-                  <Globe size={20} className="mr-2" />
-                  Download ICP opgaaf (XML)
-                </Button>
-              )}
-              <Button 
-                variant="outline" 
-                onClick={handleExportPdf}
-              >
-                <DownloadSimple size={20} className="mr-2" />
-                Download rapport (PDF)
-              </Button>
+          {/* Row 3: status summary cards */}
+          {selectedPeriodId && (
+            <div className="flex flex-wrap gap-3 pt-1">
+              <StatusCard
+                icon={<WarningCircle size={14} />}
+                label="Blokkerend"
+                value={redCount}
+                tone={redCount > 0 ? 'red' : 'neutral'}
+              />
+              <StatusCard
+                icon={<Warning size={14} />}
+                label="Waarschuwingen"
+                value={yellowCount}
+                tone={yellowCount > 0 ? 'amber' : 'neutral'}
+              />
+              <StatusCard
+                icon={<CalendarBlank size={14} />}
+                label="Status periode"
+                value={selectedPeriod ? (PERIOD_STATUS_LABELS[selectedPeriod.status] ?? selectedPeriod.status) : '—'}
+                tone={
+                  isAlreadyReady ? 'green' :
+                  redCount > 0 ? 'red' :
+                  yellowCount > 0 ? 'amber' :
+                  report ? 'blue' : 'neutral'
+                }
+              />
             </div>
-            {redCount > 0 && (
-              <Alert className="mt-4 bg-red-500/10 border-red-500/40">
-                <WarningCircle className="h-4 w-4" />
-                <AlertTitle>Indienen nog niet mogelijk</AlertTitle>
-                <AlertDescription>
-                  Er zijn {redCount} blokkerende fouten. Los deze eerst op voordat je het indienbestand downloadt.
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Rubrieken BTW-aangifte</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? <p className="text-sm text-muted-foreground">BTW gegevens laden...</p> : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Rubriek</TableHead>
-                  <TableHead>Omschrijving</TableHead>
-                  <TableHead className="text-right">Omzet</TableHead>
-                  <TableHead className="text-right">BTW</TableHead>
-                  <TableHead className="text-center">Actie</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {BOX_ORDER.map((code) => {
-                  const box = report?.boxes[code]
-                  const hasData = box && (Number(box.turnover_amount) !== 0 || Number(box.vat_amount) !== 0)
-                  
-                  return (
-                    <TableRow key={code}>
-                      <TableCell className="font-mono">{code}</TableCell>
-                      <TableCell>{box?.box_name || '—'}</TableCell>
-                      <TableCell className="text-right">{formatMoney(box?.turnover_amount || 0)}</TableCell>
-                      <TableCell className="text-right">{formatMoney(box?.vat_amount || 0)}</TableCell>
-                      <TableCell className="text-center">
-                        {hasData && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setDrilldownBoxCode(code)
-                              setDrilldownBoxName(box?.box_name || `Box ${code}`)
-                              setDrilldownOpen(true)
-                            }}
-                          >
-                            <Eye size={16} className="mr-2" />
-                            Bekijk herkomst
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
           )}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>ICP overzicht (EU B2B)</CardTitle>
-          <CardDescription>Totaal ICP: {formatMoney(icpReport?.total_supplies || 0)}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>BTW-nummer</TableHead>
-                <TableHead>Land</TableHead>
-                <TableHead>Klant</TableHead>
-                <TableHead className="text-right">Bedrag</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(icpReport?.entries || []).map((entry) => (
-                <TableRow key={`${entry.customer_vat_number}-${entry.country_code}`}>
-                  <TableCell>{entry.customer_vat_number}</TableCell>
-                  <TableCell>{entry.country_code}</TableCell>
-                  <TableCell>{entry.customer_name || '-'}</TableCell>
-                  <TableCell className="text-right">{formatMoney(entry.taxable_base)}</TableCell>
-                </TableRow>
-              ))}
-              {(!icpReport || icpReport.entries.length === 0) && (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground">Geen ICP transacties in deze periode</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* Empty state */}
+      {!selectedPeriodId && (
+        <Card>
+          <CardContent className="py-12 flex flex-col items-center gap-3 text-center text-muted-foreground">
+            <CalendarBlank size={40} className="opacity-40" />
+            <p className="text-base font-medium">Selecteer eerst een periode</p>
+            <p className="text-sm max-w-sm">
+              Kies een periode uit de keuzelijst hierboven om het BTW-overzicht te genereren.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Afwijkingen</CardTitle>
-          <CardDescription>Rode afwijkingen blokkeren "Markeer als klaar". Gele afwijkingen zijn toegestaan na controle.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {anomalies.length === 0 ? (
-            <p className="text-sm text-green-700 dark:text-green-400">Geen afwijkingen gevonden.</p>
-          ) : anomalies.map((anomaly) => (
-            <div key={anomaly.id} className={`rounded-lg border p-3 ${anomalyTone(anomaly.severity)}`}>
-              <div className="flex items-center gap-2 font-medium">
-                {anomaly.severity === 'RED' ? <WarningCircle size={16} /> : <Warning size={16} />}
-                {anomaly.title}
-              </div>
-              <p className="mt-1 text-sm">{anomaly.description}</p>
-              {anomaly.suggested_fix && <p className="mt-1 text-xs">Suggestie: {anomaly.suggested_fix}</p>}
+      {/* Loading state */}
+      {selectedPeriodId && isLoading && <LoadingSkeleton />}
+
+      {/* Report content */}
+      {selectedPeriodId && !isLoading && report && (
+        <>
+          {/* Summary figures */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Totaal omzet</div>
+              <div className="text-xl font-bold">{formatMoney(report.total_turnover)}</div>
             </div>
-          ))}
-        </CardContent>
-      </Card>
+            <div className="rounded-lg border bg-blue-500/10 border-blue-500/20 p-4">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Verschuldigde BTW</div>
+              <div className="text-xl font-bold text-blue-700 dark:text-blue-400">{formatMoney(report.total_vat_payable)}</div>
+            </div>
+            <div className="rounded-lg border bg-green-500/10 border-green-500/20 p-4">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Voorbelasting</div>
+              <div className="text-xl font-bold text-green-700 dark:text-green-400">{formatMoney(report.total_vat_receivable)}</div>
+            </div>
+            {(() => {
+              const net = Number(report.net_vat)
+              const isRefund = net < 0
+              return (
+                <div className={`rounded-lg border p-4 ${isRefund ? 'bg-green-500/10 border-green-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
+                    {isRefund ? 'Te ontvangen (5g)' : 'Te betalen (5g)'}
+                  </div>
+                  <div className={`text-xl font-bold ${isRefund ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                    {formatMoney(Math.abs(net))}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
 
-      {/* Submission History */}
-      {selectedPeriodId && (
-        <VATSubmissionHistory 
+          {/* Rubrieken table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Rubrieken BTW-aangifte</CardTitle>
+              <CardDescription>
+                Overzicht per rubriek (1a–5g) conform het formulier van de Belastingdienst.
+                Klik op een rij met boekingen om de herkomst te bekijken.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {Object.entries(BOX_GROUPS).map(([groupName, codes]) => {
+                const isCalculationGroup = groupName.startsWith('Berekening')
+                const groupBoxes = codes.map((code) => ({ code, box: report.boxes[code] })).filter(({ box }) => !!box)
+                return (
+                  <div key={groupName}>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      {groupName}
+                    </h4>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-20">Rubriek</TableHead>
+                          <TableHead>Omschrijving</TableHead>
+                          {!isCalculationGroup && <TableHead className="text-right w-36">Omzet</TableHead>}
+                          <TableHead className="text-right w-36">BTW</TableHead>
+                          <TableHead className="text-center w-28">Actie</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {groupBoxes.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={isCalculationGroup ? 3 : 4} className="text-center text-muted-foreground text-sm py-4">
+                              Geen boekingen in deze groep
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          groupBoxes.map(({ code, box }) => {
+                            const hasData = Number(box!.turnover_amount) !== 0 || Number(box!.vat_amount) !== 0
+                            const isSubtotal = ['5a', '5c', '5g'].includes(code)
+                            return (
+                              <TableRow key={code} className={isSubtotal ? 'font-semibold bg-muted/20' : ''}>
+                                <TableCell className="font-mono text-sm">{code}</TableCell>
+                                <TableCell>{box!.box_name}</TableCell>
+                                {!isCalculationGroup && (
+                                  <TableCell className="text-right">
+                                    {Number(box!.turnover_amount) !== 0 ? formatMoney(box!.turnover_amount) : <span className="text-muted-foreground">—</span>}
+                                  </TableCell>
+                                )}
+                                <TableCell className="text-right">
+                                  {Number(box!.vat_amount) !== 0 ? formatMoney(box!.vat_amount) : <span className="text-muted-foreground">—</span>}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  {hasData && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setDrilldownBoxCode(code)
+                                        setDrilldownBoxName(box!.box_name)
+                                        setDrilldownOpen(true)
+                                      }}
+                                    >
+                                      <Eye size={14} className="mr-1" />
+                                      Herkomst
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+
+          {/* Afwijkingen */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                Afwijkingen en controles
+                {anomalies.length > 0 && (
+                  <Badge variant={redCount > 0 ? 'destructive' : 'secondary'}>{anomalies.length}</Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Rode fouten blokkeren &quot;Markeer als klaar&quot;. Gele waarschuwingen zijn toegestaan maar vereisen controle.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {anomalies.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
+                  <CheckCircle size={36} weight="duotone" className="text-green-500" />
+                  <p className="font-medium text-green-700 dark:text-green-400">Geen afwijkingen gevonden</p>
+                  <p className="text-sm">De BTW-aangifte kan worden ingediend.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {redCount > 0 && (
+                    <>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">
+                        Blokkerende fouten ({redCount})
+                      </p>
+                      {anomalies.filter((a) => a.severity === 'RED').map((a) => <AnomalyRow key={a.id} anomaly={a} />)}
+                    </>
+                  )}
+                  {yellowCount > 0 && (
+                    <>
+                      {redCount > 0 && <Separator className="my-2" />}
+                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                        Waarschuwingen ({yellowCount})
+                      </p>
+                      {anomalies.filter((a) => a.severity === 'YELLOW').map((a) => <AnomalyRow key={a.id} anomaly={a} />)}
+                    </>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ICP */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe size={18} />
+                ICP overzicht (EU B2B)
+              </CardTitle>
+              <CardDescription>
+                Intracommunautaire leveringen — Totaal: <strong>{formatMoney(icpReport?.total_supplies ?? 0)}</strong>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!icpReport || icpReport.entries.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
+                  <Globe size={32} className="opacity-40" />
+                  <p className="text-sm">Geen intracommunautaire leveringen in deze periode</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>BTW-nummer</TableHead>
+                      <TableHead>Land</TableHead>
+                      <TableHead>Klant</TableHead>
+                      <TableHead className="text-right">Bedrag</TableHead>
+                      <TableHead className="text-right">Transacties</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {icpReport.entries.map((entry) => (
+                      <TableRow key={`${entry.customer_vat_number}-${entry.country_code}`}>
+                        <TableCell className="font-mono text-sm">{entry.customer_vat_number}</TableCell>
+                        <TableCell>{entry.country_code}</TableCell>
+                        <TableCell>{entry.customer_name ?? '—'}</TableCell>
+                        <TableCell className="text-right">{formatMoney(entry.taxable_base)}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{entry.transaction_count}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Indienbestanden */}
+          <Card className="border-blue-500/20 bg-blue-500/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FileText size={18} weight="duotone" />
+                Indienbestanden
+              </CardTitle>
+              <CardDescription>
+                Download XML- of PDF-bestanden voor handmatige indiening bij de Belastingdienst.
+                {redCount > 0 && (
+                  <span className="text-red-600 dark:text-red-400">
+                    {' '}Los eerst {redCount} blokkerende fout{redCount !== 1 ? 'en' : ''} op.
+                  </span>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-3">
+              <Button
+                variant="default"
+                onClick={handleDownloadBtwXml}
+                disabled={redCount > 0 || isBtwXmlLoading}
+                title={redCount > 0 ? 'Los eerst blokkerende fouten op' : undefined}
+              >
+                {isBtwXmlLoading ? <Spinner size={16} className="mr-2 animate-spin" /> : <FileArrowDown size={16} className="mr-2" />}
+                BTW indienbestand (XML)
+              </Button>
+              {icpReport && icpReport.entries.length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadIcpXml}
+                  disabled={redCount > 0 || isIcpXmlLoading}
+                  title={redCount > 0 ? 'Los eerst blokkerende fouten op' : undefined}
+                >
+                  {isIcpXmlLoading ? <Spinner size={16} className="mr-2 animate-spin" /> : <Globe size={16} className="mr-2" />}
+                  ICP opgaaf (XML)
+                </Button>
+              )}
+              <Button variant="outline" onClick={handleExportPdf} disabled={isPdfLoading}>
+                {isPdfLoading ? <Spinner size={16} className="mr-2 animate-spin" /> : <DownloadSimple size={16} className="mr-2" />}
+                Rapport (PDF)
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Generation timestamp */}
+          <p className="text-xs text-center text-muted-foreground">
+            Overzicht gegenereerd op{' '}
+            {new Date(report.generated_at).toLocaleString('nl-NL', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </p>
+        </>
+      )}
+
+      {/* Submission history */}
+      {selectedPeriodId && !isLoading && (
+        <VATSubmissionHistory
           clientId={clientId}
           periodId={selectedPeriodId}
           onRefresh={() => loadReport(selectedPeriodId)}
@@ -426,11 +779,7 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
           boxCode={drilldownBoxCode}
           boxName={drilldownBoxName}
           onViewAudit={(entityId, entityType) => {
-            // Navigate to audit tab with filters for this entity
-            // First close the drilldown
             setDrilldownOpen(false)
-            // Then navigate to audit tab
-            // The audit tab will need to support URL parameters for pre-filtering
             navigateTo(`/accountant/clients/${clientId}/audit?entity_id=${entityId}&entity_type=${entityType}`)
           }}
         />

@@ -5362,6 +5362,31 @@ export const zzpApi = {
     delete: async (quoteId: string): Promise<void> => {
       await api.delete(`/zzp/quotes/${quoteId}`)
     },
+
+    /**
+     * Download quote as PDF blob.
+     */
+    downloadPdf: async (quoteId: string): Promise<Blob> => {
+      const response = await api.get(`/zzp/quotes/${quoteId}/pdf`, {
+        responseType: 'blob',
+      })
+      return response.data as Blob
+    },
+
+    /**
+     * Get the quote PDF URL for direct download (browser navigation).
+     * Includes `?download=1` and `?token=<jwt>` for authenticated downloads.
+     */
+    getPdfUrl: (quoteId: string): string => {
+      let token: string | null = null
+      try {
+        token = localStorage.getItem('access_token')
+      } catch {
+        // localStorage may be unavailable in certain browser contexts
+      }
+      const tokenParam = token ? `&token=${encodeURIComponent(token)}` : ''
+      return `${api.defaults.baseURL}/zzp/quotes/${quoteId}/pdf?download=1${tokenParam}`
+    },
   },
 
   // ------------ Links / Consent (from zzpConsentApi) ------------

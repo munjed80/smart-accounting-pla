@@ -170,6 +170,7 @@ export const nl = {
     boekhouder: "Boekhouder",
     klanten: "Klanten",
     facturen: "Facturen",
+    offertes: "Offertes",
     uitgaven: "Uitgaven",
     uren: "Uren",
     agenda: "Agenda",

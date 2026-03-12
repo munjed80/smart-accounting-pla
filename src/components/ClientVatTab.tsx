@@ -24,6 +24,7 @@ import {
   FileText,
   Spinner,
   XCircle,
+  Info,
 } from '@phosphor-icons/react'
 import { BTWBoxDrilldown } from './BTWBoxDrilldown'
 import { VATSubmissionHistory } from './VATSubmissionHistory'
@@ -231,12 +232,18 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
   }, [selectedPeriodId])
 
   const handleValidate = async () => {
+    // Diagnostic: log disabled conditions if handler fires unexpectedly
+    if (import.meta.env.DEV) {
+      console.log('[BTW] handleValidate fired', { selectedPeriodId, isValidating, isLoading })
+    }
     if (!selectedPeriodId) return
     try {
       setIsValidating(true)
       setMessage(null)
       setError(null)
+      if (import.meta.env.DEV) console.log('[BTW] Calling vatApi.validate', { clientId, selectedPeriodId })
       const response = await vatApi.validate(clientId, selectedPeriodId)
+      if (import.meta.env.DEV) console.log('[BTW] vatApi.validate response received')
       setAnomalies(response.anomalies)
       setMessage(response.message)
       await loadReport(selectedPeriodId)
@@ -248,6 +255,7 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
   }
 
   const handleExportCsv = () => {
+    if (import.meta.env.DEV) console.log('[BTW] handleExportCsv fired', { hasReport: !!report })
     if (!report) return
     const rows = [
       ['rubriek', 'omschrijving', 'omzet', 'btw'],
@@ -261,11 +269,14 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
   }
 
   const handleExportPdf = async () => {
+    if (import.meta.env.DEV) console.log('[BTW] handleExportPdf fired', { selectedPeriodId, hasReport: !!report })
     if (!selectedPeriodId || !report) return
     try {
       setIsPdfLoading(true)
       setError(null)
+      if (import.meta.env.DEV) console.log('[BTW] Calling vatApi.downloadPdf', { clientId, selectedPeriodId })
       const blob = await vatApi.downloadPdf(clientId, selectedPeriodId)
+      if (import.meta.env.DEV) console.log('[BTW] vatApi.downloadPdf blob received')
       downloadBlob(blob, `btw-overzicht-${report.period_name}.pdf`)
     } catch (err) {
       setError(getErrorMessage(err))
@@ -275,11 +286,14 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
   }
 
   const handleDownloadBtwXml = async () => {
+    if (import.meta.env.DEV) console.log('[BTW] handleDownloadBtwXml fired', { selectedPeriodId, hasReport: !!report })
     if (!selectedPeriodId || !report) return
     try {
       setIsBtwXmlLoading(true)
       setError(null)
+      if (import.meta.env.DEV) console.log('[BTW] Calling vatApi.downloadBtwSubmissionPackage', { clientId, selectedPeriodId })
       const blob = await vatApi.downloadBtwSubmissionPackage(clientId, selectedPeriodId)
+      if (import.meta.env.DEV) console.log('[BTW] BTW XML blob received')
       downloadBlob(blob, `btw-aangifte-${report.period_name}-${report.start_date}.xml`)
     } catch (err) {
       setError(getErrorMessage(err))
@@ -289,11 +303,14 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
   }
 
   const handleDownloadIcpXml = async () => {
+    if (import.meta.env.DEV) console.log('[BTW] handleDownloadIcpXml fired', { selectedPeriodId, hasReport: !!report })
     if (!selectedPeriodId || !report) return
     try {
       setIsIcpXmlLoading(true)
       setError(null)
+      if (import.meta.env.DEV) console.log('[BTW] Calling vatApi.downloadIcpSubmissionPackage', { clientId, selectedPeriodId })
       const blob = await vatApi.downloadIcpSubmissionPackage(clientId, selectedPeriodId)
+      if (import.meta.env.DEV) console.log('[BTW] ICP XML blob received')
       downloadBlob(blob, `icp-opgaaf-${report.period_name}-${report.start_date}.xml`)
     } catch (err) {
       setError(getErrorMessage(err))
@@ -303,12 +320,17 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
   }
 
   const handleMarkReady = async () => {
+    if (import.meta.env.DEV) {
+      console.log('[BTW] handleMarkReady fired', { selectedPeriodId, canMarkReady, redCount, isAlreadyReady: selectedPeriod?.status === 'READY_FOR_FILING' })
+    }
     if (!selectedPeriodId) return
     try {
       setIsMarkingReady(true)
       setMessage(null)
       setError(null)
+      if (import.meta.env.DEV) console.log('[BTW] Calling periodApi.updateStatus', { clientId, selectedPeriodId })
       const response = await periodApi.updateStatus(clientId, selectedPeriodId, { status: 'READY_FOR_FILING' })
+      if (import.meta.env.DEV) console.log('[BTW] periodApi.updateStatus response received')
       setMessage(response.message)
       await Promise.all([loadPeriods(), loadReport(selectedPeriodId)])
     } catch (err) {
@@ -428,6 +450,26 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
               {isAlreadyReady ? 'Klaar voor indiening' : isMarkingReady ? 'Opslaan…' : 'Markeer als klaar'}
             </Button>
           </div>
+
+          {/* Disabled-state hint — visible below buttons so user sees WHY actions are unavailable */}
+          {!selectedPeriodId && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Info size={13} />
+              Selecteer een periode om de acties te activeren.
+            </p>
+          )}
+          {selectedPeriodId && isLoading && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Spinner size={13} className="animate-spin" />
+              Overzicht wordt geladen…
+            </p>
+          )}
+          {selectedPeriodId && !isLoading && !report && !error && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+              <Warning size={13} />
+              Geen overzicht beschikbaar voor deze periode.
+            </p>
+          )}
 
           {/* Row 2: feedback messages */}
           {error && (
@@ -771,8 +813,8 @@ export const ClientVatTab = ({ clientId }: { clientId: string }) => {
         />
       )}
 
-      {/* BTW Box Drilldown Drawer */}
-      {drilldownOpen && selectedPeriodId && (
+      {/* BTW Box Drilldown Drawer — always rendered so the Sheet can animate closed */}
+      {selectedPeriodId && (
         <BTWBoxDrilldown
           open={drilldownOpen}
           onClose={() => setDrilldownOpen(false)}

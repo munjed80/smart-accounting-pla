@@ -1,4 +1,18 @@
 User-agent: *
 Allow: /
 
+# Disallow authenticated app routes — these redirect to login and waste crawl budget
+Disallow: /dashboard
+Disallow: /invoices
+Disallow: /expenses
+Disallow: /hours
+Disallow: /clients
+Disallow: /agenda
+Disallow: /btw
+Disallow: /settings
+Disallow: /exports
+Disallow: /onboarding
+Disallow: /accountant/
+Disallow: /admin/
+
 Sitemap: https://zzpershub.nl/sitemap.xml

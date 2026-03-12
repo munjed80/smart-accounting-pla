@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { navigateTo } from '@/lib/navigation'
+import { useSeoMeta } from '@/hooks/useSeoMeta'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -113,24 +114,11 @@ const usps = [
 export const LandingPage = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  useEffect(() => {
-    document.title = "Gratis factuur maken voor zzp'ers | ZZPers Hub"
-
-    const ensureMetaDescription = () => {
-      let tag = document.querySelector('meta[name="description"]')
-      if (!tag) {
-        tag = document.createElement('meta')
-        tag.setAttribute('name', 'description')
-        document.head.appendChild(tag)
-      }
-      tag.setAttribute(
-        'content',
-        "Maak gratis professionele facturen als zzp'er. Beheer klanten, registreer uren en houd btw-overzicht bij. Start vandaag gratis — daarna €4,99/maand. Geen creditcard vereist.",
-      )
-    }
-
-    ensureMetaDescription()
-  }, [])
+  useSeoMeta({
+    title: "Gratis factuur maken voor zzp'ers | ZZPers Hub",
+    description: "Maak gratis professionele facturen als zzp'er. Beheer klanten, registreer uren en houd btw-overzicht bij. Start vandaag gratis — daarna €4,99/maand. Geen creditcard vereist.",
+    canonical: 'https://zzpershub.nl/',
+  })
 
   const navigation = [
     { name: 'Facturen & functies', href: '#voor-zzp' },

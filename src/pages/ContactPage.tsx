@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { navigateTo } from '@/lib/navigation'
+import { useSeoMeta } from '@/hooks/useSeoMeta'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { CheckCircle } from 'lucide-react'
@@ -32,16 +33,11 @@ export const ContactPage = () => {
   const [errors, setErrors] = useState<ContactFormErrors>({})
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    document.title = 'Contact | ZZPers Hub'
-    let tag = document.querySelector('meta[name="description"]')
-    if (!tag) {
-      tag = document.createElement('meta')
-      tag.setAttribute('name', 'description')
-      document.head.appendChild(tag)
-    }
-    tag.setAttribute('content', 'Neem contact op met ZZPers Hub. Vragen over ons gratis factuurprogramma voor zzp\'ers? Wij reageren binnen één werkdag.')
-  }, [])
+  useSeoMeta({
+    title: 'Contact | ZZPers Hub',
+    description: "Neem contact op met ZZPers Hub. Vragen over ons gratis factuurprogramma voor zzp'ers? Wij reageren binnen één werkdag.",
+    canonical: 'https://zzpershub.nl/contact',
+  })
 
   const validate = (): boolean => {
     const newErrors: ContactFormErrors = {}

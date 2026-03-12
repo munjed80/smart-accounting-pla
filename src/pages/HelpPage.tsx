@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { navigateTo } from '@/lib/navigation'
+import { useSeoMeta } from '@/hooks/useSeoMeta'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { MarketingFooter } from '@/components/marketing/Footer'
@@ -128,15 +129,35 @@ const helpSections: HelpSection[] = [
 export const HelpPage = () => {
   const [openSection, setOpenSection] = useState<string | null>('aan-de-slag')
 
+  useSeoMeta({
+    title: 'FAQ & Startgids | ZZPers Hub',
+    description: 'Veelgestelde vragen en startgids voor ZZPers Hub. Leer hoe u gratis facturen maakt, klanten beheert en uren registreert.',
+    canonical: 'https://zzpershub.nl/help',
+  })
+
   useEffect(() => {
-    document.title = 'FAQ & Startgids | ZZPers Hub'
-    let tag = document.querySelector('meta[name="description"]')
-    if (!tag) {
-      tag = document.createElement('meta')
-      tag.setAttribute('name', 'description')
-      document.head.appendChild(tag)
+    const scriptId = 'ld-json-faq-help'
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement('script')
+      script.id = scriptId
+      script.type = 'application/ld+json'
+      script.textContent = JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: helpSections.map((s) => ({
+          '@type': 'Question',
+          name: s.title,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: typeof s.content === 'string' ? s.content : s.title,
+          },
+        })),
+      })
+      document.head.appendChild(script)
     }
-    tag.setAttribute('content', 'Veelgestelde vragen en startgids voor ZZPers Hub. Leer hoe u gratis facturen maakt, klanten beheert en uren registreert.')
+    return () => {
+      document.getElementById(scriptId)?.remove()
+    }
   }, [])
 
   const toggle = (id: string) => {
@@ -175,11 +196,9 @@ export const HelpPage = () => {
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground ml-3" />
                 )}
               </button>
-              {openSection === section.id && (
-                <div className="px-5 pb-5 pt-2 border-t border-border bg-muted/20">
-                  {section.content}
-                </div>
-              )}
+              <div className={openSection === section.id ? 'px-5 pb-5 pt-2 border-t border-border bg-muted/20' : 'hidden'}>
+                {section.content}
+              </div>
             </div>
           ))}
         </div>

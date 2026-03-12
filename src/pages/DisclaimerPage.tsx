@@ -1,21 +1,16 @@
-import { useEffect } from 'react'
 import { navigateTo } from '@/lib/navigation'
+import { useSeoMeta } from '@/hooks/useSeoMeta'
 import { Button } from '@/components/ui/button'
 import { MarketingFooter } from '@/components/marketing/Footer'
 
 const LAST_UPDATED = '23 februari 2026'
 
 export const DisclaimerPage = () => {
-  useEffect(() => {
-    document.title = 'Disclaimer | ZZPers Hub'
-    let tag = document.querySelector('meta[name="description"]')
-    if (!tag) {
-      tag = document.createElement('meta')
-      tag.setAttribute('name', 'description')
-      document.head.appendChild(tag)
-    }
-    tag.setAttribute('content', 'Disclaimer van ZZPers Hub. Lees de voorwaarden rondom aansprakelijkheid en het gebruik van ons factuurprogramma voor zzp\'ers.')
-  }, [])
+  useSeoMeta({
+    title: 'Disclaimer | ZZPers Hub',
+    description: "Disclaimer van ZZPers Hub. Lees de voorwaarden rondom aansprakelijkheid en het gebruik van ons factuurprogramma voor zzp'ers.",
+    canonical: 'https://zzpershub.nl/disclaimer',
+  })
 
   return (
     <div className="min-h-screen bg-background text-foreground">

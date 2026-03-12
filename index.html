@@ -40,6 +40,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/icon-192x192.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512x512.png" />
@@ -108,18 +109,10 @@
       "mainEntity": [
         {
           "@type": "Question",
-          "name": "Hoe maak ik gratis een factuur met ZZPers Hub?",
+          "name": "Hoe maak ik gratis een factuur?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Registreer gratis op ZZPers Hub, voeg uw bedrijfsgegevens in en maak direct uw eerste professionele factuur. U kunt facturen versturen als PDF via e-mail. De eerste 30 dagen zijn volledig gratis, zonder creditcard."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Wat kost ZZPers Hub na de gratis proefperiode?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Na de gratis proefperiode van 30 dagen betaalt u €4,99 per maand. Geen verborgen kosten, maandelijks opzegbaar."
+            "text": "Maak een gratis account aan op ZZPers Hub — geen creditcard nodig. Ga daarna naar 'Facturen' en klik op '+ Nieuwe factuur'. Vul de klantgegevens in, voeg regelitems toe met omschrijving en bedrag, kies het btw-tarief en klik op 'Versturen'. Jouw professionele factuur wordt direct als PDF verstuurd naar de klant."
           }
         },
         {
@@ -127,15 +120,47 @@
           "name": "Is ZZPers Hub geschikt voor zzp'ers?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Ja, ZZPers Hub is speciaal ontwikkeld voor zzp'ers in Nederland. U kunt er professionele facturen mee maken, klanten beheren, uren registreren, bonnetjes uploaden en uw BTW-overzicht bijhouden."
+            "text": "Ja, ZZPers Hub is speciaal gemaakt voor zzp'ers, freelancers en zelfstandige ondernemers in Nederland. Je maakt snel professionele facturen, beheert klanten, registreert uren en houdt je btw-overzicht bij — zonder boekhoudkennis en zonder gedoe."
           }
         },
         {
           "@type": "Question",
-          "name": "Kan ik mijn boekhouder toegang geven tot mijn administratie?",
+          "name": "Wat kost ZZPers Hub na de gratis proefperiode?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Ja, u kunt uw accountant of boekhouder uitnodigen om live mee te kijken in uw administratie via ZZPers Hub. Zo werkt u efficiënt samen zonder bestanden heen en weer te sturen."
+            "text": "De eerste 30 dagen zijn volledig gratis — geen creditcard nodig bij aanmelding. Daarna is ZZPers Hub €4,99 per maand. Je kunt op elk moment opzeggen; er zijn geen opzegtermijnen of verborgen kosten."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Kan ik klanten beheren?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Ja. Via 'Klanten' voeg je klanten toe met naam, e-mailadres, KvK-nummer en factuuradres. Opgeslagen klanten zijn direct beschikbaar bij het aanmaken van facturen en uren. Je kunt klantgegevens altijd aanpassen via het klantprofiel."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Kan ik uren registreren?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Ja. Via 'Uren' kun je uren op twee manieren bijhouden: handmatig (datum, klant, aantal uren) of via de ingebouwde timer (start en stop). Geregistreerde uren kun je direct omzetten in factuurregels."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Kan ik bonnetjes uploaden?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Ja. Bij elke uitgave kun je een foto of PDF van het bonnetje uploaden via de knop 'Bijlage toevoegen'. De uitgave en het bonnetje worden meegenomen in je btw-overzicht en zijn opvraagbaar voor je boekhouder."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Kan ik later met mijn boekhouder samenwerken?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Ja. Via 'Boekhouder' in het menu nodig je je accountant of boekhouder uit met diens e-mailadres. Na acceptatie krijgt de boekhouder leestoegang tot jouw dossier. Je behoudt altijd de controle en kunt de toegang op elk moment intrekken."
           }
         },
         {
@@ -145,14 +170,30 @@
             "@type": "Answer",
             "text": "Ja, ZZPers Hub werkt als Progressive Web App (PWA) op zowel mobiel als desktop. U kunt het installeren op uw telefoon en facturen onderweg versturen."
           }
+        },
+        {
+          "@type": "Question",
+          "name": "Hoe werkt de gratis proefperiode?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Je krijgt 30 dagen gratis toegang tot alle functies, zonder creditcard bij aanmelding. Na 30 dagen wordt je account automatisch beperkt tot alleen-lezen modus tenzij je een abonnement activeert. Je gegevens blijven bewaard. Je ontvangt een herinnering per e-mail voor het einde van de proefperiode."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Hoe exporteer ik mijn gegevens (CSV/JSON)?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Via 'Instellingen' → 'Gegevensexport' kun je facturen, uitgaven en urenboekingen exporteren als CSV-bestand (compatibel met Excel) of als JSON. Selecteer het gewenste datumbereik en klik op 'Exporteren'. De download start direct in je browser."
+          }
         }
       ]
     }
     </script>
 
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
     <link href="/src/main.css" rel="stylesheet" />
 </head>
 

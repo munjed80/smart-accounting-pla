@@ -1,21 +1,16 @@
-import { useEffect } from 'react'
 import { navigateTo } from '@/lib/navigation'
+import { useSeoMeta } from '@/hooks/useSeoMeta'
 import { Button } from '@/components/ui/button'
 import { MarketingFooter } from '@/components/marketing/Footer'
 
 const LAST_UPDATED = '23 februari 2026'
 
 export const CookiesPage = () => {
-  useEffect(() => {
-    document.title = 'Cookiebeleid | ZZPers Hub'
-    let tag = document.querySelector('meta[name="description"]')
-    if (!tag) {
-      tag = document.createElement('meta')
-      tag.setAttribute('name', 'description')
-      document.head.appendChild(tag)
-    }
-    tag.setAttribute('content', 'Lees welke cookies ZZPers Hub gebruikt en hoe u uw cookievoorkeuren kunt beheren.')
-  }, [])
+  useSeoMeta({
+    title: 'Cookiebeleid | ZZPers Hub',
+    description: 'Lees welke cookies ZZPers Hub gebruikt en hoe u uw cookievoorkeuren kunt beheren.',
+    canonical: 'https://zzpershub.nl/cookies',
+  })
 
   return (
     <div className="min-h-screen bg-background text-foreground">

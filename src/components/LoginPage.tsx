@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason, getErrorMessage, getValidationErrors } from '@/lib/api'
 import { AxiosError } from 'axios'
 import { t } from '@/i18n'
+import { useSeoMeta } from '@/hooks/useSeoMeta'
 
 interface LoginPageProps {
   onSuccess?: (user: { role: string } | null) => void
@@ -20,6 +21,14 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   const { login, register, resendVerification, isLoading } = useAuth()
 
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login')
+
+  useSeoMeta({
+    title: activeTab === 'register' ? "Start gratis — ZZPers Hub | Gratis factuur maken voor zzp'ers" : 'Inloggen | ZZPers Hub',
+    description: activeTab === 'register'
+      ? "Maak gratis een account aan bij ZZPers Hub. 30 dagen gratis facturen maken als zzp'er — geen creditcard vereist."
+      : "Log in op uw ZZPers Hub account en beheer uw facturen, klanten en uren.",
+    canonical: 'https://zzpershub.nl/login',
+  })
 
   const [loginForm, setLoginForm] = useState({
     username: '',

@@ -1,21 +1,16 @@
-import { useEffect } from 'react'
 import { navigateTo } from '@/lib/navigation'
+import { useSeoMeta } from '@/hooks/useSeoMeta'
 import { Button } from '@/components/ui/button'
 import { MarketingFooter } from '@/components/marketing/Footer'
 
 const LAST_UPDATED = '23 februari 2026'
 
 export const TermsPage = () => {
-  useEffect(() => {
-    document.title = 'Algemene voorwaarden | ZZPers Hub'
-    let tag = document.querySelector('meta[name="description"]')
-    if (!tag) {
-      tag = document.createElement('meta')
-      tag.setAttribute('name', 'description')
-      document.head.appendChild(tag)
-    }
-    tag.setAttribute('content', 'Algemene voorwaarden van ZZPers Hub. Lees de gebruiksvoorwaarden voor ons gratis factuurprogramma voor zzp\'ers.')
-  }, [])
+  useSeoMeta({
+    title: 'Algemene voorwaarden | ZZPers Hub',
+    description: "Algemene voorwaarden van ZZPers Hub. Lees de gebruiksvoorwaarden voor ons gratis factuurprogramma voor zzp'ers.",
+    canonical: 'https://zzpershub.nl/terms',
+  })
 
   return (
     <div className="min-h-screen bg-background text-foreground">

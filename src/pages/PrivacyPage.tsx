@@ -1,21 +1,16 @@
-import { useEffect } from 'react'
 import { navigateTo } from '@/lib/navigation'
+import { useSeoMeta } from '@/hooks/useSeoMeta'
 import { Button } from '@/components/ui/button'
 import { MarketingFooter } from '@/components/marketing/Footer'
 
 const LAST_UPDATED = '23 februari 2026'
 
 export const PrivacyPage = () => {
-  useEffect(() => {
-    document.title = 'Privacybeleid | ZZPers Hub'
-    let tag = document.querySelector('meta[name="description"]')
-    if (!tag) {
-      tag = document.createElement('meta')
-      tag.setAttribute('name', 'description')
-      document.head.appendChild(tag)
-    }
-    tag.setAttribute('content', 'Lees hoe ZZPers Hub omgaat met uw persoonsgegevens. AVG-conform privacybeleid voor gebruikers van ons factuurprogramma voor zzp\'ers.')
-  }, [])
+  useSeoMeta({
+    title: 'Privacybeleid | ZZPers Hub',
+    description: "Lees hoe ZZPers Hub omgaat met uw persoonsgegevens. AVG-conform privacybeleid voor gebruikers van ons factuurprogramma voor zzp'ers.",
+    canonical: 'https://zzpershub.nl/privacy',
+  })
 
   return (
     <div className="min-h-screen bg-background text-foreground">

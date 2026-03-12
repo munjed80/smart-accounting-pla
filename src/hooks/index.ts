@@ -7,3 +7,5 @@
 export { useDebounce } from './useDebounce'
 
 export { useQueryFilters } from './useQueryFilters'
+
+export { useSeoMeta } from './useSeoMeta'

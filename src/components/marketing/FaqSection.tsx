@@ -118,11 +118,9 @@ export const FaqSection = () => {
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground ml-3" />
                 )}
               </button>
-              {openIndex === index && (
-                <div className="px-5 pb-4 pt-1 text-sm text-muted-foreground leading-relaxed border-t border-border bg-muted/20">
-                  {item.answer}
-                </div>
-              )}
+              <div className={openIndex === index ? 'px-5 pb-4 pt-1 text-sm text-muted-foreground leading-relaxed border-t border-border bg-muted/20' : 'hidden'}>
+                {item.answer}
+              </div>
             </div>
           ))}
         </div>

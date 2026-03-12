@@ -666,11 +666,11 @@ class TestInvoicePdfContent:
         
         # Generate HTML
         html = generate_invoice_html(invoice)
-        
+
         # Extract payment section - find matching closing div
-        payment_start = html.find('<div class="payment-info">')
+        payment_start = html.find('<div class="payment-box">')
         if payment_start > 0:
-            # Find the closing div for payment-info section
+            # Find the closing div for payment-box section
             # We need to track nested divs to find the correct closing tag
             depth = 0
             i = payment_start
@@ -686,15 +686,15 @@ class TestInvoicePdfContent:
             payment_section = html[payment_start:payment_end]
         else:
             payment_section = ""
-        
-        # Verify invoice number is explicitly shown in payment section
-        assert "Factuurnummer" in payment_section, "Factuurnummer label should be in payment details section"
+
+        # Verify payment reference (Kenmerk) is explicitly shown in payment section
+        assert "Kenmerk" in payment_section, "Kenmerk label should be in payment details section"
         assert "INV-TEST-001" in payment_section, "Invoice number should be in payment details section"
 
         # Verify KvK is in payment section
         assert "12345678" in payment_section, "KvK number should be in payment details section"
         assert "KvK" in payment_section, "KvK label should be in payment details section"
-        
+
         # Verify there's no separate business-ids footer div
         assert '<div class="business-ids">' not in html, "Should not have separate business-ids footer"
         
@@ -749,7 +749,7 @@ class TestInvoicePdfContent:
         html = generate_invoice_html(invoice)
         
         # Verify totals use proper HTML structure with CSS classes
-        assert '<div class="totals-row total">' in html, "Totals should use CSS class"
+        assert '<div class="totals-row grand-total">' in html, "Totals should use CSS class"
         assert '<span>Totaal</span>' in html, "Total label should be plain text in span"
         
         # Verify no escaped or inline HTML in values

@@ -30,7 +30,7 @@ def format_amount(cents: int) -> str:
     # Step 2: . (decimal) -> ,
     # Step 3: temp -> . (thousands)
     dutch_formatted = formatted.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
-    return f"€ {dutch_formatted}"
+    return f"\u20ac {dutch_formatted}"
 
 
 def format_date_nl(date_obj) -> str:
@@ -38,6 +38,19 @@ def format_date_nl(date_obj) -> str:
     if isinstance(date_obj, str):
         date_obj = datetime.fromisoformat(date_obj.replace("Z", "+00:00")).date()
     return date_obj.strftime("%d-%m-%Y")
+
+
+def format_quantity_nl(qty) -> str:
+    """
+    Format a quantity value in Dutch decimal notation.
+
+    Whole numbers are shown without decimals; fractional values use a comma as
+    the decimal separator, e.g. 28.75 → "28,75".
+    """
+    val = float(qty)
+    if val == int(val):
+        return str(int(val))
+    return f"{val:.2f}".replace(".", ",")
 
 
 def generate_invoice_html(invoice: ZZPInvoice) -> str:
@@ -50,465 +63,452 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
     Returns:
         HTML string for the invoice
     """
-    # Build seller address lines
-    seller_address_parts = []
+    # ── Company / seller details ───────────────────────────────────────────────
+    company_name = invoice.seller_company_name or "Uw Bedrijfsnaam"
+    seller_detail_lines = []
     if invoice.seller_address_street:
-        seller_address_parts.append(invoice.seller_address_street)
-    if invoice.seller_address_postal_code or invoice.seller_address_city:
-        seller_address_parts.append(
-            f"{invoice.seller_address_postal_code or ''} {invoice.seller_address_city or ''}".strip()
-        )
-    if invoice.seller_address_country and invoice.seller_address_country != "Nederland":
-        seller_address_parts.append(invoice.seller_address_country)
+        seller_detail_lines.append(invoice.seller_address_street)
+    postal_city = " ".join(filter(None, [
+        invoice.seller_address_postal_code, invoice.seller_address_city
+    ]))
+    if postal_city:
+        seller_detail_lines.append(postal_city)
+    if invoice.seller_address_country and invoice.seller_address_country.lower() != "nederland":
+        seller_detail_lines.append(invoice.seller_address_country)
+    if invoice.seller_kvk_number:
+        seller_detail_lines.append(f"KvK {invoice.seller_kvk_number}")
+    if invoice.seller_btw_number:
+        seller_detail_lines.append(f"BTW {invoice.seller_btw_number}")
+    contact_parts = list(filter(None, [invoice.seller_email, invoice.seller_phone]))
+    if contact_parts:
+        seller_detail_lines.append(" &nbsp;&middot;&nbsp; ".join(contact_parts))
 
-    # Build customer address lines
-    customer_address_parts = []
+    seller_details_html = "<br>".join(seller_detail_lines)
+
+    # ── Customer address ───────────────────────────────────────────────────────
+    customer_addr_lines = []
     if invoice.customer_address_street:
-        customer_address_parts.append(invoice.customer_address_street)
-    if invoice.customer_address_postal_code or invoice.customer_address_city:
-        customer_address_parts.append(
-            f"{invoice.customer_address_postal_code or ''} {invoice.customer_address_city or ''}".strip()
-        )
-    if invoice.customer_address_country and invoice.customer_address_country != "Nederland":
-        customer_address_parts.append(invoice.customer_address_country)
+        customer_addr_lines.append(invoice.customer_address_street)
+    cust_postal_city = " ".join(filter(None, [
+        invoice.customer_address_postal_code, invoice.customer_address_city
+    ]))
+    if cust_postal_city:
+        customer_addr_lines.append(cust_postal_city)
+    if invoice.customer_address_country and invoice.customer_address_country.lower() != "nederland":
+        customer_addr_lines.append(invoice.customer_address_country)
 
-    # Build invoice lines HTML
+    customer_addr_html = "<br>".join(customer_addr_lines)
+
+    # ── Invoice lines ──────────────────────────────────────────────────────────
     lines_html = ""
     for line in invoice.lines:
+        qty_str = format_quantity_nl(line.quantity)
+        vat_str = f"{float(line.vat_rate):g}%"
         lines_html += f"""
         <tr>
-            <td class="description">{line.description}</td>
-            <td class="quantity">{float(line.quantity):g}</td>
-            <td class="price">{format_amount(line.unit_price_cents)}</td>
-            <td class="vat">{float(line.vat_rate):g}%</td>
-            <td class="total">{format_amount(line.line_total_cents)}</td>
-        </tr>
-        """
+            <td class="col-desc">{line.description}</td>
+            <td class="col-qty">{qty_str}</td>
+            <td class="col-price">{format_amount(line.unit_price_cents)}</td>
+            <td class="col-vat">{vat_str}</td>
+            <td class="col-amount">{format_amount(line.line_total_cents)}</td>
+        </tr>"""
 
-    # Format dates
+    # ── Dates ──────────────────────────────────────────────────────────────────
     issue_date_str = format_date_nl(invoice.issue_date)
-    due_date_str = format_date_nl(invoice.due_date) if invoice.due_date else "-"
+    due_date_str   = format_date_nl(invoice.due_date) if invoice.due_date else "&mdash;"
 
-    # Seller contact line (email / phone)
-    seller_contact_parts = []
-    if invoice.seller_email:
-        seller_contact_parts.append(invoice.seller_email)
-    if invoice.seller_phone:
-        seller_contact_parts.append(invoice.seller_phone)
+    # ── Payment details ────────────────────────────────────────────────────────
+    payment_rows_html = ""
+    tnv = invoice.seller_company_name or invoice.seller_trading_name
+    if tnv:
+        payment_rows_html += f'<div class="pd-row"><span class="pd-lbl">T.n.v.</span><span class="pd-val">{tnv}</span></div>'
+    if invoice.seller_iban:
+        payment_rows_html += f'<div class="pd-row"><span class="pd-lbl">IBAN</span><span class="pd-val">{invoice.seller_iban}</span></div>'
+    payment_rows_html += f'<div class="pd-row"><span class="pd-lbl">Kenmerk</span><span class="pd-val">{invoice.invoice_number}</span></div>'
+    if invoice.seller_kvk_number:
+        payment_rows_html += f'<div class="pd-row"><span class="pd-lbl">KvK</span><span class="pd-val">{invoice.seller_kvk_number}</span></div>'
+    if invoice.seller_btw_number:
+        payment_rows_html += f'<div class="pd-row"><span class="pd-lbl">BTW-nummer</span><span class="pd-val">{invoice.seller_btw_number}</span></div>'
 
-    html = f"""
-    <!DOCTYPE html>
-    <html lang="nl">
-    <head>
-        <meta charset="UTF-8">
-        <title>Factuur {invoice.invoice_number}</title>
-        <style>
-            @page {{
-                size: A4;
-                margin: 2cm;
-            }}
+    # ── Notes block ────────────────────────────────────────────────────────────
+    notes_html = ""
+    if invoice.notes:
+        notes_html = f"""
+        <div class="notes-box">
+            <div class="notes-title">Opmerkingen</div>
+            <div class="notes-text">{invoice.notes}</div>
+        </div>"""
 
-            * {{
-                box-sizing: border-box;
-                margin: 0;
-                padding: 0;
-            }}
+    # ── Render ─────────────────────────────────────────────────────────────────
+    html = f"""<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <title>Factuur {invoice.invoice_number}</title>
+    <style>
+        @page {{
+            size: A4;
+            margin: 2cm;
+        }}
 
-            body {{
-                font-family: Arial, Helvetica, sans-serif;
-                font-size: 10pt;
-                line-height: 1.6;
-                color: #1a1a2e;
-            }}
+        * {{
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }}
 
-            .invoice-container {{
-                max-width: 100%;
-            }}
+        body {{
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10pt;
+            line-height: 1.5;
+            color: #1e293b;
+        }}
 
-            /* ── TOP HEADER ── */
-            .header {{
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                margin-bottom: 36px;
-                padding-bottom: 20px;
-                border-bottom: 3px solid #1d4ed8;
-            }}
+        /* ── HEADER ─────────────────────────────────────────────────────────── */
+        .header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding-bottom: 16px;
+            border-bottom: 2.5px solid #1d4ed8;
+            margin-bottom: 24px;
+        }}
 
-            /* Sender block – top left */
-            .sender-block {{
-                flex: 1;
-            }}
+        .company-name {{
+            font-size: 20pt;
+            font-weight: 700;
+            color: #1d4ed8;
+            line-height: 1.1;
+            margin-bottom: 5px;
+        }}
 
-            .sender-name {{
-                font-size: 20pt;
-                font-weight: 700;
-                color: #1d4ed8;
-                letter-spacing: -0.5px;
-                margin-bottom: 4px;
-            }}
+        .company-details {{
+            font-size: 8pt;
+            color: #64748b;
+            line-height: 1.7;
+        }}
 
-            .sender-details {{
-                font-size: 8.5pt;
-                color: #555;
-                line-height: 1.7;
-            }}
+        .factuur-block {{
+            text-align: right;
+            flex-shrink: 0;
+        }}
 
-            /* "FACTUUR" word-mark – top right */
-            .factuur-wordmark {{
-                text-align: right;
-            }}
+        .factuur-title {{
+            font-size: 30pt;
+            font-weight: 800;
+            color: #1d4ed8;
+            letter-spacing: 3px;
+            line-height: 1;
+            margin-bottom: 10px;
+        }}
 
-            .factuur-wordmark h1 {{
-                font-size: 26pt;
-                font-weight: 800;
-                color: #1d4ed8;
-                text-transform: uppercase;
-                letter-spacing: 4px;
-                line-height: 1;
-            }}
+        /* Invoice meta table inside header (right column) */
+        .meta-table {{
+            margin-left: auto;
+            border-collapse: collapse;
+        }}
 
-            /* ── BILLING ROW (client details left, invoice summary box right) ── */
-            .billing-row {{
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                margin-bottom: 32px;
-            }}
+        .meta-table td {{
+            font-size: 8.5pt;
+            padding: 3px 0;
+        }}
 
-            /* Client billing details */
-            .billing-to {{
-                flex: 1;
-                padding-right: 20px;
-            }}
+        .meta-table td.ml {{
+            color: #64748b;
+            padding-right: 14px;
+            text-align: right;
+            white-space: nowrap;
+        }}
 
-            .billing-to-label {{
-                font-size: 7.5pt;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 1.2px;
-                color: #888;
-                margin-bottom: 6px;
-            }}
+        .meta-table td.mv {{
+            font-weight: 600;
+            color: #1e293b;
+            text-align: right;
+        }}
 
-            .billing-to-name {{
-                font-size: 11pt;
-                font-weight: 700;
-                color: #1a1a2e;
-                margin-bottom: 2px;
-            }}
+        .meta-sep td {{
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 6px;
+        }}
 
-            .billing-to-address {{
-                font-size: 9pt;
-                color: #444;
-                line-height: 1.6;
-            }}
+        .meta-below-sep td {{
+            padding-top: 5px;
+        }}
 
-            /* Invoice summary box */
-            .invoice-summary {{
-                width: 240px;
-                background: #f1f5fd;
-                border-radius: 8px;
-                padding: 14px 18px;
-                border-left: 4px solid #1d4ed8;
-            }}
+        /* ── CUSTOMER ────────────────────────────────────────────────────────── */
+        .customer-section {{
+            margin-bottom: 20px;
+        }}
 
-            .summary-row {{
-                display: flex;
-                justify-content: space-between;
-                align-items: baseline;
-                padding: 4px 0;
-                border-bottom: 1px solid #dde3f0;
-                font-size: 9pt;
-            }}
+        .section-label {{
+            font-size: 7pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.3px;
+            color: #94a3b8;
+            margin-bottom: 4px;
+        }}
 
-            .summary-row:last-child {{
-                border-bottom: none;
-            }}
+        .customer-name {{
+            font-size: 12pt;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 3px;
+        }}
 
-            .summary-label {{
-                color: #555;
-                white-space: nowrap;
-                margin-right: 12px;
-            }}
+        .customer-address {{
+            font-size: 9pt;
+            color: #475569;
+            line-height: 1.6;
+        }}
 
-            .summary-value {{
-                font-weight: 600;
-                color: #1a1a2e;
-                text-align: right;
-            }}
+        /* ── INTRO LINE ──────────────────────────────────────────────────────── */
+        .intro-text {{
+            font-size: 9pt;
+            color: #64748b;
+            font-style: italic;
+            margin-bottom: 18px;
+        }}
 
-            .summary-value.highlight {{
-                color: #1d4ed8;
-            }}
+        /* ── INVOICE TABLE ───────────────────────────────────────────────────── */
+        .lines-table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 14px;
+            font-size: 9.5pt;
+        }}
 
-            /* ── LINES TABLE ── */
-            .lines-table {{
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 24px;
-                font-size: 9.5pt;
-            }}
+        .lines-table thead tr {{
+            background: #1d4ed8;
+        }}
 
-            .lines-table thead tr {{
-                background: #eef2fb;
-            }}
+        .lines-table th {{
+            padding: 9px 10px;
+            font-size: 8pt;
+            font-weight: 700;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
 
-            .lines-table th {{
-                padding: 10px 10px;
-                text-align: left;
-                font-size: 8pt;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 0.6px;
-                color: #1d4ed8;
-                border-bottom: 2px solid #c7d2f0;
-            }}
+        .lines-table th.col-desc  {{ text-align: left; }}
+        .lines-table th.col-qty   {{ text-align: center; }}
+        .lines-table th.col-price {{ text-align: right; }}
+        .lines-table th.col-vat   {{ text-align: center; }}
+        .lines-table th.col-amount {{ text-align: right; }}
 
-            .lines-table th.quantity,
-            .lines-table td.quantity,
-            .lines-table th.vat,
-            .lines-table td.vat {{
-                text-align: center;
-            }}
+        .lines-table td {{
+            padding: 9px 10px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #1e293b;
+            vertical-align: top;
+        }}
 
-            .lines-table th.price,
-            .lines-table td.price,
-            .lines-table th.total,
-            .lines-table td.total {{
-                text-align: right;
-            }}
+        .lines-table td.col-desc   {{ text-align: left; }}
+        .lines-table td.col-qty    {{ text-align: center; white-space: nowrap; }}
+        .lines-table td.col-price  {{ text-align: right; white-space: nowrap; }}
+        .lines-table td.col-vat    {{ text-align: center; }}
+        .lines-table td.col-amount {{ text-align: right; white-space: nowrap; }}
 
-            .lines-table td {{
-                padding: 10px 10px;
-                border-bottom: 1px solid #e8ecf5;
-                color: #1a1a2e;
-            }}
+        .lines-table tbody tr:nth-child(even) {{
+            background: #f8fafc;
+        }}
 
-            .lines-table tbody tr:nth-child(even) {{
-                background: #f8faff;
-            }}
+        .lines-table tbody tr:last-child td {{
+            border-bottom: 2px solid #1d4ed8;
+        }}
 
-            .lines-table tbody tr:last-child td {{
-                border-bottom: 2px solid #1d4ed8;
-            }}
+        /* ── TOTALS ──────────────────────────────────────────────────────────── */
+        .totals-wrapper {{
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 28px;
+        }}
 
-            /* ── TOTALS ── */
-            .totals {{
-                margin-left: auto;
-                width: 280px;
-                margin-bottom: 32px;
-            }}
+        .totals-box {{
+            width: 230px;
+        }}
 
-            .totals-row {{
-                display: flex;
-                justify-content: space-between;
-                padding: 6px 0;
-                font-size: 9.5pt;
-            }}
+        .totals-row {{
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 9.5pt;
+            color: #64748b;
+            border-bottom: 1px solid #e2e8f0;
+        }}
 
-            .totals-row.subtotal {{
-                border-top: 1px solid #e8ecf5;
-                color: #555;
-            }}
+        .totals-row:last-child {{
+            border-bottom: none;
+        }}
 
-            .totals-row.vat-row {{
-                color: #555;
-            }}
+        .totals-row.grand-total {{
+            background: #eff6ff;
+            border-radius: 4px;
+            padding: 9px 10px;
+            margin-top: 6px;
+            font-size: 13pt;
+            font-weight: 700;
+            color: #1d4ed8;
+        }}
 
-            .totals-row.total {{
-                border-top: 2px solid #1d4ed8;
-                margin-top: 4px;
-                padding-top: 10px;
-                font-size: 13pt;
-                font-weight: 700;
-                color: #1d4ed8;
-            }}
+        /* ── PAYMENT BOX ─────────────────────────────────────────────────────── */
+        .payment-box {{
+            background: #f0fdf4;
+            border-top: 2.5px solid #16a34a;
+            padding: 14px 16px;
+            margin-bottom: 18px;
+        }}
 
-            /* ── FOOTER ── */
-            .footer {{
-                margin-top: 36px;
-                padding-top: 20px;
-                border-top: 1px solid #e8ecf5;
-                display: flex;
-                align-items: flex-start;
-                gap: 20px;
-            }}
+        .payment-title {{
+            font-size: 8pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #16a34a;
+            margin-bottom: 10px;
+        }}
 
-            /* Payment info box */
-            .payment-info {{
-                flex: 1;
-                background: #f0fdf4;
-                padding: 16px 18px;
-                border-radius: 8px;
-                border-left: 4px solid #22c55e;
-            }}
+        .pd-row {{
+            display: flex;
+            gap: 0;
+            padding: 2px 0;
+            font-size: 8.5pt;
+        }}
 
-            .payment-title {{
-                font-size: 9pt;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 0.8px;
-                color: #166534;
-                margin-bottom: 10px;
-            }}
+        .pd-lbl {{
+            color: #64748b;
+            min-width: 88px;
+        }}
 
-            .payment-details {{
-                font-size: 8.5pt;
-                color: #1a1a2e;
-                line-height: 1.8;
-            }}
+        .pd-val {{
+            font-weight: 600;
+            color: #1e293b;
+        }}
 
-            .payment-details .pd-row {{
-                display: flex;
-                gap: 6px;
-            }}
+        /* ── NOTES ───────────────────────────────────────────────────────────── */
+        .notes-box {{
+            background: #fefce8;
+            border-top: 2.5px solid #ca8a04;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+        }}
 
-            .payment-details .pd-label {{
-                color: #555;
-                min-width: 68px;
-            }}
+        .notes-title {{
+            font-size: 8pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #a16207;
+            margin-bottom: 8px;
+        }}
 
-            .payment-details .pd-value {{
-                font-weight: 600;
-            }}
+        .notes-text {{
+            font-size: 9pt;
+            color: #1e293b;
+            line-height: 1.6;
+        }}
 
-            .notes {{
-                flex: 1;
-                padding: 16px 18px;
-                background: #fefce8;
-                border-radius: 8px;
-                border-left: 4px solid #eab308;
-                font-size: 8.5pt;
-                color: #1a1a2e;
-                line-height: 1.7;
-            }}
+        /* ── PAGE FOOTER ─────────────────────────────────────────────────────── */
+        .page-footer {{
+            margin-top: 24px;
+            padding-top: 8px;
+            border-top: 1px solid #e2e8f0;
+            text-align: center;
+            font-size: 7.5pt;
+            color: #cbd5e1;
+        }}
+    </style>
+</head>
+<body>
+    <div class="invoice-container">
 
-            .notes-title {{
-                font-size: 9pt;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 0.8px;
-                color: #713f12;
-                margin-bottom: 8px;
-            }}
-
-            /* Page footer */
-            .page-footer {{
-                margin-top: 28px;
-                padding-top: 10px;
-                border-top: 1px solid #e8ecf5;
-                text-align: center;
-                font-size: 7.5pt;
-                color: #bbb;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="invoice-container">
-
-            <!-- ── HEADER ── -->
-            <div class="header">
-                <div class="sender-block">
-                    <div class="sender-name">{invoice.seller_company_name or 'Bedrijfsnaam'}</div>
-                    <div class="sender-details">
-                        {('<br>'.join(seller_address_parts)) if seller_address_parts else ''}
-                        {f'<br>{" &nbsp;·&nbsp; ".join(seller_contact_parts)}' if seller_contact_parts else ''}
-                    </div>
-                </div>
-                <div class="factuur-wordmark">
-                    <h1>Factuur</h1>
-                </div>
+        <!-- ── HEADER ── -->
+        <div class="header">
+            <div class="sender-block">
+                <div class="company-name">{company_name}</div>
+                {f'<div class="company-details">{seller_details_html}</div>' if seller_details_html else ''}
             </div>
-
-            <!-- ── BILLING ROW ── -->
-            <div class="billing-row">
-                <!-- Client billing details (left) -->
-                <div class="billing-to">
-                    <div class="billing-to-label">Factuur aan</div>
-                    {f'<div class="billing-to-name">{invoice.customer_name}</div>' if invoice.customer_name else ''}
-                    {f'<div class="billing-to-address">{("<br>".join(customer_address_parts))}</div>' if customer_address_parts else ''}
-                    {f'<div class="billing-to-address">BTW: {invoice.customer_btw_number}</div>' if invoice.customer_btw_number else ''}
-                </div>
-
-                <!-- Invoice summary box (right) -->
-                <div class="invoice-summary">
-                    <div class="summary-row">
-                        <span class="summary-label">Factuurnummer</span>
-                        <span class="summary-value highlight">{invoice.invoice_number}</span>
-                    </div>
-                    <div class="summary-row">
-                        <span class="summary-label">Factuurdatum</span>
-                        <span class="summary-value">{issue_date_str}</span>
-                    </div>
-                    <div class="summary-row">
-                        <span class="summary-label">Vervaldatum</span>
-                        <span class="summary-value">{due_date_str}</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── LINE ITEMS TABLE ── -->
-            <table class="lines-table">
-                <thead>
+            <div class="factuur-block">
+                <div class="factuur-title">FACTUUR</div>
+                <table class="meta-table">
                     <tr>
-                        <th class="description">Omschrijving</th>
-                        <th class="quantity">Aantal</th>
-                        <th class="price">Prijs</th>
-                        <th class="vat">BTW</th>
-                        <th class="total">Totaal</th>
+                        <td class="ml">Factuurdatum</td>
+                        <td class="mv">{issue_date_str}</td>
                     </tr>
-                </thead>
-                <tbody>
-                    {lines_html}
-                </tbody>
-            </table>
+                    <tr class="meta-sep">
+                        <td class="ml">Vervaldatum</td>
+                        <td class="mv">{due_date_str}</td>
+                    </tr>
+                    <tr class="meta-below-sep">
+                        <td class="ml">Factuurnummer</td>
+                        <td class="mv">{invoice.invoice_number}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
 
-            <!-- ── TOTALS ── -->
-            <div class="totals">
-                <div class="totals-row subtotal">
+        <!-- ── CUSTOMER ── -->
+        <div class="customer-section">
+            <div class="section-label">Factuur voor</div>
+            {f'<div class="customer-name">{invoice.customer_name}</div>' if invoice.customer_name else ''}
+            {f'<div class="customer-address">{customer_addr_html}</div>' if customer_addr_html else ''}
+            {f'<div class="customer-address">BTW: {invoice.customer_btw_number}</div>' if invoice.customer_btw_number else ''}
+        </div>
+
+        <!-- ── INTRO LINE ── -->
+        <p class="intro-text">Bedankt voor uw vertrouwen. Hieronder vindt u de factuur voor de geleverde diensten.</p>
+
+        <!-- ── INVOICE TABLE ── -->
+        <table class="lines-table">
+            <thead>
+                <tr>
+                    <th class="col-desc">Omschrijving</th>
+                    <th class="col-qty">Aantal</th>
+                    <th class="col-price">Tarief</th>
+                    <th class="col-vat">BTW</th>
+                    <th class="col-amount">Bedrag</th>
+                </tr>
+            </thead>
+            <tbody>
+                {lines_html}
+            </tbody>
+        </table>
+
+        <!-- ── TOTALS ── -->
+        <div class="totals-wrapper">
+            <div class="totals-box">
+                <div class="totals-row">
                     <span>Subtotaal</span>
                     <span>{format_amount(invoice.subtotal_cents)}</span>
                 </div>
-                <div class="totals-row vat-row">
+                <div class="totals-row">
                     <span>BTW</span>
                     <span>{format_amount(invoice.vat_total_cents)}</span>
                 </div>
-                <div class="totals-row total">
+                <div class="totals-row grand-total">
                     <span>Totaal</span>
                     <span>{format_amount(invoice.total_cents)}</span>
                 </div>
             </div>
-
-            <!-- ── FOOTER ── -->
-            <div class="footer">
-                <div class="payment-info">
-                    <div class="payment-title">Betalingsgegevens</div>
-                    <div class="payment-details">
-                        {f'<div class="pd-row"><span class="pd-label">IBAN</span><span class="pd-value">{invoice.seller_iban}</span></div>' if invoice.seller_iban else ''}
-                        <div class="pd-row"><span class="pd-label">T.n.v.</span><span class="pd-value">{invoice.seller_company_name or '-'}</span></div>
-                        <div class="pd-row"><span class="pd-label">Factuurnummer</span><span class="pd-value">{invoice.invoice_number}</span></div>
-                        <div class="pd-row"><span class="pd-label">Kenmerk</span><span class="pd-value">{invoice.invoice_number}</span></div>
-                        {f'<div class="pd-row"><span class="pd-label">KvK</span><span class="pd-value">{invoice.seller_kvk_number}</span></div>' if invoice.seller_kvk_number else ''}
-                        {f'<div class="pd-row"><span class="pd-label">BTW-nr.</span><span class="pd-value">{invoice.seller_btw_number}</span></div>' if invoice.seller_btw_number else ''}
-                    </div>
-                </div>
-
-                {f'''<div class="notes">
-                    <div class="notes-title">Opmerkingen</div>
-                    {invoice.notes}
-                </div>''' if invoice.notes else ''}
-            </div>
-
-            <!-- Page footer -->
-            <div class="page-footer">
-                Powered by MHM IT &bull; zzpershub.nl
-            </div>
-
         </div>
-    </body>
-    </html>
-    """
+
+        <!-- ── PAYMENT DETAILS ── -->
+        <div class="payment-box">
+            <div class="payment-title">Betaalgegevens</div>
+            {payment_rows_html}
+        </div>
+
+        {notes_html}
+
+        <!-- ── PAGE FOOTER ── -->
+        <div class="page-footer">
+            Powered by MHM IT &bull; zzpershub.nl
+        </div>
+
+    </div>
+</body>
+</html>"""
 
     return html
 

@@ -39,7 +39,7 @@ async def test_ensure_trial_started_creates_new_subscription(db_session):
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
-        price_monthly=6.95,
+        price_monthly=4.99,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -75,7 +75,7 @@ async def test_ensure_trial_started_is_idempotent(db_session):
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
-        price_monthly=6.95,
+        price_monthly=4.99,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -106,7 +106,7 @@ async def test_compute_entitlements_during_trial(db_session):
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
-        price_monthly=6.95,
+        price_monthly=4.99,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -153,7 +153,7 @@ async def test_compute_entitlements_trial_expired(db_session):
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
-        price_monthly=6.95,
+        price_monthly=4.99,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -207,7 +207,7 @@ async def test_compute_entitlements_active_subscription(db_session):
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
-        price_monthly=6.95,
+        price_monthly=4.99,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -255,7 +255,7 @@ async def test_compute_entitlements_canceled_subscription(db_session):
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
-        price_monthly=6.95,
+        price_monthly=4.99,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -322,7 +322,7 @@ async def test_get_subscription(db_session):
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
-        price_monthly=6.95,
+        price_monthly=4.99,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,

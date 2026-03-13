@@ -120,7 +120,7 @@ export const nl = {
     tryAgain: "Opnieuw proberen",
     noAccount: "Geen account?",
     createAccountCta: "Maak er nu één aan",
-    trialInfo: "30 dagen gratis proefperiode. Daarna €6,95/maand.",
+    trialInfo: "30 dagen gratis proefperiode. Daarna €4,99/maand.",
   },
 
   // Roles
@@ -2490,7 +2490,7 @@ export const nl = {
     whyDifferent: "Waarom dit systeem anders is",
     
     // CTAs
-    startZzp: "Start voor ZZP € 6,95 / maand",
+    startZzp: "Start voor ZZP € 4,99 / maand",
     contactAccountants: "Contact voor accountants",
     
     // Status badges

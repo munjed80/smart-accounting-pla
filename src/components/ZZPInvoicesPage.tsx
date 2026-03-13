@@ -1701,7 +1701,8 @@ const ZZPInvoicesPageContent = () => {
   const handleSaveInvoice = useCallback(async (data: ZZPInvoiceCreate, isEdit: boolean) => {
     try {
       if (isEdit && editingInvoice) {
-        // Update existing
+        const wasCancelled = editingInvoice.status === 'cancelled'
+        // Update existing (if cancelled, backend auto-restores to draft)
         await zzpApi.invoices.update(editingInvoice.id, {
           customer_id: data.customer_id,
           issue_date: data.issue_date,
@@ -1709,7 +1710,7 @@ const ZZPInvoicesPageContent = () => {
           notes: data.notes,
           lines: data.lines,
         })
-        toast.success(t('zzpInvoices.invoiceSaved'))
+        toast.success(wasCancelled ? t('zzpInvoices.savedAndRestoredToConcept') : t('zzpInvoices.invoiceSaved'))
       } else {
         // Create new
         await zzpApi.invoices.create(data)

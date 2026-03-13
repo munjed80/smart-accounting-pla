@@ -685,6 +685,7 @@ export const nl = {
     statusCancelled: "Geannuleerd",
     restoreToConcept: "Herstellen als concept",
     restoredToConcept: "Factuur hersteld naar concept",
+    savedAndRestoredToConcept: "Factuur hersteld naar concept en opgeslagen",
     // Search results
     noInvoicesFound: "Geen facturen gevonden",
     tryDifferentSearch: "Probeer een andere zoekterm",

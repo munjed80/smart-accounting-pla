@@ -472,11 +472,15 @@ async def update_invoice(
             detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
         )
     
-    if invoice.status != InvoiceStatus.DRAFT.value:
+    if invoice.status not in (InvoiceStatus.DRAFT.value, InvoiceStatus.CANCELLED.value):
         raise HTTPException(
             status_code=400,
-            detail={"code": "INVOICE_NOT_EDITABLE", "message": "Alleen concept-facturen kunnen worden bewerkt."}
+            detail={"code": "INVOICE_NOT_EDITABLE", "message": "Alleen concept of geannuleerde facturen kunnen worden bewerkt."}
         )
+
+    # Auto-restore cancelled invoices to draft before applying changes
+    if invoice.status == InvoiceStatus.CANCELLED.value:
+        invoice.status = InvoiceStatus.DRAFT.value
     
     # Update basic fields
     if invoice_in.issue_date:

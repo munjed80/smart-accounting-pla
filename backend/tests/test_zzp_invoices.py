@@ -174,6 +174,110 @@ class TestInvoiceStatusTransitions:
         assert data["detail"]["code"] == "INVOICE_NOT_FOUND"
 
 
+class TestInvoiceUpdate:
+    """Tests for PUT /zzp/invoices/{id} - update invoice content."""
+
+    @pytest.mark.asyncio
+    async def test_update_draft_invoice_success(
+        self,
+        async_client: AsyncClient,
+        test_invoice_draft: ZZPInvoice,
+        auth_headers: dict
+    ):
+        """Draft invoice can be updated and remains draft."""
+        response = await async_client.put(
+            f"/api/v1/zzp/invoices/{test_invoice_draft.id}",
+            json={
+                "customer_id": str(test_invoice_draft.customer_id),
+                "issue_date": str(test_invoice_draft.issue_date),
+                "notes": "Updated notes",
+                "lines": [],
+            },
+            headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "draft"
+        assert data["notes"] == "Updated notes"
+
+    @pytest.mark.asyncio
+    async def test_update_cancelled_invoice_restores_to_draft(
+        self,
+        async_client: AsyncClient,
+        test_invoice_cancelled: ZZPInvoice,
+        auth_headers: dict
+    ):
+        """Cancelled invoice can be updated and is automatically restored to draft."""
+        response = await async_client.put(
+            f"/api/v1/zzp/invoices/{test_invoice_cancelled.id}",
+            json={
+                "customer_id": str(test_invoice_cancelled.customer_id),
+                "issue_date": str(test_invoice_cancelled.issue_date),
+                "notes": "Restored and updated",
+                "lines": [],
+            },
+            headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "draft"
+        assert data["notes"] == "Restored and updated"
+
+    @pytest.mark.asyncio
+    async def test_update_cancelled_invoice_persists_to_db(
+        self,
+        async_client: AsyncClient,
+        test_invoice_cancelled: ZZPInvoice,
+        auth_headers: dict
+    ):
+        """Changes made to a cancelled invoice persist after save."""
+        await async_client.put(
+            f"/api/v1/zzp/invoices/{test_invoice_cancelled.id}",
+            json={
+                "customer_id": str(test_invoice_cancelled.customer_id),
+                "issue_date": str(test_invoice_cancelled.issue_date),
+                "notes": "Persisted change",
+                "lines": [],
+            },
+            headers=auth_headers
+        )
+
+        # Fetch the invoice again to verify persistence
+        get_response = await async_client.get(
+            f"/api/v1/zzp/invoices/{test_invoice_cancelled.id}",
+            headers=auth_headers
+        )
+        assert get_response.status_code == 200
+        fetched = get_response.json()
+        assert fetched["status"] == "draft"
+        assert fetched["notes"] == "Persisted change"
+
+    @pytest.mark.asyncio
+    async def test_update_sent_invoice_fails(
+        self,
+        async_client: AsyncClient,
+        test_invoice_sent: ZZPInvoice,
+        auth_headers: dict
+    ):
+        """Sent invoice cannot be updated (only draft and cancelled are editable)."""
+        response = await async_client.put(
+            f"/api/v1/zzp/invoices/{test_invoice_sent.id}",
+            json={
+                "customer_id": str(test_invoice_sent.customer_id),
+                "issue_date": str(test_invoice_sent.issue_date),
+                "notes": "Should not save",
+                "lines": [],
+            },
+            headers=auth_headers
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["detail"]["code"] == "INVOICE_NOT_EDITABLE"
+
+
 class TestInvoicePdfEndpoint:
     """Tests for GET /zzp/invoices/{id}/pdf - PDF generation."""
     

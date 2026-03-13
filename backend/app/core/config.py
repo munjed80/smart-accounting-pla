@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     RESEND_API_KEY: Optional[str] = None
     RESEND_FROM_EMAIL: str = "no-reply@example.com"
     SUPPORT_EMAIL: str = "support@example.com"
+
+    # Invoice-specific email settings (ZZPers Hub)
+    # Used for outbound invoice emails to improve deliverability and trust
+    INVOICE_FROM_EMAIL: str = "facturen@zzpershub.nl"
+    INVOICE_FROM_NAME: str = "ZZPers Hub Facturen"
+    INVOICE_REPLY_TO: str = "info@zzpershub.nl"
     
     @property
     def email_enabled(self) -> bool:

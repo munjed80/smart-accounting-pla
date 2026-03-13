@@ -8,6 +8,7 @@ import base64
 import logging
 from datetime import datetime, date, timezone
 from decimal import Decimal
+from email.utils import formataddr
 from typing import Annotated, List, Optional
 from uuid import UUID
 
@@ -891,46 +892,93 @@ async def send_invoice(
         # Prepare email content
         invoice_number = invoice.invoice_number
         total_amount = f"€{invoice.total_cents / 100:.2f}"
-        
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-                <h1 style="color: white; margin: 0; font-size: 24px;">Factuur {invoice_number}</h1>
-            </div>
-            <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-                <p style="margin-top: 0;">Beste {customer_name},</p>
-                <p>Hierbij ontvangt u factuur {invoice_number} voor een bedrag van {total_amount}.</p>
-                <p>De factuur is bijgevoegd als PDF.</p>
-                <p style="margin-top: 20px;">Met vriendelijke groet,<br>{invoice.seller_company_name or invoice.seller_trading_name or 'Uw leverancier'}</p>
-                <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
-                <p style="color: #888; font-size: 12px; margin-bottom: 0;">
-                    Dit is een geautomatiseerd bericht van Smart Accounting Platform.
-                </p>
-            </div>
-        </body>
-        </html>
-        """
-        
-        text_content = f"""
-Beste {customer_name},
+        seller_name = invoice.seller_company_name or invoice.seller_trading_name or "ZZPers Hub"
 
-Hierbij ontvangt u factuur {invoice_number} voor een bedrag van {total_amount}.
+        from_address = formataddr((settings.INVOICE_FROM_NAME, settings.INVOICE_FROM_EMAIL))
+        subject = f"Uw factuur {invoice_number} van ZZPers Hub"
 
-De factuur is bijgevoegd als PDF.
+        html_content = f"""<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Factuur {invoice_number}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f4f4f4;">
+    <tr>
+      <td align="center" style="padding:30px 0;">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color:#1a56db;padding:28px 32px;">
+              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;letter-spacing:-0.3px;">ZZPers Hub</h1>
+              <p style="margin:4px 0 0;color:#bfdbfe;font-size:13px;">Facturatie</p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:32px 32px 24px;">
+              <p style="margin:0 0 16px;font-size:15px;color:#111827;">Beste {customer_name},</p>
+              <p style="margin:0 0 16px;font-size:15px;color:#374151;">
+                Hierbij ontvangt u factuur <strong>{invoice_number}</strong> van <strong>{seller_name}</strong> voor een totaalbedrag van <strong>{total_amount}</strong> (incl. btw).
+              </p>
+              <p style="margin:0 0 24px;font-size:15px;color:#374151;">
+                De factuur is als PDF bijgevoegd aan dit bericht.
+              </p>
+              <p style="margin:0;font-size:15px;color:#374151;">
+                Met vriendelijke groet,<br>
+                <strong>{seller_name}</strong>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding:0 32px;">
+              <hr style="border:none;border-top:1px solid #e5e7eb;margin:0;">
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 32px 28px;">
+              <p style="margin:0 0 4px;font-size:12px;color:#6b7280;">
+                <strong style="color:#374151;">ZZPers Hub</strong>
+              </p>
+              <p style="margin:0 0 2px;font-size:12px;color:#6b7280;">
+                <a href="https://zzpershub.nl" style="color:#1a56db;text-decoration:none;">www.zzpershub.nl</a>
+              </p>
+              <p style="margin:0;font-size:12px;color:#6b7280;">
+                <a href="mailto:info@zzpershub.nl" style="color:#1a56db;text-decoration:none;">info@zzpershub.nl</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+        text_content = f"""Beste {customer_name},
+
+Hierbij ontvangt u factuur {invoice_number} van {seller_name} voor een totaalbedrag van {total_amount} (incl. btw).
+
+De factuur is als PDF bijgevoegd aan dit bericht.
 
 Met vriendelijke groet,
-{invoice.seller_company_name or invoice.seller_trading_name or 'Uw leverancier'}
+{seller_name}
 
----
-Dit is een geautomatiseerd bericht van Smart Accounting Platform.
-        """
-        
+--
+ZZPers Hub
+www.zzpershub.nl
+info@zzpershub.nl
+"""
+
         # Send via Resend
         if not email_service.client:
             raise HTTPException(
@@ -940,26 +988,65 @@ Dit is een geautomatiseerd bericht van Smart Accounting Platform.
                     "message": "E-mailservice is momenteel niet beschikbaar. Controleer de configuratie."
                 }
             )
-        
+
         # Encode PDF as base64 for attachment
         pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
-        
-        email_service.client.Emails.send({
-            "from": settings.RESEND_FROM_EMAIL,
+
+        logger.info(
+            "Sending invoice email",
+            extra={
+                "event": "invoice_email_sending",
+                "provider": "resend",
+                "from": from_address,
+                "to": customer_email,
+                "subject": subject,
+                "invoice_id": str(invoice_id),
+                "invoice_number": invoice_number,
+                "has_attachment": True,
+                "attachment_filename": filename,
+            }
+        )
+
+        result = email_service.client.Emails.send({
+            "from": from_address,
             "to": [customer_email],
-            "subject": f"Factuur {invoice_number}",
+            "reply_to": settings.INVOICE_REPLY_TO,
+            "subject": subject,
             "html": html_content,
             "text": text_content,
             "attachments": [
                 {
                     "filename": filename,
                     "content": pdf_base64,
+                    "content_type": "application/pdf",
                 }
             ]
         })
-        
+
+        message_id = result.get("id") if isinstance(result, dict) else None
+        logger.info(
+            "Invoice email sent successfully",
+            extra={
+                "event": "invoice_email_sent",
+                "provider": "resend",
+                "from": from_address,
+                "to": customer_email,
+                "invoice_id": str(invoice_id),
+                "invoice_number": invoice_number,
+                "message_id": message_id,
+            }
+        )
+
     except Exception as email_error:
-        logger.error(f"Failed to send email for invoice {invoice_id}: {email_error}")
+        logger.error(
+            f"Failed to send email for invoice {invoice_id}: {email_error}",
+            extra={
+                "event": "invoice_email_failed",
+                "invoice_id": str(invoice_id),
+                "to": customer_email,
+                "error": str(email_error),
+            }
+        )
         raise HTTPException(
             status_code=500,
             detail={

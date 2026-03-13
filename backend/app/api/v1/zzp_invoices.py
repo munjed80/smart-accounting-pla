@@ -8,7 +8,6 @@ import base64
 import logging
 from datetime import datetime, date, timezone
 from decimal import Decimal
-from email.utils import formataddr
 from typing import Annotated, List, Optional
 from uuid import UUID
 
@@ -898,8 +897,8 @@ async def send_invoice(
         total_amount = f"€{invoice.total_cents / 100:.2f}"
         seller_name = invoice.seller_company_name or invoice.seller_trading_name or "ZZPers Hub"
 
-        from_address = formataddr((settings.INVOICE_FROM_NAME, settings.INVOICE_FROM_EMAIL))
-        subject = f"Uw factuur {invoice_number} van ZZPers Hub"
+        from_address = f"{settings.INVOICE_FROM_NAME} <{settings.INVOICE_FROM_EMAIL}>"
+        subject = f"Uw factuur {invoice_number} van {seller_name}"
 
         html_content = f"""<!DOCTYPE html>
 <html lang="nl">
@@ -1018,6 +1017,13 @@ info@zzpershub.nl
             "subject": subject,
             "html": html_content,
             "text": text_content,
+            "headers": {
+                "X-Entity-Ref-ID": str(invoice_id),
+                "X-Mailer": "ZZPers Hub Facturatie",
+            },
+            "tags": [
+                {"name": "category", "value": "invoice"},
+            ],
             "attachments": [
                 {
                     "filename": filename,

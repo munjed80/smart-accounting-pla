@@ -18,6 +18,7 @@ import { ContactPage } from '@/pages/ContactPage'
 import { HelpPage } from '@/pages/HelpPage'
 import { FaqPage } from '@/pages/FaqPage'
 import { PrijzenPage } from '@/pages/PrijzenPage'
+import { BedanktPage } from '@/pages/BedanktPage'
 import { SmartDashboard } from '@/components/SmartDashboard'
 import { AccountantHomePage } from '@/components/AccountantHomePage'
 import { AccountantReviewQueuePage } from '@/components/AccountantReviewQueuePage'
@@ -100,6 +101,7 @@ type Route =
   | { type: 'help' }
   | { type: 'faq' }
   | { type: 'prijzen' }
+  | { type: 'bedankt' }
   | { type: 'client-dossier'; clientId: string; tab: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'bookkeeping' | 'periods' | 'decisions' | 'audit' | 'commitments' }
   | { type: 'bulk-operations-history' }
   | { type: 'bank-reconciliation' }
@@ -170,6 +172,10 @@ const getRouteFromURL = (): Route => {
 
   if (path === '/prijzen') {
     return { type: 'prijzen' }
+  }
+
+  if (path === '/bedankt') {
+    return { type: 'bedankt' }
   }
   
   if (path === '/onboarding') {
@@ -517,6 +523,9 @@ const AppContent = () => {
     return <PrijzenPage />
   }
 
+  if (route.type === 'bedankt') {
+    return <BedanktPage />
+  }
 
   if (bootError && isAuthenticated) {
     return (

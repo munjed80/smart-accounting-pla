@@ -250,24 +250,30 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         due_date_str   = format_date_nl(invoice.due_date) if invoice.due_date else "\u2014"
 
         # ── Company details block (left column of header) ──────────────────────
-        company_name = invoice.seller_company_name or "Uw Bedrijfsnaam"
+        company_name = invoice.seller_company_name or invoice.seller_trading_name
+        company_missing = not company_name
+        if company_missing:
+            company_name = "Bedrijfsgegevens ontbreken"
         company_lines: List[str] = []
-        if invoice.seller_address_street:
-            company_lines.append(invoice.seller_address_street)
-        postal_city = " ".join(filter(None, [
-            invoice.seller_address_postal_code, invoice.seller_address_city
-        ]))
-        if postal_city:
-            company_lines.append(postal_city)
-        if invoice.seller_address_country and invoice.seller_address_country.lower() != "nederland":
-            company_lines.append(invoice.seller_address_country)
-        if invoice.seller_kvk_number:
-            company_lines.append(f"KvK {invoice.seller_kvk_number}")
-        if invoice.seller_btw_number:
-            company_lines.append(f"BTW {invoice.seller_btw_number}")
-        contact = "  \u00b7  ".join(filter(None, [invoice.seller_email, invoice.seller_phone]))
-        if contact:
-            company_lines.append(contact)
+        if company_missing:
+            company_lines.append("Vul uw bedrijfsprofiel volledig in via Instellingen.")
+        else:
+            if invoice.seller_address_street:
+                company_lines.append(invoice.seller_address_street)
+            postal_city = " ".join(filter(None, [
+                invoice.seller_address_postal_code, invoice.seller_address_city
+            ]))
+            if postal_city:
+                company_lines.append(postal_city)
+            if invoice.seller_address_country and invoice.seller_address_country.lower() != "nederland":
+                company_lines.append(invoice.seller_address_country)
+            if invoice.seller_kvk_number:
+                company_lines.append(f"KvK {invoice.seller_kvk_number}")
+            if invoice.seller_btw_number:
+                company_lines.append(f"BTW {invoice.seller_btw_number}")
+            contact = "  \u00b7  ".join(filter(None, [invoice.seller_email, invoice.seller_phone]))
+            if contact:
+                company_lines.append(contact)
 
         company_detail_text = "<br/>".join(company_lines)
 
@@ -345,6 +351,8 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         elements.append(Paragraph(invoice.customer_name or "\u2014", s_customer_name))
         if cust_addr_lines:
             elements.append(Paragraph("<br/>".join(cust_addr_lines), s_customer_addr))
+        if invoice.customer_kvk_number:
+            elements.append(Paragraph(f"KvK: {invoice.customer_kvk_number}", s_customer_addr))
         if invoice.customer_btw_number:
             elements.append(Paragraph(f"BTW: {invoice.customer_btw_number}", s_customer_addr))
 

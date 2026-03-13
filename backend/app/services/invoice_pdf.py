@@ -64,24 +64,32 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
         HTML string for the invoice
     """
     # ── Company / seller details ───────────────────────────────────────────────
-    company_name = invoice.seller_company_name or "Uw Bedrijfsnaam"
+    company_name = invoice.seller_company_name or invoice.seller_trading_name
+    company_missing = not company_name
+    if company_missing:
+        company_name = "Bedrijfsgegevens ontbreken"
     seller_detail_lines = []
-    if invoice.seller_address_street:
-        seller_detail_lines.append(invoice.seller_address_street)
-    postal_city = " ".join(filter(None, [
-        invoice.seller_address_postal_code, invoice.seller_address_city
-    ]))
-    if postal_city:
-        seller_detail_lines.append(postal_city)
-    if invoice.seller_address_country and invoice.seller_address_country.lower() != "nederland":
-        seller_detail_lines.append(invoice.seller_address_country)
-    if invoice.seller_kvk_number:
-        seller_detail_lines.append(f"KvK {invoice.seller_kvk_number}")
-    if invoice.seller_btw_number:
-        seller_detail_lines.append(f"BTW {invoice.seller_btw_number}")
-    contact_parts = list(filter(None, [invoice.seller_email, invoice.seller_phone]))
-    if contact_parts:
-        seller_detail_lines.append(" &nbsp;&middot;&nbsp; ".join(contact_parts))
+    if company_missing:
+        seller_detail_lines.append(
+            "Vul uw bedrijfsprofiel volledig in via Instellingen."
+        )
+    else:
+        if invoice.seller_address_street:
+            seller_detail_lines.append(invoice.seller_address_street)
+        postal_city = " ".join(filter(None, [
+            invoice.seller_address_postal_code, invoice.seller_address_city
+        ]))
+        if postal_city:
+            seller_detail_lines.append(postal_city)
+        if invoice.seller_address_country and invoice.seller_address_country.lower() != "nederland":
+            seller_detail_lines.append(invoice.seller_address_country)
+        if invoice.seller_kvk_number:
+            seller_detail_lines.append(f"KvK {invoice.seller_kvk_number}")
+        if invoice.seller_btw_number:
+            seller_detail_lines.append(f"BTW {invoice.seller_btw_number}")
+        contact_parts = list(filter(None, [invoice.seller_email, invoice.seller_phone]))
+        if contact_parts:
+            seller_detail_lines.append(" &nbsp;&middot;&nbsp; ".join(contact_parts))
 
     seller_details_html = "<br>".join(seller_detail_lines)
 
@@ -453,6 +461,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
             <div class="section-label">Factuur voor</div>
             {f'<div class="customer-name">{invoice.customer_name}</div>' if invoice.customer_name else ''}
             {f'<div class="customer-address">{customer_addr_html}</div>' if customer_addr_html else ''}
+            {f'<div class="customer-address">KvK: {invoice.customer_kvk_number}</div>' if invoice.customer_kvk_number else ''}
             {f'<div class="customer-address">BTW: {invoice.customer_btw_number}</div>' if invoice.customer_btw_number else ''}
         </div>
 

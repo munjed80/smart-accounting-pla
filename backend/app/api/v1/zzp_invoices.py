@@ -741,6 +741,33 @@ async def get_invoice_pdf(
             detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
         )
 
+    # Backfill missing seller snapshot fields from the current business profile.
+    # This handles invoices that were created before the profile was fully set up,
+    # ensuring the PDF always shows the most complete company data available.
+    profile_result = await db.execute(
+        select(BusinessProfile).where(
+            BusinessProfile.administration_id == administration.id
+        )
+    )
+    profile = profile_result.scalar_one_or_none()
+    if profile:
+        _seller_profile_fields = [
+            ("seller_company_name",        "company_name"),
+            ("seller_trading_name",        "trading_name"),
+            ("seller_address_street",      "address_street"),
+            ("seller_address_postal_code", "address_postal_code"),
+            ("seller_address_city",        "address_city"),
+            ("seller_address_country",     "address_country"),
+            ("seller_kvk_number",          "kvk_number"),
+            ("seller_btw_number",          "btw_number"),
+            ("seller_iban",                "iban"),
+            ("seller_email",               "email"),
+            ("seller_phone",               "phone"),
+        ]
+        for invoice_field, profile_field in _seller_profile_fields:
+            if not getattr(invoice, invoice_field, None):
+                setattr(invoice, invoice_field, getattr(profile, profile_field, None))
+
     try:
         # Try ReportLab first (pure Python, Docker-safe, no system dependencies)
         pdf_bytes = generate_invoice_pdf_reportlab(invoice)

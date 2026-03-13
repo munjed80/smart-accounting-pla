@@ -606,7 +606,7 @@ async def update_invoice_status(
         InvoiceStatus.DRAFT.value: [InvoiceStatus.SENT.value, InvoiceStatus.CANCELLED.value],
         InvoiceStatus.SENT.value: [InvoiceStatus.PAID.value, InvoiceStatus.CANCELLED.value],
         InvoiceStatus.PAID.value: [InvoiceStatus.SENT.value],  # Allow "mark as unpaid"
-        InvoiceStatus.CANCELLED.value: [],
+        InvoiceStatus.CANCELLED.value: [InvoiceStatus.DRAFT.value],  # Allow "restore to concept"
         InvoiceStatus.OVERDUE.value: [InvoiceStatus.PAID.value, InvoiceStatus.SENT.value, InvoiceStatus.CANCELLED.value],
     }
     
@@ -679,10 +679,10 @@ async def delete_invoice(
             detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
         )
     
-    if invoice.status != InvoiceStatus.DRAFT.value:
+    if invoice.status not in (InvoiceStatus.DRAFT.value, InvoiceStatus.CANCELLED.value):
         raise HTTPException(
             status_code=400,
-            detail={"code": "INVOICE_NOT_DELETABLE", "message": "Alleen concept-facturen kunnen worden verwijderd."}
+            detail={"code": "INVOICE_NOT_DELETABLE", "message": "Alleen concept- en geannuleerde facturen kunnen worden verwijderd."}
         )
     
     await db.delete(invoice)

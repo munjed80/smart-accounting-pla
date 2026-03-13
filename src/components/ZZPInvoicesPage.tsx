@@ -95,6 +95,7 @@ import {
   ShareNetwork,
   CopySimple,
   CurrencyCircleDollar,
+  ArrowCounterClockwise,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/lib/AuthContext'
 import { navigateTo } from '@/lib/navigation'
@@ -1158,6 +1159,7 @@ const InvoiceCard = ({
   onView,
   onEdit, 
   onDelete,
+  onRestore,
   onStatusChange,
   onSendInvoice,
   onDownloadPdf,
@@ -1173,6 +1175,7 @@ const InvoiceCard = ({
   onView: () => void
   onEdit: () => void
   onDelete: () => void
+  onRestore: () => void
   onStatusChange: (newStatus: 'sent' | 'paid' | 'cancelled') => void
   onSendInvoice: () => void
   onDownloadPdf: () => void
@@ -1233,7 +1236,7 @@ const InvoiceCard = ({
             {canEdit ? <PencilSimple size={16} /> : <Eye size={16} />}
             {canEdit ? t('common.edit') : t('common.view')}
           </Button>
-          {invoice.status === 'draft' && (
+          {(invoice.status === 'draft' || invoice.status === 'cancelled') && (
             <Button
               variant="ghost"
               size="sm"
@@ -1278,10 +1281,8 @@ const InvoiceCard = ({
                 {t('zzpInvoices.share')}
               </DropdownMenuItem>
               
-              {/* Status actions separator - show for all except cancelled */}
-              {invoice.status !== 'cancelled' && (
-                <DropdownMenuSeparator />
-              )}
+              {/* Status actions separator */}
+              <DropdownMenuSeparator />
               
               {/* Send invoice - only for draft invoices */}
               {invoice.status === 'draft' && (
@@ -1343,9 +1344,24 @@ const InvoiceCard = ({
                   )}
                 </>
               )}
+
+              {/* Cancelled invoice actions */}
+              {invoice.status === 'cancelled' && (
+                <DropdownMenuItem onClick={(event) => {
+                  event.stopPropagation()
+                  onRestore()
+                }} disabled={isUpdatingStatus}>
+                  {isUpdatingStatus ? (
+                    <SpinnerGap size={16} className="mr-2 animate-spin" />
+                  ) : (
+                    <ArrowCounterClockwise size={16} className="mr-2" />
+                  )}
+                  {t('zzpInvoices.restoreToConcept')}
+                </DropdownMenuItem>
+              )}
               
-              {/* Delete - only for draft invoices */}
-              {invoice.status === 'draft' && (
+              {/* Delete - for draft and cancelled invoices */}
+              {(invoice.status === 'draft' || invoice.status === 'cancelled') && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
@@ -1728,6 +1744,21 @@ const ZZPInvoicesPageContent = () => {
       setUpdatingStatusInvoiceId(null)
     }
   }, [loadData])
+
+  // Handle restore cancelled invoice to concept (cancelled → draft)
+  const handleRestoreToConcept = useCallback(async (invoice: ZZPInvoice) => {
+    setUpdatingStatusInvoiceId(invoice.id)
+    try {
+      await zzpApi.invoices.updateStatus(invoice.id, 'draft')
+      toast.success(t('zzpInvoices.restoredToConcept'))
+      await loadData()
+    } catch (err) {
+      console.error('Failed to restore invoice to concept:', err)
+      toast.error(parseApiError(err))
+    } finally {
+      setUpdatingStatusInvoiceId(null)
+    }
+  }, [loadData, t])
 
   // Handle send invoice (draft → sent)
   const handleSendInvoice = useCallback(async (invoice: ZZPInvoice) => {
@@ -2147,7 +2178,7 @@ const ZZPInvoicesPageContent = () => {
                   </div>
                 ) : (
                   filteredInvoices.map((invoice) => {
-                    const canEdit = invoice.status === 'draft'
+                    const canEdit = invoice.status === 'draft' || invoice.status === 'cancelled'
                     return (
                       <InvoiceCard
                         key={invoice.id}
@@ -2155,6 +2186,7 @@ const ZZPInvoicesPageContent = () => {
                         onView={() => openViewForm(invoice)}
                         onEdit={() => openEditForm(invoice)}
                         onDelete={() => setDeletingInvoice(invoice)}
+                        onRestore={() => handleRestoreToConcept(invoice)}
                         onStatusChange={(status) => handleStatusChange(invoice, status)}
                         onSendInvoice={() => handleSendInvoice(invoice)}
                         onDownloadPdf={() => handleDownloadPdf(invoice)}
@@ -2197,7 +2229,7 @@ const ZZPInvoicesPageContent = () => {
                       </TableRow>
                     ) : (
                       filteredInvoices.map((invoice) => {
-                        const canEdit = invoice.status === 'draft'
+                        const canEdit = invoice.status === 'draft' || invoice.status === 'cancelled'
                         return (
                           <TableRow key={invoice.id} className="hover:bg-secondary/30">
                             <TableCell>
@@ -2251,7 +2283,7 @@ const ZZPInvoicesPageContent = () => {
                                   {canEdit ? <PencilSimple size={16} /> : <Eye size={16} />}
                                   <span className="sr-only">{canEdit ? t('common.edit') : t('common.view')}</span>
                                 </Button>
-                                {invoice.status === 'draft' && (
+                                {(invoice.status === 'draft' || invoice.status === 'cancelled') && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -2291,10 +2323,8 @@ const ZZPInvoicesPageContent = () => {
                                       {t('zzpInvoices.share')}
                                     </DropdownMenuItem>
                                     
-                                    {/* Status actions separator - show for all except cancelled */}
-                                    {invoice.status !== 'cancelled' && (
-                                      <DropdownMenuSeparator />
-                                    )}
+                                    {/* Status actions separator */}
+                                    <DropdownMenuSeparator />
                                     
                                     {/* Send invoice - only for draft invoices */}
                                     {invoice.status === 'draft' && (
@@ -2358,8 +2388,23 @@ const ZZPInvoicesPageContent = () => {
                                       </>
                                     )}
                                     
-                                    {/* Delete - only for draft invoices */}
-                                    {invoice.status === 'draft' && (
+                                    {/* Cancelled invoice actions */}
+                                    {invoice.status === 'cancelled' && (
+                                      <DropdownMenuItem
+                                        onSelect={() => handleRestoreToConcept(invoice)}
+                                        disabled={updatingStatusInvoiceId === invoice.id}
+                                      >
+                                        {updatingStatusInvoiceId === invoice.id ? (
+                                          <SpinnerGap size={16} className="mr-2 animate-spin" />
+                                        ) : (
+                                          <ArrowCounterClockwise size={16} className="mr-2" />
+                                        )}
+                                        {t('zzpInvoices.restoreToConcept')}
+                                      </DropdownMenuItem>
+                                    )}
+                                    
+                                    {/* Delete - for draft and cancelled invoices */}
+                                    {(invoice.status === 'draft' || invoice.status === 'cancelled') && (
                                       <>
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem 

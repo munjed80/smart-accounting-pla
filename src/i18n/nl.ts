@@ -683,6 +683,8 @@ export const nl = {
     statusPaid: "Betaald",
     statusOverdue: "Verlopen",
     statusCancelled: "Geannuleerd",
+    restoreToConcept: "Herstellen als concept",
+    restoredToConcept: "Factuur hersteld naar concept",
     // Search results
     noInvoicesFound: "Geen facturen gevonden",
     tryDifferentSearch: "Probeer een andere zoekterm",

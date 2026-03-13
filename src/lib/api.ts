@@ -4805,7 +4805,7 @@ export const zzpApi = {
       return response.data
     },
 
-    updateStatus: async (invoiceId: string, status: 'sent' | 'paid' | 'cancelled'): Promise<ZZPInvoice> => {
+    updateStatus: async (invoiceId: string, status: 'draft' | 'sent' | 'paid' | 'cancelled'): Promise<ZZPInvoice> => {
       const response = await api.patch<ZZPInvoice>(`/zzp/invoices/${invoiceId}/status`, { status })
       return response.data
     },

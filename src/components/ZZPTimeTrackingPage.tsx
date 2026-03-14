@@ -554,6 +554,44 @@ export const ZZPTimeTrackingPage = () => {
     <div className="space-y-6 pb-24">
       <Card>
         <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Clock size={20} />OnClock</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            Actieve sessie:
+            <Badge variant={activeSession ? 'default' : 'secondary'} className={activeSession ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/40' : ''}>
+              {activeSession ? 'ja' : 'nee'}
+            </Badge>
+          </div>
+          {activeSession ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                variant="destructive"
+                className="bg-red-600 hover:bg-red-700 text-white"
+                disabled={isClockActionLoading}
+                onClick={() => void handleClockOut()}
+              >
+                {isClockActionLoading ? 'Uitchecken...' : 'Uitchecken'}
+              </Button>
+              <p className="text-sm">Lopende tijd: <span className="font-semibold">{formatDurationHHMMSS(elapsedSeconds)}</span></p>
+            </div>
+          ) : (
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              disabled={isClockActionLoading}
+              onClick={() => {
+                setStartSessionForm({ customer_id: '', description: '', hourly_rate: '' })
+                setIsStartSessionDialogOpen(true)
+              }}
+            >
+              Inchecken
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Receipt size={20} />
             Facturatie deze week
@@ -629,44 +667,6 @@ export const ZZPTimeTrackingPage = () => {
           <Button disabled={!filters.customer_id || totalOpenHours === 0 || invoicing} onClick={() => void handleInvoiceWeek()}>
             {invoicing ? 'Factuur maken...' : 'Maak factuur'}
           </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Clock size={20} />OnClock</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            Actieve sessie:
-            <Badge variant={activeSession ? 'default' : 'secondary'} className={activeSession ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/40' : ''}>
-              {activeSession ? 'ja' : 'nee'}
-            </Badge>
-          </div>
-          {activeSession ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                variant="destructive"
-                className="bg-red-600 hover:bg-red-700 text-white"
-                disabled={isClockActionLoading}
-                onClick={() => void handleClockOut()}
-              >
-                {isClockActionLoading ? 'Uitchecken...' : 'Uitchecken'}
-              </Button>
-              <p className="text-sm">Lopende tijd: <span className="font-semibold">{formatDurationHHMMSS(elapsedSeconds)}</span></p>
-            </div>
-          ) : (
-            <Button
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              disabled={isClockActionLoading}
-              onClick={() => {
-                setStartSessionForm({ customer_id: '', description: '', hourly_rate: '' })
-                setIsStartSessionDialogOpen(true)
-              }}
-            >
-              Inchecken
-            </Button>
-          )}
         </CardContent>
       </Card>
 

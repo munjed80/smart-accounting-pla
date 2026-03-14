@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 # Mollie subscription constants
-ZZP_BASIC_PRICE = Decimal("6.95")
+ZZP_BASIC_PRICE = Decimal("4.99")
 ZZP_BASIC_CURRENCY = "EUR"
 ZZP_BASIC_INTERVAL = "1 month"
 ZZP_BASIC_DESCRIPTION = "ZZP Basic abonnement"

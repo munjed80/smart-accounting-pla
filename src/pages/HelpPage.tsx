@@ -90,7 +90,7 @@ const helpSections: HelpSection[] = [
     content: (
       <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
         <p><strong className="text-foreground">Gratis proefperiode:</strong> U heeft 30 dagen gratis toegang tot alle functies. Geen creditcard vereist bij aanmelding. Na 30 dagen wordt uw account beperkt tot alleen-lezen tenzij u een abonnement activeert.</p>
-        <p><strong className="text-foreground">Abonnement activeren:</strong> Ga naar "Instellingen" → "Abonnement" en klik op "Activeer abonnement". Betaal via iDEAL of creditcard via ons betalingssysteem (Mollie). Het abonnement kost €6,95 per maand (voor ZZP).</p>
+        <p><strong className="text-foreground">Abonnement activeren:</strong> Ga naar "Instellingen" → "Abonnement" en klik op "Activeer abonnement". Betaal via iDEAL of creditcard via ons betalingssysteem (Mollie). Het abonnement kost €4,99 per maand (voor ZZP).</p>
         <p><strong className="text-foreground">Opzeggen:</strong> U kunt uw abonnement op elk moment opzeggen via "Instellingen" → "Abonnement" → "Abonnement opzeggen". Uw toegang blijft actief tot het einde van de betaalde periode. Geen opzegtermijn of boetes.</p>
         <p><strong className="text-foreground">Factuur ontvangen:</strong> Na elke betaling ontvangt u een factuur per e-mail van MHM IT.</p>
       </div>

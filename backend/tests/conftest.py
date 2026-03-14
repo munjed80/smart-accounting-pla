@@ -156,7 +156,7 @@ async def test_zzp_plan(db_session: AsyncSession):
     plan = Plan(
         code="zzp_basic",
         name="ZZP Basic",
-        price_monthly=6.95,
+        price_monthly=4.99,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,

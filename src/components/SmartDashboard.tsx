@@ -209,23 +209,23 @@ export const SmartDashboard = () => {
   const getSeverityIcon = (severity: string) => {
     switch (severity) {
       case 'error':
-        return <WarningCircle size={18} weight="fill" className="text-destructive" />
+        return <WarningCircle size={16} weight="duotone" className="text-destructive/70 flex-shrink-0" />
       case 'warning':
-        return <Warning size={18} weight="fill" className="text-amber-500" />
+        return <Warning size={16} weight="duotone" className="text-amber-500/80 flex-shrink-0" />
       default:
-        return <Info size={18} weight="fill" className="text-blue-500" />
+        return <Info size={16} weight="duotone" className="text-blue-400/80 flex-shrink-0" />
     }
   }
 
-  // Get badge variant for action severity
-  const getSeverityBadgeClass = (severity: string) => {
+  // Get subtle left-border color for notification rows
+  const getSeverityBorderClass = (severity: string) => {
     switch (severity) {
       case 'error':
-        return 'bg-destructive/20 text-destructive border-destructive/30'
+        return 'border-l-destructive/50'
       case 'warning':
-        return 'bg-amber-500/20 text-amber-700 border-amber-500/30'
+        return 'border-l-amber-500/50'
       default:
-        return 'bg-blue-500/20 text-blue-700 border-blue-500/30'
+        return 'border-l-blue-400/50'
     }
   }
 
@@ -397,39 +397,52 @@ export const SmartDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Actions Needed Card */}
+          {/* Actions Needed — compact notification list */}
           <Card className="bg-card/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkle size={24} weight="duotone" className="text-amber-500" />
-                {t('dashboard.actionsNeeded')}
-              </CardTitle>
-              <CardDescription>{t('dashboard.actionsNeededDescription')}</CardDescription>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  <Sparkle size={14} weight="duotone" className="text-primary/60" />
+                  {t('dashboard.actionsNeeded')}
+                </CardTitle>
+                {dashboardData?.actions && dashboardData.actions.length > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {dashboardData.actions.length}
+                  </span>
+                )}
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-1">
               {dashboardData?.actions && dashboardData.actions.length > 0 ? (
-                <div className="space-y-3">
+                <ul className="space-y-1">
                   {dashboardData.actions.map((action) => (
-                    <div 
+                    <li
                       key={action.id}
-                      className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-accent/5 transition-colors ${getSeverityBadgeClass(action.severity)}`}
-                      onClick={() => action.route && navigateTo(action.route)}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-md border border-border/20 border-l-2 ${getSeverityBorderClass(action.severity)} hover:bg-accent/5 transition-colors`}
                     >
                       {getSeverityIcon(action.severity)}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{action.title}</p>
+                        <p className="text-sm font-medium leading-tight">{action.title}</p>
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">{action.description}</p>
                       </div>
-                    </div>
+                      {action.route && (
+                        <button
+                          onClick={() => navigateTo(action.route!)}
+                          className="text-xs text-primary/60 hover:text-primary whitespace-nowrap transition-colors ml-2"
+                        >
+                          {t('dashboard.viewAction')}
+                        </button>
+                      )}
+                    </li>
                   ))}
-                </div>
+                </ul>
               ) : (
-                <div className="text-center py-8">
-                  <CheckCircle size={48} className="mx-auto mb-4 text-accent opacity-50" weight="duotone" />
-                  <p className="text-muted-foreground">{t('dashboard.noActionsNeeded')}</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {t('dashboard.noActionsNeededDescription')}
-                  </p>
+                <div className="flex items-center gap-3 px-3 py-4">
+                  <CheckCircle size={20} className="text-accent/60" weight="duotone" />
+                  <div>
+                    <p className="text-sm font-medium">{t('dashboard.noActionsNeeded')}</p>
+                    <p className="text-xs text-muted-foreground">{t('dashboard.noActionsNeededDescription')}</p>
+                  </div>
                 </div>
               )}
             </CardContent>

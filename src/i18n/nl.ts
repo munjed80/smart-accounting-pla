@@ -762,6 +762,7 @@ export const nl = {
     actionsNeededDescription: "Punten die aandacht vragen",
     noActionsNeeded: "Geen acties nodig",
     noActionsNeededDescription: "Alles is op orde!",
+    viewAction: "Bekijken",
     invoice: "factuur",
     invoices: "facturen",
     expenses: "uitgaven",

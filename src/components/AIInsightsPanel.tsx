@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -24,7 +24,6 @@ import {
 import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { 
   Sparkle,
@@ -33,11 +32,8 @@ import {
   Info,
   ArrowRight,
   X,
-  CaretDown,
-  CaretUp,
   Receipt,
   Clock,
-  CurrencyCircleDollar,
   Calendar,
   User,
   Warning,
@@ -60,24 +56,21 @@ const insightTypeIcons: Record<string, React.ElementType> = {
   no_recent_activity: Info,
 }
 
-// Map severity to colors and styles
-const severityStyles: Record<InsightSeverity, { bg: string; border: string; text: string; icon: React.ElementType }> = {
+// Map severity to subtle left-border and icon color
+const severityStyles: Record<InsightSeverity, { border: string; text: string; icon: React.ElementType }> = {
   action_needed: {
-    bg: 'bg-red-500/10',
-    border: 'border-red-500/30',
-    text: 'text-red-600 dark:text-red-400',
+    border: 'border-l-red-400/50',
+    text: 'text-red-500 dark:text-red-400',
     icon: Lightning,
   },
   suggestion: {
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/30',
-    text: 'text-amber-600 dark:text-amber-400',
+    border: 'border-l-amber-400/50',
+    text: 'text-amber-500 dark:text-amber-400',
     icon: Lightbulb,
   },
   info: {
-    bg: 'bg-blue-500/10',
-    border: 'border-blue-500/30',
-    text: 'text-blue-600 dark:text-blue-400',
+    border: 'border-l-blue-400/50',
+    text: 'text-blue-400 dark:text-blue-300',
     icon: Info,
   },
 }
@@ -109,88 +102,79 @@ const InsightCard = ({ insight, onDismiss, onAction }: InsightCardProps) => {
   }
 
   return (
-    <div className={`relative rounded-lg border ${style.border} ${style.bg} p-4 transition-all hover:shadow-sm`}>
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
-          <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${style.bg} flex-shrink-0`}>
-            <TypeIcon size={20} className={style.text} weight="duotone" />
+    <div className={`rounded-md border border-border/25 border-l-2 ${style.border} bg-card/50 transition-all hover:bg-accent/5`}>
+      {/* Main row */}
+      <div className="flex items-center gap-3 px-3 py-2.5">
+        <TypeIcon size={16} className={`${style.text} flex-shrink-0`} weight="duotone" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <h4 className="font-medium text-sm leading-tight">{insight.title}</h4>
+            {insight.amount_cents && insight.amount_cents > 0 && (
+              <span className="text-xs text-muted-foreground">· {formatAmount(insight.amount_cents)}</span>
+            )}
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <Badge variant="outline" className={`${style.bg} ${style.text} ${style.border} text-xs px-1.5 py-0`}>
-                <SeverityIcon size={12} className="mr-1" />
-                {insight.severity === 'action_needed' 
-                  ? t('aiInsights.severityActionNeeded')
-                  : insight.severity === 'suggestion'
-                    ? t('aiInsights.severitySuggestion')
-                    : t('aiInsights.severityInfo')
-                }
-              </Badge>
-              {insight.amount_cents && insight.amount_cents > 0 && (
-                <span className="text-xs font-medium text-muted-foreground">
-                  {formatAmount(insight.amount_cents)}
-                </span>
-              )}
-            </div>
-            <h4 className="font-medium text-sm leading-tight mb-1">{insight.title}</h4>
-            <p className="text-xs text-muted-foreground line-clamp-2">{insight.description}</p>
-          </div>
+          <p className="text-xs text-muted-foreground line-clamp-1">{insight.description}</p>
         </div>
-        
-        {/* Dismiss button */}
-        {insight.dismissible && onDismiss && (
+
+        {/* Actions */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Why toggle */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 w-7 p-0 opacity-50 hover:opacity-100"
-                onClick={() => onDismiss(insight.id)}
+                className="h-6 w-6 p-0 opacity-40 hover:opacity-80"
+                onClick={() => setShowReason(!showReason)}
               >
-                <X size={14} />
-                <span className="sr-only">{t('aiInsights.dismiss')}</span>
+                <SeverityIcon size={12} className={style.text} />
+                <span className="sr-only">{t('aiInsights.why')}</span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{t('aiInsights.dismiss')}</TooltipContent>
+            <TooltipContent>{t('aiInsights.why')}</TooltipContent>
           </Tooltip>
-        )}
+
+          {/* Action button */}
+          {insight.action && (
+            <button
+              onClick={handleAction}
+              className="text-xs text-primary/60 hover:text-primary whitespace-nowrap transition-colors px-1"
+            >
+              {insight.action.label}
+            </button>
+          )}
+
+          {/* Dismiss button */}
+          {insight.dismissible && onDismiss && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 opacity-30 hover:opacity-80"
+                  onClick={() => onDismiss(insight.id)}
+                >
+                  <X size={12} />
+                  <span className="sr-only">{t('aiInsights.dismiss')}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t('aiInsights.dismiss')}</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       </div>
 
       {/* Why section (collapsible) */}
       <Collapsible open={showReason} onOpenChange={setShowReason}>
-        <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mt-2 h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-          >
-            {showReason ? <CaretUp size={12} className="mr-1" /> : <CaretDown size={12} className="mr-1" />}
-            {t('aiInsights.why')}
-          </Button>
-        </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="mt-2 p-2 rounded bg-secondary/50 text-xs text-muted-foreground">
-            <Sparkle size={12} className="inline mr-1 text-primary" />
-            {insight.reason}
+          <div className="px-3 pb-2.5">
+            <div className="rounded bg-secondary/40 text-xs text-muted-foreground px-2.5 py-1.5">
+              <Sparkle size={11} className="inline mr-1 text-primary/60" />
+              {insight.reason}
+            </div>
           </div>
         </CollapsibleContent>
       </Collapsible>
-
-      {/* Action button */}
-      {insight.action && (
-        <div className="mt-3 pt-3 border-t border-border/50">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full h-8 text-xs gap-2"
-            onClick={handleAction}
-          >
-            {insight.action.label}
-            <ArrowRight size={14} />
-          </Button>
-        </div>
-      )}
     </div>
   )
 }
@@ -272,47 +256,26 @@ export const AIInsightsPanel = ({
   const displayInsights = visibleInsights.slice(0, maxItems)
   const hasMore = visibleInsights.length > maxItems
 
-  // Count by severity (excluding dismissed)
-  const actionNeededCount = visibleInsights.filter(i => i.severity === 'action_needed').length
-  const suggestionCount = visibleInsights.filter(i => i.severity === 'suggestion').length
 
   return (
     <Card className={`bg-card/80 backdrop-blur-sm border border-border/50 ${className}`}>
       {showHeader && (
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Sparkle size={18} className="text-primary" weight="duotone" />
-              </div>
-              <div>
-                <CardTitle className="text-base">{t('aiInsights.title')}</CardTitle>
-                <CardDescription className="text-xs">
-                  {t('aiInsights.subtitle')}
-                </CardDescription>
-              </div>
-            </div>
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              <Sparkle size={14} weight="duotone" className="text-primary/60" />
+              {t('aiInsights.title')}
+            </CardTitle>
             {!isLoading && !error && visibleInsights.length > 0 && (
-              <div className="flex gap-2">
-                {actionNeededCount > 0 && (
-                  <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/30 text-xs">
-                    <Lightning size={12} className="mr-1" />
-                    {actionNeededCount}
-                  </Badge>
-                )}
-                {suggestionCount > 0 && (
-                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs">
-                    <Lightbulb size={12} className="mr-1" />
-                    {suggestionCount}
-                  </Badge>
-                )}
-              </div>
+              <span className="text-xs text-muted-foreground">
+                {visibleInsights.length}
+              </span>
             )}
           </div>
         </CardHeader>
       )}
       
-      <CardContent className={showHeader ? '' : 'pt-4'}>
+      <CardContent className={showHeader ? 'pt-1' : 'pt-4'}>
         {showSkeleton ? (
           <InsightsSkeleton />
         ) : error ? (
@@ -325,7 +288,7 @@ export const AIInsightsPanel = ({
         ) : displayInsights.length === 0 ? (
           <EmptyInsights />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             {displayInsights.map((insight) => (
               <InsightCard 
                 key={insight.id} 

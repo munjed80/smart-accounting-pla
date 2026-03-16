@@ -29,9 +29,9 @@ import {
 } from 'lucide-react'
 import { MarketingFooter } from '@/components/marketing/Footer'
 import { CookieBanner } from '@/components/marketing/CookieBanner'
-import { FaqSection } from '@/components/marketing/FaqSection'
 import { HowItWorksSection } from '@/components/landing/HowItWorksSection'
 import { HeroProductMockup } from '@/components/landing/HeroProductMockup'
+import { ProductShowcaseSection } from '@/components/landing/ProductShowcaseSection'
 
 
 const zzpFeatures = [
@@ -444,8 +444,8 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* FAQ */}
-      <FaqSection />
+      {/* Product Showcase */}
+      <ProductShowcaseSection />
 
       {/* Help / Startgids */}
       <section className="py-14 sm:py-16 lg:py-24 border-t border-border/60">

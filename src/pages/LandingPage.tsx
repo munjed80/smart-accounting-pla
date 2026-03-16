@@ -31,6 +31,7 @@ import { MarketingFooter } from '@/components/marketing/Footer'
 import { CookieBanner } from '@/components/marketing/CookieBanner'
 import { FaqSection } from '@/components/marketing/FaqSection'
 import { HowItWorksSection } from '@/components/landing/HowItWorksSection'
+import { HeroProductMockup } from '@/components/landing/HeroProductMockup'
 
 
 const zzpFeatures = [
@@ -191,57 +192,65 @@ export const LandingPage = () => {
       <section className="relative overflow-hidden border-b border-primary/10">
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/15 via-background to-accent/10" />
         <div className="hero-glow-bg absolute inset-0 -z-10" />
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8 lg:py-32">
-          <div className="mx-auto max-w-4xl text-center">
-            {/* Premium badge */}
-            <div className="hero-badge-premium mb-6 inline-flex items-center gap-2 rounded-full border border-accent/45 bg-accent/10 px-4 py-1.5 text-xs font-semibold text-accent shadow-[inset_0_1px_0_oklch(1_0_0/0.08),0_1px_8px_oklch(0_0_0/0.25)] backdrop-blur-sm">
-              <Star className="h-3.5 w-3.5 shrink-0 fill-current opacity-90" />
-              <span>30 dagen gratis uitproberen — geen creditcard vereist</span>
-            </div>
-            {/* Headline */}
-            <h1 className="text-4xl font-extrabold leading-[1.15] tracking-tight sm:text-5xl lg:text-6xl lg:tracking-[-0.03em]">
-              <span className="block">Gratis factuur maken</span>
-              <span className="hero-gradient-text block">voor zzp'ers</span>
-            </h1>
-            {/* Subtitle */}
-            <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg lg:mt-6 lg:max-w-2xl lg:text-xl lg:leading-[1.7]">
-              Maak professionele facturen, beheer klanten, registreer uren en houd overzicht — allemaal op één plek. Eenvoudig, snel en mobiel.
-            </p>
-            {/* ZZP feature highlights */}
-            <div className="mt-7 flex flex-wrap justify-center gap-2">
-              {['Facturen', 'Klanten', 'Uren', 'Uitgaven', 'BTW-overzicht', 'Mobiel'].map((label) => (
-                <span key={label} className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3.5 py-1.5 text-xs font-semibold text-accent/95 shadow-[inset_0_1px_0_oklch(1_0_0/0.06)] transition-all duration-150 hover:border-accent/50 hover:bg-accent/15 hover:shadow-[0_0_8px_oklch(0.75_0.22_150/0.2)]">
-                  <CheckCircle className="h-3 w-3 shrink-0" />
-                  {label}
-                </span>
-              ))}
-            </div>
-            {/* CTA buttons */}
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Button
-                size="lg"
-                className="btn-premium-glow w-full max-w-sm sm:w-auto"
-                onClick={() => navigateTo('/login')}
-              >
-                Start gratis
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full max-w-sm border-border/60 transition-colors hover:border-primary/40 hover:bg-primary/5 sm:w-auto"
-                onClick={() => navigateTo('/login')}
-              >
-                Inloggen
-              </Button>
-            </div>
-            {/* Helper text */}
-            <div className="mt-5 space-y-1.5">
-              <p className="text-sm text-muted-foreground">30 dagen gratis, daarna €4,99 per maand. Geen verplichtingen.</p>
-              <p className="flex items-center justify-center gap-1.5 text-sm font-semibold" style={{ color: 'var(--accent2)' }}>
-                <CheckCircle className="h-3.5 w-3.5 shrink-0" />
-                Binnen 60 seconden gestart.
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
+          <div className="flex flex-col items-center gap-12 lg:flex-row lg:items-center lg:gap-16">
+            {/* Left — text content */}
+            <div className="flex-1 text-center lg:text-left">
+              {/* Premium badge */}
+              <div className="hero-badge-premium mb-6 inline-flex items-center gap-2 rounded-full border border-accent/45 bg-accent/10 px-4 py-1.5 text-xs font-semibold text-accent shadow-[inset_0_1px_0_oklch(1_0_0/0.08),0_1px_8px_oklch(0_0_0/0.25)] backdrop-blur-sm">
+                <Star className="h-3.5 w-3.5 shrink-0 fill-current opacity-90" />
+                <span>30 dagen gratis uitproberen — geen creditcard vereist</span>
+              </div>
+              {/* Headline */}
+              <h1 className="text-4xl font-extrabold leading-[1.15] tracking-tight sm:text-5xl lg:text-6xl lg:tracking-[-0.03em]">
+                <span className="block">Gratis factuur maken</span>
+                <span className="hero-gradient-text block">voor zzp'ers</span>
+              </h1>
+              {/* Subtitle */}
+              <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg lg:mx-0 lg:mt-6 lg:max-w-lg lg:text-xl lg:leading-[1.7]">
+                Maak professionele facturen, beheer klanten, registreer uren en houd overzicht — allemaal op één plek. Eenvoudig, snel en mobiel.
               </p>
+              {/* ZZP feature highlights */}
+              <div className="mt-7 flex flex-wrap justify-center gap-2 lg:justify-start">
+                {['Facturen', 'Klanten', 'Uren', 'Uitgaven', 'BTW-overzicht', 'Mobiel'].map((label) => (
+                  <span key={label} className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3.5 py-1.5 text-xs font-semibold text-accent/95 shadow-[inset_0_1px_0_oklch(1_0_0/0.06)] transition-all duration-150 hover:border-accent/50 hover:bg-accent/15 hover:shadow-[0_0_8px_oklch(0.75_0.22_150/0.2)]">
+                    <CheckCircle className="h-3 w-3 shrink-0" />
+                    {label}
+                  </span>
+                ))}
+              </div>
+              {/* CTA buttons */}
+              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
+                <Button
+                  size="lg"
+                  className="btn-premium-glow w-full max-w-sm sm:w-auto"
+                  onClick={() => navigateTo('/login')}
+                >
+                  Start gratis
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full max-w-sm border-border/60 transition-colors hover:border-primary/40 hover:bg-primary/5 sm:w-auto"
+                  onClick={() => navigateTo('/login')}
+                >
+                  Inloggen
+                </Button>
+              </div>
+              {/* Helper text */}
+              <div className="mt-5 space-y-1.5">
+                <p className="text-sm text-muted-foreground">30 dagen gratis, daarna €4,99 per maand. Geen verplichtingen.</p>
+                <p className="flex items-center justify-center gap-1.5 text-sm font-semibold lg:justify-start" style={{ color: 'var(--accent2)' }}>
+                  <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+                  Binnen 60 seconden gestart.
+                </p>
+              </div>
+            </div>
+
+            {/* Right — product visual */}
+            <div className="w-full flex-shrink-0 px-4 sm:px-8 lg:w-[52%] lg:px-0">
+              <HeroProductMockup />
             </div>
           </div>
         </div>

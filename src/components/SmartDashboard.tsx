@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/lib/AuthContext'
-import { zzpApi, ZZPDashboardResponse, administrationApi, Administration, getErrorMessage } from '@/lib/api'
+import { zzpApi, ZZPDashboardResponse, MonthlyInvoiceSummary, administrationApi, Administration, getErrorMessage } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { NoAdministrationsEmptyState } from '@/components/EmptyState'
 import { AIInsightsPanel } from '@/components/AIInsightsPanel'
@@ -23,7 +23,8 @@ import {
   Warning,
   Info,
   CurrencyEur,
-  CalendarCheck
+  CalendarCheck,
+  ArrowRight
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 import { nl as nlLocale } from 'date-fns/locale'
@@ -60,6 +61,24 @@ export const SmartDashboard = () => {
         return await zzpApi.dashboard.get()
       } catch {
         // Dashboard data may be unavailable for fresh accounts - this is expected
+        return null
+      }
+    },
+    enabled: !isLoadingAdmins && administrations.length > 0,
+    refetchOnWindowFocus: false,
+  })
+
+  // Fetch monthly invoice summary
+  const {
+    data: monthlyInvoicesData,
+    isLoading: isLoadingMonthly,
+  } = useQuery({
+    queryKey: ['zzp-monthly-invoices', 'last_6_months'],
+    queryFn: async () => {
+      if (administrations.length === 0) return null
+      try {
+        return await zzpApi.dashboard.monthlyInvoices('last_6_months')
+      } catch {
         return null
       }
     },
@@ -449,6 +468,73 @@ export const SmartDashboard = () => {
           </Card>
         </div>
         
+        {/* Monthly Invoice Summary Block */}
+        <div className="mb-8">
+          <Card className="bg-card/80 backdrop-blur-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Receipt size={20} weight="duotone" className="text-primary" />
+                    {t('dashboard.monthlyInvoicesTitle')}
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    {t('dashboard.monthlyInvoicesDescription')}
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-muted-foreground hover:text-foreground gap-1"
+                  onClick={() => navigateTo('/zzp/invoices')}
+                >
+                  {t('dashboard.monthlyInvoicesViewAll')}
+                  <ArrowRight size={14} />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {isLoadingMonthly ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-10 w-full rounded-md" />
+                  ))}
+                </div>
+              ) : !monthlyInvoicesData || monthlyInvoicesData.months.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">{t('zzpInvoices.monthlyNoData')}</p>
+              ) : (
+                <div className="space-y-1">
+                  {/* Header row */}
+                  <div className="grid grid-cols-4 gap-2 px-2 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b border-border/30">
+                    <span>{t('zzpInvoices.monthlyColumnMonth')}</span>
+                    <span className="text-right">{t('dashboard.monthlyInvoicesSent')}</span>
+                    <span className="text-right">{t('dashboard.monthlyInvoicesPaid')}</span>
+                    <span className="text-right">{t('dashboard.monthlyInvoicesOpen')}</span>
+                  </div>
+                  {/* Month rows — show last 6 reversed (most recent first) */}
+                  {[...monthlyInvoicesData.months].reverse().map((m: MonthlyInvoiceSummary) => (
+                    <div
+                      key={m.month_key}
+                      className="grid grid-cols-4 gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-muted/30 transition-colors"
+                    >
+                      <span className="font-medium truncate">{m.month_label}</span>
+                      <span className="text-right text-muted-foreground">
+                        {formatCurrency(m.sent_total)}
+                      </span>
+                      <span className="text-right text-accent">
+                        {formatCurrency(m.paid_total)}
+                      </span>
+                      <span className={`text-right ${m.open_total > 0 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                        {formatCurrency(m.open_total)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         {/* AI Insights Panel + Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <div className="lg:col-span-2">

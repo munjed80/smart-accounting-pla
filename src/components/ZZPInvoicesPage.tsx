@@ -106,6 +106,8 @@ import {
   ZZPInvoiceLineCreate,
   ZZPCustomer,
   ZZPBusinessProfile,
+  MonthlyInvoiceSummary,
+  MonthlyInvoicePeriod,
   getApiBaseUrl,
 } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
@@ -1488,7 +1490,27 @@ const ZZPInvoicesPageContent = () => {
   const debugEnabled = import.meta.env.DEV && new URLSearchParams(window.location.search).get('debug') === '1'
   const administrationId = typeof window !== 'undefined' ? localStorage.getItem('administration_id') : null
 
-  // Check for customer_id in URL params or invoice_id in URL path
+  // Monthly invoice overview state
+  const [monthlyPeriod, setMonthlyPeriod] = useState<MonthlyInvoicePeriod>('last_6_months')
+  const [monthlyData, setMonthlyData] = useState<MonthlyInvoiceSummary[]>([])
+  const [isLoadingMonthly, setIsLoadingMonthly] = useState(false)
+
+  // Fetch monthly invoice summary
+  const loadMonthlyData = useCallback(async (period: MonthlyInvoicePeriod) => {
+    setIsLoadingMonthly(true)
+    try {
+      const response = await zzpApi.dashboard.monthlyInvoices(period)
+      setMonthlyData(response.months)
+    } catch {
+      setMonthlyData([])
+    } finally {
+      setIsLoadingMonthly(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadMonthlyData(monthlyPeriod)
+  }, [monthlyPeriod, loadMonthlyData])
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const customerId = params.get('customer_id')
@@ -1569,6 +1591,8 @@ const ZZPInvoicesPageContent = () => {
       setBusinessProfile(profileData)
       setLoadState('success')
       setLastErrorMessage(null)
+      // Refresh monthly summary after loading invoices
+      void loadMonthlyData(monthlyPeriod)
     } catch (err) {
       console.error('[Invoices] Failed to load invoices page data', {
         route: 'Facturen',
@@ -1612,7 +1636,7 @@ const ZZPInvoicesPageContent = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [administrationId, user?.id, user?.role])
+  }, [administrationId, user?.id, user?.role, loadMonthlyData, monthlyPeriod])
 
   useEffect(() => {
     loadData()
@@ -2091,6 +2115,98 @@ const ZZPInvoicesPageContent = () => {
             />
           </div>
         )}
+
+        {/* Maandoverzicht facturen */}
+        <div className="mb-6">
+          <Card className="bg-card/80 backdrop-blur-sm">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <CalendarBlank size={18} weight="duotone" className="text-primary" />
+                    {t('zzpInvoices.monthlyOverviewTitle')}
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    {t('zzpInvoices.monthlyOverviewDescription')}
+                  </CardDescription>
+                </div>
+                <div className="flex gap-1.5">
+                  {(['this_month', 'last_6_months', 'this_year'] as MonthlyInvoicePeriod[]).map(p => (
+                    <button
+                      key={p}
+                      onClick={() => setMonthlyPeriod(p)}
+                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                        monthlyPeriod === p
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'border-border/50 text-muted-foreground hover:border-muted-foreground/50'
+                      }`}
+                    >
+                      {p === 'this_month'
+                        ? t('zzpInvoices.monthlyPeriodThisMonth')
+                        : p === 'last_6_months'
+                        ? t('zzpInvoices.monthlyPeriodLast6Months')
+                        : t('zzpInvoices.monthlyPeriodThisYear')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {isLoadingMonthly ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="h-9 bg-muted/30 rounded-md animate-pulse" />
+                  ))}
+                </div>
+              ) : monthlyData.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-3">{t('zzpInvoices.monthlyNoData')}</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs font-medium text-muted-foreground uppercase tracking-wide border-b border-border/30">
+                        <th className="text-left pb-2 font-medium">{t('zzpInvoices.monthlyColumnMonth')}</th>
+                        <th className="text-right pb-2 font-medium">{t('zzpInvoices.monthlyColumnSent')}</th>
+                        <th className="text-right pb-2 font-medium">{t('zzpInvoices.monthlyColumnPaid')}</th>
+                        <th className="text-right pb-2 font-medium">{t('zzpInvoices.monthlyColumnOpen')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...monthlyData].reverse().map((m: MonthlyInvoiceSummary) => (
+                        <tr
+                          key={m.month_key}
+                          className="border-b border-border/10 last:border-0 hover:bg-muted/20 transition-colors"
+                        >
+                          <td className="py-2 pr-4 font-medium">{m.month_label}</td>
+                          <td className="py-2 text-right text-muted-foreground tabular-nums">
+                            <span className="block">{formatAmountEUR(m.sent_total)}</span>
+                            {m.sent_count > 0 && (
+                              <span className="text-xs text-muted-foreground/60">
+                                {m.sent_count === 1
+                                  ? t('zzpInvoices.monthlySentCount').replace('{count}', '1')
+                                  : t('zzpInvoices.monthlySentCountPlural').replace('{count}', String(m.sent_count))}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 text-right tabular-nums">
+                            <span className={`block ${m.paid_total > 0 ? 'text-green-500' : 'text-muted-foreground'}`}>
+                              {formatAmountEUR(m.paid_total)}
+                            </span>
+                          </td>
+                          <td className="py-2 text-right tabular-nums">
+                            <span className={`block ${m.open_total > 0 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                              {formatAmountEUR(m.open_total)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Show loading, error, empty state or content */}
         {showLoading ? (

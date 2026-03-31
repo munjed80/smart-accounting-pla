@@ -4272,6 +4272,25 @@ export interface ZZPDashboardResponse {
   notes: Record<string, string>
 }
 
+// Monthly Invoice Summary Types
+export interface MonthlyInvoiceSummary {
+  month_key: string      // e.g. "2026-03"
+  month_label: string    // e.g. "Maart 2026"
+  sent_total: number     // cents
+  paid_total: number     // cents
+  open_total: number     // cents
+  sent_count: number
+  paid_count: number
+  open_count: number
+}
+
+export interface MonthlyInvoicesResponse {
+  months: MonthlyInvoiceSummary[]
+  period: string
+}
+
+export type MonthlyInvoicePeriod = 'this_month' | 'last_6_months' | 'this_year'
+
 // Quote (Offerte) Types
 export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'converted'
 
@@ -5306,6 +5325,19 @@ export const zzpApi = {
      */
     get: async (): Promise<ZZPDashboardResponse> => {
       const response = await api.get<ZZPDashboardResponse>('/zzp/dashboard')
+      return response.data
+    },
+
+    /**
+     * Get monthly invoice aggregations for the ZZP user.
+     * Invoices are grouped by issue_date month.
+     *
+     * @param period - 'this_month' | 'last_6_months' | 'this_year'
+     */
+    monthlyInvoices: async (period: MonthlyInvoicePeriod = 'last_6_months'): Promise<MonthlyInvoicesResponse> => {
+      const response = await api.get<MonthlyInvoicesResponse>('/zzp/dashboard/monthly-invoices', {
+        params: { period },
+      })
       return response.data
     },
   },

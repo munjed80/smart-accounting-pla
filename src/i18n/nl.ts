@@ -701,6 +701,22 @@ export const nl = {
     print: "Afdrukken",
     generatedInvoiceNote: "Automatisch gegenereerd concept - controleer en pas aan indien nodig.",
     generatedLineDescription: "Dienstverlening",
+    // Monthly invoice overview
+    monthlyOverviewTitle: "Maandoverzicht facturen",
+    monthlyOverviewDescription: "Factuuromzet per maand",
+    monthlyPeriodThisMonth: "Deze maand",
+    monthlyPeriodLast6Months: "Laatste 6 maanden",
+    monthlyPeriodThisYear: "Dit jaar",
+    monthlyColumnMonth: "Maand",
+    monthlyColumnSent: "Verstuurd",
+    monthlyColumnPaid: "Betaald",
+    monthlyColumnOpen: "Openstaand",
+    monthlyNoData: "Geen factuurdata voor deze periode",
+    monthlySentLabel: "Verstuurd",
+    monthlyPaidLabel: "Betaald",
+    monthlyOpenLabel: "Openstaand",
+    monthlySentCount: "{count} factuur",
+    monthlySentCountPlural: "{count} facturen",
   },
 
   // Dashboard
@@ -769,6 +785,13 @@ export const nl = {
     billableHours: "factureerbaar",
     overdue: "Te laat",
     draft: "Concept",
+    // Monthly invoice summary block on dashboard
+    monthlyInvoicesTitle: "Facturen per maand",
+    monthlyInvoicesDescription: "Overzicht van de afgelopen 6 maanden",
+    monthlyInvoicesViewAll: "Volledig overzicht",
+    monthlyInvoicesSent: "Verstuurd",
+    monthlyInvoicesPaid: "Betaald",
+    monthlyInvoicesOpen: "Openstaand",
   },
 
   // Transaction statuses

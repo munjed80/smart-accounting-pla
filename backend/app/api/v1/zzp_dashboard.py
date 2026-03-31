@@ -555,6 +555,7 @@ async def get_monthly_invoices(
             ZZPInvoice.issue_date >= range_start,
             ZZPInvoice.issue_date <= range_end,
             ZZPInvoice.status != InvoiceStatus.DRAFT.value,
+            ZZPInvoice.status != InvoiceStatus.CANCELLED.value,
         )
     )
     invoices = result.scalars().all()

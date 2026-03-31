@@ -712,11 +712,6 @@ export const nl = {
     monthlyColumnPaid: "Betaald",
     monthlyColumnOpen: "Openstaand",
     monthlyNoData: "Geen factuurdata voor deze periode",
-    monthlySentLabel: "Verstuurd",
-    monthlyPaidLabel: "Betaald",
-    monthlyOpenLabel: "Openstaand",
-    monthlySentCount: "{count} factuur",
-    monthlySentCountPlural: "{count} facturen",
   },
 
   // Dashboard

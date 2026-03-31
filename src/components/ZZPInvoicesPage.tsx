@@ -1494,6 +1494,7 @@ const ZZPInvoicesPageContent = () => {
   const [monthlyPeriod, setMonthlyPeriod] = useState<MonthlyInvoicePeriod>('last_6_months')
   const [monthlyData, setMonthlyData] = useState<MonthlyInvoiceSummary[]>([])
   const [isLoadingMonthly, setIsLoadingMonthly] = useState(false)
+  const [monthlyRefreshKey, setMonthlyRefreshKey] = useState(0)
 
   // Fetch monthly invoice summary
   const loadMonthlyData = useCallback(async (period: MonthlyInvoicePeriod) => {
@@ -1510,7 +1511,7 @@ const ZZPInvoicesPageContent = () => {
 
   useEffect(() => {
     void loadMonthlyData(monthlyPeriod)
-  }, [monthlyPeriod, loadMonthlyData])
+  }, [monthlyPeriod, monthlyRefreshKey, loadMonthlyData])
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const customerId = params.get('customer_id')
@@ -1592,7 +1593,7 @@ const ZZPInvoicesPageContent = () => {
       setLoadState('success')
       setLastErrorMessage(null)
       // Refresh monthly summary after loading invoices
-      void loadMonthlyData(monthlyPeriod)
+      setMonthlyRefreshKey(k => k + 1)
     } catch (err) {
       console.error('[Invoices] Failed to load invoices page data', {
         route: 'Facturen',
@@ -1636,7 +1637,7 @@ const ZZPInvoicesPageContent = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [administrationId, user?.id, user?.role, loadMonthlyData, monthlyPeriod])
+  }, [administrationId, user?.id, user?.role])
 
   useEffect(() => {
     loadData()
@@ -2182,9 +2183,7 @@ const ZZPInvoicesPageContent = () => {
                             <span className="block">{formatAmountEUR(m.sent_total)}</span>
                             {m.sent_count > 0 && (
                               <span className="text-xs text-muted-foreground/60">
-                                {m.sent_count === 1
-                                  ? t('zzpInvoices.monthlySentCount').replace('{count}', '1')
-                                  : t('zzpInvoices.monthlySentCountPlural').replace('{count}', String(m.sent_count))}
+                                {m.sent_count} {m.sent_count === 1 ? 'factuur' : 'facturen'}
                               </span>
                             )}
                           </td>

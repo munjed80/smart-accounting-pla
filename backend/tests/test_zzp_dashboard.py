@@ -136,10 +136,13 @@ async def test_zzp_dashboard_with_expenses(
     today = date.today()
     
     # Create an expense this month
+    # Use the 1st of the current month to avoid crossing month boundaries
+    # (e.g. on April 1, "today - 5 days" would be March 27 = previous month)
+    month_start = date(today.year, today.month, 1)
     expense = ZZPExpense()
     expense.administration_id = test_administration.id
     expense.vendor = "Test Vendor"
-    expense.expense_date = today - timedelta(days=5)
+    expense.expense_date = month_start
     expense.amount_cents = 5000
     expense.vat_rate = Decimal("21.0")
     expense.vat_amount_cents = 868  # 5000 * 21 / 121

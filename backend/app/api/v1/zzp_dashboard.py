@@ -11,13 +11,14 @@ Metrics provided:
 - Hours this week + billable hours
 - BTW (VAT) estimate for current quarter
 - Actions needed (draft invoices, missing profile, overdue invoices)
+- Monthly invoice summary (sent/paid/open totals grouped by month)
 """
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from typing import Annotated, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func, and_, extract
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -458,3 +459,149 @@ async def get_zzp_dashboard(
         generated_at=now,
         notes=notes,
     )
+
+
+# ============================================================================
+# Monthly Invoice Summary
+# ============================================================================
+
+DUTCH_MONTHS = [
+    "Januari", "Februari", "Maart", "April", "Mei", "Juni",
+    "Juli", "Augustus", "September", "Oktober", "November", "December",
+]
+
+
+def dutch_month_label(year: int, month: int) -> str:
+    """Return a Dutch month label, e.g. 'Maart 2026'."""
+    return f"{DUTCH_MONTHS[month - 1]} {year}"
+
+
+class MonthlyInvoiceSummary(BaseModel):
+    """Monthly invoice aggregation for a single month."""
+    month_key: str = Field(..., description="Month identifier, e.g. '2026-03'")
+    month_label: str = Field(..., description="Human-readable Dutch month label, e.g. 'Maart 2026'")
+    sent_total: int = Field(0, description="Total cents of all non-draft/non-cancelled invoices issued this month")
+    paid_total: int = Field(0, description="Total cents of paid invoices issued this month")
+    open_total: int = Field(0, description="Total cents of open (sent/overdue) invoices issued this month")
+    sent_count: int = Field(0, description="Number of non-draft/non-cancelled invoices issued this month")
+    paid_count: int = Field(0, description="Number of paid invoices issued this month")
+    open_count: int = Field(0, description="Number of open (sent/overdue) invoices issued this month")
+
+
+class MonthlyInvoicesResponse(BaseModel):
+    """Response wrapper for monthly invoice summaries."""
+    months: List[MonthlyInvoiceSummary]
+    period: str = Field(..., description="Requested period: this_month | last_6_months | this_year")
+
+
+@router.get(
+    "/dashboard/monthly-invoices",
+    response_model=MonthlyInvoicesResponse,
+    summary="Get monthly invoice summary",
+    description="""
+    Returns monthly aggregated invoice totals for the ZZP user.
+
+    Invoices are grouped by **issue_date** month.
+
+    **Metrics per month:**
+    - `sent_total` / `sent_count`: All invoices with a non-draft, non-cancelled status
+    - `paid_total` / `paid_count`: Invoices with status *paid*
+    - `open_total` / `open_count`: Invoices with status *sent* or *overdue*
+
+    **Period options:**
+    - `this_month`: Only the current calendar month
+    - `last_6_months`: The 6 most recent calendar months (including current)
+    - `this_year`: All months of the current calendar year
+    """,
+)
+async def get_monthly_invoices(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    period: str = Query(
+        "last_6_months",
+        description="Period to aggregate: this_month | last_6_months | this_year",
+        pattern="^(this_month|last_6_months|this_year)$",
+    ),
+) -> MonthlyInvoicesResponse:
+    """Return monthly invoice summary grouped by issue_date month."""
+    require_zzp(current_user)
+
+    administration = await get_user_administration(current_user.id, db)
+    admin_id = administration.id
+    today = date.today()
+
+    # Determine date range based on period
+    if period == "this_month":
+        range_start = date(today.year, today.month, 1)
+        range_end = today
+    elif period == "this_year":
+        range_start = date(today.year, 1, 1)
+        range_end = today
+    else:  # last_6_months (default)
+        # Go back 5 full months + current partial month = 6 months total
+        # Subtract 5 months
+        m = today.month - 5
+        y = today.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        range_start = date(y, m, 1)
+        range_end = today
+
+    # Fetch all relevant invoices in the date range (by issue_date)
+    result = await db.execute(
+        select(ZZPInvoice).where(
+            ZZPInvoice.administration_id == admin_id,
+            ZZPInvoice.issue_date >= range_start,
+            ZZPInvoice.issue_date <= range_end,
+            ZZPInvoice.status != InvoiceStatus.DRAFT.value,
+            ZZPInvoice.status != InvoiceStatus.CANCELLED.value,
+        )
+    )
+    invoices = result.scalars().all()
+
+    # Build a dict of month_key -> MonthlyInvoiceSummary
+    summaries: dict[str, MonthlyInvoiceSummary] = {}
+
+    # Generate all months in the range so we always have entries (even if zero)
+    cursor_year = range_start.year
+    cursor_month = range_start.month
+    end_year = today.year
+    end_month = today.month
+    while (cursor_year, cursor_month) <= (end_year, end_month):
+        key = f"{cursor_year:04d}-{cursor_month:02d}"
+        summaries[key] = MonthlyInvoiceSummary(
+            month_key=key,
+            month_label=dutch_month_label(cursor_year, cursor_month),
+        )
+        cursor_month += 1
+        if cursor_month > 12:
+            cursor_month = 1
+            cursor_year += 1
+
+    # Populate stats from invoice data
+    for inv in invoices:
+        key = f"{inv.issue_date.year:04d}-{inv.issue_date.month:02d}"
+        if key not in summaries:
+            summaries[key] = MonthlyInvoiceSummary(
+                month_key=key,
+                month_label=dutch_month_label(inv.issue_date.year, inv.issue_date.month),
+            )
+        s = summaries[key]
+        total = inv.total_cents or 0
+
+        # Verstuurd: all non-draft, non-cancelled (already filtered above)
+        s.sent_total += total
+        s.sent_count += 1
+
+        if inv.status == InvoiceStatus.PAID.value:
+            s.paid_total += total
+            s.paid_count += 1
+        elif inv.status in (InvoiceStatus.SENT.value, InvoiceStatus.OVERDUE.value):
+            s.open_total += total
+            s.open_count += 1
+
+    # Return sorted by month_key ascending
+    sorted_months = sorted(summaries.values(), key=lambda x: x.month_key)
+
+    return MonthlyInvoicesResponse(months=sorted_months, period=period)

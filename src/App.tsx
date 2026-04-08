@@ -1,53 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from '@/lib/AuthContext'
 import { NetworkError, ServerError } from '@/lib/errors'
 import { ActiveClientProvider } from '@/lib/ActiveClientContext'
 import { LoginPage } from '@/components/LoginPage'
-import { VerifyEmailPage } from '@/components/VerifyEmailPage'
-import { ForgotPasswordPage } from '@/components/ForgotPasswordPage'
-import { ResetPasswordPage } from '@/components/ResetPasswordPage'
-import { OnboardingPage } from '@/components/OnboardingPage'
-import { AccountantOnboardingPage } from '@/components/AccountantOnboardingPage'
-import { LandingPage } from '@/pages/LandingPage'
-import { PrivacyPage } from '@/pages/PrivacyPage'
-import { CookiesPage } from '@/pages/CookiesPage'
-import { TermsPage } from '@/pages/TermsPage'
-import { DisclaimerPage } from '@/pages/DisclaimerPage'
-import { ContactPage } from '@/pages/ContactPage'
-import { HelpPage } from '@/pages/HelpPage'
-import { FaqPage } from '@/pages/FaqPage'
-import { PrijzenPage } from '@/pages/PrijzenPage'
-import { BedanktPage } from '@/pages/BedanktPage'
-import { SmartDashboard } from '@/components/SmartDashboard'
-import { AccountantHomePage } from '@/components/AccountantHomePage'
-import { AccountantReviewQueuePage } from '@/components/AccountantReviewQueuePage'
-import { AccountantRemindersPage } from '@/components/AccountantRemindersPage'
-import { AccountantActionsPage } from '@/components/AccountantActionsPage'
-import { AccountantClientsPage } from '@/components/AccountantClientsPage'
-import { AccountantNotFoundPage } from '@/components/AccountantNotFoundPage'
-import { CrediteurenPage } from '@/components/CrediteurenPage'
-import { ProfitLossPage } from '@/components/ProfitLossPage'
-import { GrootboekPage } from '@/components/GrootboekPage'
-import { ZZPAccountantLinksPage } from '@/components/ZZPAccountantLinksPage'
-import { ZZPCustomersPage } from '@/components/ZZPCustomersPage'
-import { ZZPInvoicesPage } from '@/components/ZZPInvoicesPage'
-import { ZZPOffertesPage } from '@/components/ZZPOffertesPage'
-import { ZZPExpensesPage } from '@/components/ZZPExpensesPage'
-import { ZZPTimeTrackingPage } from '@/components/ZZPTimeTrackingPage'
-import { ZZPAgendaPage } from '@/components/ZZPAgendaPage'
-import { ZZPCommitmentsOverviewPage } from '@/components/ZZPCommitmentsOverviewPage'
-import { ZZPLeaseLoansPage } from '@/components/ZZPLeaseLoansPage'
-import { ZZPDocumentInboxPage } from '@/components/ZZPDocumentInboxPage'
-import { ZZPSubscriptionsPage } from '@/components/ZZPSubscriptionsPage'
-import { ClientDossierPage } from '@/components/ClientDossierPage'
-import { BulkOperationsHistoryPage } from '@/components/BulkOperationsHistoryPage'
-import { BankReconciliationPage } from '@/components/BankReconciliationPage'
-import { IntelligentUploadPortal } from '@/components/IntelligentUploadPortal'
-import { SmartTransactionList } from '@/components/SmartTransactionList'
-import { SettingsPage } from '@/components/SettingsPage'
-import { SupportPage } from '@/components/SupportPage'
-import { AdminDashboard } from '@/components/AdminDashboard'
 import { AppShell } from '@/components/AppShell'
 import { DashboardErrorBoundary } from '@/components/DashboardErrorBoundary'
 import { administrationApi, accountantClientApi, getApiBaseUrl } from '@/lib/api'
@@ -61,11 +17,66 @@ import { Database, LockSimple } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 
+// Lazy-loaded page components for code splitting
+const VerifyEmailPage = lazy(() => import('@/components/VerifyEmailPage').then(m => ({ default: m.VerifyEmailPage })))
+const ForgotPasswordPage = lazy(() => import('@/components/ForgotPasswordPage').then(m => ({ default: m.ForgotPasswordPage })))
+const ResetPasswordPage = lazy(() => import('@/components/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })))
+const OnboardingPage = lazy(() => import('@/components/OnboardingPage').then(m => ({ default: m.OnboardingPage })))
+const AccountantOnboardingPage = lazy(() => import('@/components/AccountantOnboardingPage').then(m => ({ default: m.AccountantOnboardingPage })))
+const LandingPage = lazy(() => import('@/pages/LandingPage').then(m => ({ default: m.LandingPage })))
+const PrivacyPage = lazy(() => import('@/pages/PrivacyPage').then(m => ({ default: m.PrivacyPage })))
+const CookiesPage = lazy(() => import('@/pages/CookiesPage').then(m => ({ default: m.CookiesPage })))
+const TermsPage = lazy(() => import('@/pages/TermsPage').then(m => ({ default: m.TermsPage })))
+const DisclaimerPage = lazy(() => import('@/pages/DisclaimerPage').then(m => ({ default: m.DisclaimerPage })))
+const ContactPage = lazy(() => import('@/pages/ContactPage').then(m => ({ default: m.ContactPage })))
+const HelpPage = lazy(() => import('@/pages/HelpPage').then(m => ({ default: m.HelpPage })))
+const FaqPage = lazy(() => import('@/pages/FaqPage').then(m => ({ default: m.FaqPage })))
+const PrijzenPage = lazy(() => import('@/pages/PrijzenPage').then(m => ({ default: m.PrijzenPage })))
+const BedanktPage = lazy(() => import('@/pages/BedanktPage').then(m => ({ default: m.BedanktPage })))
+const SmartDashboard = lazy(() => import('@/components/SmartDashboard').then(m => ({ default: m.SmartDashboard })))
+const AccountantHomePage = lazy(() => import('@/components/AccountantHomePage').then(m => ({ default: m.AccountantHomePage })))
+const AccountantReviewQueuePage = lazy(() => import('@/components/AccountantReviewQueuePage').then(m => ({ default: m.AccountantReviewQueuePage })))
+const AccountantRemindersPage = lazy(() => import('@/components/AccountantRemindersPage').then(m => ({ default: m.AccountantRemindersPage })))
+const AccountantActionsPage = lazy(() => import('@/components/AccountantActionsPage').then(m => ({ default: m.AccountantActionsPage })))
+const AccountantClientsPage = lazy(() => import('@/components/AccountantClientsPage').then(m => ({ default: m.AccountantClientsPage })))
+const AccountantNotFoundPage = lazy(() => import('@/components/AccountantNotFoundPage').then(m => ({ default: m.AccountantNotFoundPage })))
+const CrediteurenPage = lazy(() => import('@/components/CrediteurenPage').then(m => ({ default: m.CrediteurenPage })))
+const ProfitLossPage = lazy(() => import('@/components/ProfitLossPage').then(m => ({ default: m.ProfitLossPage })))
+const GrootboekPage = lazy(() => import('@/components/GrootboekPage').then(m => ({ default: m.GrootboekPage })))
+const ZZPAccountantLinksPage = lazy(() => import('@/components/ZZPAccountantLinksPage').then(m => ({ default: m.ZZPAccountantLinksPage })))
+const ZZPCustomersPage = lazy(() => import('@/components/ZZPCustomersPage').then(m => ({ default: m.ZZPCustomersPage })))
+const ZZPInvoicesPage = lazy(() => import('@/components/ZZPInvoicesPage').then(m => ({ default: m.ZZPInvoicesPage })))
+const ZZPOffertesPage = lazy(() => import('@/components/ZZPOffertesPage').then(m => ({ default: m.ZZPOffertesPage })))
+const ZZPExpensesPage = lazy(() => import('@/components/ZZPExpensesPage').then(m => ({ default: m.ZZPExpensesPage })))
+const ZZPTimeTrackingPage = lazy(() => import('@/components/ZZPTimeTrackingPage').then(m => ({ default: m.ZZPTimeTrackingPage })))
+const ZZPAgendaPage = lazy(() => import('@/components/ZZPAgendaPage').then(m => ({ default: m.ZZPAgendaPage })))
+const ZZPCommitmentsOverviewPage = lazy(() => import('@/components/ZZPCommitmentsOverviewPage').then(m => ({ default: m.ZZPCommitmentsOverviewPage })))
+const ZZPLeaseLoansPage = lazy(() => import('@/components/ZZPLeaseLoansPage').then(m => ({ default: m.ZZPLeaseLoansPage })))
+const ZZPDocumentInboxPage = lazy(() => import('@/components/ZZPDocumentInboxPage').then(m => ({ default: m.ZZPDocumentInboxPage })))
+const ZZPSubscriptionsPage = lazy(() => import('@/components/ZZPSubscriptionsPage').then(m => ({ default: m.ZZPSubscriptionsPage })))
+const ClientDossierPage = lazy(() => import('@/components/ClientDossierPage').then(m => ({ default: m.ClientDossierPage })))
+const BulkOperationsHistoryPage = lazy(() => import('@/components/BulkOperationsHistoryPage').then(m => ({ default: m.BulkOperationsHistoryPage })))
+const BankReconciliationPage = lazy(() => import('@/components/BankReconciliationPage').then(m => ({ default: m.BankReconciliationPage })))
+const IntelligentUploadPortal = lazy(() => import('@/components/IntelligentUploadPortal').then(m => ({ default: m.IntelligentUploadPortal })))
+const SmartTransactionList = lazy(() => import('@/components/SmartTransactionList').then(m => ({ default: m.SmartTransactionList })))
+const SettingsPage = lazy(() => import('@/components/SettingsPage').then(m => ({ default: m.SettingsPage })))
+const SupportPage = lazy(() => import('@/components/SupportPage').then(m => ({ default: m.SupportPage })))
+const AdminDashboard = lazy(() => import('@/components/AdminDashboard').then(m => ({ default: m.AdminDashboard })))
+
 // Delay for Radix UI to complete cleanup before our global cleanup runs
 // Increased to 200ms to handle slower devices and ensure animations complete
 const GLOBAL_CLEANUP_DELAY_MS = 200
 
 const BOOT_TIMEOUT_MS = 15000
+
+const LazyFallback = () => (
+  <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center">
+    <div className="text-center">
+      <div className="h-8 w-8 mx-auto mb-4 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <p className="text-muted-foreground text-sm">Laden...</p>
+    </div>
+  </div>
+)
 
 type BootStage = 'auth' | 'onboarding-check' | 'ready' | 'error'
 
@@ -847,7 +858,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ActiveClientProvider>
-          <AppContent />
+          <Suspense fallback={<LazyFallback />}>
+            <AppContent />
+          </Suspense>
         </ActiveClientProvider>
       </AuthProvider>
     </QueryClientProvider>

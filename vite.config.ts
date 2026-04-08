@@ -39,4 +39,32 @@ export default defineConfig({
       '@': resolve(projectRoot, 'src')
     }
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Vendor: Radix UI components
+          if (id.includes('@radix-ui')) {
+            return 'vendor-radix'
+          }
+          // Vendor: Recharts + D3 (charting)
+          if (id.includes('recharts') || id.includes('d3-')) {
+            return 'vendor-charts'
+          }
+          // Vendor: React core
+          if (id.includes('react-dom') || (id.includes('/react/') && id.includes('node_modules'))) {
+            return 'vendor-react'
+          }
+          // Vendor: TanStack React Query
+          if (id.includes('@tanstack')) {
+            return 'vendor-tanstack'
+          }
+          // Vendor: date-fns
+          if (id.includes('date-fns')) {
+            return 'vendor-date-fns'
+          }
+        },
+      },
+    },
+  },
 });

@@ -47,7 +47,7 @@ export default defineConfig({
           if (id.includes('@radix-ui')) {
             return 'vendor-radix'
           }
-          // Vendor: Recharts + D3 (charting)
+          // Vendor: Recharts and its d3 dependencies
           if (id.includes('recharts') || id.includes('d3-')) {
             return 'vendor-charts'
           }

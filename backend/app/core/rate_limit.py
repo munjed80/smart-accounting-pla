@@ -105,9 +105,19 @@ class RedisRateLimiter:
     Falls back to in-memory if Redis becomes unavailable.
     """
 
+    # Lua script for atomic INCR + conditional EXPIRE
+    _LUA_SCRIPT = """
+    local count = redis.call('INCR', KEYS[1])
+    if count == 1 then
+        redis.call('EXPIRE', KEYS[1], ARGV[1])
+    end
+    return count
+    """
+
     def __init__(self, redis_url: str):
         self._redis_url = redis_url
         self._redis = None
+        self._script_sha = None
         self._fallback = InMemoryRateLimiter()
         self._init_redis()
 
@@ -121,8 +131,9 @@ class RedisRateLimiter:
                 socket_connect_timeout=2,
                 socket_timeout=2,
             )
-            # Quick connectivity test
+            # Quick connectivity test and register Lua script
             self._redis.ping()
+            self._script_sha = self._redis.script_load(self._LUA_SCRIPT)
             logger.info("Rate limiter connected to Redis")
         except Exception as exc:
             logger.warning(
@@ -139,7 +150,7 @@ class RedisRateLimiter:
         window_seconds: int = 60,
     ) -> Tuple[bool, int]:
         """
-        Check if request should be rate limited using Redis INCR + EXPIRE.
+        Check if request should be rate limited using atomic Lua INCR + EXPIRE.
 
         Returns:
             Tuple of (is_limited, requests_remaining)
@@ -149,14 +160,7 @@ class RedisRateLimiter:
 
         key = f"rl:{endpoint}:{ip}"
         try:
-            pipe = self._redis.pipeline(transaction=True)
-            pipe.incr(key)
-            pipe.ttl(key)
-            count, ttl = pipe.execute()
-
-            # First request in window – set expiry
-            if ttl == -1:
-                self._redis.expire(key, window_seconds)
+            count = self._redis.evalsha(self._script_sha, 1, key, window_seconds)
 
             if count > max_requests:
                 logger.warning(

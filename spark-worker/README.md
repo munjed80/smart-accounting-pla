@@ -1,5 +1,10 @@
 # Smart Accounting Platform - Spark OCR Processor
 
+> **Note:** This is an **optional** component. The default production worker is in
+> `worker/`, which is referenced by `docker-compose.yml`. This `spark-worker/` adds
+> Apache Spark (PySpark) support for large-scale OCR invoice processing and is meant
+> for horizontal scaling scenarios that require Spark infrastructure.
+
 ## Overview
 
 The **Intelligent Invoice Processor** is a production-grade Apache Spark job that automatically processes invoice images using OCR, extracts key financial data, and creates draft accounting transactions with AI-powered ledger account prediction.

@@ -2,10 +2,10 @@
 Rate limiting for authentication endpoints.
 
 Features:
-- In-memory rate limiting (suitable for single-instance deployments)
+- Redis-backed rate limiting for multi-instance deployments (when REDIS_URL is set)
+- In-memory fallback for single-instance or development environments
 - Per-IP rate limiting
 - Configurable limits per endpoint
-- TODO: Replace with Redis-based rate limiting for multi-instance deployments
 """
 import time
 import logging
@@ -18,14 +18,10 @@ from fastapi import HTTPException, Request, status
 logger = logging.getLogger(__name__)
 
 
-# TODO: Replace with Redis-based rate limiting for multi-instance deployments
-# For production with multiple instances, use Redis to share rate limit state
 class InMemoryRateLimiter:
     """
     Simple in-memory rate limiter using sliding window algorithm.
-    
-    Note: This only works correctly for single-instance deployments.
-    For multi-instance deployments, replace with Redis-based implementation.
+    Used as fallback when Redis is not available.
     """
     
     def __init__(self):
@@ -66,12 +62,6 @@ class InMemoryRateLimiter:
         """
         Check if request should be rate limited.
         
-        Args:
-            endpoint: Endpoint identifier
-            ip: Client IP address
-            max_requests: Maximum requests allowed in window
-            window_seconds: Time window in seconds
-            
         Returns:
             Tuple of (is_limited, requests_remaining)
         """
@@ -108,8 +98,100 @@ class InMemoryRateLimiter:
         return False, remaining
 
 
+class RedisRateLimiter:
+    """
+    Redis-backed rate limiter using sliding window counters.
+    Safe for multi-instance / horizontally-scaled deployments.
+    Falls back to in-memory if Redis becomes unavailable.
+    """
+
+    def __init__(self, redis_url: str):
+        self._redis_url = redis_url
+        self._redis = None
+        self._fallback = InMemoryRateLimiter()
+        self._init_redis()
+
+    def _init_redis(self):
+        """Initialize Redis connection (lazy, non-blocking)."""
+        try:
+            import redis as redis_lib
+            self._redis = redis_lib.from_url(
+                self._redis_url,
+                decode_responses=True,
+                socket_connect_timeout=2,
+                socket_timeout=2,
+            )
+            # Quick connectivity test
+            self._redis.ping()
+            logger.info("Rate limiter connected to Redis")
+        except Exception as exc:
+            logger.warning(
+                "Rate limiter failed to connect to Redis, using in-memory fallback: %s",
+                exc,
+            )
+            self._redis = None
+
+    def is_rate_limited(
+        self,
+        endpoint: str,
+        ip: str,
+        max_requests: int,
+        window_seconds: int = 60,
+    ) -> Tuple[bool, int]:
+        """
+        Check if request should be rate limited using Redis INCR + EXPIRE.
+
+        Returns:
+            Tuple of (is_limited, requests_remaining)
+        """
+        if self._redis is None:
+            return self._fallback.is_rate_limited(endpoint, ip, max_requests, window_seconds)
+
+        key = f"rl:{endpoint}:{ip}"
+        try:
+            pipe = self._redis.pipeline(transaction=True)
+            pipe.incr(key)
+            pipe.ttl(key)
+            count, ttl = pipe.execute()
+
+            # First request in window – set expiry
+            if ttl == -1:
+                self._redis.expire(key, window_seconds)
+
+            if count > max_requests:
+                logger.warning(
+                    f"Rate limit exceeded for {endpoint}",
+                    extra={
+                        "event": "rate_limit_exceeded",
+                        "endpoint": endpoint,
+                        "ip": ip,
+                        "total_requests": count,
+                        "max_requests": max_requests,
+                    },
+                )
+                return True, 0
+
+            return False, max_requests - count
+        except Exception as exc:
+            logger.warning("Redis rate-limit error, falling back to in-memory: %s", exc)
+            self._redis = None
+            return self._fallback.is_rate_limited(endpoint, ip, max_requests, window_seconds)
+
+
+def _create_rate_limiter():
+    """Create the appropriate rate limiter based on configuration."""
+    try:
+        from app.core.config import get_settings
+        settings = get_settings()
+        if settings.redis_enabled:
+            return RedisRateLimiter(settings.REDIS_URL)
+    except Exception as exc:
+        logger.debug("Could not load settings for rate limiter: %s", exc)
+    return InMemoryRateLimiter()
+
+
 # Global rate limiter instance
-rate_limiter = InMemoryRateLimiter()
+rate_limiter = _create_rate_limiter()
 
 
 # Rate limit configurations

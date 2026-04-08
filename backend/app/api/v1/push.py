@@ -126,17 +126,16 @@ async def get_vapid_public_key():
     Get VAPID public key for push notifications.
     
     Returns the public key needed for browser push subscription.
-    In production, this should:
-    1. Return actual VAPID public key from environment
-    2. Generate keys if not present
-    
-    For now, returns a placeholder.
+    Reads VAPID_PUBLIC_KEY from environment configuration.
     """
-    
-    # TODO: Implement VAPID key management
-    # Generate with: pywebpush library or web-push CLI
+    from app.core.config import settings
+
+    if not settings.VAPID_PUBLIC_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Push notifications are not configured. Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables.",
+        )
     
     return {
-        "publicKey": "PLACEHOLDER_VAPID_PUBLIC_KEY_REPLACE_IN_PRODUCTION",
-        "note": "Generate VAPID keys with: npx web-push generate-vapid-keys",
+        "publicKey": settings.VAPID_PUBLIC_KEY,
     }

@@ -425,46 +425,10 @@ async def scan_receipt(
             detail="Invalid file type. Please upload an image file (JPEG, PNG, etc.)"
         )
     
-    try:
-        # Read file contents
-        contents = await file.read()
-        
-        # TODO: Implement actual OCR processing
-        # For now, return mock extracted data with basic file validation
-        # In production, you would:
-        # 1. Save the file temporarily or to cloud storage
-        # 2. Process with OCR service (pytesseract, Google Vision, etc.)
-        # 3. Parse the OCR text to extract structured data
-        # 4. Use NLP/regex to find vendor, amount, date, VAT
-        # 5. Return confidence scores per field
-        
-        from datetime import datetime
-        import random
-        
-        # Simulate varying confidence based on file size (larger = potentially better quality)
-        confidence = min(0.95, max(0.70, len(contents) / (1024 * 200)))
-        
-        # Mock extracted data - in production, this would come from OCR
-        extracted_data = {
-            "vendor": "Voorbeeld Leverancier",
-            "description": "Kantoorbenodigdheden",
-            "amount_cents": 12500,  # €125.00
-            "expense_date": datetime.now().date().isoformat(),
-            "category": "kantoorkosten",
-            "vat_rate": 21.0,
-            "notes": f"Geëxtraheerd via bonnenscanner - controleer de gegevens (bestand: {file.filename})"
-        }
-        
-        return {
-            "extracted_data": extracted_data,
-            "confidence": confidence,
-            "status": "ready_for_review",
-            "message": "Bon succesvol gescand. Controleer de gegevens en pas aan indien nodig."
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process receipt: {str(e)}"
-        )
-    finally:
-        await file.close()
+    # OCR receipt scanning is not yet implemented.
+    # Return an honest error instead of fake/mock extracted data.
+    await file.close()
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Bonnenscanner is nog niet beschikbaar. OCR-verwerking wordt binnenkort toegevoegd. Voer de uitgave handmatig in.",
+    )

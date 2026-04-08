@@ -889,22 +889,13 @@ export const ZZPExpensesPage = () => {
           </div>
           <div className="flex gap-2">
             <Button 
-              onClick={handleScanButtonClick} 
               variant="outline"
-              disabled={isScanning}
+              disabled
+              title="Bonnenscanner is nog niet beschikbaar"
               className="gap-2 h-10 sm:h-11 flex-1 sm:flex-initial"
             >
-              {isScanning ? (
-                <>
-                  <SpinnerGap size={18} className="animate-spin" />
-                  {t('zzpExpenses.scanning')}
-                </>
-              ) : (
-                <>
-                  <Camera size={18} weight="bold" />
-                  {t('zzpExpenses.scanReceipt')}
-                </>
-              )}
+              <Camera size={18} weight="bold" />
+              {t('zzpExpenses.scanReceipt')}
             </Button>
             <Button onClick={openNewForm} className="gap-2 h-10 sm:h-11 flex-1 sm:flex-initial">
               <Plus size={18} weight="bold" />

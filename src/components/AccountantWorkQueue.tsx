@@ -58,6 +58,7 @@ import {
   Info,
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
+import { toast } from 'sonner'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
 // Readiness score badge with tooltip
@@ -391,10 +392,9 @@ export const AccountantWorkQueue = () => {
     setIsDrawerOpen(true)
   }
 
-  // Handle drawer actions
+  // Handle drawer actions — not yet implemented
   const handleAction = (action: string) => {
-    console.log('Action:', action, 'for client:', selectedItem?.client_id)
-    // TODO: Implement action handlers
+    toast.info('Deze actie is nog niet beschikbaar.')
     setIsDrawerOpen(false)
   }
 

@@ -765,6 +765,11 @@ export const authApi = {
     const response = await api.post<ResetPasswordResponse>('/auth/reset-password', data)
     return response.data
   },
+
+  changePassword: async (data: { current_password: string; new_password: string }): Promise<GenericMessageResponse> => {
+    const response = await api.post<GenericMessageResponse>('/auth/change-password', data)
+    return response.data
+  },
 }
 
 /**

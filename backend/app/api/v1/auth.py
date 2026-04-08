@@ -5,6 +5,7 @@ import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -461,6 +462,51 @@ async def reset_password(
     )
     
     return ResetPasswordResponse(message="Password reset successfully")
+
+
+class ChangePasswordRequest(BaseModel):
+    """Request to change password (authenticated user)."""
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class ChangePasswordResponse(BaseModel):
+    """Response after successful password change."""
+    message: str = "Password changed successfully"
+
+
+@router.post("/change-password", response_model=ChangePasswordResponse)
+async def change_password(
+    body: ChangePasswordRequest,
+    request: Request,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Change password for the currently authenticated user.
+    
+    Validates the current password, then updates to the new one.
+    """
+    check_rate_limit("change_password", request)
+
+    if not verify_password(body.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+
+    current_user.hashed_password = get_password_hash(body.new_password)
+    await db.commit()
+
+    logger.info(
+        "Password changed",
+        extra={
+            "event": "password_changed",
+            "user_id": str(current_user.id),
+        },
+    )
+
+    return ChangePasswordResponse()
 
 
 @router.get("/me", response_model=UserResponse)

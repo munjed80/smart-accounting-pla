@@ -111,8 +111,8 @@ async def health_check():
         health["components"]["redis"]["status"] = "disabled"
         health["components"]["redis"]["message"] = "Redis not configured (REDIS_URL not set)"
     
-    # Background tasks status (placeholder - would check actual task queue in production)
-    health["components"]["background_tasks"]["status"] = "healthy"
+    # Background tasks — no task queue is configured yet
+    health["components"]["background_tasks"]["status"] = "not_configured"
     health["components"]["background_tasks"]["message"] = "No background task queue configured"
     
     # Set overall status

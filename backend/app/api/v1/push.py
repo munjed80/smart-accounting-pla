@@ -48,23 +48,13 @@ async def subscribe_to_push(
     """
     Subscribe to push notifications.
     
-    Stores the push subscription for the current user.
-    In a full implementation, this would:
-    1. Store subscription in database with user_id and tenant_id
-    2. Handle duplicate subscriptions (update if exists)
-    3. Validate VAPID keys
-    
-    For now, this is a minimal scaffold.
+    Not yet implemented — database storage for push subscriptions
+    is not available. Returns an honest 501 response.
     """
-    
-    # TODO: Implement database storage
-    # For now, just return success
-    
-    return {
-        "success": True,
-        "message": "Subscription registered",
-        "user_id": current_user.id,
-    }
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Push notifications are not yet available. This feature is under development.",
+    )
 
 
 @router.post("/unsubscribe")
@@ -76,22 +66,13 @@ async def unsubscribe_from_push(
     """
     Unsubscribe from push notifications.
     
-    Removes the push subscription for the current user.
-    In a full implementation, this would:
-    1. Delete subscription from database
-    2. Handle missing subscriptions gracefully
-    
-    For now, this is a minimal scaffold.
+    Not yet implemented — database storage for push subscriptions
+    is not available. Returns an honest 501 response.
     """
-    
-    # TODO: Implement database deletion
-    # For now, just return success
-    
-    return {
-        "success": True,
-        "message": "Subscription removed",
-        "user_id": current_user.id,
-    }
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Push notifications are not yet available. This feature is under development.",
+    )
 
 
 @router.get("/subscription")
@@ -102,21 +83,15 @@ async def get_push_subscription(
     """
     Get current push subscription status.
     
-    Returns whether the user has an active push subscription.
-    In a full implementation, this would:
-    1. Query database for user's subscription
-    2. Return subscription details if exists
-    
-    For now, returns placeholder data.
+    Not yet implemented — always returns unsubscribed until
+    the push notification backend is completed.
     """
-    
-    # TODO: Implement database query
-    # For now, return no subscription
-    
     return {
         "subscribed": False,
         "subscription": None,
         "user_id": current_user.id,
+        "available": False,
+        "message": "Push notifications are not yet available.",
     }
 
 
@@ -125,18 +100,10 @@ async def get_vapid_public_key():
     """
     Get VAPID public key for push notifications.
     
-    Returns the public key needed for browser push subscription.
-    In production, this should:
-    1. Return actual VAPID public key from environment
-    2. Generate keys if not present
-    
-    For now, returns a placeholder.
+    Not yet implemented — VAPID key management is not configured.
+    Returns 501 until production keys are provisioned.
     """
-    
-    # TODO: Implement VAPID key management
-    # Generate with: pywebpush library or web-push CLI
-    
-    return {
-        "publicKey": "PLACEHOLDER_VAPID_PUBLIC_KEY_REPLACE_IN_PRODUCTION",
-        "note": "Generate VAPID keys with: npx web-push generate-vapid-keys",
-    }
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Push notifications are not yet available. VAPID keys have not been configured.",
+    )

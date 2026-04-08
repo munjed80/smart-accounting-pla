@@ -93,10 +93,13 @@ export const BookingProposalModal = ({
       const vatAmount = document.vat_amount || 0
       const totalAmount = document.total_amount || 0
       
+      // Default booking accounts — editable by the user before posting.
+      // These are standard Dutch SBR codes; the user should verify
+      // they match their chart of accounts.
       const defaultLines: BookingLine[] = [
         {
           id: crypto.randomUUID(),
-          account_id: '4000', // Expense account (placeholder)
+          account_id: '4000', // Default expense account
           account_name: 'Inkopen/Kosten',
           description: 'Netto bedrag',
           debit_amount: netAmount,

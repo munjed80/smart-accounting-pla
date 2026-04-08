@@ -35,6 +35,7 @@ import {
   ZZPBusinessProfileCreate,
   subscriptionApi,
   SubscriptionMeResponse,
+  authApi,
 } from '@/lib/api'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useEntitlements } from '@/hooks/useEntitlements'
@@ -205,11 +206,8 @@ export const SettingsPage = () => {
   }, [user?.id, user?.role])
 
   const handleSaveNotifications = async () => {
-    setIsSaving(true)
-    // Simulate save - in full implementation this would call an API
-    await new Promise(resolve => setTimeout(resolve, 500))
-    toast.success(t('settings.preferencesSaved'))
-    setIsSaving(false)
+    // Notification preferences backend is not yet implemented
+    toast.info('Meldingsvoorkeuren opslaan is nog niet beschikbaar.')
   }
   
   const handleSaveBusinessProfile = async () => {
@@ -325,14 +323,10 @@ export const SettingsPage = () => {
     setIsChangingPassword(true)
     
     try {
-      // TODO: Implement backend endpoint for password change
-      // await authApi.changePassword({
-      //   current_password: passwordForm.currentPassword,
-      //   new_password: passwordForm.newPassword
-      // })
-      
-      // For now, simulate the API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await authApi.changePassword({
+        current_password: passwordForm.currentPassword,
+        new_password: passwordForm.newPassword,
+      })
       
       toast.success('Wachtwoord succesvol gewijzigd')
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })

@@ -104,42 +104,16 @@ export const WorkQueueSection = ({ onRefresh }: WorkQueueSectionProps) => {
 
   const handleBulkMarkReviewed = async () => {
     if (selectedItems.size === 0) return
-    
-    try {
-      toast.promise(
-        Promise.resolve(), // Placeholder - actual API call would go here
-        {
-          loading: 'Markeren als beoordeeld...',
-          success: `${selectedItems.size} items gemarkeerd als beoordeeld`,
-          error: 'Fout bij markeren',
-        }
-      )
-      setSelectedItems(new Set())
-      await fetchWorkQueue()
-      onRefresh?.()
-    } catch (err) {
-      console.error('Bulk mark reviewed failed:', err)
-    }
+    // Bulk review is not yet connected to the backend
+    toast.info('Bulk markeren als beoordeeld is nog niet beschikbaar.')
+    setSelectedItems(new Set())
   }
 
   const handleBulkRequestInfo = async () => {
     if (selectedItems.size === 0) return
-    
-    try {
-      toast.promise(
-        Promise.resolve(), // Placeholder - actual API call would go here
-        {
-          loading: 'Informatie aanvragen...',
-          success: `Informatie aangevraagd voor ${selectedItems.size} items`,
-          error: 'Fout bij aanvragen informatie',
-        }
-      )
-      setSelectedItems(new Set())
-      await fetchWorkQueue()
-      onRefresh?.()
-    } catch (err) {
-      console.error('Bulk request info failed:', err)
-    }
+    // Bulk request info is not yet connected to the backend
+    toast.info('Bulk informatie aanvragen is nog niet beschikbaar.')
+    setSelectedItems(new Set())
   }
 
   const getSeverityBadge = (severity: string | null) => {

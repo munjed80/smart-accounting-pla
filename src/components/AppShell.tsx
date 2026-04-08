@@ -46,6 +46,9 @@ import {
   CalendarBlank,
   ListChecks,
   CurrencyEur,
+  Scales,
+  BookOpen,
+  ChartPie,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 import { getBrandName } from '@/lib/roles'
@@ -65,6 +68,8 @@ interface MenuItem {
   section?: 'main' | 'secondary'
   // Accounting concept grouping for accountants (5 core concepts + workflow)
   accountingSection?: 'workflow' | 'activa' | 'debiteuren' | 'crediteuren' | 'grootboek' | 'winstverlies'
+  // ZZP section grouping (items without zzpSection appear in the default flat list)
+  zzpSection?: 'belastinghulp'
   // Hidden from menu but code remains
   hidden?: boolean
 }
@@ -260,6 +265,40 @@ const menuItems: MenuItem[] = [
     icon: <ListChecks size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',
+  },
+
+  // === Belastinghulp section (ZZP self-service tax) ===
+  {
+    label: t('sidebar.btwAangifte'),
+    tabValue: 'tax-btw',
+    icon: <Receipt size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+    zzpSection: 'belastinghulp',
+  },
+  {
+    label: t('sidebar.inkomstenbelasting'),
+    tabValue: 'tax-income',
+    icon: <CurrencyEur size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+    zzpSection: 'belastinghulp',
+  },
+  {
+    label: t('sidebar.uitlegHulp'),
+    tabValue: 'tax-help',
+    icon: <BookOpen size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+    zzpSection: 'belastinghulp',
+  },
+  {
+    label: t('sidebar.jaaroverzicht'),
+    tabValue: 'tax-annual',
+    icon: <ChartPie size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+    zzpSection: 'belastinghulp',
   },
 
   {
@@ -496,33 +535,75 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
             ))}
           </div>
         ) : (
-          /* ZZP users: Show flat list without sections */
-          <ul className="space-y-1" role="menu">
-            {visibleMenuItems.filter(item => item.section !== 'secondary').map((item) => {
-              const isActive = item.tabValue && activeTab === item.tabValue
+          /* ZZP users: Show flat list with optional section grouping */
+          <div className="space-y-1">
+            {/* Items without a zzpSection (default flat list) */}
+            <ul className="space-y-1" role="menu">
+              {visibleMenuItems.filter(item => item.section !== 'secondary' && !item.zzpSection).map((item) => {
+                const isActive = item.tabValue && activeTab === item.tabValue
+                return (
+                  <li key={item.label} role="none">
+                    <button
+                      role="menuitem"
+                      onClick={() => handleMenuClick(item)}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={`
+                        w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm
+                        transition-colors duration-150
+                        ${isActive 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'hover:bg-secondary text-foreground'
+                        }
+                      `}
+                      style={{ minHeight: '44px' }}
+                    >
+                      {item.icon}
+                      <span>{item.label}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+
+            {/* Belastinghulp section */}
+            {(() => {
+              const belastinghulpItems = visibleMenuItems.filter(item => item.zzpSection === 'belastinghulp' && item.section !== 'secondary')
+              if (belastinghulpItems.length === 0) return null
               return (
-                <li key={item.label} role="none">
-                  <button
-                    role="menuitem"
-                    onClick={() => handleMenuClick(item)}
-                    aria-current={isActive ? 'page' : undefined}
-                    className={`
-                      w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm
-                      transition-colors duration-150
-                      ${isActive 
-                        ? 'bg-primary text-primary-foreground' 
-                        : 'hover:bg-secondary text-foreground'
-                      }
-                    `}
-                    style={{ minHeight: '44px' }} // iOS tap target minimum
-                  >
-                    {item.icon}
-                    <span>{item.label}</span>
-                  </button>
-                </li>
+                <div className="mt-4">
+                  <h3 className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {t('sidebar.sectionBelastinghulp')}
+                  </h3>
+                  <ul className="space-y-1" role="menu">
+                    {belastinghulpItems.map((item) => {
+                      const isActive = item.tabValue && activeTab === item.tabValue
+                      return (
+                        <li key={item.label} role="none">
+                          <button
+                            role="menuitem"
+                            onClick={() => handleMenuClick(item)}
+                            aria-current={isActive ? 'page' : undefined}
+                            className={`
+                              w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm
+                              transition-colors duration-150
+                              ${isActive 
+                                ? 'bg-primary text-primary-foreground' 
+                                : 'hover:bg-secondary text-foreground'
+                              }
+                            `}
+                            style={{ minHeight: '44px' }}
+                          >
+                            {item.icon}
+                            <span>{item.label}</span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
               )
-            })}
-          </ul>
+            })()}
+          </div>
         )}
         
         {/* Secondary Navigation - Settings & Support */}

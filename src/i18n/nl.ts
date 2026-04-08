@@ -175,6 +175,7 @@ export const nl = {
     uren: "Uren",
     agenda: "Agenda",
     backToOverzicht: "Terug naar Overzicht",
+    btwAangifte: "BTW Aangifte",
   },
 
   // ZZP Expenses page (Uitgaven)

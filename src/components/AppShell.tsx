@@ -46,6 +46,7 @@ import {
   CalendarBlank,
   ListChecks,
   CurrencyEur,
+  Calculator,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 import { getBrandName } from '@/lib/roles'
@@ -250,6 +251,14 @@ const menuItems: MenuItem[] = [
     label: t('sidebar.documenten'),
     tabValue: 'documents',
     icon: <FileText size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  // 8b. BTW Aangifte (ZZP self-service VAT)
+  {
+    label: 'BTW Aangifte',
+    tabValue: 'btw-aangifte',
+    icon: <Calculator size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',
   },

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.core.database import engine
-from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta, zzp_customers, zzp_profile, zzp_invoices, zzp_expenses, zzp_time, zzp_calendar, zzp_work_sessions, zzp_bank, zzp_insights, zzp_quotes, zzp_dashboard, bookkeeping, client_data, zzp_payments, zzp_ledger, zzp_commitments, certificates, subscriptions, webhooks, contact_messages, zzp_documents, push
+from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta, zzp_customers, zzp_profile, zzp_invoices, zzp_expenses, zzp_time, zzp_calendar, zzp_work_sessions, zzp_bank, zzp_insights, zzp_quotes, zzp_dashboard, bookkeeping, client_data, zzp_payments, zzp_ledger, zzp_commitments, certificates, subscriptions, webhooks, contact_messages, zzp_documents, push, zzp_btw
 logger = logging.getLogger(__name__)
 
 
@@ -336,6 +336,7 @@ api_v1_router.include_router(zzp_payments.router, prefix="/zzp", tags=["zzp-paym
 api_v1_router.include_router(zzp_ledger.router, prefix="/zzp", tags=["zzp-ledger"], dependencies=_zzp_paywall_deps)
 api_v1_router.include_router(zzp_commitments.router, prefix="/zzp", tags=["zzp-commitments"], dependencies=_zzp_paywall_deps)
 api_v1_router.include_router(zzp_documents.router, prefix="/zzp", tags=["zzp-documents"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_btw.router, prefix="/zzp", tags=["zzp-btw-aangifte"], dependencies=_zzp_paywall_deps)
 api_v1_router.include_router(subscriptions.router, prefix="", tags=["subscriptions"])
 api_v1_router.include_router(webhooks.router, prefix="", tags=["webhooks"])
 api_v1_router.include_router(observability.router, prefix="/ops", tags=["observability"])

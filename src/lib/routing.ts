@@ -61,6 +61,8 @@ export const pathToTab = (path: string, isAccountant: boolean, isSuperAdmin = fa
       return 'subscriptions'
     case '/zzp/documenten':
       return 'documents'
+    case '/zzp/btw':
+      return 'btw-aangifte'
     case '/':
     default:
       return isSuperAdmin ? 'admin' : isAccountant ? 'workqueue' : 'dashboard'
@@ -121,6 +123,8 @@ export const tabToPath = (tab: string, isAccountant: boolean, isSuperAdmin = fal
       return '/zzp/verplichtingen/abonnementen'
     case 'documents':
       return '/zzp/documenten'
+    case 'btw-aangifte':
+      return '/zzp/btw'
     default:
       return isSuperAdmin ? '/admin' : isAccountant ? '/accountant' : '/dashboard'
   }

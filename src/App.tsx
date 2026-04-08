@@ -39,6 +39,7 @@ import { ZZPAgendaPage } from '@/components/ZZPAgendaPage'
 import { ZZPCommitmentsOverviewPage } from '@/components/ZZPCommitmentsOverviewPage'
 import { ZZPLeaseLoansPage } from '@/components/ZZPLeaseLoansPage'
 import { ZZPDocumentInboxPage } from '@/components/ZZPDocumentInboxPage'
+import { ZZPBtwAangiftePage } from '@/components/ZZPBtwAangiftePage'
 import { ZZPSubscriptionsPage } from '@/components/ZZPSubscriptionsPage'
 import { ClientDossierPage } from '@/components/ClientDossierPage'
 import { BulkOperationsHistoryPage } from '@/components/BulkOperationsHistoryPage'
@@ -757,6 +758,8 @@ const AppContent = () => {
         return !isAccountant ? <ZZPSubscriptionsPage /> : <SmartDashboard />
       case 'documents':
         return !isAccountant ? <ZZPDocumentInboxPage /> : <SmartDashboard />
+      case 'btw-aangifte':
+        return !isAccountant ? <ZZPBtwAangiftePage /> : <SmartDashboard />
       case 'dashboard':
         return <SmartDashboard />
       case 'transactions':
@@ -797,6 +800,7 @@ const AppContent = () => {
       case 'lease-loans': return 'Lease & Leningen'
       case 'subscriptions': return 'Abonnementen'
       case 'documents': return 'Documenten'
+      case 'btw-aangifte': return 'BTW Aangifte'
       case 'dashboard': return 'Overzicht'
       case 'transactions': return 'Transacties'
       case 'upload': return 'Upload'

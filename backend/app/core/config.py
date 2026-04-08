@@ -120,6 +120,16 @@ class Settings(BaseSettings):
     BILLING_FORCE_PAYWALL: bool = False
     BILLING_TRIAL_OVERRIDE_DAYS: Optional[int] = None  # e.g. 0 or 1
 
+    # Web Push (VAPID) keys – optional, enables push notifications
+    # Generate with: npx web-push generate-vapid-keys
+    VAPID_PUBLIC_KEY: Optional[str] = None
+    VAPID_PRIVATE_KEY: Optional[str] = None
+
+    @property
+    def push_enabled(self) -> bool:
+        """Check if Web Push is configured (both VAPID keys must be set)."""
+        return bool(self.VAPID_PUBLIC_KEY and self.VAPID_PRIVATE_KEY)
+
     @property
     def billing_force_paywall(self) -> bool:
         """Check if billing force-paywall mode is enabled."""

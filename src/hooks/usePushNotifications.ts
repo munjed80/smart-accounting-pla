@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
+import { api } from '@/lib/api'
 
 export const isPushEnabled = (): boolean => {
   return import.meta.env.VITE_PWA_PUSH === 'true'
@@ -71,9 +72,8 @@ export const usePushNotifications = () => {
 
   const getVAPIDPublicKey = async (): Promise<string> => {
     try {
-      const response = await fetch('/api/v1/push/vapid-public-key')
-      const data = await response.json()
-      return data.publicKey
+      const response = await api.get('/push/vapid-public-key')
+      return response.data.publicKey
     } catch (error) {
       console.error('Failed to get VAPID key:', error)
       throw new Error('Kan VAPID key niet ophalen')
@@ -125,19 +125,9 @@ export const usePushNotifications = () => {
       })
 
       // Send subscription to backend
-      const response = await fetch('/api/v1/push/subscribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          subscription: sub.toJSON(),
-        }),
+      await api.post('/push/subscribe', {
+        subscription: sub.toJSON(),
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to save subscription')
-      }
 
       setSubscription(sub)
       setIsSubscribed(true)
@@ -164,17 +154,11 @@ export const usePushNotifications = () => {
       await subscription.unsubscribe()
 
       // Notify backend
-      const response = await fetch('/api/v1/push/unsubscribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      try {
+        await api.post('/push/unsubscribe', {
           endpoint: subscription.endpoint,
-        }),
-      })
-
-      if (!response.ok) {
+        })
+      } catch {
         console.warn('Failed to notify backend of unsubscribe')
       }
 

@@ -40,6 +40,10 @@ import { ZZPCommitmentsOverviewPage } from '@/components/ZZPCommitmentsOverviewP
 import { ZZPLeaseLoansPage } from '@/components/ZZPLeaseLoansPage'
 import { ZZPDocumentInboxPage } from '@/components/ZZPDocumentInboxPage'
 import { ZZPSubscriptionsPage } from '@/components/ZZPSubscriptionsPage'
+import { BelastinghulpBTWPage } from '@/components/BelastinghulpBTWPage'
+import { BelastinghulpInkomstenbelastingPage } from '@/components/BelastinghulpInkomstenbelastingPage'
+import { BelastinghulpUitlegPage } from '@/components/BelastinghulpUitlegPage'
+import { BelastinghulpJaaroverzichtPage } from '@/components/BelastinghulpJaaroverzichtPage'
 import { ClientDossierPage } from '@/components/ClientDossierPage'
 import { BulkOperationsHistoryPage } from '@/components/BulkOperationsHistoryPage'
 import { BankReconciliationPage } from '@/components/BankReconciliationPage'
@@ -261,7 +265,7 @@ const AppContent = () => {
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
   const isSuperAdmin = user?.role === 'super_admin'
   const isAccountantOnly = user?.role === 'accountant'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'offertes' | 'expenses' | 'time' | 'agenda' | 'obligations-overview' | 'lease-loans' | 'subscriptions' | 'documents' | 'admin'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'offertes' | 'expenses' | 'time' | 'agenda' | 'obligations-overview' | 'lease-loans' | 'subscriptions' | 'documents' | 'admin' | 'tax-btw' | 'tax-income' | 'tax-help' | 'tax-annual'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
   // Onboarding state - tracks if user needs onboarding (no administrations for ZZP, no clients for accountants)
@@ -757,6 +761,14 @@ const AppContent = () => {
         return !isAccountant ? <ZZPSubscriptionsPage /> : <SmartDashboard />
       case 'documents':
         return !isAccountant ? <ZZPDocumentInboxPage /> : <SmartDashboard />
+      case 'tax-btw':
+        return !isAccountant ? <BelastinghulpBTWPage /> : <SmartDashboard />
+      case 'tax-income':
+        return !isAccountant ? <BelastinghulpInkomstenbelastingPage /> : <SmartDashboard />
+      case 'tax-help':
+        return !isAccountant ? <BelastinghulpUitlegPage /> : <SmartDashboard />
+      case 'tax-annual':
+        return !isAccountant ? <BelastinghulpJaaroverzichtPage /> : <SmartDashboard />
       case 'dashboard':
         return <SmartDashboard />
       case 'transactions':
@@ -797,6 +809,10 @@ const AppContent = () => {
       case 'lease-loans': return 'Lease & Leningen'
       case 'subscriptions': return 'Abonnementen'
       case 'documents': return 'Documenten'
+      case 'tax-btw': return 'BTW Aangifte'
+      case 'tax-income': return 'Inkomstenbelasting'
+      case 'tax-help': return 'Uitleg & Hulp'
+      case 'tax-annual': return 'Jaaroverzicht'
       case 'dashboard': return 'Overzicht'
       case 'transactions': return 'Transacties'
       case 'upload': return 'Upload'

@@ -175,6 +175,12 @@ export const nl = {
     uren: "Uren",
     agenda: "Agenda",
     backToOverzicht: "Terug naar Overzicht",
+    // Belastinghulp section
+    sectionBelastinghulp: "Belastinghulp",
+    btwAangifte: "BTW Aangifte",
+    inkomstenbelasting: "Inkomstenbelasting",
+    uitlegHulp: "Uitleg & Hulp",
+    jaaroverzicht: "Jaaroverzicht",
   },
 
   // ZZP Expenses page (Uitgaven)

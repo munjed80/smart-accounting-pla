@@ -46,7 +46,6 @@ import {
   CalendarBlank,
   ListChecks,
   CurrencyEur,
-  Scales,
   BookOpen,
   ChartPie,
 } from '@phosphor-icons/react'

@@ -9,6 +9,7 @@ import { ChartBar, WarningCircle, FileText, Receipt, ArrowsClockwise, Bank, User
 import { logApiError, zzpApi, zzpBtwApi, zzpIncomeTaxApi } from '@/lib/api'
 import type { BTWQuarterOverview, IncomeTaxYearOverview, ZZPInvoice } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
+import { formatCurrency } from '@/components/belastinghulp/shared'
 
 type TransactionsSummary = {
   total: number
@@ -22,11 +23,6 @@ type ClientRevenueItem = {
   customer_name: string
   revenue_cents: number
   paid_invoice_count: number
-}
-
-const formatCurrency = (cents: number): string => {
-  const euros = cents / 100
-  return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(euros)
 }
 
 const getDateRangeForYear = (year: number): { from: string; to: string } => ({
@@ -84,10 +80,7 @@ export const BelastinghulpJaaroverzichtPage = () => {
       }
       sourceWarnings.push(...incomeTax.overview.warnings.map((w) => w.title))
     } catch (err) {
-      logApiError('Failed to load jaaroverzicht income-tax data', err, {
-        route: 'BelastinghulpJaaroverzichtPage',
-        endpoint: '/zzp/income-tax',
-      })
+      logApiError(err, 'BelastinghulpJaaroverzicht')
       setOverview(null)
       setError('Het jaaroverzicht kon niet volledig worden geladen. Probeer het opnieuw.')
     }
@@ -172,6 +165,16 @@ export const BelastinghulpJaaroverzichtPage = () => {
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      {/* Helper text */}
+      <div className="rounded-lg border border-blue-200 bg-blue-50/60 dark:bg-blue-950/20 dark:border-blue-900 p-3 text-xs space-y-1">
+        <p className="font-semibold text-blue-900 dark:text-blue-200">
+          Hoe gebruik je dit overzicht?
+        </p>
+        <p className="text-blue-800 dark:text-blue-300">
+          Dit jaaroverzicht combineert je facturen, uitgaven en BTW-gegevens tot één samenvatting per boekjaar. Gebruik het om te controleren of alles klopt voordat je je aangifte indient. Klik op de bedragen voor meer details.
+        </p>
       </div>
 
       {error && (
@@ -291,7 +294,7 @@ export const BelastinghulpJaaroverzichtPage = () => {
             ) : (
               <p className="text-muted-foreground">Nog geen transactiesamenvatting beschikbaar.</p>
             )}
-            <Button variant="link" className="h-auto px-0" onClick={() => navigateTo('/zzp/bank')}>
+            <Button variant="link" className="h-auto px-0" onClick={() => navigateTo('/transactions')}>
               Naar banktransacties
             </Button>
           </CardContent>
@@ -363,6 +366,16 @@ export const BelastinghulpJaaroverzichtPage = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Disclaimer */}
+      <div className="rounded-lg border border-muted p-4 text-xs text-muted-foreground space-y-1">
+        <p className="font-medium">Disclaimer</p>
+        <p>
+          Dit overzicht is bedoeld ter voorbereiding en is geen vervanging voor professioneel
+          fiscaal advies. De berekeningen zijn gebaseerd op de gegevens die je hebt ingevoerd.
+          Raadpleeg een belastingadviseur als je twijfelt.
+        </p>
+      </div>
     </div>
   )
 }

@@ -125,13 +125,13 @@ export const BelastinghulpUitlegPage = () => {
       </div>
 
       {/* Quick-tip card */}
-      <Card className="border-blue-200 bg-blue-50/50">
+      <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <Lightbulb size={24} weight="duotone" className="text-blue-600 shrink-0" />
+            <Lightbulb size={24} weight="duotone" className="text-blue-600 dark:text-blue-400 shrink-0" />
             <div>
-              <CardTitle className="text-blue-900">Tip</CardTitle>
-              <CardDescription className="text-blue-700">
+              <CardTitle className="text-blue-900 dark:text-blue-200">Tip</CardTitle>
+              <CardDescription className="text-blue-700 dark:text-blue-300">
                 Houd je boekhouding bij gedurende het hele jaar. Zo voorkom je stress bij de aangifte en mis je geen aftrekposten.
               </CardDescription>
             </div>

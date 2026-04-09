@@ -93,7 +93,7 @@ class SubscriptionService:
             .where(Subscription.administration_id == administration_id)
             .order_by(Subscription.created_at.desc())
         )
-        existing_subscription = result.scalar_one_or_none()
+        existing_subscription = result.scalars().first()
         
         if existing_subscription:
             logger.info(
@@ -163,7 +163,7 @@ class SubscriptionService:
             .where(Subscription.administration_id == administration_id)
             .order_by(Subscription.created_at.desc())
         )
-        return result.scalar_one_or_none()
+        return result.scalars().first()
     
     async def compute_entitlements(
         self,

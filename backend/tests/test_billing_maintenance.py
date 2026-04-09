@@ -280,6 +280,7 @@ async def test_get_my_subscription_includes_force_paywall_flag(
     test_zzp_plan,
     auth_headers,
     db_session,
+    clean_subscriptions,
 ):
     """GET /me/subscription response includes force_paywall field."""
     now = datetime.now(timezone.utc)
@@ -313,6 +314,7 @@ async def test_get_my_subscription_force_paywall_true(
     test_zzp_plan,
     auth_headers,
     db_session,
+    clean_subscriptions,
 ):
     """When BILLING_FORCE_PAYWALL=true, GET /me/subscription returns force_paywall=true."""
     now = datetime.now(timezone.utc)
@@ -350,6 +352,7 @@ async def test_force_paywall_blocks_zzp_with_expired_subscription(
     test_zzp_plan,
     auth_headers,
     db_session,
+    clean_subscriptions,
 ):
     """ZZP user with EXPIRED subscription gets 402 when force paywall is enabled."""
     now = datetime.now(timezone.utc)
@@ -383,6 +386,7 @@ async def test_force_paywall_allows_zzp_with_active_subscription(
     test_zzp_plan,
     auth_headers,
     db_session,
+    clean_subscriptions,
 ):
     """ZZP user with ACTIVE subscription is NOT blocked by force paywall."""
     now = datetime.now(timezone.utc)
@@ -416,6 +420,7 @@ async def test_expired_trial_blocked_when_force_paywall_disabled(
     test_zzp_plan,
     auth_headers,
     db_session,
+    clean_subscriptions,
 ):
     """When BILLING_FORCE_PAYWALL=false, expired ZZP user IS still blocked (trial enforcement)."""
     now = datetime.now(timezone.utc)

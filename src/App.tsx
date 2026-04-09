@@ -265,6 +265,7 @@ const AppContent = () => {
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
   const isSuperAdmin = user?.role === 'super_admin'
   const isAccountantOnly = user?.role === 'accountant'
+  const isZzp = user?.role === 'zzp'
   const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'offertes' | 'expenses' | 'time' | 'agenda' | 'obligations-overview' | 'lease-loans' | 'subscriptions' | 'documents' | 'admin' | 'tax-btw' | 'tax-income' | 'tax-help' | 'tax-annual'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
@@ -762,13 +763,13 @@ const AppContent = () => {
       case 'documents':
         return !isAccountant ? <ZZPDocumentInboxPage /> : <SmartDashboard />
       case 'tax-btw':
-        return !isAccountant ? <ZZPBtwAangiftePage /> : <SmartDashboard />
+        return isZzp ? <ZZPBtwAangiftePage /> : <SmartDashboard />
       case 'tax-income':
-        return !isAccountant ? <BelastinghulpInkomstenbelastingPage /> : <SmartDashboard />
+        return isZzp ? <BelastinghulpInkomstenbelastingPage /> : <SmartDashboard />
       case 'tax-help':
-        return !isAccountant ? <BelastinghulpUitlegPage /> : <SmartDashboard />
+        return isZzp ? <BelastinghulpUitlegPage /> : <SmartDashboard />
       case 'tax-annual':
-        return !isAccountant ? <BelastinghulpJaaroverzichtPage /> : <SmartDashboard />
+        return isZzp ? <BelastinghulpJaaroverzichtPage /> : <SmartDashboard />
       case 'dashboard':
         return <SmartDashboard />
       case 'transactions':

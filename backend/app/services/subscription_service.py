@@ -260,8 +260,33 @@ class SubscriptionService:
                 plan_code=subscription.plan_code,
             )
         
+        elif subscription.status == SubscriptionStatus.CANCELED:
+            # Canceled but still within billing period → allow access until period ends
+            if subscription.current_period_end:
+                period_end = subscription.current_period_end
+                if period_end.tzinfo is None:
+                    period_end = period_end.replace(tzinfo=timezone.utc)
+                if now <= period_end:
+                    return EntitlementResult(
+                        is_paid=False,
+                        in_trial=False,
+                        can_use_pro_features=True,
+                        days_left_trial=0,
+                        status=subscription.status.value,
+                        plan_code=subscription.plan_code,
+                    )
+            # Canceled and past billing period → no access
+            return EntitlementResult(
+                is_paid=False,
+                in_trial=False,
+                can_use_pro_features=False,
+                days_left_trial=0,
+                status=subscription.status.value,
+                plan_code=subscription.plan_code,
+            )
+        
         else:
-            # PAST_DUE, CANCELED, EXPIRED - no access
+            # PAST_DUE, EXPIRED - no access
             return EntitlementResult(
                 is_paid=False,
                 in_trial=False,

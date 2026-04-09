@@ -560,25 +560,25 @@ async def require_force_paywall(
     token: Optional[str] = Query(default=None),
 ) -> None:
     """
-    Guard: Block ZZP users without an ACTIVE subscription when BILLING_FORCE_PAYWALL=True.
+    Guard: Block ZZP users whose trial has expired and who lack an active paid subscription.
 
-    - Accountants, admins, and super_admins are NOT blocked (bypass).
-    - Non-ZZP roles other than the above are not blocked (no subscription concept).
-    - If BILLING_FORCE_PAYWALL=False (default), this is a complete no-op (no auth required).
+    Always enforces subscription state for ZZP users:
+    - If BILLING_FORCE_PAYWALL=True: only ACTIVE (paid) subscriptions pass.
+    - If BILLING_FORCE_PAYWALL=False (default): ACTIVE and valid TRIALING pass;
+      EXPIRED / CANCELED (past end) / PAST_DUE / no subscription are blocked with 402.
 
-    Supports two auth methods to match the PDF download endpoint:
+    Bypass roles (accountant, admin, super_admin) are never blocked.
+    Non-ZZP roles other than the above are not blocked (no subscription concept).
+
+    Supports two auth methods:
       1. Authorization: Bearer <jwt>  (standard API calls)
       2. ?token=<jwt> query parameter  (iOS Safari / direct browser navigation)
 
     Raises:
-        HTTP 401: If force paywall is on and no valid token is provided.
-        HTTP 402: If ZZP user is not ACTIVE and force-paywall mode is enabled.
+        HTTP 401: If no valid token is provided.
+        HTTP 402: If ZZP user does not have a valid subscription.
     """
     from app.services.subscription_service import subscription_service
-
-    # Fast path: flag is disabled (default) – no auth check needed at all
-    if not settings.billing_force_paywall:
-        return
 
     # Extract JWT from Authorization header or ?token= query param
     jwt_token: Optional[str] = None
@@ -589,45 +589,39 @@ async def require_force_paywall(
         jwt_token = token
 
     if not jwt_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        # No token at all — if force-paywall is on we must reject;
+        # otherwise allow through (the endpoint's own auth will handle it).
+        if settings.billing_force_paywall:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return
 
     payload = decode_token(jwt_token)
     if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        if settings.billing_force_paywall:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return
 
     user_id_str = payload.get("sub")
     if user_id_str is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        return
 
     try:
         user_uuid = UUID(user_id_str)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        return
 
     result = await db.execute(select(User).where(User.id == user_uuid))
     current_user = result.scalar_one_or_none()
     if current_user is None or not current_user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        return
 
     # Accountants and admins bypass the paywall entirely
     if current_user.role in SUBSCRIPTION_BYPASS_ROLES:
@@ -659,17 +653,30 @@ async def require_force_paywall(
     # Compute entitlements – this also transitions expired trials to EXPIRED
     entitlements = await subscription_service.compute_entitlements(db, administration.id)
 
-    # Only ACTIVE (paid) subscriptions are allowed under force-paywall mode
-    if not entitlements.is_paid:
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "code": "SUBSCRIPTION_REQUIRED",
-                "message": "Abonnement vereist om de app te gebruiken.",
-                "status": entitlements.status,
-                "force_paywall": True,
-            },
-        )
+    if settings.billing_force_paywall:
+        # Strict mode: only ACTIVE (paid) subscriptions pass
+        if not entitlements.is_paid:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "SUBSCRIPTION_REQUIRED",
+                    "message": "Abonnement vereist om de app te gebruiken.",
+                    "status": entitlements.status,
+                    "force_paywall": True,
+                },
+            )
+    else:
+        # Default mode: ACTIVE or valid trial pass; expired/canceled/past_due blocked
+        if not entitlements.can_use_pro_features:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "SUBSCRIPTION_REQUIRED",
+                    "message": "Je proefperiode is verlopen. Upgrade naar Pro om door te gaan.",
+                    "status": entitlements.status,
+                    "force_paywall": False,
+                },
+            )
 
 
 def require_feature(feature: str):

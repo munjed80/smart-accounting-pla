@@ -26,7 +26,7 @@ async def test_get_my_subscription_auto_starts_trial(async_client, test_user, te
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "TRIALING"
-    assert data["plan_code"] == "zzp_basic"
+    assert data["plan_code"] == "free"
     assert data["in_trial"] is True
     assert data["can_use_pro_features"] is True
     assert data["is_paid"] is False
@@ -69,7 +69,7 @@ async def test_get_my_subscription_returns_existing(async_client, test_user, tes
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ACTIVE"
-    assert data["plan_code"] == "zzp_basic"
+    assert data["plan_code"] == "free"
     assert data["in_trial"] is False
     assert data["can_use_pro_features"] is True
     assert data["is_paid"] is True
@@ -184,4 +184,4 @@ async def test_get_entitlements(async_client, test_user, test_administration, te
     # Days left might be 19 or 20 depending on timing
     assert 19 <= data["days_left_trial"] <= 20
     assert data["status"] == "TRIALING"
-    assert data["plan_code"] == "zzp_basic"
+    assert data["plan_code"] == "free"

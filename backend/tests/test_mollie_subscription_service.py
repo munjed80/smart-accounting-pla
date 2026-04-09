@@ -35,9 +35,9 @@ async def test_ensure_mollie_customer_creates_new_customer(db_session):
     db_session.add(admin)
     
     plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=4.99,
+        code="free",
+        name="Free",
+        price_monthly=0.00,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -99,9 +99,9 @@ async def test_ensure_mollie_customer_is_idempotent(db_session):
     db_session.add(admin)
     
     plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=4.99,
+        code="free",
+        name="Free",
+        price_monthly=0.00,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -156,15 +156,27 @@ async def test_activate_subscription_creates_immediate_checkout_during_trial(db_
     db_session.add(admin)
     
     plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=4.99,
+        code="free",
+        name="Free",
+        price_monthly=0.00,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
         max_users=1,
     )
     db_session.add(plan)
+
+    # Also need a starter plan for activate_subscription
+    starter_plan = Plan(
+        code="starter",
+        name="Starter",
+        price_monthly=4.95,
+        trial_days=0,
+        max_invoices=999999,
+        max_storage_mb=5120,
+        max_users=1,
+    )
+    db_session.add(starter_plan)
     await db_session.commit()
     
     # Create subscription with trial ending in future (still in trial)
@@ -200,6 +212,7 @@ async def test_activate_subscription_creates_immediate_checkout_during_trial(db_
             db=db_session,
             user=user,
             administration_id=admin.id,
+            plan_code="starter",
         )
 
         # Should always return an immediate checkout URL
@@ -238,9 +251,9 @@ async def test_activate_subscription_is_idempotent_for_active(db_session):
     db_session.add(admin)
     
     plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=4.99,
+        code="free",
+        name="Free",
+        price_monthly=0.00,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,

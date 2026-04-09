@@ -27,15 +27,15 @@ from app.services.subscription_service import subscription_service
 # ---------------------------------------------------------------------------
 
 async def _make_plan(db_session) -> Plan:
-    """Return existing zzp_basic plan or create one."""
-    result = await db_session.execute(select(Plan).where(Plan.code == "zzp_basic"))
+    """Return existing free plan or create one."""
+    result = await db_session.execute(select(Plan).where(Plan.code == "free"))
     existing = result.scalar_one_or_none()
     if existing:
         return existing
     plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=4.99,
+        code="free",
+        name="Free",
+        price_monthly=0.00,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,

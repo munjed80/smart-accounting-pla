@@ -61,8 +61,14 @@ export const pathToTab = (path: string, isAccountant: boolean, isSuperAdmin = fa
       return 'subscriptions'
     case '/zzp/documenten':
       return 'documents'
-    case '/zzp/btw':
-      return 'btw-aangifte'
+    case '/zzp/belastinghulp/btw':
+      return 'tax-btw'
+    case '/zzp/belastinghulp/inkomstenbelasting':
+      return 'tax-income'
+    case '/zzp/belastinghulp/uitleg':
+      return 'tax-help'
+    case '/zzp/belastinghulp/jaaroverzicht':
+      return 'tax-annual'
     case '/':
     default:
       return isSuperAdmin ? 'admin' : isAccountant ? 'workqueue' : 'dashboard'
@@ -123,8 +129,14 @@ export const tabToPath = (tab: string, isAccountant: boolean, isSuperAdmin = fal
       return '/zzp/verplichtingen/abonnementen'
     case 'documents':
       return '/zzp/documenten'
-    case 'btw-aangifte':
-      return '/zzp/btw'
+    case 'tax-btw':
+      return '/zzp/belastinghulp/btw'
+    case 'tax-income':
+      return '/zzp/belastinghulp/inkomstenbelasting'
+    case 'tax-help':
+      return '/zzp/belastinghulp/uitleg'
+    case 'tax-annual':
+      return '/zzp/belastinghulp/jaaroverzicht'
     default:
       return isSuperAdmin ? '/admin' : isAccountant ? '/accountant' : '/dashboard'
   }

@@ -41,18 +41,19 @@ interface StepCardProps {
   stepNumber: number
   title: string
   description: string
+  isLast?: boolean
   children?: React.ReactNode
 }
 
-const StepCard = ({ stepNumber, title, description, children }: StepCardProps) => (
+const StepCard = ({ stepNumber, title, description, isLast, children }: StepCardProps) => (
   <div className="flex gap-4">
     <div className="flex flex-col items-center">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
         {stepNumber}
       </div>
-      <div className="mt-2 w-px flex-1 bg-border" />
+      {!isLast && <div className="mt-2 w-px flex-1 bg-border" />}
     </div>
-    <div className="pb-8 last:pb-0 flex-1 min-w-0">
+    <div className={`flex-1 min-w-0 ${isLast ? '' : 'pb-8'}`}>
       <h3 className="font-semibold leading-none">{title}</h3>
       <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{description}</p>
       {children && <div className="mt-3">{children}</div>}
@@ -200,6 +201,7 @@ export const BelastinghulpUitlegPage = () => {
             </StepCard>
             <StepCard
               stepNumber={4}
+              isLast
               title="Dien je aangifte in"
               description="Log in op Mijn Belastingdienst Zakelijk en vul de bedragen in. Bewaar een kopie van je aangifte in je administratie."
             />
@@ -270,6 +272,7 @@ export const BelastinghulpUitlegPage = () => {
             />
             <StepCard
               stepNumber={4}
+              isLast
               title="Vul de aangifte in"
               description="Gebruik het aangifteformulier op Mijn Belastingdienst. De deadline is meestal 1 mei. Vraag uitstel aan als je meer tijd nodig hebt."
             />

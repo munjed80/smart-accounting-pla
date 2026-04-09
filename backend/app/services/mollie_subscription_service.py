@@ -624,19 +624,24 @@ class MollieSubscriptionService:
         # Build webhook URL
         webhook_url = self._get_webhook_url()
         
+        # Resolve plan pricing from the subscription's current plan_code
+        reactivate_plan_code = subscription.plan_code if subscription.plan_code in PLAN_METADATA else DEFAULT_ACTIVATE_PLAN
+        reactivate_meta = PLAN_METADATA[reactivate_plan_code]
+
         # Create new Mollie subscription
         async with MollieClient() as mollie:
             subscription_data = await mollie.create_subscription(
                 customer_id=customer_id,
-                amount=ZZP_BASIC_PRICE,
-                currency=ZZP_BASIC_CURRENCY,
-                interval=ZZP_BASIC_INTERVAL,
-                description=ZZP_BASIC_DESCRIPTION,
+                amount=reactivate_meta["price"],
+                currency=SUBSCRIPTION_CURRENCY,
+                interval=SUBSCRIPTION_INTERVAL,
+                description=reactivate_meta["description"],
                 webhook_url=webhook_url,
                 start_date=start_date,
                 metadata={
                     "administration_id": str(administration_id),
                     "subscription_id": str(subscription.id),
+                    "plan_code": reactivate_plan_code,
                 }
             )
         
@@ -671,8 +676,8 @@ class MollieSubscriptionService:
             new_value={
                 "mollie_subscription_id": subscription_data["id"],
                 "start_date": start_date.isoformat(),
-                "amount": str(ZZP_BASIC_PRICE),
-                "currency": ZZP_BASIC_CURRENCY,
+                "amount": str(reactivate_meta["price"]),
+                "currency": SUBSCRIPTION_CURRENCY,
                 "reason": "reactivation",
             }
         )
@@ -971,18 +976,23 @@ class MollieSubscriptionService:
         webhook_url = self._get_webhook_url()
 
         try:
+            # Resolve plan pricing from the subscription's current plan
+            recurring_plan_code = subscription.plan_code if subscription.plan_code in PLAN_METADATA else DEFAULT_ACTIVATE_PLAN
+            recurring_meta = PLAN_METADATA[recurring_plan_code]
+
             async with MollieClient() as mollie:
                 sub_data = await mollie.create_subscription(
                     customer_id=customer_id,
-                    amount=ZZP_BASIC_PRICE,
-                    currency=ZZP_BASIC_CURRENCY,
-                    interval=ZZP_BASIC_INTERVAL,
-                    description=ZZP_BASIC_DESCRIPTION,
+                    amount=recurring_meta["price"],
+                    currency=SUBSCRIPTION_CURRENCY,
+                    interval=SUBSCRIPTION_INTERVAL,
+                    description=recurring_meta["description"],
                     webhook_url=webhook_url,
                     start_date=start_date,
                     metadata={
                         "administration_id": str(subscription.administration_id),
                         "subscription_id": str(subscription.id),
+                        "plan_code": recurring_plan_code,
                     },
                 )
 

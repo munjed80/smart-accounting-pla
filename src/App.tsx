@@ -235,9 +235,6 @@ const TrialExpiredScreen = ({ onGoToSubscriptions, onLogout }: { onGoToSubscript
       <div className="space-y-2">
         <h2 className="text-xl font-semibold">Je proefperiode is afgelopen</h2>
         <p className="text-sm text-muted-foreground">
-          Your trial has ended. Upgrade to Pro to continue using the platform.
-        </p>
-        <p className="text-sm text-muted-foreground">
           Upgrade naar Pro om het platform te blijven gebruiken.
         </p>
       </div>
@@ -253,7 +250,7 @@ const TrialExpiredScreen = ({ onGoToSubscriptions, onLogout }: { onGoToSubscript
       </div>
       <div className="flex flex-col gap-2">
         <Button onClick={onGoToSubscriptions} className="w-full bg-orange-600 hover:bg-orange-700">
-          Upgrade to Pro
+          Upgraden naar Pro
         </Button>
         <Button variant="outline" onClick={onLogout} className="w-full">
           Uitloggen

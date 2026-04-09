@@ -601,27 +601,38 @@ async def require_force_paywall(
 
     payload = decode_token(jwt_token)
     if payload is None:
-        if settings.billing_force_paywall:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        return
+        # Token present but invalid – reject to prevent bypassing auth
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     user_id_str = payload.get("sub")
     if user_id_str is None:
-        return
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     try:
         user_uuid = UUID(user_id_str)
     except ValueError:
-        return
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     result = await db.execute(select(User).where(User.id == user_uuid))
     current_user = result.scalar_one_or_none()
     if current_user is None or not current_user.is_active:
-        return
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     # Accountants and admins bypass the paywall entirely
     if current_user.role in SUBSCRIPTION_BYPASS_ROLES:

@@ -155,7 +155,7 @@ describe('SettingsPage', () => {
         can_use_pro_features: true,
         days_left_trial: 0,
         status: 'ACTIVE',
-        plan_code: 'zzp_basic',
+        plan_code: 'starter',
         force_paywall: false,
       },
       subscription: null,

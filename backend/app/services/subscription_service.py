@@ -68,7 +68,7 @@ class EntitlementResult:
 class SubscriptionService:
     """Service for managing subscriptions and computing entitlements"""
     
-    ZZP_BASIC_PLAN_CODE = "zzp_basic"
+    ZZP_FREE_PLAN_CODE = "free"
     DEFAULT_TRIAL_DAYS = 30
     
     async def ensure_trial_started(
@@ -102,14 +102,14 @@ class SubscriptionService:
             )
             return existing_subscription
         
-        # Get ZZP Basic plan
+        # Get Free plan (1-month trial)
         plan_result = await db.execute(
-            select(Plan).where(Plan.code == self.ZZP_BASIC_PLAN_CODE)
+            select(Plan).where(Plan.code == self.ZZP_FREE_PLAN_CODE)
         )
         plan = plan_result.scalar_one_or_none()
         
         if not plan:
-            raise ValueError(f"Plan with code '{self.ZZP_BASIC_PLAN_CODE}' not found")
+            raise ValueError(f"Plan with code '{self.ZZP_FREE_PLAN_CODE}' not found")
         
         # Create new trial subscription
         now = datetime.now(timezone.utc)

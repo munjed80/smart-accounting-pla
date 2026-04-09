@@ -30,10 +30,23 @@ logger = logging.getLogger(__name__)
 
 
 # Mollie subscription constants
-ZZP_BASIC_PRICE = Decimal("4.99")
-ZZP_BASIC_CURRENCY = "EUR"
-ZZP_BASIC_INTERVAL = "1 month"
-ZZP_BASIC_DESCRIPTION = "ZZP Basic abonnement"
+SUBSCRIPTION_CURRENCY = "EUR"
+SUBSCRIPTION_INTERVAL = "1 month"
+
+# Plan metadata for Mollie checkout
+PLAN_METADATA = {
+    "starter": {
+        "price": Decimal("4.95"),
+        "description": "Starter abonnement",
+    },
+    "zzp_pro": {
+        "price": Decimal("6.95"),
+        "description": "Pro abonnement",
+    },
+}
+
+# Default plan for activation when no plan_code is specified
+DEFAULT_ACTIVATE_PLAN = "starter"
 
 
 class MollieSubscriptionService:
@@ -146,6 +159,7 @@ class MollieSubscriptionService:
         db: AsyncSession,
         user: User,
         administration_id: UUID,
+        plan_code: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Activate Mollie subscription for a user.
@@ -164,13 +178,24 @@ class MollieSubscriptionService:
             db: Database session
             user: User object
             administration_id: Administration UUID
+            plan_code: Which paid plan to activate ("starter" or "zzp_pro").
+                       Defaults to DEFAULT_ACTIVATE_PLAN.
 
         Returns:
             Dict with status information including checkout_url for Mollie redirect
 
         Raises:
             MollieError: If subscription creation fails
+            ValueError: If plan_code is not a valid paid plan
         """
+        chosen_plan = plan_code or DEFAULT_ACTIVATE_PLAN
+        if chosen_plan not in PLAN_METADATA:
+            raise ValueError(
+                f"Invalid plan_code '{chosen_plan}'. "
+                f"Valid options: {', '.join(PLAN_METADATA.keys())}"
+            )
+        plan_meta = PLAN_METADATA[chosen_plan]
+
         # Ensure trial started
         subscription = await subscription_service.ensure_trial_started(db, administration_id)
 
@@ -199,6 +224,15 @@ class MollieSubscriptionService:
                 "message_nl": "Abonnement is actief.",
             }
 
+        # Update plan_code on the subscription to the chosen paid plan
+        target_plan_result = await db.execute(
+            select(Plan).where(Plan.code == chosen_plan)
+        )
+        target_plan = target_plan_result.scalar_one_or_none()
+        if target_plan:
+            subscription.plan_id = target_plan.id
+            subscription.plan_code = target_plan.code
+
         # Ensure Mollie customer exists
         customer_id = await self.ensure_mollie_customer(
             db, user, administration, subscription
@@ -214,9 +248,9 @@ class MollieSubscriptionService:
         redirect_url = self._get_payment_redirect_url()
         async with MollieClient() as mollie:
             payment_data = await mollie.create_payment(
-                amount=ZZP_BASIC_PRICE,
-                currency=ZZP_BASIC_CURRENCY,
-                description=ZZP_BASIC_DESCRIPTION,
+                amount=plan_meta["price"],
+                currency=SUBSCRIPTION_CURRENCY,
+                description=plan_meta["description"],
                 redirect_url=redirect_url,
                 webhook_url=webhook_url,
                 customer_id=customer_id,
@@ -232,6 +266,7 @@ class MollieSubscriptionService:
                     "administration_id": str(administration_id),
                     "subscription_id": str(subscription.id),
                     "payment_type": "first",
+                    "plan_code": chosen_plan,
                 },
             )
 
@@ -242,9 +277,10 @@ class MollieSubscriptionService:
         payment_id = payment_data.get("id")
 
         logger.info(
-            "Created Mollie first-payment %s for subscription %s, checkout_url present: %s",
+            "Created Mollie first-payment %s for subscription %s (plan=%s), checkout_url present: %s",
             payment_id,
             subscription.id,
+            chosen_plan,
             bool(checkout_url),
         )
 
@@ -258,8 +294,9 @@ class MollieSubscriptionService:
             user_role=user.role,
             new_value={
                 "mollie_payment_id": payment_id,
-                "amount": str(ZZP_BASIC_PRICE),
-                "currency": ZZP_BASIC_CURRENCY,
+                "amount": str(plan_meta["price"]),
+                "currency": SUBSCRIPTION_CURRENCY,
+                "plan_code": chosen_plan,
             },
         )
         db.add(audit)

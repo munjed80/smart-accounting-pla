@@ -5658,8 +5658,8 @@ export const subscriptionApi = {
    * The caller must redirect `window.location.href = result.checkout_url`.
    * Idempotent for already-ACTIVE subscriptions (returns existing status).
    */
-  activateSubscription: async (): Promise<ActivateSubscriptionResponse> => {
-    const response = await api.post('/me/subscription/activate', {})
+  activateSubscription: async (planCode?: string): Promise<ActivateSubscriptionResponse> => {
+    const response = await api.post('/me/subscription/activate', { plan_code: planCode ?? null })
     return response.data
   },
 

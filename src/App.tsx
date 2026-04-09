@@ -235,18 +235,30 @@ const ForcedPaywallScreen = ({ onGoToSettings, onLogout }: { onGoToSettings: () 
       <div className="space-y-2">
         <h2 className="text-xl font-semibold">Abonnement vereist</h2>
         <p className="text-sm text-muted-foreground">
-          Je proefperiode is verlopen of je hebt nog geen actief abonnement.
-          Activeer een abonnement om de app te blijven gebruiken.
+          Je gratis maand is verlopen of je hebt nog geen actief abonnement.
+          Kies een abonnement om de app te blijven gebruiken.
         </p>
       </div>
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-left">
-        <p className="text-sm font-semibold text-blue-900 mb-1">ZZP Basic — €4,99/maand</p>
-        <ul className="space-y-1 text-xs text-blue-800">
-          <li>✓ Onbeperkt facturen</li>
-          <li>✓ BTW-aangifte via Digipoort</li>
-          <li>✓ Bankrekening koppeling</li>
-          <li>✓ Exports (PDF, CSV)</li>
-        </ul>
+      <div className="space-y-3 text-left">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <p className="text-sm font-semibold text-blue-900 mb-1">Starter — €4,95/maand</p>
+          <ul className="space-y-1 text-xs text-blue-800">
+            <li>✓ Onbeperkt facturen</li>
+            <li>✓ Urenregistratie & agenda</li>
+            <li>✓ 5 GB opslag</li>
+          </ul>
+        </div>
+        <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
+          <p className="text-sm font-semibold text-purple-900 mb-1">
+            Pro — €6,95/maand <span className="font-normal line-through text-purple-400">€11,99</span>
+          </p>
+          <ul className="space-y-1 text-xs text-purple-800">
+            <li>✓ Alles van Starter</li>
+            <li>✓ BTW-aangifte via Digipoort</li>
+            <li>✓ Bankrekening koppeling</li>
+            <li>✓ Exports (PDF, CSV)</li>
+          </ul>
+        </div>
       </div>
       <div className="flex flex-col gap-2">
         <Button onClick={onGoToSettings} className="w-full bg-orange-600 hover:bg-orange-700">

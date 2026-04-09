@@ -67,6 +67,14 @@ class StartTrialResponse(BaseModel):
     message: str = Field(description="Success message in Dutch")
 
 
+class ActivateSubscriptionRequest(BaseModel):
+    """Request schema for activating a subscription"""
+    plan_code: Optional[str] = Field(
+        None,
+        description="Plan to activate: 'starter' (€4.95/mo) or 'zzp_pro' (€6.95/mo). Defaults to 'starter'.",
+    )
+
+
 class ActivateSubscriptionResponse(BaseModel):
     """Response schema for activating a subscription"""
     status: str = Field(description="Subscription status (TRIALING, ACTIVE, etc.)")

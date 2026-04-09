@@ -21,6 +21,7 @@ from app.schemas.subscription import (
     EntitlementResponse,
     StartTrialRequest,
     StartTrialResponse,
+    ActivateSubscriptionRequest,
     ActivateSubscriptionResponse,
     CancelSubscriptionResponse,
     ReactivateSubscriptionResponse,
@@ -201,6 +202,7 @@ async def get_entitlements(
 async def activate_subscription(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    body: ActivateSubscriptionRequest = ActivateSubscriptionRequest(),
 ):
     """
     Activate Mollie subscription for the current user.
@@ -211,6 +213,9 @@ async def activate_subscription(
 
     Idempotent for already-ACTIVE subscriptions (returns existing status without
     a new checkout URL).
+
+    Body (optional):
+        plan_code: 'starter' (€4.95/mo) or 'zzp_pro' (€6.95/mo). Defaults to 'starter'.
 
     Returns:
         ActivateSubscriptionResponse with checkout_url for Mollie redirect
@@ -239,10 +244,16 @@ async def activate_subscription(
             db=db,
             user=current_user,
             administration_id=member.administration_id,
+            plan_code=body.plan_code,
         )
         
         return ActivateSubscriptionResponse(**result)
     
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_PLAN", "message": str(e)}
+        )
     except MollieError as e:
         logger.error(f"Mollie error activating subscription: {e}")
         raise HTTPException(

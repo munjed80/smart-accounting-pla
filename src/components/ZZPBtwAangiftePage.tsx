@@ -35,25 +35,11 @@ import {
   CalendarBlank,
   DownloadSimple,
   Printer,
-  CaretRight,
 } from '@phosphor-icons/react'
 import { zzpBtwApi, logApiError } from '@/lib/api'
 import type { BTWAangifteResponse, BTWQuarterOverview, BTWWarning } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-const formatCurrency = (cents: number): string => {
-  const euros = cents / 100
-  return new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(euros)
-}
-
-const formatCurrencyAbs = (cents: number): string => formatCurrency(Math.abs(cents))
+import { formatCurrency, formatCurrencyAbs, TaxWarningItem } from '@/components/belastinghulp/shared'
 
 // ============================================================================
 // Sub-components
@@ -133,41 +119,7 @@ const StatCard = ({
   )
 }
 
-/** Warning item */
-const WarningItem = ({ warning }: { warning: BTWWarning }) => {
-  const severityConfig = {
-    error: { icon: <WarningCircle size={18} weight="fill" className="text-red-500" />, bg: 'border-red-200 bg-red-50/50 dark:bg-red-950/20 dark:border-red-900' },
-    warning: { icon: <WarningCircle size={18} weight="fill" className="text-amber-500" />, bg: 'border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-900' },
-    info: { icon: <Info size={18} weight="fill" className="text-blue-500" />, bg: 'border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900' },
-  }
-
-  const config = severityConfig[warning.severity] || severityConfig.info
-
-  return (
-    <div className={`rounded-lg border p-3 text-sm space-y-1 ${config.bg}`}>
-      <div className="flex items-start gap-2">
-        <span className="mt-0.5 flex-shrink-0">{config.icon}</span>
-        <div className="flex-1 min-w-0">
-          <p className="font-medium">{warning.title}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{warning.description}</p>
-          {warning.action_hint && (
-            <p className="text-xs mt-1 font-medium">{warning.action_hint}</p>
-          )}
-          {warning.related_route && (
-            <Button
-              variant="link"
-              size="sm"
-              className="h-auto p-0 text-xs mt-1"
-              onClick={() => navigateTo(warning.related_route!)}
-            >
-              Bekijken <CaretRight size={12} className="ml-0.5" />
-            </Button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
+/** Warning item - uses shared TaxWarningItem */
 
 /** Quarter overview detail section */
 const QuarterDetail = ({ overview, showExplanations = true }: { overview: BTWQuarterOverview; showExplanations?: boolean }) => {
@@ -317,7 +269,7 @@ const QuarterDetail = ({ overview, showExplanations = true }: { overview: BTWQua
           </CardHeader>
           <CardContent className="space-y-2">
             {overview.warnings.map((warning) => (
-              <WarningItem key={warning.id} warning={warning} />
+              <TaxWarningItem key={warning.id} warning={warning} />
             ))}
           </CardContent>
         </Card>

@@ -39,8 +39,8 @@ import { ZZPAgendaPage } from '@/components/ZZPAgendaPage'
 import { ZZPCommitmentsOverviewPage } from '@/components/ZZPCommitmentsOverviewPage'
 import { ZZPLeaseLoansPage } from '@/components/ZZPLeaseLoansPage'
 import { ZZPDocumentInboxPage } from '@/components/ZZPDocumentInboxPage'
+import { ZZPBtwAangiftePage } from '@/components/ZZPBtwAangiftePage'
 import { ZZPSubscriptionsPage } from '@/components/ZZPSubscriptionsPage'
-import { BelastinghulpBTWPage } from '@/components/BelastinghulpBTWPage'
 import { BelastinghulpInkomstenbelastingPage } from '@/components/BelastinghulpInkomstenbelastingPage'
 import { BelastinghulpUitlegPage } from '@/components/BelastinghulpUitlegPage'
 import { BelastinghulpJaaroverzichtPage } from '@/components/BelastinghulpJaaroverzichtPage'
@@ -762,7 +762,7 @@ const AppContent = () => {
       case 'documents':
         return !isAccountant ? <ZZPDocumentInboxPage /> : <SmartDashboard />
       case 'tax-btw':
-        return !isAccountant ? <BelastinghulpBTWPage /> : <SmartDashboard />
+        return !isAccountant ? <ZZPBtwAangiftePage /> : <SmartDashboard />
       case 'tax-income':
         return !isAccountant ? <BelastinghulpInkomstenbelastingPage /> : <SmartDashboard />
       case 'tax-help':

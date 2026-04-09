@@ -223,17 +223,17 @@ const ForbiddenAdminAccess = () => (
 )
 
 /**
- * Full-screen paywall shown when BILLING_FORCE_PAYWALL=true and ZZP user has no ACTIVE subscription.
- * Only allows navigation to /settings (subscription management) and logout.
+ * Full-screen paywall shown when ZZP user has an expired trial and no active paid subscription.
+ * Only allows navigation to /settings or /subscriptions (subscription management) and logout.
  */
-const ForcedPaywallScreen = ({ onGoToSettings, onLogout }: { onGoToSettings: () => void; onLogout: () => void }) => (
+const TrialExpiredScreen = ({ onGoToSubscriptions, onLogout }: { onGoToSubscriptions: () => void; onLogout: () => void }) => (
   <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center p-4">
     <div className="max-w-md w-full rounded-lg border bg-card p-8 space-y-5 text-center shadow-lg">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-orange-100">
         <LockSimple className="h-7 w-7 text-orange-600" weight="fill" />
       </div>
       <div className="space-y-2">
-        <h2 className="text-xl font-semibold">Abonnement vereist</h2>
+        <h2 className="text-xl font-semibold">Je proefperiode is afgelopen</h2>
         <p className="text-sm text-muted-foreground">
           Je gratis maand is verlopen of je hebt nog geen actief abonnement.
           Kies een abonnement om de app te blijven gebruiken.
@@ -261,8 +261,8 @@ const ForcedPaywallScreen = ({ onGoToSettings, onLogout }: { onGoToSettings: () 
         </div>
       </div>
       <div className="flex flex-col gap-2">
-        <Button onClick={onGoToSettings} className="w-full bg-orange-600 hover:bg-orange-700">
-          Abonnement activeren
+        <Button onClick={onGoToSubscriptions} className="w-full bg-orange-600 hover:bg-orange-700">
+          Upgraden naar Pro
         </Button>
         <Button variant="outline" onClick={onLogout} className="w-full">
           Uitloggen
@@ -657,25 +657,24 @@ const AppContent = () => {
     )
   }
 
-  // Force-paywall guard: block ZZP users without ACTIVE subscription when flag is active.
-  // Accountants and super_admins are never blocked.
-  // Allow /settings (subscription management) to pass through so user can activate.
-  const isSettingsPath = route.type === 'app' && route.path === '/settings'
+  // Force-paywall guard: block ZZP users whose trial has expired or who have no active subscription.
+  // Accountants and super_admins are never blocked (isAccountantBypass in useEntitlements).
+  // Allow settings, subscriptions, and support pages through so user can manage billing.
+  const isPaywallExemptTab = ['settings', 'subscriptions', 'support'].includes(activeTab)
   const isZzpUser = user?.role === 'zzp'
   const paywallActive =
     isZzpUser &&
-    forcePaywall &&
     !isLoadingPaywall &&
     paywallSubscription !== null && // Subscription data loaded
-    !paywallSubscription.is_paid &&  // Not ACTIVE
-    !isSettingsPath                  // Allow settings page through
+    !paywallSubscription.can_use_pro_features &&  // Trial expired or no active subscription
+    !isPaywallExemptTab                            // Allow billing/support pages through
 
   if (paywallActive) {
     return (
-      <ForcedPaywallScreen
-        onGoToSettings={() => {
-          setActiveTab('settings')
-          navigateTo('/settings')
+      <TrialExpiredScreen
+        onGoToSubscriptions={() => {
+          setActiveTab('subscriptions')
+          navigateTo('/zzp/verplichtingen/abonnementen')
         }}
         onLogout={() => {
           logout()

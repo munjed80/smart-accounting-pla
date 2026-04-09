@@ -94,6 +94,7 @@ async def test_activate_endpoint_is_idempotent_for_active(
     test_administration: Administration,
     test_zzp_plan: Plan,
     db_session,
+    clean_subscriptions,
 ):
     """Test that activate endpoint is idempotent for already-ACTIVE subscriptions"""
     # Create existing ACTIVE subscription (already paid)
@@ -147,6 +148,7 @@ async def test_activate_endpoint_returns_active_subscription(
     test_administration: Administration,
     test_zzp_plan: Plan,
     db_session,
+    clean_subscriptions,
 ):
     """Test that activate endpoint returns correct message for active subscription"""
     # Create active subscription
@@ -603,6 +605,7 @@ async def test_cancel_subscription_idempotency(
     test_administration: Administration,
     test_zzp_plan: Plan,
     db_session,
+    clean_subscriptions,
 ):
     """Test that cancel endpoint is idempotent"""
     # Create a subscription with Mollie IDs
@@ -666,6 +669,7 @@ async def test_reactivate_subscription_idempotency(
     test_administration: Administration,
     test_zzp_plan: Plan,
     db_session,
+    clean_subscriptions,
 ):
     """Test that reactivate endpoint is idempotent for active subscriptions"""
     # Create an active subscription
@@ -705,6 +709,7 @@ async def test_reactivate_canceled_subscription_creates_new(
     test_administration: Administration,
     test_zzp_plan: Plan,
     db_session,
+    clean_subscriptions,
 ):
     """Test that reactivate creates new subscription for canceled status"""
     # Create a canceled subscription
@@ -759,6 +764,7 @@ async def test_webhook_payment_paid_from_past_due(
     test_administration: Administration,
     test_zzp_plan: Plan,
     db_session,
+    clean_subscriptions,
 ):
     """Test webhook activates subscription when payment is paid after PAST_DUE"""
     from sqlalchemy import select
@@ -822,6 +828,7 @@ async def test_webhook_subscription_canceled_records_period_end(
     test_administration: Administration,
     test_zzp_plan: Plan,
     db_session,
+    clean_subscriptions,
 ):
     """Test webhook records current_period_end when subscription is canceled"""
     from sqlalchemy import select

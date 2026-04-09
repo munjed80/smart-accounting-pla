@@ -169,6 +169,37 @@ async def test_zzp_plan(db_session: AsyncSession):
 
 
 @pytest_asyncio.fixture(scope="function")
+async def test_subscription(
+    db_session: AsyncSession,
+    test_administration: Administration,
+    test_zzp_plan,
+):
+    """Create an active trial subscription for the test administration.
+
+    This ensures the ``require_force_paywall`` dependency (which always
+    checks subscription state for ZZP users) allows test requests through.
+    """
+    from datetime import timedelta
+    from app.models.subscription import Subscription, SubscriptionStatus
+
+    now = datetime.now(timezone.utc)
+    subscription = Subscription(
+        administration_id=test_administration.id,
+        plan_id=test_zzp_plan.id,
+        plan_code=test_zzp_plan.code,
+        status=SubscriptionStatus.TRIALING,
+        trial_start_at=now,
+        trial_end_at=now + timedelta(days=30),
+        starts_at=now,
+        cancel_at_period_end=False,
+    )
+    db_session.add(subscription)
+    await db_session.commit()
+    await db_session.refresh(subscription)
+    return subscription
+
+
+@pytest_asyncio.fixture(scope="function")
 async def auth_headers(test_user: User) -> dict:
     """Create authentication headers for the test user."""
     token = create_access_token(
@@ -178,12 +209,33 @@ async def auth_headers(test_user: User) -> dict:
 
 
 @pytest_asyncio.fixture(scope="function")
+async def clean_subscriptions(db_session: AsyncSession, test_administration: Administration):
+    """Delete all existing subscriptions for the test administration.
+    
+    Use this fixture in tests that create their own subscription records
+    (e.g. billing, subscription API, Mollie webhook tests) to avoid
+    conflicts with the auto-created trial from test_subscription.
+    """
+    from sqlalchemy import delete
+    from app.models.subscription import Subscription
+    await db_session.execute(
+        delete(Subscription).where(Subscription.administration_id == test_administration.id)
+    )
+    await db_session.commit()
+
+
+@pytest_asyncio.fixture(scope="function")
 async def async_client(
     db_session: AsyncSession,
     test_user: User,
     test_administration: Administration,
+    test_subscription,
 ) -> AsyncGenerator[AsyncClient, None]:
-    """Create an async test client with database override."""
+    """Create an async test client with database override.
+    
+    Depends on test_subscription to ensure ZZP test users have a valid
+    trial subscription so requests are not blocked by the paywall guard.
+    """
     
     async def override_get_db():
         yield db_session

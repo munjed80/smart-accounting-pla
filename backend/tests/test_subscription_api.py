@@ -37,7 +37,7 @@ async def test_get_my_subscription_auto_starts_trial(async_client, test_user, te
 
 
 @pytest.mark.asyncio
-async def test_get_my_subscription_returns_existing(async_client, test_user, test_administration, test_zzp_plan, auth_headers, db_session):
+async def test_get_my_subscription_returns_existing(async_client, test_user, test_administration, test_zzp_plan, auth_headers, db_session, clean_subscriptions):
     """Test GET /api/v1/me/subscription returns existing subscription"""
     # Plan already created by test_zzp_plan fixture
     plan = test_zzp_plan
@@ -149,7 +149,7 @@ async def test_start_trial_idempotent(async_client, test_user, test_administrati
 
 
 @pytest.mark.asyncio
-async def test_get_entitlements(async_client, test_user, test_administration, test_zzp_plan, auth_headers, db_session):
+async def test_get_entitlements(async_client, test_user, test_administration, test_zzp_plan, auth_headers, db_session, clean_subscriptions):
     """Test GET /api/v1/me/subscription/entitlements"""
     # Plan already created by test_zzp_plan fixture
     plan = test_zzp_plan

@@ -6,7 +6,7 @@ Covers:
 - enforce_trial_override() expires subscriptions when override_days=0
 - enforce_trial_override() is a no-op when BILLING_TRIAL_OVERRIDE_DAYS is not set
 - ensure_trial_started() respects BILLING_TRIAL_OVERRIDE_DAYS for new subscriptions
-- require_force_paywall dependency blocks ZZP users without ACTIVE subscription
+- require_force_paywall dependency blocks ZZP users without active subscription (always enforced)
 - require_force_paywall dependency does NOT block accountants
 """
 import pytest
@@ -280,6 +280,7 @@ async def test_get_my_subscription_includes_force_paywall_flag(
     test_zzp_plan,
     auth_headers,
     db_session,
+    clean_subscriptions,
 ):
     """GET /me/subscription response includes force_paywall field."""
     now = datetime.now(timezone.utc)
@@ -313,6 +314,7 @@ async def test_get_my_subscription_force_paywall_true(
     test_zzp_plan,
     auth_headers,
     db_session,
+    clean_subscriptions,
 ):
     """When BILLING_FORCE_PAYWALL=true, GET /me/subscription returns force_paywall=true."""
     now = datetime.now(timezone.utc)
@@ -350,6 +352,7 @@ async def test_force_paywall_blocks_zzp_with_expired_subscription(
     test_zzp_plan,
     auth_headers,
     db_session,
+    clean_subscriptions,
 ):
     """ZZP user with EXPIRED subscription gets 402 when force paywall is enabled."""
     now = datetime.now(timezone.utc)
@@ -383,6 +386,7 @@ async def test_force_paywall_allows_zzp_with_active_subscription(
     test_zzp_plan,
     auth_headers,
     db_session,
+    clean_subscriptions,
 ):
     """ZZP user with ACTIVE subscription is NOT blocked by force paywall."""
     now = datetime.now(timezone.utc)
@@ -410,14 +414,15 @@ async def test_force_paywall_allows_zzp_with_active_subscription(
 
 
 @pytest.mark.asyncio
-async def test_force_paywall_does_not_block_when_disabled(
+async def test_expired_trial_blocked_when_force_paywall_disabled(
     async_client,
     test_administration,
     test_zzp_plan,
     auth_headers,
     db_session,
+    clean_subscriptions,
 ):
-    """When BILLING_FORCE_PAYWALL=false, expired ZZP user is NOT blocked at API level."""
+    """When BILLING_FORCE_PAYWALL=false, expired ZZP user IS still blocked (trial enforcement)."""
     now = datetime.now(timezone.utc)
     sub = Subscription(
         administration_id=test_administration.id,
@@ -436,8 +441,8 @@ async def test_force_paywall_does_not_block_when_disabled(
         mock_settings.billing_force_paywall = False
         response = await async_client.get("/api/v1/zzp/dashboard", headers=auth_headers)
 
-    # Should NOT return 402
-    assert response.status_code != 402
+    # Should return 402 – expired trial users are blocked even without force-paywall flag
+    assert response.status_code == 402
 
 
 @pytest.mark.asyncio

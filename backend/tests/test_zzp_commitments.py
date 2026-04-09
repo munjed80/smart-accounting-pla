@@ -1,5 +1,7 @@
 import pytest
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+
+from sqlalchemy import select
 
 from app.models.administration import Administration, AdministrationMember, MemberRole
 from app.models.bank import BankAccount, BankTransaction, BankTransactionStatus
@@ -163,6 +165,25 @@ async def test_commitment_tenant_safety_and_expense_link(async_client, auth_head
     await db_session.flush()
 
     db_session.add(AdministrationMember(user_id=other_user.id, administration_id=other_admin.id, role=MemberRole.OWNER))
+
+    # Create a trial subscription for the other admin so paywall doesn't block
+    from app.models.subscription import Subscription, SubscriptionStatus, Plan
+    plan_result = await db_session.execute(select(Plan).where(Plan.code == "zzp_basic"))
+    plan = plan_result.scalars().first()
+    if plan:
+        now = datetime.now(timezone.utc)
+        other_sub = Subscription(
+            administration_id=other_admin.id,
+            plan_id=plan.id,
+            plan_code=plan.code,
+            status=SubscriptionStatus.TRIALING,
+            trial_start_at=now,
+            trial_end_at=now + timedelta(days=30),
+            starts_at=now,
+            cancel_at_period_end=False,
+        )
+        db_session.add(other_sub)
+
     await db_session.commit()
 
     other_headers = {"Authorization": f"Bearer {create_access_token(data={'sub': str(other_user.id), 'email': other_user.email})}"}

@@ -625,21 +625,18 @@ export const BelastinghulpInkomstenbelastingPage = () => {
     try {
       const result = await zzpIncomeTaxApi.getOverview(year)
       setData(result)
-      if (!selectedYear) {
-        setSelectedYear(String(result.overview.year))
-      }
+      setSelectedYear((prev) => prev || String(result.overview.year))
     } catch (err) {
       logApiError(err, 'BelastinghulpInkomstenbelasting')
       setError('Er is een fout opgetreden bij het laden van je jaaroverzicht. Probeer het later opnieuw.')
     } finally {
       setLoading(false)
     }
-  }, [selectedYear])
+  }, [])
 
   useEffect(() => {
     fetchData()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [fetchData])
 
   const handleYearChange = (yearStr: string) => {
     setSelectedYear(yearStr)

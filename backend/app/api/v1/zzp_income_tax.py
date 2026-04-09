@@ -15,6 +15,7 @@ Metrics provided per year:
 """
 from datetime import datetime, date, timezone
 from decimal import Decimal
+import logging
 from typing import Annotated, List, Optional
 from uuid import UUID
 
@@ -35,6 +36,7 @@ from app.models.administration import Administration, AdministrationMember
 from app.api.v1.deps import CurrentUser, require_zzp
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -506,7 +508,8 @@ async def get_zzp_income_tax(
     # Build main overview
     try:
         overview = await build_year_overview(admin_id, target_year, today, db)
-    except Exception:
+    except Exception as exc:
+        logger.exception("Failed to build income tax overview for year %d: %s", target_year, exc)
         overview = IncomeTaxYearOverview(
             year=target_year,
             year_start=date(target_year, 1, 1).isoformat(),

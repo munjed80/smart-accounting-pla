@@ -475,8 +475,19 @@ async def get_subscription_me(
             dt = dt.replace(tzinfo=timezone.utc)
         return dt.isoformat()
 
+    # Map plan_code to Dutch display name
+    plan_code = subscription.plan_code
+    plan_name_map = {
+        "free": "Gratis proefperiode",
+        "starter": "Starter",
+        "zzp_pro": "Pro",
+    }
+    plan_name = plan_name_map.get(plan_code, plan_code)
+
     return SubscriptionMeResponse(
         status=simple_status,
+        planCode=plan_code,
+        planName=plan_name,
         startDate=_iso(start_dt),
         endDate=_iso(end_dt),
         daysRemaining=days_remaining,

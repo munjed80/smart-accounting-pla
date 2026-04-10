@@ -5619,6 +5619,8 @@ export interface ReactivateSubscriptionResponse {
 
 export interface SubscriptionMeResponse {
   status: 'trial' | 'active' | 'expired'
+  planCode: string | null
+  planName: string | null
   startDate: string | null
   endDate: string | null
   daysRemaining: number

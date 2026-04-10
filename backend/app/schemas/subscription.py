@@ -101,6 +101,8 @@ class ReactivateSubscriptionResponse(BaseModel):
 class SubscriptionMeResponse(BaseModel):
     """Simplified subscription response for ZZP settings page (GET /subscription/me)"""
     status: str = Field(description="Simplified status: trial | active | expired")
+    planCode: Optional[str] = Field(None, description="Current plan code (e.g. free, starter, zzp_pro)")
+    planName: Optional[str] = Field(None, description="Human-readable Dutch plan name")
     startDate: Optional[str] = Field(None, description="Subscription start date (ISO 8601)")
     endDate: Optional[str] = Field(None, description="Subscription end date (ISO 8601)")
     daysRemaining: int = Field(description="Days remaining until subscription ends (0 if expired)")

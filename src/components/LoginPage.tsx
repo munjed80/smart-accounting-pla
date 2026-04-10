@@ -20,7 +20,9 @@ interface LoginPageProps {
 export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   const { login, register, resendVerification, isLoading } = useAuth()
 
-  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login')
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>(
+    window.location.pathname === '/register' ? 'register' : 'login'
+  )
 
   useSeoMeta({
     title: activeTab === 'register' ? "Start gratis — ZZPers Hub | Gratis factuur maken voor zzp'ers" : 'Inloggen | ZZPers Hub',

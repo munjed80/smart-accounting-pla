@@ -142,7 +142,7 @@ const getRouteFromURL = (): Route => {
     return { type: 'forgot-password' }
   }
   
-  if (path === '/login' || path === '/auth') {
+  if (path === '/login' || path === '/auth' || path === '/register') {
     return { type: 'login' }
   }
   

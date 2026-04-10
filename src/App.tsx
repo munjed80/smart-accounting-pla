@@ -673,8 +673,8 @@ const AppContent = () => {
     return (
       <TrialExpiredScreen
         onGoToSubscriptions={() => {
-          setActiveTab('subscriptions')
-          navigateTo('/zzp/verplichtingen/abonnementen')
+          setActiveTab('settings')
+          navigateTo('/settings')
         }}
         onLogout={() => {
           logout()

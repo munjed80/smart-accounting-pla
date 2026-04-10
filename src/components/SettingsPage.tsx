@@ -134,6 +134,48 @@ export const SettingsPage = () => {
   })
   const [isChangingPassword, setIsChangingPassword] = useState(false)
 
+  // Detect return from Mollie payment (?payment=complete) and poll for ACTIVE status
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (!params.has('payment')) return
+
+    const paymentStatus = params.get('payment')
+    // Clean query param from URL so it doesn't re-trigger on refresh
+    params.delete('payment')
+    const cleanUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`
+    window.history.replaceState({}, '', cleanUrl)
+
+    if (paymentStatus === 'complete') {
+      toast.success('Betaling ontvangen', {
+        description: 'Je abonnement wordt geactiveerd. Dit kan enkele seconden duren.',
+      })
+      // Force immediate refetch, then poll every 3s for up to 60s until subscription is ACTIVE
+      refetchSubscription()
+      refetchSubscriptionMe()
+
+      let elapsed = 0
+      const interval = setInterval(async () => {
+        elapsed += 3000
+        if (elapsed > 60000) {
+          clearInterval(interval)
+          return
+        }
+        const sub = await refetchSubscription()
+        await refetchSubscriptionMe()
+        // sub is the react-query result; .data contains the SubscriptionResponse
+        if (sub?.data?.status === 'ACTIVE') {
+          clearInterval(interval)
+          toast.success('Abonnement actief', {
+            description: 'Je abonnement is nu actief. Je hebt toegang tot alle functies.',
+          })
+        }
+      }, 3000)
+
+      return () => clearInterval(interval)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     let isMounted = true
     

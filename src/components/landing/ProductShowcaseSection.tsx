@@ -71,9 +71,9 @@ function FacturenMockup() {
         </div>
         {/* Rows */}
         {[
-          { client: 'De Vries B.V.', nr: '#2024-047', amount: '€ 1.250,00', status: 'Betaald', paid: true },
-          { client: 'Bakker & Zn', nr: '#2024-046', amount: '€ 875,50', status: 'Verzonden', paid: false },
-          { client: 'Studio Noord', nr: '#2024-045', amount: '€ 490,00', status: 'Concept', paid: false },
+          { client: 'De Vries B.V.', nr: '#2026-047', amount: '€ 1.250,00', status: 'Betaald', paid: true },
+          { client: 'Bakker & Zn', nr: '#2026-046', amount: '€ 875,50', status: 'Verzonden', paid: false },
+          { client: 'Studio Noord', nr: '#2026-045', amount: '€ 490,00', status: 'Concept', paid: false },
         ].map((r) => (
           <div
             key={r.nr}
@@ -326,7 +326,7 @@ const showcaseItems: ShowcaseItem[] = [
     title: 'Facturen maken in seconden',
     tagline: "Gratis factuur maken voor zzp'ers",
     description:
-      'Maak professionele facturen met automatische BTW-berekening. Verstuur ze direct per e-mail naar uw klant en volg de betalingsstatus op één plek. Nooit meer een factuur kwijt.',
+      'Maak professionele facturen met automatische BTW-berekening en deel ze direct met je klant. Volg de betalingsstatus op één plek — nooit meer een factuur kwijt.',
     accent: 'oklch(0.65 0.25 265)',
     accentBg: 'oklch(0.65 0.25 265 / 0.12)',
     accentBorder: 'oklch(0.65 0.25 265 / 0.30)',
@@ -365,7 +365,7 @@ const showcaseItems: ShowcaseItem[] = [
     title: 'Bonnen & uitgaven bijhouden',
     tagline: 'Uitgaven bijhouden voor zzp',
     description:
-      'Upload bonnetjes eenvoudig via uw telefoon of desktop. Kosten worden automatisch gecategoriseerd en toegevoegd aan uw BTW-overzicht.',
+      'Upload bonnetjes eenvoudig via uw telefoon of desktop. Categoriseer kosten eenvoudig en zie ze direct terug in je BTW-overzicht.',
     accent: 'oklch(0.72 0.18 55)',
     accentBg: 'oklch(0.72 0.18 55 / 0.12)',
     accentBorder: 'oklch(0.72 0.18 55 / 0.30)',
@@ -477,7 +477,7 @@ export function ProductShowcaseSection() {
             Werk professioneel zonder gedoe — start vandaag gratis.
           </p>
           <button
-            onClick={() => navigateTo('/login')}
+            onClick={() => navigateTo('/register')}
             className="inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
             style={{
               background: 'linear-gradient(135deg, oklch(0.65 0.25 265), oklch(0.72 0.20 200))',

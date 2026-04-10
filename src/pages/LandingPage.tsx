@@ -5,23 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   ArrowRight,
-  Briefcase,
-  CalendarDays,
   CheckCircle,
   ClipboardList,
-  Clock,
-  Download,
-  FileCheck,
   FileText,
-  GitBranch,
-  History,
-  Key,
-  Receipt,
-  Search,
   ShieldCheck,
   Smartphone,
   Star,
-  UserCheck,
   Users,
   Wallet,
   X,
@@ -34,74 +23,7 @@ import { HeroProductMockup } from '@/components/landing/HeroProductMockup'
 import { ProductShowcaseSection } from '@/components/landing/ProductShowcaseSection'
 
 
-const zzpFeatures = [
-  {
-    icon: FileText,
-    title: 'Facturen & betalingen',
-    description: 'Professionele facturen, automatische BTW-berekening en directe e-mailverzending naar uw klanten.',
-  },
-  {
-    icon: Receipt,
-    title: 'Uitgaven & bonnen',
-    description: 'Upload bonnetjes, koppel aan kosten en zie ze direct terug in uw BTW-overzicht.',
-  },
-  {
-    icon: Clock,
-    title: 'Urenregistratie',
-    description: 'Registreer uren handmatig of via timer en zet ze direct om in factuurregels.',
-  },
-  {
-    icon: CalendarDays,
-    title: 'Agenda',
-    description: 'Houd grip op opdrachten, deadlines en afspraken in uw geïntegreerde agenda.',
-  },
-  {
-    icon: FileCheck,
-    title: 'BTW-overzicht',
-    description: 'Zie exact hoe elke rubriek wordt berekend — volledig transparant voor uw aangifte.',
-  },
-  {
-    icon: Download,
-    title: 'Exports (PDF/CSV/JSON)',
-    description: 'Exporteer facturen als PDF en uw volledige administratie als CSV of JSON voor archivering.',
-  },
-  {
-    icon: Users,
-    title: 'Klantenbeheer',
-    description: 'Beheer uw klantenbestand, klantgegevens en communicatiehistorie in één overzicht.',
-  },
-]
 
-const accountantFeatures = [
-  { icon: ClipboardList, title: 'Werklijst', description: 'Prioriteer en verwerk openstaande taken per klant vanuit één overzicht.' },
-  { icon: UserCheck, title: 'Te beoordelen', description: 'Review en keur facturen en uitgaven van klanten goed of stuur terug.' },
-  { icon: Briefcase, title: 'Dossier per klant', description: 'Volledig klantdossier met facturen, uitgaven, uren, BTW en perioden.' },
-  { icon: Search, title: 'BTW rubrieken drilldown', description: 'Van rubriek tot bronboeking met toewijzingsreden — volledige traceerbaarheid.' },
-  { icon: History, title: 'Audit trail', description: 'Automatische vastlegging van alle acties voor compliance en dossiervorming.' },
-  { icon: GitBranch, title: 'Bank matching/reconciliatie', description: 'Koppel bankregels aan boekingen en werk efficiënt met bankimport.', beta: true },
-  { icon: Key, title: 'PKI-ondertekening', description: 'Digitale handtekening voor documenten (voorbereid voor toekomstige certificering).', beta: true },
-]
-
-const testimonials = [
-  {
-    quote: 'Eindelijk inzicht in mijn BTW zonder gedoe. Ik zie precies hoe elke rubriek is opgebouwd.',
-    initials: 'M.V.',
-    author: 'M. Vermeer',
-    role: 'ZZP — Freelance ontwerper',
-  },
-  {
-    quote: 'Mijn boekhouder kan nu live meekijken in mijn administratie. Dat scheelt enorm veel tijd en e-mails.',
-    initials: 'R.H.',
-    author: 'R. Hendriks',
-    role: 'ZZP — IT-consultant',
-  },
-  {
-    quote: 'Eenvoudig, mobiel en professioneel. Ik gebruik het dagelijks op mijn telefoon en verstuur facturen onderweg.',
-    initials: 'S.B.',
-    author: 'S. Bakker',
-    role: 'ZZP — Zelfstandig aannemer',
-  },
-]
 
 const usps = [
   { icon: FileText, title: 'Professionele facturen in seconden' },
@@ -116,13 +38,13 @@ export const LandingPage = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useSeoMeta({
-    title: "Gratis factuur maken voor zzp'ers | ZZPers Hub",
-    description: "Maak gratis professionele facturen als zzp'er. Beheer klanten, registreer uren en houd btw-overzicht bij. Start vandaag gratis — daarna €4,99/maand. Geen creditcard vereist.",
+    title: "Jouw boekhouding, simpel en duidelijk | ZZPers Hub",
+    description: "Altijd weten wat je moet betalen. Facturen, uitgaven, BTW-overzicht en jaaroverzicht op één plek — speciaal voor zzp'ers. Start 30 dagen gratis, daarna €4,95/maand.",
     canonical: 'https://zzpershub.nl/',
   })
 
   const navigation = [
-    { name: 'Facturen & functies', href: '#voor-zzp' },
+    { name: 'Functies', href: '#product-showcase' },
     { name: 'Pakketten', href: '/prijzen' },
     { name: 'FAQ', href: '/faq' },
     { name: 'Contact', href: '/contact' },
@@ -154,7 +76,7 @@ export const LandingPage = () => {
             <Button variant="ghost" onClick={() => navigateTo('/login')}>
               Inloggen
             </Button>
-            <Button size="sm" onClick={() => navigateTo('/login')}>
+            <Button size="sm" onClick={() => navigateTo('/register')}>
               Start gratis
             </Button>
           </div>
@@ -181,7 +103,7 @@ export const LandingPage = () => {
             <Button variant="ghost" className="mt-2 w-full justify-start" onClick={() => navigateTo('/login')}>
               Inloggen
             </Button>
-            <Button className="mt-2 w-full" onClick={() => navigateTo('/login')}>
+            <Button className="mt-2 w-full" onClick={() => navigateTo('/register')}>
               Start gratis
             </Button>
           </div>
@@ -203,12 +125,12 @@ export const LandingPage = () => {
               </div>
               {/* Headline */}
               <h1 className="text-4xl font-extrabold leading-[1.15] tracking-tight sm:text-5xl lg:text-6xl lg:tracking-[-0.03em]">
-                <span className="block">Gratis factuur maken</span>
-                <span className="hero-gradient-text block">voor zzp'ers</span>
+                <span className="block">Jouw boekhouding,</span>
+                <span className="hero-gradient-text block">simpel en duidelijk</span>
               </h1>
               {/* Subtitle */}
               <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg lg:mx-0 lg:mt-6 lg:max-w-lg lg:text-xl lg:leading-[1.7]">
-                Maak professionele facturen, beheer klanten, registreer uren en houd overzicht — allemaal op één plek. Eenvoudig, snel en mobiel.
+                Facturen, uitgaven, BTW-overzicht en jaaroverzicht — alles op één plek. Speciaal voor zzp'ers, zonder boekhoudkennis.
               </p>
               {/* ZZP feature highlights */}
               <div className="mt-7 flex flex-wrap justify-center gap-2 lg:justify-start">
@@ -224,7 +146,7 @@ export const LandingPage = () => {
                 <Button
                   size="lg"
                   className="btn-premium-glow w-full max-w-sm sm:w-auto"
-                  onClick={() => navigateTo('/login')}
+                  onClick={() => navigateTo('/register')}
                 >
                   Start gratis
                   <ArrowRight className="ml-2 h-5 w-5" />
@@ -240,7 +162,7 @@ export const LandingPage = () => {
               </div>
               {/* Helper text */}
               <div className="mt-5 space-y-1.5">
-                <p className="text-sm text-muted-foreground">30 dagen gratis, daarna €4,99 per maand. Geen verplichtingen.</p>
+                <p className="text-sm text-muted-foreground">30 dagen gratis, daarna €4,95 per maand. Geen verplichtingen.</p>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold lg:justify-start" style={{ color: 'var(--accent2)' }}>
                   <CheckCircle className="h-3.5 w-3.5 shrink-0" />
                   Binnen 60 seconden gestart.
@@ -259,42 +181,7 @@ export const LandingPage = () => {
       {/* Hoe werkt het — 3-step premium workflow */}
       <HowItWorksSection />
 
-      {/* For ZZP */}
-      <section id="voor-zzp" className="py-14 sm:py-20 lg:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-8 sm:mb-10">
-            <p className="text-sm font-semibold text-accent uppercase tracking-wider mb-2">Functies voor zzp'ers</p>
-            <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Alles wat je nodig hebt als zzp'er</h2>
-            <p className="mt-3 text-muted-foreground max-w-2xl lg:text-lg lg:leading-relaxed">Van eerste factuur tot kwartaalaangifte: overzichtelijk, snel en zonder gedoe.</p>
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {zzpFeatures.map((feature) => {
-              const Icon = feature.icon
-              return (
-                <Card key={feature.title} className="border-border/80">
-                  <CardHeader>
-                    <div className="mb-2" style={{ color: 'oklch(0.72 0.18 150)' }}>
-                      <Icon className="h-6 w-6" />
-                    </div>
-                    <CardTitle className="text-base lg:text-lg">{feature.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="lg:text-base">{feature.description}</CardDescription>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-          <div className="mt-8">
-            <Button size="lg" onClick={() => navigateTo('/login')}>
-              Start gratis
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* For Accountants — secondary, lower position */}
+      {/* For Accountants — secondary, brief mention */}
       <section id="voor-accountants" className="bg-muted/40 py-14 sm:py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-8">
@@ -304,25 +191,6 @@ export const LandingPage = () => {
               Wil je je administratie delen met een boekhouder of accountant? Dat kan met één klik. Zij krijgen leestoegang tot jouw dossier — jij behoudt altijd de controle.
             </p>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {accountantFeatures.map((feature) => {
-              const Icon = feature.icon
-              return (
-                <div key={feature.title} className="flex flex-col gap-2 rounded-lg border border-border bg-background p-4">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-4 w-4 text-primary shrink-0" />
-                    <span className="text-sm font-medium lg:text-base">
-                      {feature.title}
-                      {feature.beta && (
-                        <span className="ml-2 text-xs text-muted-foreground font-normal">(coming soon)</span>
-                      )}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground lg:text-sm">{feature.description}</p>
-                </div>
-              )
-            })}
-          </div>
           <div className="mt-8">
             <Button size="lg" variant="outline" onClick={() => navigateTo('/contact')}>
               Contact opnemen
@@ -331,32 +199,26 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="bg-muted/40 py-14 sm:py-20 lg:py-28">
+      {/* Trust section — factual statements, no fake testimonials */}
+      <section className="py-14 sm:py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl mb-10">Wat klanten zeggen</h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {testimonials.map((item) => (
-              <Card key={item.author} className="border-border/80">
-                <CardContent className="pt-6">
-                  <div className="flex gap-0.5 mb-3">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="h-3.5 w-3.5" style={{ color: 'var(--accent2)', fill: 'var(--accent2)' }} />
-                    ))}
-                  </div>
-                  <p className="text-sm text-muted-foreground lg:text-base lg:leading-relaxed">"{item.quote}"</p>
-                  <div className="mt-4 flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary shrink-0">
-                      {item.initials}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold">{item.author}</p>
-                      <p className="text-xs text-muted-foreground">{item.role}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl mb-3">Gebouwd voor de Nederlandse markt</h2>
+          <p className="text-muted-foreground max-w-2xl mb-10 lg:text-lg">Vertrouwd, transparant en volledig conform Nederlandse regelgeving.</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { icon: CheckCircle, text: 'Nederlandse BTW-tarieven en rubrieken ingebouwd' },
+              { icon: CheckCircle, text: 'Voldoet aan Nederlandse boekhoudregels' },
+              { icon: CheckCircle, text: 'Gegevens veilig opgeslagen in Europa' },
+              { icon: CheckCircle, text: 'KvK: 69779716 — Alkmaar' },
+            ].map((item) => {
+              const Icon = item.icon
+              return (
+                <div key={item.text} className="flex items-start gap-3 rounded-lg border border-border/80 bg-background p-4">
+                  <Icon className="h-5 w-5 text-accent shrink-0 mt-0.5" />
+                  <p className="text-sm font-medium lg:text-base">{item.text}</p>
+                </div>
+              )
+            })}
           </div>
         </div>
       </section>
@@ -410,7 +272,7 @@ export const LandingPage = () => {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button variant="outline" className="w-full" onClick={() => navigateTo('/login')}>
+                <Button variant="outline" className="w-full" onClick={() => navigateTo('/register')}>
                   Start gratis maand
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -437,7 +299,7 @@ export const LandingPage = () => {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button className="w-full" onClick={() => navigateTo('/login')}>
+                <Button className="w-full" onClick={() => navigateTo('/register')}>
                   Kies Starter
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -456,7 +318,14 @@ export const LandingPage = () => {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm lg:text-base">
-                  {['Alles van Starter', 'BTW-aangifte met Digipoort', 'Bankrekening koppeling', 'Exports (PDF, CSV)', '10 GB opslag', 'Prioriteit support'].map((item) => (
+                  {[
+                    'Alles van Starter',
+                    'BTW-aangifte met Digipoort (binnenkort)',
+                    'Bankrekening koppeling (binnenkort)',
+                    'Exports (PDF, CSV)',
+                    '10 GB opslag (binnenkort)',
+                    'Prioriteit support (binnenkort)',
+                  ].map((item) => (
                     <li key={item} className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-accent shrink-0" />
                       {item}
@@ -465,7 +334,7 @@ export const LandingPage = () => {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button className="w-full" onClick={() => navigateTo('/login')}>
+                <Button className="w-full" onClick={() => navigateTo('/register')}>
                   Kies Pro
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -524,7 +393,7 @@ export const LandingPage = () => {
             Start vandaag nog met uw gratis proefperiode van 30 dagen. Geen creditcard, geen verplichtingen.
           </p>
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <Button size="lg" onClick={() => navigateTo('/login')}>
+            <Button size="lg" onClick={() => navigateTo('/register')}>
               Start gratis
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>

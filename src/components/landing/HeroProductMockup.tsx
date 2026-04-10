@@ -155,10 +155,10 @@ export function HeroProductMockup() {
                 {/* Invoice rows */}
                 <div className="flex-1 px-2 py-1.5 space-y-1 overflow-hidden">
                   {[
-                    { num: '#2024-047', client: 'De Vries B.V.', amount: '€ 1.250,00', status: 'Betaald', paid: true },
-                    { num: '#2024-046', client: 'Bakker & Zn', amount: '€ 875,50', status: 'Verzonden', paid: false },
-                    { num: '#2024-045', client: 'Hofman ICT', amount: '€ 2.100,00', status: 'Betaald', paid: true },
-                    { num: '#2024-044', client: 'Studio Noord', amount: '€ 490,00', status: 'Concept', paid: false },
+                    { num: '#2026-047', client: 'De Vries B.V.', amount: '€ 1.250,00', status: 'Betaald', paid: true },
+                    { num: '#2026-046', client: 'Bakker & Zn', amount: '€ 875,50', status: 'Verzonden', paid: false },
+                    { num: '#2026-045', client: 'Hofman ICT', amount: '€ 2.100,00', status: 'Betaald', paid: true },
+                    { num: '#2026-044', client: 'Studio Noord', amount: '€ 490,00', status: 'Concept', paid: false },
                   ].map((inv) => (
                     <div
                       key={inv.num}

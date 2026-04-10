@@ -3,18 +3,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { 
   Database, 
-  User, 
   Buildings, 
   CheckCircle, 
   ArrowRight,
   ArrowLeft,
-  Sparkle,
-  Briefcase
+  Bank,
+  Invoice,
+  Upload,
+  House
 } from '@phosphor-icons/react'
 import { administrationApi, AdministrationCreateRequest } from '@/lib/api'
+import { navigateTo } from '@/lib/navigation'
 import { toast } from 'sonner'
 import { t } from '@/i18n'
 
@@ -24,36 +25,39 @@ interface OnboardingPageProps {
   onComplete: () => void
 }
 
-type OnboardingStep = 'account-type' | 'create-administration' | 'confirmation'
+type OnboardingStep = 'bedrijf' | 'bankgegevens' | 'klaar'
 
-export const OnboardingPage = ({ userRole, userName, onComplete }: OnboardingPageProps) => {
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>('account-type')
-  const [accountType, setAccountType] = useState<'zzp' | 'accountant'>(
-    userRole === 'accountant' ? 'accountant' : 'zzp'
-  )
+export const OnboardingPage = ({ userName, onComplete }: OnboardingPageProps) => {
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>('bedrijf')
   const [isLoading, setIsLoading] = useState(false)
   
   // Administration form state
   const [administrationForm, setAdministrationForm] = useState<AdministrationCreateRequest>({
     name: '',
-    description: '',
     kvk_number: '',
     btw_number: '',
   })
   
-  const handleAccountTypeSelect = (type: 'zzp' | 'accountant') => {
-    setAccountType(type)
-    setCurrentStep('create-administration')
+  // IBAN is collected but stored in description for now (no backend field yet)
+  const [iban, setIban] = useState('')
+  
+  const handleBedrijfNext = () => {
+    if (!administrationForm.name.trim()) return
+    setCurrentStep('bankgegevens')
   }
   
-  const handleCreateAdministration = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleCreateAdministration = async () => {
     setIsLoading(true)
     
     try {
-      await administrationApi.create(administrationForm)
+      // Store IBAN in description if provided (until dedicated field is added)
+      const createData: AdministrationCreateRequest = {
+        ...administrationForm,
+        description: iban ? `IBAN: ${iban}` : undefined,
+      }
+      await administrationApi.create(createData)
       toast.success(t('onboarding.adminCreatedSuccess'))
-      setCurrentStep('confirmation')
+      setCurrentStep('klaar')
     } catch (error) {
       console.error('Failed to create administration:', error)
       toast.error(t('onboarding.adminCreatedError'))
@@ -63,74 +67,77 @@ export const OnboardingPage = ({ userRole, userName, onComplete }: OnboardingPag
   }
   
   const handleGoBack = () => {
-    if (currentStep === 'create-administration') {
-      setCurrentStep('account-type')
+    if (currentStep === 'bankgegevens') {
+      setCurrentStep('bedrijf')
     }
   }
 
-  // Step 1: Choose account type
-  const renderAccountTypeStep = () => (
+  // Step 1: Over je bedrijf
+  const renderBedrijfStep = () => (
     <Card className="bg-card/80 backdrop-blur-sm border-2 border-primary/20 max-w-2xl mx-auto">
       <CardHeader className="text-center">
         <div className="flex justify-center mb-4">
-          <User size={48} weight="duotone" className="text-primary" />
+          <Buildings size={48} weight="duotone" className="text-primary" />
         </div>
-        <CardTitle className="text-2xl">{t('onboarding.welcomeZzp')}, {userName}!</CardTitle>
+        <CardTitle className="text-2xl">Over je bedrijf</CardTitle>
         <CardDescription className="text-base">
-          {t('onboarding.zzpDescription')}
+          Vul je bedrijfsgegevens in om je administratie aan te maken.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* ZZP Option */}
-          <button
-            onClick={() => handleAccountTypeSelect('zzp')}
-            className={`p-6 rounded-lg border-2 text-left transition-all hover:border-primary hover:bg-primary/5 ${
-              accountType === 'zzp' ? 'border-primary bg-primary/5' : 'border-border'
-            }`}
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <Briefcase size={32} weight="duotone" className="text-primary" />
-              <div>
-                <h3 className="font-semibold text-lg">{t('onboarding.accountTypeZzp')}</h3>
-                <Badge variant="outline" className="text-xs">{t('onboarding.accountTypeZzpBadge')}</Badge>
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {t('onboarding.accountTypeZzpDescription')}
-            </p>
-          </button>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="admin-name">Bedrijfsnaam *</Label>
+            <Input
+              id="admin-name"
+              placeholder="bijv. Jan Jansen Consulting"
+              value={administrationForm.name}
+              onChange={(e) => setAdministrationForm({ ...administrationForm, name: e.target.value })}
+              required
+              minLength={1}
+              maxLength={255}
+            />
+          </div>
           
-          {/* Accountant Option */}
-          <button
-            onClick={() => handleAccountTypeSelect('accountant')}
-            className={`p-6 rounded-lg border-2 text-left transition-all hover:border-primary hover:bg-primary/5 ${
-              accountType === 'accountant' ? 'border-primary bg-primary/5' : 'border-border'
-            }`}
+          <div className="space-y-2">
+            <Label htmlFor="admin-kvk">KVK-nummer (optioneel maar aanbevolen)</Label>
+            <Input
+              id="admin-kvk"
+              placeholder="bijv. 12345678"
+              value={administrationForm.kvk_number}
+              onChange={(e) => setAdministrationForm({ ...administrationForm, kvk_number: e.target.value })}
+              maxLength={50}
+            />
+            <p className="text-xs text-muted-foreground">Inschrijfnummer Kamer van Koophandel</p>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="admin-btw">BTW-nummer (optioneel maar aanbevolen)</Label>
+            <Input
+              id="admin-btw"
+              placeholder="bijv. NL123456789B01"
+              value={administrationForm.btw_number}
+              onChange={(e) => setAdministrationForm({ ...administrationForm, btw_number: e.target.value })}
+              maxLength={50}
+            />
+            <p className="text-xs text-muted-foreground">BTW-identificatienummer</p>
+          </div>
+          
+          <Button 
+            onClick={handleBedrijfNext}
+            className="w-full mt-6" 
+            disabled={!administrationForm.name.trim()}
           >
-            <div className="flex items-center gap-3 mb-3">
-              <Buildings size={32} weight="duotone" className="text-accent" />
-              <div>
-                <h3 className="font-semibold text-lg">{t('onboarding.accountTypeAccountant')}</h3>
-                <Badge variant="outline" className="text-xs">{t('onboarding.accountTypeAccountantBadge')}</Badge>
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {t('onboarding.accountTypeAccountantDescription')}
-            </p>
-          </button>
+            Volgende
+            <ArrowRight size={18} className="ml-2" />
+          </Button>
         </div>
-        
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          <Sparkle size={14} className="inline mr-1" />
-          {t('onboarding.canChangeLater')}
-        </p>
       </CardContent>
     </Card>
   )
 
-  // Step 2: Create first administration
-  const renderCreateAdministrationStep = () => (
+  // Step 2: Bankgegevens
+  const renderBankgegevensStep = () => (
     <Card className="bg-card/80 backdrop-blur-sm border-2 border-primary/20 max-w-2xl mx-auto">
       <CardHeader>
         <div className="flex items-center gap-2 mb-2">
@@ -145,123 +152,97 @@ export const OnboardingPage = ({ userRole, userName, onComplete }: OnboardingPag
           </Button>
         </div>
         <div className="flex justify-center mb-4">
-          <Buildings size={48} weight="duotone" className="text-primary" />
+          <Bank size={48} weight="duotone" className="text-primary" />
         </div>
-        <CardTitle className="text-2xl text-center">
-          {accountType === 'zzp' ? t('onboarding.createAdministration') : t('onboarding.createClientAdmin')}
-        </CardTitle>
+        <CardTitle className="text-2xl text-center">Bankgegevens</CardTitle>
         <CardDescription className="text-base text-center">
-          {accountType === 'zzp'
-            ? t('onboarding.adminSetupZzp')
-            : t('onboarding.adminSetupAccountant')}
+          Voeg je IBAN toe. Dit wordt later gebruikt voor factuursjablonen.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleCreateAdministration} className="space-y-4">
+        <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="admin-name">
-              {accountType === 'zzp' ? t('onboarding.businessName') : t('onboarding.clientName')} *
-            </Label>
+            <Label htmlFor="admin-iban">IBAN (optioneel maar aanbevolen)</Label>
             <Input
-              id="admin-name"
-              placeholder={accountType === 'zzp' ? t('onboarding.businessNamePlaceholder') : t('onboarding.clientNamePlaceholder')}
-              value={administrationForm.name}
-              onChange={(e) => setAdministrationForm({ ...administrationForm, name: e.target.value })}
-              required
-              minLength={1}
-              maxLength={255}
+              id="admin-iban"
+              placeholder="bijv. NL91 ABNA 0417 1643 00"
+              value={iban}
+              onChange={(e) => setIban(e.target.value)}
+              maxLength={34}
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="admin-kvk">{t('onboarding.kvkNumberLabel')}</Label>
-            <Input
-              id="admin-kvk"
-              placeholder={t('onboarding.kvkNumberPlaceholder')}
-              value={administrationForm.kvk_number}
-              onChange={(e) => setAdministrationForm({ ...administrationForm, kvk_number: e.target.value })}
-              maxLength={50}
-            />
-            <p className="text-xs text-muted-foreground">{t('onboarding.kvkNumberHelp')}</p>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="admin-btw">{t('onboarding.btwNumberLabel')}</Label>
-            <Input
-              id="admin-btw"
-              placeholder={t('onboarding.btwNumberPlaceholder')}
-              value={administrationForm.btw_number}
-              onChange={(e) => setAdministrationForm({ ...administrationForm, btw_number: e.target.value })}
-              maxLength={50}
-            />
-            <p className="text-xs text-muted-foreground">{t('onboarding.btwNumberHelp')}</p>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="admin-description">{t('onboarding.descriptionLabel')}</Label>
-            <Input
-              id="admin-description"
-              placeholder={t('onboarding.descriptionPlaceholder')}
-              value={administrationForm.description}
-              onChange={(e) => setAdministrationForm({ ...administrationForm, description: e.target.value })}
-              maxLength={1000}
-            />
+            <p className="text-xs text-muted-foreground">
+              Je IBAN wordt gebruikt voor je factuursjablonen
+            </p>
           </div>
           
           <Button 
-            type="submit" 
+            onClick={handleCreateAdministration}
             className="w-full mt-6" 
-            disabled={isLoading || !administrationForm.name.trim()}
+            disabled={isLoading}
           >
-            {isLoading ? t('onboarding.creatingAdmin') : t('onboarding.createAdminButton')}
+            {isLoading ? 'Aanmaken...' : 'Administratie aanmaken'}
             <ArrowRight size={18} className="ml-2" />
           </Button>
-        </form>
+          
+          <Button
+            variant="ghost"
+            onClick={handleCreateAdministration}
+            className="w-full text-muted-foreground"
+            disabled={isLoading}
+          >
+            Overslaan — ik voeg dit later toe
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )
 
-  // Step 3: Confirmation
-  const renderConfirmationStep = () => (
+  // Step 3: Klaar!
+  const renderKlaarStep = () => (
     <Card className="bg-card/80 backdrop-blur-sm border-2 border-primary/20 max-w-2xl mx-auto">
       <CardHeader className="text-center">
         <div className="flex justify-center mb-4">
           <CheckCircle size={64} weight="fill" className="text-green-500" />
         </div>
-        <CardTitle className="text-2xl text-green-600">{t('onboarding.allSetTitle')}</CardTitle>
+        <CardTitle className="text-2xl text-green-600">Klaar!</CardTitle>
         <CardDescription className="text-base">
-          {t('onboarding.allSetDescription')}
+          Je administratie is aangemaakt. Je kunt nu aan de slag!
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="bg-secondary/50 rounded-lg p-4 space-y-3">
-          <h4 className="font-medium">{t('onboarding.whatYouCanDo')}</h4>
-          <ul className="text-sm text-muted-foreground space-y-2">
-            <li className="flex items-center gap-2">
-              <Sparkle size={16} className="text-primary" />
-              {t('onboarding.uploadInvoicesReceipts')}
-            </li>
-            <li className="flex items-center gap-2">
-              <Sparkle size={16} className="text-primary" />
-              {t('onboarding.reviewAiTransactions')}
-            </li>
-            <li className="flex items-center gap-2">
-              <Sparkle size={16} className="text-primary" />
-              {t('onboarding.trackVatObligations')}
-            </li>
-            {accountType === 'accountant' && (
-              <li className="flex items-center gap-2">
-                <Sparkle size={16} className="text-primary" />
-                {t('onboarding.addMoreClientsAccountant')}
-              </li>
-            )}
-          </ul>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Button 
+            onClick={() => {
+              onComplete()
+              setTimeout(() => navigateTo('/zzp/invoices'), 0)
+            }}
+            variant="outline"
+            className="flex flex-col items-center gap-2 h-auto py-4"
+          >
+            <Invoice size={24} weight="duotone" className="text-primary" />
+            <span className="text-sm">Maak je eerste factuur →</span>
+          </Button>
+          
+          <Button 
+            onClick={() => {
+              onComplete()
+              setTimeout(() => navigateTo('/ai-upload'), 0)
+            }}
+            variant="outline"
+            className="flex flex-col items-center gap-2 h-auto py-4"
+          >
+            <Upload size={24} weight="duotone" className="text-primary" />
+            <span className="text-sm">Upload een bon →</span>
+          </Button>
+          
+          <Button 
+            onClick={onComplete}
+            className="flex flex-col items-center gap-2 h-auto py-4"
+          >
+            <House size={24} weight="duotone" />
+            <span className="text-sm">Bekijk je dashboard →</span>
+          </Button>
         </div>
-        
-        <Button onClick={onComplete} className="w-full" size="lg">
-          {t('onboarding.goToDashboard')}
-          <ArrowRight size={18} className="ml-2" />
-        </Button>
       </CardContent>
     </Card>
   )
@@ -280,28 +261,31 @@ export const OnboardingPage = ({ userRole, userName, onComplete }: OnboardingPag
             </h1>
           </div>
           
+          <p className="text-lg text-muted-foreground mb-2">
+            Welkom, {userName}!
+          </p>
+          
           {/* Progress indicator */}
           <div className="flex items-center justify-center gap-2 mt-6">
-            {/* Step 1 is always highlighted (current or completed) */}
             <div className="h-2 w-16 rounded-full transition-colors bg-primary" />
             <div className={`h-2 w-16 rounded-full transition-colors ${
-              currentStep === 'create-administration' || currentStep === 'confirmation' 
+              currentStep === 'bankgegevens' || currentStep === 'klaar' 
                 ? 'bg-primary' 
                 : 'bg-muted'
             }`} />
             <div className={`h-2 w-16 rounded-full transition-colors ${
-              currentStep === 'confirmation' ? 'bg-primary' : 'bg-muted'
+              currentStep === 'klaar' ? 'bg-primary' : 'bg-muted'
             }`} />
           </div>
           <p className="text-sm text-muted-foreground mt-2">
-            {t('onboarding.step')} {currentStep === 'account-type' ? '1' : currentStep === 'create-administration' ? '2' : '3'} {t('onboarding.of')} 3
+            {t('onboarding.step')} {currentStep === 'bedrijf' ? '1' : currentStep === 'bankgegevens' ? '2' : '3'} {t('onboarding.of')} 3
           </p>
         </div>
         
         {/* Step content */}
-        {currentStep === 'account-type' && renderAccountTypeStep()}
-        {currentStep === 'create-administration' && renderCreateAdministrationStep()}
-        {currentStep === 'confirmation' && renderConfirmationStep()}
+        {currentStep === 'bedrijf' && renderBedrijfStep()}
+        {currentStep === 'bankgegevens' && renderBankgegevensStep()}
+        {currentStep === 'klaar' && renderKlaarStep()}
       </div>
     </div>
   )

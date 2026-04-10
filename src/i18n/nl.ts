@@ -1299,14 +1299,15 @@ export const nl = {
     eachClientSeparate: "Elke klant krijgt een eigen administratie",
     // No transactions
     noTransactionsYet: "Nog geen transacties",
-    noTransactionsDescription: "Upload je eerste factuur of bon om automatisch transacties aan te maken.",
-    uploadDocument: "Document uploaden",
+    noTransactionsDescription: "Je hebt nog geen transacties. Upload een bon of maak een factuur om te beginnen.",
+    uploadDocument: "Upload een bon",
+    createInvoice: "Maak een factuur",
     uploadFormats: "Upload PDF's, afbeeldingen of gescande documenten",
     aiExtract: "AI haalt gegevens op en maakt transacties aan",
     reviewBeforePost: "Controleer en keur goed voordat je naar het grootboek boekt",
     // No documents
     noDocumentsUploaded: "Geen documenten geüpload",
-    noDocumentsDescription: "Begin met het uploaden van je facturen, bonnen of bankafschriften.",
+    noDocumentsDescription: "Sleep je eerste factuur of bon hierheen om te beginnen.",
     uploadFirstDocument: "Eerste document uploaden",
     supportedFormats: "Ondersteunde formaten: PDF, PNG, JPG, JPEG",
     aiProcesses: "AI verwerkt documenten in seconden",

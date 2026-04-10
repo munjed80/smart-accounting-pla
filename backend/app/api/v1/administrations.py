@@ -1,3 +1,5 @@
+import logging
+import uuid as uuid_mod
 from typing import Annotated, List, Optional
 from uuid import UUID
 
@@ -9,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.core.config import settings
 from app.models.administration import Administration, AdministrationMember, MemberRole
+from app.models.accounting import ChartOfAccount
 from app.models.document import Document, DocumentStatus
 from app.models.user import User
 from app.schemas.administration import (
@@ -20,6 +23,47 @@ from app.schemas.administration import (
 )
 from app.schemas.document import DocumentResponse
 from app.api.v1.deps import CurrentUser
+
+logger = logging.getLogger(__name__)
+
+# Dutch minimal chart of accounts template (mirrors seed.py)
+CHART_OF_ACCOUNTS_TEMPLATE = [
+    {"code": "0100", "name": "Gebouwen", "type": "ASSET"},
+    {"code": "0200", "name": "Machines & Inventaris", "type": "ASSET"},
+    {"code": "0300", "name": "Transportmiddelen", "type": "ASSET"},
+    {"code": "1000", "name": "Kas", "type": "ASSET"},
+    {"code": "1100", "name": "Bank", "type": "ASSET"},
+    {"code": "1200", "name": "Spaarrekening", "type": "ASSET"},
+    {"code": "1300", "name": "Debiteuren", "type": "ASSET"},
+    {"code": "1400", "name": "Voorraad", "type": "ASSET"},
+    {"code": "1500", "name": "Vooruitontvangen", "type": "LIABILITY"},
+    {"code": "1600", "name": "Crediteuren", "type": "LIABILITY"},
+    {"code": "1700", "name": "Te betalen BTW", "type": "LIABILITY"},
+    {"code": "1800", "name": "Te vorderen BTW", "type": "LIABILITY"},
+    {"code": "1900", "name": "Leningen", "type": "LIABILITY"},
+    {"code": "2000", "name": "Kapitaal", "type": "EQUITY"},
+    {"code": "2100", "name": "Privé stortingen", "type": "EQUITY"},
+    {"code": "2200", "name": "Privé opnamen", "type": "EQUITY"},
+    {"code": "2900", "name": "Resultaat lopend jaar", "type": "EQUITY"},
+    {"code": "8000", "name": "Omzet verkopen", "type": "REVENUE"},
+    {"code": "8100", "name": "Omzet diensten", "type": "REVENUE"},
+    {"code": "8200", "name": "Overige opbrengsten", "type": "REVENUE"},
+    {"code": "4000", "name": "Autokosten & Brandstof", "type": "EXPENSE"},
+    {"code": "4050", "name": "Reiskosten Openbaar Vervoer", "type": "EXPENSE"},
+    {"code": "4100", "name": "Huisvestingskosten", "type": "EXPENSE"},
+    {"code": "4200", "name": "Verkoopkosten", "type": "EXPENSE"},
+    {"code": "4300", "name": "Kantoorkosten & Apparatuur", "type": "EXPENSE"},
+    {"code": "4310", "name": "Software & Licenties", "type": "EXPENSE"},
+    {"code": "4400", "name": "Promotiekosten", "type": "EXPENSE"},
+    {"code": "4500", "name": "Algemene kosten", "type": "EXPENSE"},
+    {"code": "4550", "name": "Telefoon & Internet", "type": "EXPENSE"},
+    {"code": "4600", "name": "Bankkosten", "type": "EXPENSE"},
+    {"code": "4700", "name": "Verzekeringen", "type": "EXPENSE"},
+    {"code": "4800", "name": "Administratiekosten", "type": "EXPENSE"},
+    {"code": "4900", "name": "Afschrijvingen", "type": "EXPENSE"},
+    {"code": "7000", "name": "Inkoopkosten", "type": "EXPENSE"},
+    {"code": "9999", "name": "Te rubriceren", "type": "EXPENSE"},
+]
 
 router = APIRouter()
 
@@ -51,7 +95,10 @@ async def create_administration(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Create a new administration and add current user as OWNER"""
+    """Create a new administration and add current user as OWNER.
+    
+    Also seeds the default Dutch chart of accounts for the new administration.
+    """
     # Create administration
     administration = Administration(**admin_in.model_dump())
     db.add(administration)
@@ -64,6 +111,23 @@ async def create_administration(
         role=MemberRole.OWNER,
     )
     db.add(member)
+
+    # Seed default chart of accounts for this administration
+    for acc in CHART_OF_ACCOUNTS_TEMPLATE:
+        account = ChartOfAccount(
+            id=uuid_mod.uuid4(),
+            administration_id=administration.id,
+            account_code=acc["code"],
+            account_name=acc["name"],
+            account_type=acc["type"],
+            is_active=True,
+        )
+        db.add(account)
+    logger.info(
+        "Seeded %d chart of accounts for administration %s",
+        len(CHART_OF_ACCOUNTS_TEMPLATE),
+        administration.id,
+    )
     
     await db.commit()
     await db.refresh(administration)

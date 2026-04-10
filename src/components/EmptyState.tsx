@@ -124,10 +124,12 @@ export const NoAdministrationsEmptyState = ({
  */
 interface NoTransactionsEmptyStateProps {
   onUploadDocument?: () => void
+  onCreateInvoice?: () => void
 }
 
 export const NoTransactionsEmptyState = ({
   onUploadDocument,
+  onCreateInvoice,
 }: NoTransactionsEmptyStateProps) => {
   return (
     <EmptyState
@@ -135,6 +137,8 @@ export const NoTransactionsEmptyState = ({
       description={t('emptyStates.noTransactionsDescription')}
       actionLabel={t('emptyStates.uploadDocument')}
       onAction={onUploadDocument}
+      secondaryActionLabel={t('emptyStates.createInvoice')}
+      onSecondaryAction={onCreateInvoice}
       tips={[
         t('emptyStates.uploadFormats'),
         t('emptyStates.aiExtract'),

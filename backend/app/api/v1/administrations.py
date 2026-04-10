@@ -113,8 +113,8 @@ async def create_administration(
     db.add(member)
 
     # Seed default chart of accounts for this administration
-    for acc in CHART_OF_ACCOUNTS_TEMPLATE:
-        account = ChartOfAccount(
+    chart_accounts = [
+        ChartOfAccount(
             id=uuid_mod.uuid4(),
             administration_id=administration.id,
             account_code=acc["code"],
@@ -122,7 +122,9 @@ async def create_administration(
             account_type=acc["type"],
             is_active=True,
         )
-        db.add(account)
+        for acc in CHART_OF_ACCOUNTS_TEMPLATE
+    ]
+    db.add_all(chart_accounts)
     logger.info(
         "Seeded %d chart of accounts for administration %s",
         len(CHART_OF_ACCOUNTS_TEMPLATE),

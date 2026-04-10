@@ -168,21 +168,33 @@ async def test_commitment_tenant_safety_and_expense_link(async_client, auth_head
 
     # Create a trial subscription for the other admin so paywall doesn't block
     from app.models.subscription import Subscription, SubscriptionStatus, Plan
-    plan_result = await db_session.execute(select(Plan).where(Plan.code == "zzp_basic"))
+    plan_result = await db_session.execute(select(Plan).where(Plan.code == "free"))
     plan = plan_result.scalars().first()
-    if plan:
-        now = datetime.now(timezone.utc)
-        other_sub = Subscription(
-            administration_id=other_admin.id,
-            plan_id=plan.id,
-            plan_code=plan.code,
-            status=SubscriptionStatus.TRIALING,
-            trial_start_at=now,
-            trial_end_at=now + timedelta(days=30),
-            starts_at=now,
-            cancel_at_period_end=False,
+    if not plan:
+        plan = Plan(
+            code="free",
+            name="Free",
+            price_monthly=0.00,
+            trial_days=30,
+            max_invoices=999999,
+            max_storage_mb=5120,
+            max_users=1,
         )
-        db_session.add(other_sub)
+        db_session.add(plan)
+        await db_session.flush()
+
+    now = datetime.now(timezone.utc)
+    other_sub = Subscription(
+        administration_id=other_admin.id,
+        plan_id=plan.id,
+        plan_code=plan.code,
+        status=SubscriptionStatus.TRIALING,
+        trial_start_at=now,
+        trial_end_at=now + timedelta(days=30),
+        starts_at=now,
+        cancel_at_period_end=False,
+    )
+    db_session.add(other_sub)
 
     await db_session.commit()
 

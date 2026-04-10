@@ -31,11 +31,17 @@ export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallM
   const { entitlements, refetch } = useEntitlements()
   const [isActivating, setIsActivating] = useState(false)
   
-  const handleActivate = async () => {
+  const handleActivate = async (planCode: string) => {
     setIsActivating(true)
     
     try {
-      const result = await subscriptionApi.activateSubscription()
+      const result = await subscriptionApi.activateSubscription(planCode)
+      
+      // Redirect to Mollie checkout for immediate payment
+      if (result.checkout_url) {
+        window.location.href = result.checkout_url
+        return
+      }
       
       // Refetch entitlements to update UI
       await refetch()
@@ -65,7 +71,7 @@ export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallM
   
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-orange-100">
             <Lock className="h-6 w-6 text-orange-600" />
@@ -88,33 +94,74 @@ export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallM
           </DialogDescription>
         </DialogHeader>
         
-        <div className="my-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
-          <div className="flex items-start gap-3">
-            <Sparkles className="h-5 w-5 text-blue-600 mt-0.5" />
-            <div>
-              <h4 className="font-semibold text-blue-900 mb-2">ZZP Basic - €4,99/maand</h4>
-              <ul className="space-y-1.5 text-sm text-blue-800">
-                <li className="flex items-center gap-2">
-                  <span className="text-blue-600">✓</span>
-                  Onbeperkt aantal facturen
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-blue-600">✓</span>
-                  BTW-aangifte met Digipoort
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-blue-600">✓</span>
-                  Bankrekening koppeling
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-blue-600">✓</span>
-                  Exports (PDF, CSV)
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-blue-600">✓</span>
-                  5 GB opslag
-                </li>
-              </ul>
+        <div className="my-4 space-y-3">
+          {/* Starter plan */}
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <div className="flex items-start gap-3">
+              <Sparkles className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-blue-900 mb-2">Starter — €4,95/maand</h4>
+                <ul className="space-y-1.5 text-sm text-blue-800">
+                  <li className="flex items-center gap-2">
+                    <span className="text-blue-600">✓</span>
+                    Onbeperkt aantal facturen
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-blue-600">✓</span>
+                    Urenregistratie & agenda
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-blue-600">✓</span>
+                    5 GB opslag
+                  </li>
+                </ul>
+                <Button
+                  size="sm"
+                  className="mt-3 bg-blue-600 hover:bg-blue-700"
+                  onClick={() => handleActivate('starter')}
+                  disabled={isActivating}
+                >
+                  {isActivating ? 'Bezig...' : 'Kies Starter'}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Pro plan */}
+          <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
+            <div className="flex items-start gap-3">
+              <Sparkles className="h-5 w-5 text-purple-600 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-purple-900 mb-2">
+                  Pro — €6,95/maand <span className="text-sm font-normal line-through text-purple-400">€11,99</span>
+                </h4>
+                <ul className="space-y-1.5 text-sm text-purple-800">
+                  <li className="flex items-center gap-2">
+                    <span className="text-purple-600">✓</span>
+                    Alles van Starter
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-purple-600">✓</span>
+                    BTW-aangifte met Digipoort
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-purple-600">✓</span>
+                    Bankrekening koppeling & Exports
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-purple-600">✓</span>
+                    10 GB opslag & Prioriteit support
+                  </li>
+                </ul>
+                <Button
+                  size="sm"
+                  className="mt-3 bg-purple-600 hover:bg-purple-700"
+                  onClick={() => handleActivate('zzp_pro')}
+                  disabled={isActivating}
+                >
+                  {isActivating ? 'Bezig...' : 'Kies Pro'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -122,13 +169,6 @@ export const PaywallModal = ({ open, onClose, feature, featureNameNL }: PaywallM
         <DialogFooter className="flex gap-2 sm:justify-center">
           <Button variant="outline" onClick={onClose} disabled={isActivating}>
             Annuleren
-          </Button>
-          <Button 
-            onClick={handleActivate} 
-            className="bg-orange-600 hover:bg-orange-700"
-            disabled={isActivating}
-          >
-            {isActivating ? 'Bezig...' : 'Abonnement activeren'}
           </Button>
         </DialogFooter>
       </DialogContent>

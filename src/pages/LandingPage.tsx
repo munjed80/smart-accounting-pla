@@ -389,16 +389,42 @@ export const LandingPage = () => {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl font-bold sm:text-center sm:text-4xl lg:text-5xl mb-2">Prijzen</h2>
           <p className="text-muted-foreground sm:text-center mb-10 lg:text-lg">Eenvoudig en transparant — geen verborgen kosten.</p>
-          <div className="mx-auto mt-8 grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="mx-auto mt-8 grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-3">
+            {/* Free */}
+            <Card className="border-border/80">
+              <CardHeader>
+                <CardTitle className="text-2xl">Free</CardTitle>
+                <div>
+                  <p className="text-3xl font-bold text-primary">Gratis</p>
+                  <p className="text-sm text-muted-foreground">1 maand gratis</p>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm lg:text-base">
+                  {['Facturatie & klantbeheer', 'Urenregistratie', 'BTW-overzicht met drilldown', 'Uitgaven & bonnetjes', 'Bankimport', 'Mobiele app (PWA)', 'Accountant uitnodigen'].map((item) => (
+                    <li key={item} className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-accent shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+              <CardFooter>
+                <Button variant="outline" className="w-full" onClick={() => navigateTo('/login')}>
+                  Start gratis maand
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </CardFooter>
+            </Card>
+
+            {/* Starter */}
             <Card className="border-primary/50 shadow-lg relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary to-accent" />
               <CardHeader>
-                <CardTitle className="text-2xl">ZZP</CardTitle>
+                <CardTitle className="text-2xl">Starter</CardTitle>
                 <div>
-                  <p className="text-3xl font-bold text-primary">Gratis</p>
-                  <p className="text-sm text-muted-foreground">eerste 30 dagen</p>
+                  <p className="text-3xl font-bold text-primary">€4,95 <span className="text-sm font-normal text-muted-foreground">/ maand</span></p>
                 </div>
-                <p className="text-lg font-semibold">Daarna €4,99 <span className="text-sm font-normal text-muted-foreground">/ maand</span></p>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm lg:text-base">
@@ -412,12 +438,43 @@ export const LandingPage = () => {
               </CardContent>
               <CardFooter>
                 <Button className="w-full" onClick={() => navigateTo('/login')}>
-                  Start 30 dagen gratis
+                  Kies Starter
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </CardFooter>
             </Card>
 
+            {/* Pro */}
+            <Card className="border-primary/50 shadow-lg relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-primary" />
+              <CardHeader>
+                <CardTitle className="text-2xl">Pro</CardTitle>
+                <div>
+                  <p className="text-3xl font-bold text-primary">€6,95 <span className="text-sm font-normal text-muted-foreground">/ maand</span></p>
+                  <p className="text-sm text-muted-foreground"><s>€11,99</s> — introductieprijs</p>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm lg:text-base">
+                  {['Alles van Starter', 'BTW-aangifte met Digipoort', 'Bankrekening koppeling', 'Exports (PDF, CSV)', '10 GB opslag', 'Prioriteit support'].map((item) => (
+                    <li key={item} className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-accent shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+              <CardFooter>
+                <Button className="w-full" onClick={() => navigateTo('/login')}>
+                  Kies Pro
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+
+          {/* Accountant card below */}
+          <div className="mx-auto mt-6 max-w-5xl">
             <Card className="border-border/80">
               <CardHeader>
                 <CardTitle className="text-2xl">Accountant</CardTitle>

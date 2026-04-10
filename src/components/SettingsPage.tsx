@@ -280,7 +280,7 @@ export const SettingsPage = () => {
   const handleActivateSubscription = async () => {
     setIsActivating(true)
     try {
-      const result = await subscriptionApi.activateSubscription()
+      const result = await subscriptionApi.activateSubscription('starter')
       if (result.checkout_url) {
         // Redirect to Mollie checkout for immediate payment
         window.location.href = result.checkout_url
@@ -299,6 +299,33 @@ export const SettingsPage = () => {
       await refetchSubscriptionMe()
     } catch (error) {
       console.error('Failed to activate subscription:', error)
+      toast.error(parseApiError(error))
+    } finally {
+      setIsActivating(false)
+    }
+  }
+
+  const handleActivateSubscriptionPro = async () => {
+    setIsActivating(true)
+    try {
+      const result = await subscriptionApi.activateSubscription('zzp_pro')
+      if (result.checkout_url) {
+        window.location.href = result.checkout_url
+        return
+      }
+      if (result.scheduled) {
+        toast.success('Pro abonnement gepland', {
+          description: `Je Pro abonnement start automatisch na de proefperiode${result.trial_end_at ? ` op ${new Date(result.trial_end_at).toLocaleDateString('nl-NL')}` : ''}.`,
+        })
+      } else {
+        toast.success('Pro abonnement actief', {
+          description: 'Je Pro abonnement is nu actief.',
+        })
+      }
+      await refetchSubscription()
+      await refetchSubscriptionMe()
+    } catch (error) {
+      console.error('Failed to activate Pro subscription:', error)
       toast.error(parseApiError(error))
     } finally {
       setIsActivating(false)
@@ -972,7 +999,15 @@ export const SettingsPage = () => {
                             disabled={isActivating}
                           >
                             {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Upgrade to Pro
+                            Starter (€4,95/mnd)
+                          </Button>
+                          <Button
+                            onClick={handleActivateSubscriptionPro}
+                            disabled={isActivating}
+                            className="bg-purple-600 hover:bg-purple-700"
+                          >
+                            {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
+                            Pro (€6,95/mnd)
                           </Button>
                           <Button
                             variant="outline"
@@ -980,7 +1015,7 @@ export const SettingsPage = () => {
                             disabled={isCanceling}
                           >
                             {isCanceling && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Cancel Trial
+                            Annuleer proefperiode
                           </Button>
                         </>
                       )}
@@ -990,7 +1025,7 @@ export const SettingsPage = () => {
                             variant="outline"
                             onClick={() => toast.info('Abonnementsbeheer wordt binnenkort beschikbaar.')}
                           >
-                            Manage Subscription
+                            Abonnement beheren
                           </Button>
                           <Button
                             variant="outline"
@@ -998,18 +1033,28 @@ export const SettingsPage = () => {
                             disabled={isCanceling}
                           >
                             {isCanceling && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Cancel Subscription
+                            Abonnement opzeggen
                           </Button>
                         </>
                       )}
                       {subscriptionMe.status === 'expired' && (
-                        <Button
-                          onClick={handleReactivateSubscription}
-                          disabled={isReactivating}
-                        >
-                          {isReactivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                          Renew Subscription
-                        </Button>
+                        <>
+                          <Button
+                            onClick={handleActivateSubscription}
+                            disabled={isActivating}
+                          >
+                            {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
+                            Starter (€4,95/mnd)
+                          </Button>
+                          <Button
+                            onClick={handleActivateSubscriptionPro}
+                            disabled={isActivating}
+                            className="bg-purple-600 hover:bg-purple-700"
+                          >
+                            {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
+                            Pro (€6,95/mnd)
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>

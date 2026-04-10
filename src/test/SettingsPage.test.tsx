@@ -155,7 +155,7 @@ describe('SettingsPage', () => {
         can_use_pro_features: true,
         days_left_trial: 0,
         status: 'ACTIVE',
-        plan_code: 'zzp_basic',
+        plan_code: 'starter',
         force_paywall: false,
       },
       subscription: null,
@@ -260,7 +260,7 @@ describe('SettingsPage', () => {
     expect(screen.getByText('Profielinformatie')).toBeInTheDocument()
   })
 
-  it('renders Upgrade to Pro button for ZZP trial users and wires onClick', async () => {
+  it('renders Starter button for ZZP trial users and wires onClick', async () => {
     vi.mocked(api.administrationApi.list).mockResolvedValue([{ id: 'admin-1', name: 'Test' }] as any)
     vi.mocked(api.zzpApi.profile.get).mockResolvedValue({} as any)
     vi.mocked(api.subscriptionApi.activateSubscription).mockResolvedValue({
@@ -275,10 +275,10 @@ describe('SettingsPage', () => {
 
     // Wait for subscription data to load
     await waitFor(() => {
-      expect(screen.getByText('Upgrade to Pro')).toBeInTheDocument()
+      expect(screen.getByText(/Starter/)).toBeInTheDocument()
     })
 
-    const upgradeButton = screen.getByText('Upgrade to Pro').closest('button')
+    const upgradeButton = screen.getByText(/Starter/).closest('button')
     expect(upgradeButton).not.toBeNull()
     expect(upgradeButton).toHaveAttribute('type', 'button')
     
@@ -296,10 +296,10 @@ describe('SettingsPage', () => {
     renderWithClient(<SettingsPage />)
 
     await waitFor(() => {
-      expect(screen.getByText('Cancel Trial')).toBeInTheDocument()
+      expect(screen.getByText('Annuleer proefperiode')).toBeInTheDocument()
     })
 
-    const cancelButton = screen.getByText('Cancel Trial').closest('button')
+    const cancelButton = screen.getByText('Annuleer proefperiode').closest('button')
     expect(cancelButton).not.toBeNull()
     expect(cancelButton).toHaveAttribute('type', 'button')
 

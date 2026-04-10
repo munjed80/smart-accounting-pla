@@ -35,11 +35,11 @@ async def test_ensure_trial_started_creates_new_subscription(db_session):
     db_session.add(admin)
     await db_session.commit()
     
-    # Create ZZP Basic plan
+    # Create Free plan
     plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=4.99,
+        code="free",
+        name="Free",
+        price_monthly=0.00,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -54,7 +54,7 @@ async def test_ensure_trial_started_creates_new_subscription(db_session):
     # Assertions
     assert subscription is not None
     assert subscription.administration_id == admin.id
-    assert subscription.plan_code == "zzp_basic"
+    assert subscription.plan_code == "free"
     assert subscription.status == SubscriptionStatus.TRIALING
     assert subscription.trial_start_at is not None
     assert subscription.trial_end_at is not None
@@ -73,9 +73,9 @@ async def test_ensure_trial_started_is_idempotent(db_session):
     db_session.add(admin)
     
     plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=4.99,
+        code="free",
+        name="Free",
+        price_monthly=0.00,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -104,9 +104,9 @@ async def test_compute_entitlements_during_trial(db_session):
     db_session.add(admin)
     
     plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=4.99,
+        code="free",
+        name="Free",
+        price_monthly=0.00,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -151,9 +151,9 @@ async def test_compute_entitlements_trial_expired(db_session):
     db_session.add(admin)
     
     plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=4.99,
+        code="free",
+        name="Free",
+        price_monthly=0.00,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -205,9 +205,9 @@ async def test_compute_entitlements_active_subscription(db_session):
     db_session.add(admin)
     
     plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=4.99,
+        code="free",
+        name="Free",
+        price_monthly=0.00,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -253,9 +253,9 @@ async def test_compute_entitlements_canceled_subscription(db_session):
     db_session.add(admin)
     
     plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=4.99,
+        code="free",
+        name="Free",
+        price_monthly=0.00,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,
@@ -320,9 +320,9 @@ async def test_get_subscription(db_session):
     db_session.add(admin)
     
     plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=4.99,
+        code="free",
+        name="Free",
+        price_monthly=0.00,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,

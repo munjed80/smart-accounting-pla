@@ -140,12 +140,12 @@ async def test_administration(db_session: AsyncSession, test_user: User) -> Admi
 
 @pytest_asyncio.fixture(scope="function")
 async def test_zzp_plan(db_session: AsyncSession):
-    """Create the ZZP Basic plan for tests that require it."""
+    """Create the Free plan for tests that require it (ZZP trial plan)."""
     from app.models.subscription import Plan
     
     # Check if plan already exists
     result = await db_session.execute(
-        select(Plan).where(Plan.code == "zzp_basic")
+        select(Plan).where(Plan.code == "free")
     )
     existing_plan = result.scalar_one_or_none()
     
@@ -154,9 +154,9 @@ async def test_zzp_plan(db_session: AsyncSession):
     
     # Create the plan
     plan = Plan(
-        code="zzp_basic",
-        name="ZZP Basic",
-        price_monthly=4.99,
+        code="free",
+        name="Free",
+        price_monthly=0.00,
         trial_days=30,
         max_invoices=999999,
         max_storage_mb=5120,

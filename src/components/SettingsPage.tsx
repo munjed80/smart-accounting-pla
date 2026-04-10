@@ -134,6 +134,56 @@ export const SettingsPage = () => {
   })
   const [isChangingPassword, setIsChangingPassword] = useState(false)
 
+  // Detect return from Mollie payment (?payment=complete) and poll for ACTIVE status
+  const PAYMENT_POLL_INTERVAL_MS = 3_000
+  const PAYMENT_POLL_MAX_MS = 60_000
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (!params.has('payment')) return
+
+    const paymentStatus = params.get('payment')
+    // Clean query param from URL so it doesn't re-trigger on refresh
+    params.delete('payment')
+    const cleanUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`
+    window.history.replaceState({}, '', cleanUrl)
+
+    if (paymentStatus !== 'complete') return
+
+    let cancelled = false
+
+    toast.success('Betaling ontvangen', {
+      description: 'Je abonnement wordt geactiveerd. Dit kan enkele seconden duren.',
+    })
+    // Force immediate refetch, then poll until subscription is ACTIVE
+    refetchSubscription()
+    refetchSubscriptionMe()
+
+    let elapsed = 0
+    const interval = setInterval(async () => {
+      elapsed += PAYMENT_POLL_INTERVAL_MS
+      if (elapsed > PAYMENT_POLL_MAX_MS || cancelled) {
+        clearInterval(interval)
+        return
+      }
+      const sub = await refetchSubscription()
+      if (cancelled) return
+      await refetchSubscriptionMe()
+      // sub is the react-query result; .data contains the SubscriptionResponse
+      if (sub?.data?.status === 'ACTIVE') {
+        clearInterval(interval)
+        toast.success('Abonnement actief', {
+          description: 'Je abonnement is nu actief. Je hebt toegang tot alle functies.',
+        })
+      }
+    }, PAYMENT_POLL_INTERVAL_MS)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [refetchSubscription, refetchSubscriptionMe])
+
   useEffect(() => {
     let isMounted = true
     

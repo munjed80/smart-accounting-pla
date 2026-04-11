@@ -10,7 +10,7 @@ import csv
 import io
 import re
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Optional, List, Tuple
 
@@ -583,11 +583,12 @@ async def confirm_invoice_import(
             vat_total_cents=vat_total,
             total_cents=total,
             amount_paid_cents=total if data["status"] == "paid" else 0,
-            paid_at=datetime.utcnow() if data["status"] == "paid" else None,
+            paid_at=datetime.now(timezone.utc) if data["status"] == "paid" else None,
             customer_name=customer_name,
             notes="Geïmporteerd via CSV",
         )
         db.add(invoice)
+        await db.flush()  # Flush to generate invoice.id for the line
 
         # Create a single invoice line for the full amount
         line = ZZPInvoiceLine(

@@ -253,6 +253,7 @@ export const AdminDashboard = () => {
                         try {
                           await adminApi.updateAdministrationSubscription(company.id, { status })
                           await companiesQuery.refetch()
+                          void queryClient.invalidateQueries({ queryKey: ['admin-subscription-detail', company.id] })
                           toast.success('Abonnement bijgewerkt')
                         } catch {
                           toast.error('Bijwerken mislukt')

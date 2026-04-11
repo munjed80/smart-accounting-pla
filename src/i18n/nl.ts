@@ -793,6 +793,7 @@ export const nl = {
     viewAction: "Bekijken",
     invoice: "factuur",
     invoices: "facturen",
+    invoicesCount: "stuks",
     expenses: "uitgaven",
     billableHours: "factureerbaar",
     overdue: "Te laat",

@@ -11,7 +11,6 @@ import { NoAdministrationsEmptyState } from '@/components/EmptyState'
 import { AIInsightsPanel } from '@/components/AIInsightsPanel'
 import { 
   Receipt, 
-  TrendUp, 
   TrendDown,
   FileText, 
   House,
@@ -281,7 +280,7 @@ export const SmartDashboard = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <FileText size={18} weight="duotone" className="text-primary" />
-                {t('dashboard.openInvoices')}
+                💰 {t('dashboard.openInvoices')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -289,54 +288,53 @@ export const SmartDashboard = () => {
                 {formatCurrency(dashboardData?.invoices.open_total_cents || 0)}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {dashboardData?.invoices.open_count || 0} {(dashboardData?.invoices.open_count || 0) === 1 ? t('dashboard.invoice') : t('dashboard.invoices')}
-                {(dashboardData?.invoices.overdue_count || 0) > 0 && (
-                  <span className="text-destructive ml-1">
-                    ({dashboardData?.invoices.overdue_count} {t('dashboard.overdue').toLowerCase()})
-                  </span>
-                )}
+                {dashboardData?.invoices.open_count || 0} {t('dashboard.invoicesCount')}
               </p>
             </CardContent>
           </Card>
 
-          {/* Paid This Month Card */}
+          {/* Overdue (Te laat) Card */}
           <Card 
-            className="bg-card/80 backdrop-blur-sm border-2 border-accent/20 cursor-pointer hover:border-accent/40 transition-colors"
-            onClick={() => navigateTo('/zzp/invoices')}
+            className={`bg-card/80 backdrop-blur-sm border-2 cursor-pointer transition-colors ${
+              (dashboardData?.invoices.overdue_count || 0) > 0 
+                ? 'border-destructive/30 hover:border-destructive/50' 
+                : 'border-accent/20 hover:border-accent/40'
+            }`}
+            onClick={() => navigateTo('/zzp/invoices?status=overdue')}
           >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <TrendUp size={18} weight="duotone" className="text-accent" />
-                {t('dashboard.paidThisMonth')}
+                <Clock size={18} weight="duotone" className={(dashboardData?.invoices.overdue_count || 0) > 0 ? "text-destructive" : "text-accent"} />
+                ⏰ {t('dashboard.overdue')}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-accent">
-                {formatCurrency(dashboardData?.invoices.paid_this_month_cents || 0)}
+              <div className={`text-3xl font-bold ${(dashboardData?.invoices.overdue_count || 0) > 0 ? 'text-destructive' : 'text-accent'}`}>
+                {formatCurrency(dashboardData?.invoices.overdue_total_cents || 0)}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {dashboardData?.invoices.paid_this_month_count || 0} {(dashboardData?.invoices.paid_this_month_count || 0) === 1 ? t('dashboard.invoice') : t('dashboard.invoices')} in {getCurrentMonthName()}
+                {dashboardData?.invoices.overdue_count || 0} {t('dashboard.invoicesCount')}
               </p>
             </CardContent>
           </Card>
 
-          {/* Expenses This Month Card */}
+          {/* BTW Dit Kwartaal Card */}
           <Card 
-            className="bg-card/80 backdrop-blur-sm border-2 border-border cursor-pointer hover:border-muted-foreground/40 transition-colors"
-            onClick={() => navigateTo('/zzp/expenses')}
+            className="bg-card/80 backdrop-blur-sm border-2 border-primary/20 cursor-pointer hover:border-primary/40 transition-colors"
+            onClick={() => navigateTo('/zzp/btw-aangifte')}
           >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <TrendDown size={18} weight="duotone" />
-                {t('dashboard.expensesThisMonth')}
+                <CurrencyEur size={18} weight="duotone" className="text-primary" />
+                📊 BTW dit kwartaal
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">
-                {formatCurrency(dashboardData?.expenses.this_month_total_cents || 0)}
+              <div className="text-3xl font-bold text-primary">
+                {formatCurrency(dashboardData?.btw.vat_payable_cents || 0)}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {dashboardData?.expenses.this_month_count || 0} {t('dashboard.expenses')} in {getCurrentMonthName()}
+                af te dragen ({dashboardData?.btw?.quarter || ''})
               </p>
             </CardContent>
           </Card>
@@ -416,18 +414,18 @@ export const SmartDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Actions Needed — compact notification list */}
+          {/* Actions Needed — "Wat moet je doen?" */}
           <Card className="bg-card/80 backdrop-blur-sm">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                   <Sparkle size={14} weight="duotone" className="text-primary/60" />
-                  {t('dashboard.actionsNeeded')}
+                  Wat moet je doen?
                 </CardTitle>
                 {dashboardData?.actions && dashboardData.actions.length > 0 && (
-                  <span className="text-xs text-muted-foreground">
+                  <Badge variant="outline" className="text-xs">
                     {dashboardData.actions.length}
-                  </span>
+                  </Badge>
                 )}
               </div>
             </CardHeader>
@@ -437,7 +435,11 @@ export const SmartDashboard = () => {
                   {dashboardData.actions.map((action) => (
                     <li
                       key={action.id}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-md border border-border/20 border-l-2 ${getSeverityBorderClass(action.severity)} hover:bg-accent/5 transition-colors`}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-md border border-border/20 border-l-2 ${getSeverityBorderClass(action.severity)} hover:bg-accent/5 transition-colors cursor-pointer`}
+                      onClick={() => action.route && navigateTo(action.route)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && action.route && navigateTo(action.route)}
                     >
                       {getSeverityIcon(action.severity)}
                       <div className="flex-1 min-w-0">
@@ -445,12 +447,7 @@ export const SmartDashboard = () => {
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">{action.description}</p>
                       </div>
                       {action.route && (
-                        <button
-                          onClick={() => navigateTo(action.route!)}
-                          className="text-xs text-primary/60 hover:text-primary whitespace-nowrap transition-colors ml-2"
-                        >
-                          {t('dashboard.viewAction')}
-                        </button>
+                        <ArrowRight size={14} className="text-muted-foreground/50 flex-shrink-0" />
                       )}
                     </li>
                   ))}
@@ -459,8 +456,8 @@ export const SmartDashboard = () => {
                 <div className="flex items-center gap-3 px-3 py-4">
                   <CheckCircle size={20} className="text-accent/60" weight="duotone" />
                   <div>
-                    <p className="text-sm font-medium">{t('dashboard.noActionsNeeded')}</p>
-                    <p className="text-xs text-muted-foreground">{t('dashboard.noActionsNeededDescription')}</p>
+                    <p className="text-sm font-medium">✅ Alles is bijgewerkt!</p>
+                    <p className="text-xs text-muted-foreground">Geen openstaande taken.</p>
                   </div>
                 </div>
               )}

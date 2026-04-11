@@ -44,12 +44,14 @@ router = APIRouter()
 class ActionItem(BaseModel):
     """An action item requiring ZZP user attention."""
     id: str
-    type: str  # 'draft_invoice', 'overdue_invoice', 'missing_profile', 'unreviewed_receipt'
+    type: str  # 'draft_invoice', 'overdue_invoice', 'missing_profile', 'incomplete_profile', 'btw_deadline', 'uncategorized_expense', 'missing_btw_on_expense'
     title: str
     description: str
     severity: str  # 'error', 'warning', 'info'
     route: Optional[str] = None
     related_id: Optional[str] = None
+    count: Optional[int] = None
+    amount_cents: Optional[int] = None
 
 
 class InvoiceStats(BaseModel):
@@ -405,6 +407,7 @@ async def get_zzp_dashboard(
     
     # Draft invoices action
     if len(draft_invoices) > 0:
+        draft_total_cents = sum(i.total_cents or 0 for i in draft_invoices)
         actions.append(ActionItem(
             id="draft-invoices",
             type="draft_invoice",
@@ -412,11 +415,14 @@ async def get_zzp_dashboard(
             description="Je hebt conceptfacturen die nog verstuurd moeten worden.",
             severity="info",
             route="/zzp/invoices?status=draft",
+            count=len(draft_invoices),
+            amount_cents=draft_total_cents,
         ))
     
     # Overdue invoices action
     if len(overdue_invoices) > 0:
-        total_overdue = sum(i.total_cents or 0 for i in overdue_invoices) / 100
+        overdue_total_cents = sum(i.total_cents or 0 for i in overdue_invoices)
+        total_overdue = overdue_total_cents / 100
         actions.append(ActionItem(
             id="overdue-invoices",
             type="overdue_invoice",
@@ -424,17 +430,60 @@ async def get_zzp_dashboard(
             description=f"€{total_overdue:,.2f} aan openstaande facturen is over de vervaldatum.",
             severity="error",
             route="/zzp/invoices?status=overdue",
+            count=len(overdue_invoices),
+            amount_cents=overdue_total_cents,
         ))
     
-    # BTW deadline warning (14 days)
-    if 0 < days_until_deadline <= 14:
+    # BTW deadline warning (30 days)
+    if 0 < days_until_deadline <= 30:
+        severity = "warning" if days_until_deadline <= 14 else "info"
         actions.append(ActionItem(
             id="btw-deadline",
             type="btw_deadline",
-            title=f"BTW aangifte over {days_until_deadline} dagen",
-            description=f"De deadline voor {quarter_label} is {btw_deadline.strftime('%d-%m-%Y')}.",
+            title=f"BTW-aangifte {quarter_label} deadline: {btw_deadline.strftime('%d-%m-%Y')}",
+            description=f"Nog {days_until_deadline} dag{'en' if days_until_deadline != 1 else ''} tot de deadline.",
+            severity=severity,
+            route="/zzp/btw-aangifte",
+        ))
+    
+    # Uncategorized expenses action
+    # Fetch all expenses (we already have quarter expenses; get full set)
+    all_expense_result = await db.execute(
+        select(ZZPExpense)
+        .where(ZZPExpense.administration_id == admin_id)
+    )
+    all_expenses = all_expense_result.scalars().all()
+    
+    uncategorized = [
+        e for e in all_expenses
+        if not e.category or e.category.strip() == ""
+    ]
+    if len(uncategorized) > 0:
+        actions.append(ActionItem(
+            id="uncategorized-expenses",
+            type="uncategorized_expense",
+            title=f"{len(uncategorized)} bonn{'en' if len(uncategorized) > 1 else ''} zonder categorie",
+            description="Categoriseer je uitgaven voor een beter overzicht.",
             severity="warning",
             route="/zzp/expenses",
+            count=len(uncategorized),
+        ))
+    
+    # Expenses without BTW rate assigned
+    missing_btw_expenses = [
+        e for e in all_expenses
+        if e.vat_amount_cents == 0 and (e.vat_rate is None or e.vat_rate == 0)
+        and e.amount_cents > 0
+    ]
+    if len(missing_btw_expenses) > 0:
+        actions.append(ActionItem(
+            id="missing-btw-expenses",
+            type="missing_btw_on_expense",
+            title=f"{len(missing_btw_expenses)} bonn{'en' if len(missing_btw_expenses) > 1 else ''} zonder BTW-tarief",
+            description="Controleer of de BTW-tarieven correct zijn ingesteld.",
+            severity="warning",
+            route="/zzp/expenses",
+            count=len(missing_btw_expenses),
         ))
     
     # ========================================================================
@@ -458,6 +507,179 @@ async def get_zzp_dashboard(
         profile_complete=profile_complete,
         generated_at=now,
         notes=notes,
+    )
+
+
+# ============================================================================
+# Dashboard Actions Endpoint (standalone)
+# ============================================================================
+
+class DashboardActionsResponse(BaseModel):
+    """Standalone response for dashboard action items."""
+    actions: List[ActionItem]
+    count: int = Field(0, description="Total number of action items")
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+@router.get(
+    "/dashboard/actions",
+    response_model=DashboardActionsResponse,
+    summary="Get ZZP dashboard action items",
+    description="""
+    Returns a list of action items that require the ZZP user's attention.
+
+    **Action types:**
+    - `overdue_invoice`: Invoices past their due date
+    - `uncategorized_expense`: Expenses without a category
+    - `draft_invoice`: Draft invoices not yet sent
+    - `btw_deadline`: BTW filing deadline approaching (within 30 days)
+    - `missing_btw_on_expense`: Expenses without a BTW rate assigned
+    - `missing_profile` / `incomplete_profile`: Business profile issues
+
+    Each action includes a `route` field for navigation and optional `count` / `amount_cents`.
+    """,
+)
+async def get_zzp_dashboard_actions(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DashboardActionsResponse:
+    """Get action items from the dashboard (lightweight standalone endpoint)."""
+    require_zzp(current_user)
+
+    administration = await get_user_administration(current_user.id, db)
+    admin_id = administration.id
+    today = date.today()
+    _, _, _, btw_deadline = get_quarter_info(today)
+    quarter_label, _, _, btw_deadline = get_quarter_info(today)
+    days_until_deadline = (btw_deadline - today).days
+
+    actions: List[ActionItem] = []
+
+    # ---- Profile checks ----
+    profile_result = await db.execute(
+        select(BusinessProfile)
+        .where(BusinessProfile.administration_id == admin_id)
+    )
+    profile = profile_result.scalar_one_or_none()
+
+    if not profile:
+        actions.append(ActionItem(
+            id="missing-profile",
+            type="missing_profile",
+            title="Bedrijfsprofiel ontbreekt",
+            description="Vul je bedrijfsgegevens in om facturen te kunnen versturen.",
+            severity="error",
+            route="/zzp/settings",
+        ))
+    elif not all([profile.company_name, profile.kvk_number, profile.btw_number, profile.iban]):
+        missing_fields = []
+        if not profile.company_name:
+            missing_fields.append("bedrijfsnaam")
+        if not profile.kvk_number:
+            missing_fields.append("KVK-nummer")
+        if not profile.btw_number:
+            missing_fields.append("BTW-nummer")
+        if not profile.iban:
+            missing_fields.append("IBAN")
+        actions.append(ActionItem(
+            id="incomplete-profile",
+            type="incomplete_profile",
+            title="Bedrijfsprofiel incompleet",
+            description=f"Ontbrekende gegevens: {', '.join(missing_fields)}",
+            severity="warning",
+            route="/zzp/settings",
+        ))
+
+    # ---- Invoice checks ----
+    invoice_result = await db.execute(
+        select(ZZPInvoice)
+        .where(ZZPInvoice.administration_id == admin_id)
+    )
+    invoices = invoice_result.scalars().all()
+
+    draft_invoices = [i for i in invoices if i.status == InvoiceStatus.DRAFT.value]
+    overdue_invoices = [
+        i for i in invoices
+        if i.status == InvoiceStatus.SENT.value and i.due_date and i.due_date < today
+    ]
+
+    if len(overdue_invoices) > 0:
+        overdue_total_cents = sum(i.total_cents or 0 for i in overdue_invoices)
+        total_overdue = overdue_total_cents / 100
+        actions.append(ActionItem(
+            id="overdue-invoices",
+            type="overdue_invoice",
+            title=f"{len(overdue_invoices)} factuur{'en' if len(overdue_invoices) > 1 else ''} te laat",
+            description=f"€{total_overdue:,.2f} aan openstaande facturen is over de vervaldatum.",
+            severity="error",
+            route="/zzp/invoices?status=overdue",
+            count=len(overdue_invoices),
+            amount_cents=overdue_total_cents,
+        ))
+
+    if len(draft_invoices) > 0:
+        draft_total_cents = sum(i.total_cents or 0 for i in draft_invoices)
+        actions.append(ActionItem(
+            id="draft-invoices",
+            type="draft_invoice",
+            title=f"{len(draft_invoices)} conceptfactuur{'en' if len(draft_invoices) > 1 else ''} wachten",
+            description="Je hebt conceptfacturen die nog verstuurd moeten worden.",
+            severity="info",
+            route="/zzp/invoices?status=draft",
+            count=len(draft_invoices),
+            amount_cents=draft_total_cents,
+        ))
+
+    # ---- Expense checks ----
+    expense_result = await db.execute(
+        select(ZZPExpense)
+        .where(ZZPExpense.administration_id == admin_id)
+    )
+    all_expenses = expense_result.scalars().all()
+
+    uncategorized = [e for e in all_expenses if not e.category or e.category.strip() == ""]
+    if len(uncategorized) > 0:
+        actions.append(ActionItem(
+            id="uncategorized-expenses",
+            type="uncategorized_expense",
+            title=f"{len(uncategorized)} bonn{'en' if len(uncategorized) > 1 else ''} zonder categorie",
+            description="Categoriseer je uitgaven voor een beter overzicht.",
+            severity="warning",
+            route="/zzp/expenses",
+            count=len(uncategorized),
+        ))
+
+    missing_btw = [
+        e for e in all_expenses
+        if e.vat_amount_cents == 0 and (e.vat_rate is None or e.vat_rate == 0)
+        and e.amount_cents > 0
+    ]
+    if len(missing_btw) > 0:
+        actions.append(ActionItem(
+            id="missing-btw-expenses",
+            type="missing_btw_on_expense",
+            title=f"{len(missing_btw)} bonn{'en' if len(missing_btw) > 1 else ''} zonder BTW-tarief",
+            description="Controleer of de BTW-tarieven correct zijn ingesteld.",
+            severity="warning",
+            route="/zzp/expenses",
+            count=len(missing_btw),
+        ))
+
+    # ---- BTW deadline ----
+    if 0 < days_until_deadline <= 30:
+        severity = "warning" if days_until_deadline <= 14 else "info"
+        actions.append(ActionItem(
+            id="btw-deadline",
+            type="btw_deadline",
+            title=f"BTW-aangifte {quarter_label} deadline: {btw_deadline.strftime('%d-%m-%Y')}",
+            description=f"Nog {days_until_deadline} dag{'en' if days_until_deadline != 1 else ''} tot de deadline.",
+            severity=severity,
+            route="/zzp/btw-aangifte",
+        ))
+
+    return DashboardActionsResponse(
+        actions=actions,
+        count=len(actions),
     )
 
 

@@ -4225,12 +4225,14 @@ export interface ZZPInsightsResponse {
 // ZZP Dashboard Types
 export interface ZZPDashboardActionItem {
   id: string
-  type: string  // 'draft_invoice', 'overdue_invoice', 'missing_profile', 'incomplete_profile', 'btw_deadline'
+  type: string  // 'draft_invoice', 'overdue_invoice', 'missing_profile', 'incomplete_profile', 'btw_deadline', 'uncategorized_expense', 'missing_btw_on_expense'
   title: string
   description: string
   severity: 'error' | 'warning' | 'info'
   route?: string
   related_id?: string
+  count?: number
+  amount_cents?: number
 }
 
 export interface ZZPDashboardInvoiceStats {
@@ -5342,6 +5344,15 @@ export const zzpApi = {
       const response = await api.get<MonthlyInvoicesResponse>('/zzp/dashboard/monthly-invoices', {
         params: { period },
       })
+      return response.data
+    },
+
+    /**
+     * Get standalone dashboard action items.
+     * Returns a list of actions requiring the ZZP user's attention.
+     */
+    actions: async (): Promise<{ actions: ZZPDashboardActionItem[]; count: number; generated_at: string }> => {
+      const response = await api.get<{ actions: ZZPDashboardActionItem[]; count: number; generated_at: string }>('/zzp/dashboard/actions')
       return response.data
     },
   },

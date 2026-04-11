@@ -354,8 +354,12 @@ export const AdminDashboard = () => {
                                   disabled={extendTrialMutation.isPending || !extendReason.trim() || !extendDays}
                                   onClick={() => {
                                     const days = parseInt(extendDays, 10)
-                                    if (isNaN(days) || days < 1) {
-                                      toast.error('Voer een geldig aantal dagen in')
+                                    if (isNaN(days) || days < 1 || days > 365) {
+                                      toast.error('Voer een geldig aantal dagen in (1–365)')
+                                      return
+                                    }
+                                    if (!extendReason.trim()) {
+                                      toast.error('Reden is verplicht')
                                       return
                                     }
                                     if (!window.confirm(`Proefperiode verlengen met ${days} dagen voor "${company.name}"?`)) return

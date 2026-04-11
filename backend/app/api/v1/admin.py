@@ -601,6 +601,7 @@ async def get_subscription_detail(
     can_extend = subscription.status in (
         SubscriptionStatus.TRIALING,
         SubscriptionStatus.EXPIRED,
+        SubscriptionStatus.CANCELED,
     )
 
     return SubscriptionDetailResponse(

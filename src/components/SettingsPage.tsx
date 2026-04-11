@@ -35,6 +35,7 @@ import {
   ZZPBusinessProfileCreate,
   subscriptionApi,
   SubscriptionMeResponse,
+  authApi,
 } from '@/lib/api'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useEntitlements } from '@/hooks/useEntitlements'
@@ -394,24 +395,30 @@ export const SettingsPage = () => {
       return
     }
     
-    if (passwordForm.newPassword.length < 8) {
-      toast.error('Wachtwoord moet minimaal 8 tekens bevatten')
+    if (passwordForm.newPassword.length < 10) {
+      toast.error('Wachtwoord moet minimaal 10 tekens bevatten')
+      return
+    }
+
+    if (!/[A-Za-z]/.test(passwordForm.newPassword)) {
+      toast.error('Wachtwoord moet minimaal één letter bevatten')
+      return
+    }
+
+    if (!/[0-9]/.test(passwordForm.newPassword)) {
+      toast.error('Wachtwoord moet minimaal één cijfer bevatten')
       return
     }
     
     setIsChangingPassword(true)
     
     try {
-      // TODO: Implement backend endpoint for password change
-      // await authApi.changePassword({
-      //   current_password: passwordForm.currentPassword,
-      //   new_password: passwordForm.newPassword
-      // })
+      const result = await authApi.changePassword({
+        current_password: passwordForm.currentPassword,
+        new_password: passwordForm.newPassword,
+      })
       
-      // For now, simulate the API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      toast.success('Wachtwoord succesvol gewijzigd')
+      toast.success(result.message || 'Wachtwoord succesvol gewijzigd')
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
     } catch (error) {
       console.error('Failed to change password:', error)
@@ -1176,7 +1183,7 @@ export const SettingsPage = () => {
               <Alert>
                 <Info size={16} />
                 <AlertDescription>
-                  Je wachtwoord moet minimaal 8 tekens bevatten
+                  Je wachtwoord moet minimaal 10 tekens bevatten en minimaal één letter en één cijfer bevatten
                 </AlertDescription>
               </Alert>
             </CardContent>

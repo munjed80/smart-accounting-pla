@@ -24,6 +24,7 @@ from app.schemas.user import (
     VerifyEmailResponse,
     ResetPasswordRequest,
     ResetPasswordResponse,
+    ChangePasswordRequest,
 )
 from app.api.v1.deps import CurrentUser
 from app.services.auth_token import (
@@ -461,6 +462,45 @@ async def reset_password(
     )
     
     return ResetPasswordResponse(message="Password reset successfully")
+
+
+@router.post("/change-password", response_model=GenericMessageResponse)
+async def change_password(
+    change_request: ChangePasswordRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Change password for the currently authenticated user.
+    
+    Requires the current password for verification and a new password
+    that meets complexity requirements (min 10 chars, letters + numbers).
+    
+    Returns:
+        - 200: Password changed successfully
+        - 400: Current password is incorrect
+        - 422: New password doesn't meet requirements
+    """
+    # Verify current password
+    if not verify_password(change_request.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Huidig wachtwoord is onjuist",
+        )
+    
+    # Update password
+    current_user.hashed_password = get_password_hash(change_request.new_password)
+    await db.commit()
+    
+    logger.info(
+        "Password changed successfully",
+        extra={
+            "event": "password_changed",
+            "user_id": str(current_user.id),
+        }
+    )
+    
+    return GenericMessageResponse(message="Wachtwoord succesvol gewijzigd")
 
 
 @router.get("/me", response_model=UserResponse)

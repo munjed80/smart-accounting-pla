@@ -472,6 +472,21 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         if invoice.seller_btw_number:
             payment_rows.append([Paragraph("BTW-nummer",  s_pay_lbl), Paragraph(invoice.seller_btw_number, s_pay_val)])
 
+        # Payment instruction line
+        pay_instruction_parts: List[str] = []
+        if invoice.due_date and invoice.issue_date:
+            try:
+                delta = (invoice.due_date - invoice.issue_date).days
+                if delta > 0:
+                    pay_instruction_parts.append(f"Gelieve te betalen binnen {delta} dagen")
+            except (TypeError, AttributeError):
+                pass
+        if invoice.seller_iban:
+            pay_instruction_parts.append(f"op IBAN {invoice.seller_iban}")
+        if pay_instruction_parts:
+            pay_instruction_parts.append(f"o.v.v. {invoice.invoice_number}.")
+        pay_instruction = " ".join(pay_instruction_parts) if pay_instruction_parts else None
+
         if payment_rows:
             pay_inner = Table(payment_rows, colWidths=[30 * mm, 116 * mm])
             pay_inner.setStyle(TableStyle([
@@ -482,8 +497,12 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
                 ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
             ]))
 
+            pay_box_rows = [[Paragraph("BETAALGEGEVENS", s_pay_title)], [pay_inner]]
+            if pay_instruction:
+                pay_box_rows.append([Paragraph(pay_instruction, s_pay_lbl)])
+
             pay_box = Table(
-                [[Paragraph("BETAALGEGEVENS", s_pay_title)], [pay_inner]],
+                pay_box_rows,
                 colWidths=[_PAGE_W],
             )
             pay_box.setStyle(TableStyle([

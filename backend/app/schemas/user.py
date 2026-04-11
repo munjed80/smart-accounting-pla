@@ -75,6 +75,15 @@ class VerifyEmailResponse(BaseModel):
     verified: bool = True
 
 
+def _validate_password_strength(v: str) -> str:
+    """Validate password has required complexity (shared by reset and change)."""
+    if not re.search(r'[A-Za-z]', v):
+        raise ValueError('Password must contain at least one letter')
+    if not re.search(r'[0-9]', v):
+        raise ValueError('Password must contain at least one number')
+    return v
+
+
 class ResetPasswordRequest(BaseModel):
     """Request to reset password with token."""
     token: str = Field(..., min_length=1)
@@ -84,16 +93,24 @@ class ResetPasswordRequest(BaseModel):
     @classmethod
     def validate_password_strength(cls, v: str) -> str:
         """Validate password has required complexity."""
-        if not re.search(r'[A-Za-z]', v):
-            raise ValueError('Password must contain at least one letter')
-        if not re.search(r'[0-9]', v):
-            raise ValueError('Password must contain at least one number')
-        return v
+        return _validate_password_strength(v)
 
 
 class ResetPasswordResponse(BaseModel):
     """Response after successful password reset."""
     message: str = "Password reset successfully"
+
+
+class ChangePasswordRequest(BaseModel):
+    """Request to change password (authenticated user)."""
+    current_password: str = Field(..., min_length=1, max_length=128)
+    new_password: str = Field(..., min_length=10, max_length=128)
+    
+    @field_validator('new_password')
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        """Validate new password has required complexity."""
+        return _validate_password_strength(v)
 
 
 class LoginErrorResponse(BaseModel):

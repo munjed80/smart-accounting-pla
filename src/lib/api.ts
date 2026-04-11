@@ -765,6 +765,11 @@ export const authApi = {
     const response = await api.post<ResetPasswordResponse>('/auth/reset-password', data)
     return response.data
   },
+
+  changePassword: async (data: { current_password: string; new_password: string }): Promise<GenericMessageResponse> => {
+    const response = await api.post<GenericMessageResponse>('/auth/change-password', data)
+    return response.data
+  },
 }
 
 /**
@@ -4957,12 +4962,11 @@ export const zzpApi = {
     },
     
     /**
-     * Scan a receipt and extract expense data.
-     * Returns extracted data that can be used to prefill the expense form.
+     * Upload a receipt photo as attachment.
+     * Returns empty data for manual form entry.
      */
     scanReceipt: async (file: File): Promise<{
       extracted_data: ZZPExpenseCreate
-      confidence: number
       status: string
       message: string
     }> => {

@@ -33,6 +33,11 @@ const NO_CUSTOMER = '__none__'
 /** Escapes a value for CSV output: wraps in quotes and escapes internal quotes. */
 const csvEscape = (value: string) => `"${value.replace(/"/g, '""')}"`
 
+/** Maximum pixel height for a full bar in the weekly bar chart. */
+const BAR_MAX_HEIGHT = 56
+/** Minimum pixel height for a non-zero bar so it remains visible. */
+const BAR_MIN_HEIGHT = 4
+
 const defaultTimeFilters: TimeEntryFilters = {
   q: '',
   from: '',
@@ -123,9 +128,6 @@ export const ZZPTimeTrackingPage = () => {
   const [hourlyRate, setHourlyRate] = useState<string>('')
 
   const { filters: invoicedFilters, setFilter: setInvoicedFilter } = useQueryFilters(defaultInvoicedFilters)
-  const invoicedFilterCustomerId = invoicedFilters.inv_customer as string
-  const invoicedFilterStart = invoicedFilters.inv_from as string
-  const invoicedFilterEnd = invoicedFilters.inv_to as string
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<ZZPTimeEntry | null>(null)
@@ -265,13 +267,16 @@ export const ZZPTimeTrackingPage = () => {
   }, [openEntries, filters, debouncedSearch, customerMap, periodStart, periodEnd])
 
   const filteredInvoicedEntries = useMemo(() => {
+    const custId = invoicedFilters.inv_customer as string
+    const fromDate = invoicedFilters.inv_from as string
+    const toDate = invoicedFilters.inv_to as string
     return invoicedEntries.filter((entry) => {
-      if (invoicedFilterCustomerId && entry.customer_id !== invoicedFilterCustomerId) return false
-      if (invoicedFilterStart && entry.entry_date < invoicedFilterStart) return false
-      if (invoicedFilterEnd && entry.entry_date > invoicedFilterEnd) return false
+      if (custId && entry.customer_id !== custId) return false
+      if (fromDate && entry.entry_date < fromDate) return false
+      if (toDate && entry.entry_date > toDate) return false
       return true
     })
-  }, [invoicedEntries, invoicedFilterCustomerId, invoicedFilterStart, invoicedFilterEnd])
+  }, [invoicedEntries, invoicedFilters])
 
   const groupedOpenEntries = useMemo(() => groupByDay(filteredOpenEntries), [filteredOpenEntries])
 
@@ -841,15 +846,15 @@ export const ZZPTimeTrackingPage = () => {
         </CardHeader>
         <CardContent>
           {/* Weekly bar chart */}
-          {weeklyBarData.some((d) => d.hours > 0) && (
-            <div className="mb-6 rounded-lg border p-4">
-              <p className="text-sm font-medium mb-3 text-muted-foreground">Uren deze week</p>
-              <div className="flex items-end gap-2" style={{ height: 72 }}>
-                {(() => {
-                  const todayIso = toLocalISODate(new Date())
-                  const maxH = Math.max(...weeklyBarData.map((x) => x.hours), 1)
-                  return weeklyBarData.map((d) => {
-                    const barH = Math.max((d.hours / maxH) * 56, d.hours > 0 ? 4 : 0)
+          {weeklyBarData.some((d) => d.hours > 0) && (() => {
+            const todayIso = toLocalISODate(new Date())
+            const maxH = Math.max(...weeklyBarData.map((x) => x.hours), 1)
+            return (
+              <div className="mb-6 rounded-lg border p-4">
+                <p className="text-sm font-medium mb-3 text-muted-foreground">Uren deze week</p>
+                <div className="flex items-end gap-2" style={{ height: 72 }}>
+                  {weeklyBarData.map((d) => {
+                    const barH = Math.max((d.hours / maxH) * BAR_MAX_HEIGHT, d.hours > 0 ? BAR_MIN_HEIGHT : 0)
                     const isToday = d.iso === todayIso
                     const barBg = isToday
                       ? 'hsl(var(--primary))'
@@ -865,11 +870,11 @@ export const ZZPTimeTrackingPage = () => {
                         <span className={`text-[11px] font-medium ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>{d.label}</span>
                       </div>
                     )
-                  })
-                })()}
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
           <div className="grid gap-3 md:grid-cols-3 mb-4">
             <Input placeholder="Zoek op project, klant of omschrijving" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
             <Select value={filters.billable} onValueChange={(value) => setFilter('billable', value as TimeEntryFilters['billable'])}>
@@ -967,7 +972,7 @@ export const ZZPTimeTrackingPage = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-3">
-            <Select value={invoicedFilterCustomerId || NO_CUSTOMER} onValueChange={(value) => setInvoicedFilter('inv_customer', value === NO_CUSTOMER ? '' : value)}>
+            <Select value={(invoicedFilters.inv_customer as string) || NO_CUSTOMER} onValueChange={(value) => setInvoicedFilter('inv_customer', value === NO_CUSTOMER ? '' : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Filter op klant" />
               </SelectTrigger>
@@ -978,8 +983,8 @@ export const ZZPTimeTrackingPage = () => {
                 ))}
               </SelectContent>
             </Select>
-            <Input type="date" value={invoicedFilterStart} onChange={(event) => setInvoicedFilter('inv_from', event.target.value)} />
-            <Input type="date" value={invoicedFilterEnd} onChange={(event) => setInvoicedFilter('inv_to', event.target.value)} />
+            <Input type="date" value={invoicedFilters.inv_from as string} onChange={(event) => setInvoicedFilter('inv_from', event.target.value)} />
+            <Input type="date" value={invoicedFilters.inv_to as string} onChange={(event) => setInvoicedFilter('inv_to', event.target.value)} />
           </div>
 
           {loading ? (
@@ -998,7 +1003,7 @@ export const ZZPTimeTrackingPage = () => {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium">{entry.description}</p>
-                        <Badge variant="secondary" className="text-amber-700 border-amber-300 bg-amber-50">Gefactureerd</Badge>
+                        <Badge variant="secondary" className="text-amber-700 border-amber-300 bg-amber-50" role="status" aria-label="Gefactureerd">Gefactureerd</Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {new Date(`${entry.entry_date}T00:00:00`).toLocaleDateString('nl-NL')} • {parseHours(entry.hours).toFixed(2)}u

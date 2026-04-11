@@ -1,6 +1,16 @@
+import logging
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+_UNSAFE_SECRET_KEYS: frozenset[str] = frozenset({
+    "change-me-in-production-use-openssl-rand-hex-32",
+    "change-me",
+    "secret",
+    "",
+})
 
 
 class Settings(BaseSettings):
@@ -157,25 +167,16 @@ class Settings(BaseSettings):
         In non-production environments a warning is logged but startup continues,
         so local development with the default key still works.
         """
-        import logging
-        _logger = logging.getLogger(__name__)
-
-        UNSAFE_KEYS = {
-            "change-me-in-production-use-openssl-rand-hex-32",
-            "change-me",
-            "secret",
-            "",
-        }
         if self.ENV.lower() == "production":
-            if self.SECRET_KEY in UNSAFE_KEYS or len(self.SECRET_KEY) < 32:
+            if self.SECRET_KEY in _UNSAFE_SECRET_KEYS or len(self.SECRET_KEY) < 32:
                 raise ValueError(
                     "FATAL: SECRET_KEY is not configured for production. "
                     "Set a strong SECRET_KEY (min 32 chars) via environment variable. "
                     "Generate one with: openssl rand -hex 32"
                 )
         else:
-            if self.SECRET_KEY in UNSAFE_KEYS or len(self.SECRET_KEY) < 32:
-                _logger.warning(
+            if self.SECRET_KEY in _UNSAFE_SECRET_KEYS or len(self.SECRET_KEY) < 32:
+                logger.warning(
                     "SECRET_KEY is using an insecure default. "
                     "Set a strong SECRET_KEY before deploying to production."
                 )
@@ -186,9 +187,6 @@ class Settings(BaseSettings):
 
         In non-production environments a warning is logged but startup continues.
         """
-        import logging
-        _logger = logging.getLogger(__name__)
-
         if self.ENV.lower() == "production":
             if "change_me" in self.DATABASE_URL:
                 raise ValueError(
@@ -197,7 +195,7 @@ class Settings(BaseSettings):
                 )
         else:
             if "change_me" in self.DATABASE_URL:
-                _logger.warning(
+                logger.warning(
                     "DATABASE_URL contains default credentials ('change_me'). "
                     "Set proper database credentials before deploying to production."
                 )

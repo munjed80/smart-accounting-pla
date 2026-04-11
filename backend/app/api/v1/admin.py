@@ -72,6 +72,35 @@ class UpdateSubscriptionRequest(BaseModel):
     ends_at: datetime | None = None
 
 
+class ExtendTrialRequest(BaseModel):
+    extend_days: int | None = Field(default=None, ge=1, le=365)
+    new_trial_end: datetime | None = None
+    reason: str = Field(..., min_length=3, max_length=500)
+
+    def model_post_init(self, __context: object) -> None:
+        if self.extend_days is None and self.new_trial_end is None:
+            raise ValueError("Either extend_days or new_trial_end must be provided")
+        if self.extend_days is not None and self.new_trial_end is not None:
+            raise ValueError("Provide either extend_days or new_trial_end, not both")
+
+
+class SubscriptionDetailResponse(BaseModel):
+    administration_id: UUID
+    subscription_id: UUID | None = None
+    plan_code: str | None = None
+    status: str | None = None
+    trial_start_at: datetime | None = None
+    trial_end_at: datetime | None = None
+    days_remaining: int | None = None
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
+    cancel_at_period_end: bool | None = None
+    provider: str | None = None
+    provider_subscription_id: str | None = None
+    is_paid: bool = False
+    can_extend_trial: bool = False
+
+
 class ImpersonateResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -526,6 +555,177 @@ async def impersonate_user(
     )
 
     return ImpersonateResponse(access_token=token, impersonated_user_id=user.id)
+
+
+# ---------------------------------------------------------------------------
+# Subscription detail & trial extension (super_admin only)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/administrations/{admin_id}/subscription-detail",
+    response_model=SubscriptionDetailResponse,
+)
+async def get_subscription_detail(
+    admin_id: UUID,
+    super_admin: SuperAdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Return rich subscription info for admin UI (status, dates, remaining days)."""
+    administration = (
+        await db.execute(select(Administration).where(Administration.id == admin_id))
+    ).scalar_one_or_none()
+    if not administration:
+        raise HTTPException(status_code=404, detail="Administration not found")
+
+    subscription = (
+        await db.execute(
+            select(Subscription)
+            .where(Subscription.administration_id == admin_id)
+            .order_by(Subscription.created_at.desc())
+        )
+    ).scalars().first()
+
+    if not subscription:
+        return SubscriptionDetailResponse(administration_id=admin_id)
+
+    now = datetime.now(timezone.utc)
+    days_remaining: int | None = None
+    if subscription.trial_end_at:
+        trial_end = subscription.trial_end_at
+        if trial_end.tzinfo is None:
+            trial_end = trial_end.replace(tzinfo=timezone.utc)
+        days_remaining = max(0, (trial_end - now).days)
+
+    is_paid = subscription.status == SubscriptionStatus.ACTIVE
+    can_extend = subscription.status in (
+        SubscriptionStatus.TRIALING,
+        SubscriptionStatus.EXPIRED,
+        SubscriptionStatus.CANCELED,
+    )
+
+    return SubscriptionDetailResponse(
+        administration_id=admin_id,
+        subscription_id=subscription.id,
+        plan_code=subscription.plan_code,
+        status=subscription.status.value if subscription.status else None,
+        trial_start_at=subscription.trial_start_at,
+        trial_end_at=subscription.trial_end_at,
+        days_remaining=days_remaining,
+        current_period_start=subscription.current_period_start,
+        current_period_end=subscription.current_period_end,
+        cancel_at_period_end=subscription.cancel_at_period_end,
+        provider=subscription.provider,
+        provider_subscription_id=subscription.provider_subscription_id,
+        is_paid=is_paid,
+        can_extend_trial=can_extend,
+    )
+
+
+@router.post("/administrations/{admin_id}/extend-trial")
+async def extend_trial(
+    admin_id: UUID,
+    payload: ExtendTrialRequest,
+    super_admin: SuperAdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Extend or renew the trial period for an administration.
+
+    - Refuses to touch ACTIVE subscriptions (protects paid users).
+    - For EXPIRED subscriptions, resets status to TRIALING.
+    - Accepts either ``extend_days`` (adds days to current/now) or
+      ``new_trial_end`` (sets an absolute date).
+    - Requires a reason for audit purposes.
+    """
+    administration = (
+        await db.execute(select(Administration).where(Administration.id == admin_id))
+    ).scalar_one_or_none()
+    if not administration:
+        raise HTTPException(status_code=404, detail="Administration not found")
+
+    subscription = (
+        await db.execute(
+            select(Subscription)
+            .where(Subscription.administration_id == admin_id)
+            .order_by(Subscription.created_at.desc())
+        )
+    ).scalars().first()
+
+    if not subscription:
+        raise HTTPException(status_code=404, detail="No subscription found for this administration")
+
+    # Protect paid subscriptions
+    if subscription.status == SubscriptionStatus.ACTIVE:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot extend trial for an active paid subscription. Cancel the subscription first if needed.",
+        )
+
+    now = datetime.now(timezone.utc)
+    old_status = subscription.status.value if subscription.status else None
+    old_trial_end = subscription.trial_end_at
+
+    # Compute new trial end
+    if payload.new_trial_end is not None:
+        new_end = payload.new_trial_end
+        if new_end.tzinfo is None:
+            new_end = new_end.replace(tzinfo=timezone.utc)
+        if new_end <= now:
+            raise HTTPException(status_code=400, detail="new_trial_end must be in the future")
+        subscription.trial_end_at = new_end
+    else:
+        # extend_days: add days from the later of (current trial_end, now)
+        base = now
+        if subscription.trial_end_at:
+            te = subscription.trial_end_at
+            if te.tzinfo is None:
+                te = te.replace(tzinfo=timezone.utc)
+            if te > now:
+                base = te
+        subscription.trial_end_at = base + timedelta(days=payload.extend_days)  # type: ignore[arg-type]
+
+    # If the subscription was expired, revert to TRIALING
+    if subscription.status in (SubscriptionStatus.EXPIRED, SubscriptionStatus.CANCELED):
+        subscription.status = SubscriptionStatus.TRIALING
+
+    # If trial_start_at was never set (unlikely), set it to now
+    if not subscription.trial_start_at:
+        subscription.trial_start_at = now
+
+    await _write_audit_log(
+        db,
+        actor_user_id=super_admin.id,
+        action="trial_extended",
+        target_type="subscription",
+        target_id=str(subscription.id),
+        details={
+            "administration_id": str(admin_id),
+            "reason": payload.reason,
+            "old_status": old_status,
+            "new_status": subscription.status.value,
+            "old_trial_end": old_trial_end.isoformat() if old_trial_end else None,
+            "new_trial_end": subscription.trial_end_at.isoformat() if subscription.trial_end_at else None,
+            "extend_days": payload.extend_days,
+        },
+    )
+    await db.commit()
+
+    logger.info(
+        "Admin extended trial",
+        extra={
+            "event": "admin_trial_extended",
+            "actor": str(super_admin.id),
+            "administration_id": str(admin_id),
+            "new_trial_end": str(subscription.trial_end_at),
+        },
+    )
+
+    return {
+        "message": "Trial extended successfully",
+        "new_trial_end": subscription.trial_end_at.isoformat() if subscription.trial_end_at else None,
+        "new_status": subscription.status.value,
+    }
 
 
 # ---------------------------------------------------------------------------

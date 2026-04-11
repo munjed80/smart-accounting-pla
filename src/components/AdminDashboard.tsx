@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { adminApi, formatApiErrorForDisplay, ContactMessageListItem, ContactMessageDetail } from '@/lib/api'
+import { adminApi, formatApiErrorForDisplay, ContactMessageListItem, ContactMessageDetail, AdminSubscriptionDetail } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -23,6 +23,9 @@ export const AdminDashboard = () => {
   const [selectedMessage, setSelectedMessage] = useState<ContactMessageDetail | null>(null)
   const [messagesStatusFilter, setMessagesStatusFilter] = useState<string>('')
   const [messagesQuery, setMessagesQuery] = useState('')
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null)
+  const [extendDays, setExtendDays] = useState('14')
+  const [extendReason, setExtendReason] = useState('')
   const queryClient = useQueryClient()
 
   const overviewQuery = useQuery({
@@ -57,6 +60,28 @@ export const AdminDashboard = () => {
       q: messagesQuery || undefined,
     }),
     enabled: section === 'messages',
+  })
+
+  const subscriptionDetailQuery = useQuery<AdminSubscriptionDetail>({
+    queryKey: ['admin-subscription-detail', selectedCompanyId],
+    queryFn: () => adminApi.getSubscriptionDetail(selectedCompanyId!),
+    enabled: !!selectedCompanyId,
+  })
+
+  const extendTrialMutation = useMutation({
+    mutationFn: ({ adminId, days, reason }: { adminId: string; days: number; reason: string }) =>
+      adminApi.extendTrial(adminId, { extend_days: days, reason }),
+    onSuccess: () => {
+      toast.success('Proefperiode verlengd')
+      setExtendDays('14')
+      setExtendReason('')
+      void queryClient.invalidateQueries({ queryKey: ['admin-subscription-detail', selectedCompanyId] })
+      void queryClient.invalidateQueries({ queryKey: ['admin-companies'] })
+    },
+    onError: (error) => {
+      const parsed = formatApiErrorForDisplay(error)
+      toast.error(parsed.message || 'Verlenging mislukt')
+    },
   })
 
   const updateMessageMutation = useMutation({
@@ -204,28 +229,159 @@ export const AdminDashboard = () => {
             </Alert>
           ) : null}
           {companiesQuery.data?.administrations.map((company) => (
-            <Card key={company.id}>
-              <CardContent className="pt-4 flex items-center justify-between">
-                <div>
-                  <p className="font-semibold">{company.name}</p>
-                  <p className="text-sm text-muted-foreground">{company.owner_email || 'Geen eigenaar'} · {company.plan || 'Geen plan'} · {company.subscription_status || 'onbekend'}</p>
+            <Card key={company.id} className={selectedCompanyId === company.id ? 'border-primary' : ''}>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold">{company.name}</p>
+                    <p className="text-sm text-muted-foreground">{company.owner_email || 'Geen eigenaar'} · {company.plan || 'Geen plan'} · {company.subscription_status || 'onbekend'}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedCompanyId(selectedCompanyId === company.id ? null : company.id)}
+                    >
+                      {selectedCompanyId === company.id ? 'Sluiten' : 'Details'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const status = window.prompt('Nieuwe status (trial/active/past_due/canceled):', company.subscription_status || 'active')
+                        if (!status) return
+                        try {
+                          await adminApi.updateAdministrationSubscription(company.id, { status })
+                          await companiesQuery.refetch()
+                          toast.success('Abonnement bijgewerkt')
+                        } catch {
+                          toast.error('Bijwerken mislukt')
+                        }
+                      }}
+                    >
+                      Wijzig
+                    </Button>
+                  </div>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={async () => {
-                    const status = window.prompt('Nieuwe status (trial/active/past_due/canceled):', company.subscription_status || 'active')
-                    if (!status) return
-                    try {
-                      await adminApi.updateAdministrationSubscription(company.id, { status })
-                      await companiesQuery.refetch()
-                      toast.success('Abonnement bijgewerkt')
-                    } catch {
-                      toast.error('Bijwerken mislukt')
-                    }
-                  }}
-                >
-                  Wijzig
-                </Button>
+
+                {/* Subscription detail panel */}
+                {selectedCompanyId === company.id ? (
+                  <div className="mt-4 rounded-md border p-4 space-y-4">
+                    {subscriptionDetailQuery.isLoading ? <p className="text-sm text-muted-foreground">Laden...</p> : null}
+                    {subscriptionDetailQuery.isError ? (
+                      <p className="text-sm text-destructive">Fout bij laden van details</p>
+                    ) : null}
+                    {subscriptionDetailQuery.data ? (() => {
+                      const detail = subscriptionDetailQuery.data
+                      const STATUS_LABELS: Record<string, string> = {
+                        TRIALING: 'Proefperiode',
+                        ACTIVE: 'Actief',
+                        EXPIRED: 'Verlopen',
+                        CANCELED: 'Geannuleerd',
+                        PAST_DUE: 'Betaling achterstallig',
+                      }
+                      const STATUS_COLORS: Record<string, string> = {
+                        TRIALING: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+                        ACTIVE: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+                        EXPIRED: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+                        CANCELED: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+                        PAST_DUE: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+                      }
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                            <div>
+                              <p className="text-muted-foreground">Status</p>
+                              <span className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[detail.status ?? ''] ?? ''}`}>
+                                {STATUS_LABELS[detail.status ?? ''] ?? detail.status ?? 'Onbekend'}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Plan</p>
+                              <p className="font-medium">{detail.plan_code ?? 'Geen'}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Proefperiode tot</p>
+                              <p className="font-medium">
+                                {detail.trial_end_at
+                                  ? new Date(detail.trial_end_at).toLocaleDateString('nl-NL')
+                                  : '—'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Resterende dagen</p>
+                              <p className="font-medium">{detail.days_remaining ?? '—'}</p>
+                            </div>
+                          </div>
+
+                          {detail.is_paid ? (
+                            <div className="rounded-md bg-green-50 dark:bg-green-950/20 border border-green-200 p-3 text-sm">
+                              <p className="font-medium text-green-800 dark:text-green-200">Betaald abonnement actief</p>
+                              {detail.current_period_end ? (
+                                <p className="text-green-700 dark:text-green-300">
+                                  Huidige periode tot: {new Date(detail.current_period_end).toLocaleDateString('nl-NL')}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
+
+                          {detail.can_extend_trial ? (
+                            <div className="rounded-md border p-3 space-y-3">
+                              <p className="font-medium text-sm">Proefperiode verlengen</p>
+                              <div className="flex flex-wrap gap-3 items-end">
+                                <div>
+                                  <label className="text-xs text-muted-foreground block mb-1">Aantal dagen</label>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    max="365"
+                                    value={extendDays}
+                                    onChange={(e) => setExtendDays(e.target.value)}
+                                    className="w-24"
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-[200px]">
+                                  <label className="text-xs text-muted-foreground block mb-1">Reden (verplicht)</label>
+                                  <Input
+                                    value={extendReason}
+                                    onChange={(e) => setExtendReason(e.target.value)}
+                                    placeholder="Bijv. klant had technische problemen"
+                                    className="w-full"
+                                  />
+                                </div>
+                                <Button
+                                  size="sm"
+                                  disabled={extendTrialMutation.isPending || !extendReason.trim() || !extendDays}
+                                  onClick={() => {
+                                    const days = parseInt(extendDays, 10)
+                                    if (isNaN(days) || days < 1 || days > 365) {
+                                      toast.error('Voer een geldig aantal dagen in (1–365)')
+                                      return
+                                    }
+                                    if (!extendReason.trim()) {
+                                      toast.error('Reden is verplicht')
+                                      return
+                                    }
+                                    if (!window.confirm(`Proefperiode verlengen met ${days} dagen voor "${company.name}"?`)) return
+                                    extendTrialMutation.mutate({ adminId: company.id, days, reason: extendReason.trim() })
+                                  }}
+                                >
+                                  {extendTrialMutation.isPending ? 'Bezig...' : 'Verlengen'}
+                                </Button>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {!detail.can_extend_trial && !detail.is_paid && detail.subscription_id ? (
+                            <p className="text-sm text-muted-foreground">
+                              Verlenging niet beschikbaar voor de huidige status.
+                            </p>
+                          ) : null}
+                        </>
+                      )
+                    })() : null}
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           ))}

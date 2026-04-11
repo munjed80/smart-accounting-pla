@@ -5515,6 +5515,35 @@ export interface ContactMessageDetail {
   internal_note: string | null
 }
 
+export interface AdminSubscriptionDetail {
+  administration_id: string
+  subscription_id: string | null
+  plan_code: string | null
+  status: string | null
+  trial_start_at: string | null
+  trial_end_at: string | null
+  days_remaining: number | null
+  current_period_start: string | null
+  current_period_end: string | null
+  cancel_at_period_end: boolean | null
+  provider: string | null
+  provider_subscription_id: string | null
+  is_paid: boolean
+  can_extend_trial: boolean
+}
+
+export interface ExtendTrialRequest {
+  extend_days?: number
+  new_trial_end?: string
+  reason: string
+}
+
+export interface ExtendTrialResponse {
+  message: string
+  new_trial_end: string | null
+  new_status: string
+}
+
 export const adminApi = {
   getOverview: async (): Promise<AdminOverview> => {
     const response = await api.get('/admin/overview')
@@ -5561,6 +5590,14 @@ export const adminApi = {
   },
   updateContactMessage: async (id: string, payload: { status?: string; internal_note?: string }): Promise<ContactMessageDetail> => {
     const response = await api.patch(`/admin/contact-messages/${id}`, payload)
+    return response.data
+  },
+  getSubscriptionDetail: async (administrationId: string): Promise<AdminSubscriptionDetail> => {
+    const response = await api.get(`/admin/administrations/${administrationId}/subscription-detail`)
+    return response.data
+  },
+  extendTrial: async (administrationId: string, payload: ExtendTrialRequest): Promise<ExtendTrialResponse> => {
+    const response = await api.post(`/admin/administrations/${administrationId}/extend-trial`, payload)
     return response.data
   },
 }

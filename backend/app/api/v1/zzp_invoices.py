@@ -12,7 +12,7 @@ from typing import Annotated, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -1007,7 +1007,6 @@ info@zzpershub.nl
             resp = invoice_to_response(invoice)
             resp_dict = resp.model_dump(mode="json")
             resp_dict["_email_status"] = "not_configured"
-            from fastapi.responses import JSONResponse
             return JSONResponse(content=resp_dict)
 
         # Encode PDF as base64 for attachment

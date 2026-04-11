@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { CalendarBlank, Clock, CurrencyEur, PencilSimple, Plus, Receipt, TrashSimple, WarningCircle } from '@phosphor-icons/react'
+import { Switch } from '@/components/ui/switch'
+import { CalendarBlank, Clock, Copy, CurrencyEur, Export, LockSimple, PencilSimple, Plus, Receipt, TrashSimple, WarningCircle } from '@phosphor-icons/react'
 import { WorkSession, getApiBaseUrl, zzpApi, ZZPCustomer, ZZPTimeEntry, ZZPTimeEntryCreate, ZZPTimeEntryUpdate } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -25,6 +26,7 @@ import {
   toLocalISODate,
   totalMinutesForEntries,
 } from '@/lib/timeTracking'
+import { EmptyState } from '@/components/EmptyState'
 
 const NO_CUSTOMER = '__none__'
 
@@ -47,6 +49,13 @@ type EntryFormState = {
   customer_id: string
   project_name: string
   hourly_rate: string
+  billable: boolean
+}
+
+const defaultInvoicedFilters = {
+  inv_customer: '',
+  inv_from: '',
+  inv_to: '',
 }
 
 const INVOICE_MODE_STORAGE_KEY = 'uren_invoice_mode'
@@ -84,6 +93,7 @@ const defaultFormState = (): EntryFormState => ({
   customer_id: '',
   project_name: '',
   hourly_rate: '',
+  billable: true,
 })
 
 export const ZZPTimeTrackingPage = () => {
@@ -109,9 +119,10 @@ export const ZZPTimeTrackingPage = () => {
   const [periodEnd, setPeriodEnd] = useState<string>(initialPeriod?.end || '')
   const [hourlyRate, setHourlyRate] = useState<string>('')
 
-  const [invoicedFilterCustomerId, setInvoicedFilterCustomerId] = useState<string>('')
-  const [invoicedFilterStart, setInvoicedFilterStart] = useState<string>('')
-  const [invoicedFilterEnd, setInvoicedFilterEnd] = useState<string>('')
+  const { filters: invoicedFilters, setFilter: setInvoicedFilter } = useQueryFilters(defaultInvoicedFilters)
+  const invoicedFilterCustomerId = invoicedFilters.inv_customer as string
+  const invoicedFilterStart = invoicedFilters.inv_from as string
+  const invoicedFilterEnd = invoicedFilters.inv_to as string
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<ZZPTimeEntry | null>(null)
@@ -123,6 +134,7 @@ export const ZZPTimeTrackingPage = () => {
   const [isClockActionLoading, setIsClockActionLoading] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [isStartSessionDialogOpen, setIsStartSessionDialogOpen] = useState(false)
+  const [isInvoiceConfirmOpen, setIsInvoiceConfirmOpen] = useState(false)
   const [startSessionForm, setStartSessionForm] = useState({ customer_id: '', description: '', hourly_rate: '' })
   const [sessionMetadata, setSessionMetadata] = useState<{ customer_id: string; description: string; hourly_rate: string } | null>(() => {
     try {
@@ -269,6 +281,55 @@ export const ZZPTimeTrackingPage = () => {
   const weeklyOpenMinutes = useMemo(() => totalMinutesForEntries(openEntries), [openEntries])
   const weeklyOpenHours = useMemo(() => minutesToHours(weeklyOpenMinutes), [weeklyOpenMinutes])
 
+  const utilizationRate = useMemo(() => {
+    const total = totalOpenHours
+    const billable = timeTotals.billableHours
+    if (total <= 0) return null
+    return Math.round((billable / total) * 100)
+  }, [totalOpenHours, timeTotals.billableHours])
+
+  const weeklyBarData = useMemo(() => {
+    const today = new Date()
+    const dayOfWeek = today.getDay() // 0=Sun, 1=Mon...
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+    const monday = new Date(today)
+    monday.setDate(today.getDate() + mondayOffset)
+
+    return ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'].map((label, i) => {
+      const d = new Date(monday)
+      d.setDate(monday.getDate() + i)
+      const iso = toLocalISODate(d)
+      const hours = openEntries
+        .filter((e) => e.entry_date === iso)
+        .reduce((sum, e) => sum + parseHours(e.hours), 0)
+      return { label, hours, iso }
+    })
+  }, [openEntries])
+
+  const projectSuggestions = useMemo(() => {
+    const names = new Set<string>()
+    openEntries.forEach((e) => { if (e.project_name) names.add(e.project_name) })
+    invoicedEntries.forEach((e) => { if (e.project_name) names.add(e.project_name) })
+    return Array.from(names).sort()
+  }, [openEntries, invoicedEntries])
+
+  // Keyboard shortcut: press N (when not in an input) to open the add-entry form
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isFormOpen || isStartSessionDialogOpen || isInvoiceConfirmOpen) return
+      const target = event.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+      if (event.key === 'n' || event.key === 'N') {
+        event.preventDefault()
+        openForm()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  // openForm is defined below but stable — we use a ref pattern to avoid stale closure
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFormOpen, isStartSessionDialogOpen, isInvoiceConfirmOpen])
+
   const handleClockIn = async (customer_id: string, description: string, hourly_rate: string) => {
     setIsClockActionLoading(true)
     try {
@@ -317,18 +378,20 @@ export const ZZPTimeTrackingPage = () => {
     }
   }
 
-  const openForm = (entry?: ZZPTimeEntry) => {
+  const openForm = (entry?: ZZPTimeEntry, duplicate?: boolean) => {
     setFormError(null)
     setFormValidationErrors([])
     if (entry) {
-      setEditingEntry(entry)
+      if (!duplicate) setEditingEntry(entry)
+      else setEditingEntry(null)
       setFormState({
-        entry_date: entry.entry_date,
+        entry_date: duplicate ? toLocalISODate(new Date()) : entry.entry_date,
         hours: String(entry.hours),
         description: entry.description,
         customer_id: entry.customer_id || '',
         project_name: entry.project_name || '',
         hourly_rate: entry.hourly_rate ? String(entry.hourly_rate) : '',
+        billable: entry.billable !== false,
       })
     } else {
       setEditingEntry(null)
@@ -384,7 +447,7 @@ export const ZZPTimeTrackingPage = () => {
         customer_id: selectedCustomerId || undefined,
         project_name: formState.project_name || undefined,
         hourly_rate: parsedHourlyRate,
-        billable: true,
+        billable: formState.billable,
       }
 
       const method = editingEntry ? 'PATCH' : 'POST'
@@ -437,7 +500,7 @@ export const ZZPTimeTrackingPage = () => {
             customer_id: selectedCustomerId || undefined,
             project_name: formState.project_name || undefined,
             hourly_rate: parsedHourlyRate,
-            billable: true,
+            billable: formState.billable,
           },
           status: rawError?.response?.status,
           statusText: rawError?.response?.statusText,
@@ -534,6 +597,28 @@ export const ZZPTimeTrackingPage = () => {
     } finally {
       setInvoicing(false)
     }
+  }
+
+  const handleExportCSV = () => {
+    const headers = ['Datum', 'Uren', 'Omschrijving', 'Klant', 'Project', 'Uurtarief', 'Factureerbaar']
+    const rows = filteredOpenEntries.map((entry) => [
+      entry.entry_date,
+      parseHours(entry.hours).toFixed(2),
+      `"${entry.description.replace(/"/g, '""')}"`,
+      `"${(entry.customer_id && customerMap[entry.customer_id]) || ''}"`,
+      `"${(entry.project_name || '').replace(/"/g, '""')}"`,
+      entry.hourly_rate ? Number(entry.hourly_rate).toFixed(2) : '',
+      entry.billable !== false ? 'Ja' : 'Nee',
+    ])
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `uren-export-${toLocalISODate(new Date())}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    toast.success('CSV geëxporteerd')
   }
 
   if (pageError && !loading) {
@@ -662,9 +747,13 @@ export const ZZPTimeTrackingPage = () => {
               <p className="text-sm text-muted-foreground">Billable uren (filter)</p>
               <p className="text-2xl font-semibold">{timeTotals.billableHours.toFixed(2)}u</p>
             </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-sm text-muted-foreground">Bezettingsgraad</p>
+              <p className="text-2xl font-semibold">{utilizationRate !== null ? `${utilizationRate}%` : '–'}</p>
+            </div>
           </div>
 
-          <Button disabled={!filters.customer_id || totalOpenHours === 0 || invoicing} onClick={() => void handleInvoiceWeek()}>
+          <Button disabled={!filters.customer_id || totalOpenHours === 0 || invoicing} onClick={() => setIsInvoiceConfirmOpen(true)}>
             {invoicing ? 'Factuur maken...' : 'Maak factuur'}
           </Button>
         </CardContent>
@@ -737,18 +826,51 @@ export const ZZPTimeTrackingPage = () => {
           <CardTitle className="flex items-center gap-2"><Clock size={20} />Open uren</CardTitle>
           <div className="flex items-center gap-3">
             <Badge variant="secondary">Week totaal: {weeklyOpenHours.toFixed(2)}u</Badge>
-            <Button onClick={() => openForm()} size="sm"><Plus size={16} className="mr-2" />Uren toevoegen</Button>
+            <Button onClick={handleExportCSV} size="sm" variant="outline"><Export size={16} className="mr-2" />CSV exporteren</Button>
+            <Button onClick={() => openForm()} size="sm" title="Uren toevoegen (N)"><Plus size={16} className="mr-2" />Uren toevoegen</Button>
           </div>
         </CardHeader>
         <CardContent>
+          {/* Weekly bar chart */}
+          {weeklyBarData.some((d) => d.hours > 0) && (
+            <div className="mb-6 rounded-lg border p-4">
+              <p className="text-sm font-medium mb-3 text-muted-foreground">Uren deze week</p>
+              <div className="flex items-end gap-2" style={{ height: 72 }}>
+                {weeklyBarData.map((d) => {
+                  const maxH = Math.max(...weeklyBarData.map((x) => x.hours), 1)
+                  const barH = Math.max((d.hours / maxH) * 56, d.hours > 0 ? 4 : 0)
+                  const isToday = d.iso === toLocalISODate(new Date())
+                  return (
+                    <div key={d.label} className="flex flex-1 flex-col items-center gap-1">
+                      {d.hours > 0 && (
+                        <span className="text-[10px] text-muted-foreground">{d.hours.toFixed(1)}u</span>
+                      )}
+                      <div
+                        className="w-full rounded-t"
+                        style={{
+                          height: barH,
+                          background: isToday
+                            ? 'hsl(var(--primary))'
+                            : d.hours > 0
+                              ? 'hsl(var(--primary) / 0.4)'
+                              : 'hsl(var(--muted))',
+                        }}
+                      />
+                      <span className={`text-[11px] font-medium ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>{d.label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           <div className="grid gap-3 md:grid-cols-3 mb-4">
             <Input placeholder="Zoek op project, klant of omschrijving" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
             <Select value={filters.billable} onValueChange={(value) => setFilter('billable', value as TimeEntryFilters['billable'])}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Alle</SelectItem>
-                <SelectItem value="billable">Billable</SelectItem>
-                <SelectItem value="non_billable">Non-billable</SelectItem>
+                <SelectItem value="billable">Factureerbaar</SelectItem>
+                <SelectItem value="non_billable">Niet factureerbaar</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filters.invoiced} onValueChange={(value) => setFilter('invoiced', value as TimeEntryFilters['invoiced'])}>
@@ -764,10 +886,10 @@ export const ZZPTimeTrackingPage = () => {
             <Input placeholder="Project" value={filters.project} onChange={(e) => setFilter('project', e.target.value)} />
           </div>
           <div className="flex flex-wrap gap-2 mb-4">
-            <Button size="sm" variant="outline" onClick={() => { const d = toLocalISODate(new Date()); setFilter('from', d); setFilter('to', d); }}>Today</Button>
-            <Button size="sm" variant="outline" onClick={() => { const p = getInvoicePeriodRange('weekly', new Date()); if (p) { setFilter('from', p.start); setFilter('to', p.end); } }}>This week</Button>
-            <Button size="sm" variant="outline" onClick={() => { const p = getInvoicePeriodRange('monthly', new Date()); if (p) { setFilter('from', p.start); setFilter('to', p.end); } }}>This month</Button>
-            <Button size="sm" variant="outline" onClick={reset}>Clear filters</Button>
+            <Button size="sm" variant="outline" onClick={() => { const d = toLocalISODate(new Date()); setFilter('from', d); setFilter('to', d); }}>Vandaag</Button>
+            <Button size="sm" variant="outline" onClick={() => { const p = getInvoicePeriodRange('weekly', new Date()); if (p) { setFilter('from', p.start); setFilter('to', p.end); } }}>Deze week</Button>
+            <Button size="sm" variant="outline" onClick={() => { const p = getInvoicePeriodRange('monthly', new Date()); if (p) { setFilter('from', p.start); setFilter('to', p.end); } }}>Deze maand</Button>
+            <Button size="sm" variant="outline" onClick={reset}>Wis filters</Button>
           </div>
           {loading ? (
             <div className="space-y-3">
@@ -776,7 +898,13 @@ export const ZZPTimeTrackingPage = () => {
               <Skeleton className="h-16 w-full" />
             </div>
           ) : Object.keys(groupedOpenEntries).length === 0 ? (
-            <p className="text-muted-foreground">Geen open uren in deze selectie.</p>
+            <EmptyState
+              title="Geen open uren"
+              description="Er zijn nog geen uren geregistreerd voor deze selectie. Voeg uren toe om te beginnen."
+              icon={<Clock size={64} weight="duotone" className="text-muted-foreground" />}
+              actionLabel="Uren toevoegen"
+              onAction={() => openForm()}
+            />
           ) : (
             <div className="space-y-4">
               {Object.entries(groupedOpenEntries).sort(([a], [b]) => (a < b ? 1 : -1)).map(([day, dayEntries]) => {
@@ -807,6 +935,9 @@ export const ZZPTimeTrackingPage = () => {
                             <Button variant="outline" size="sm" onClick={() => openForm(entry)}>
                               <PencilSimple size={14} className="mr-1 text-emerald-500" />Bewerken
                             </Button>
+                            <Button variant="outline" size="sm" onClick={() => openForm(entry, true)} title="Dupliceren">
+                              <Copy size={14} className="mr-1 text-blue-500" />Dupliceren
+                            </Button>
                             <Button variant="outline" size="sm" onClick={() => void handleDeleteEntry(entry)}>
                               <TrashSimple size={14} className="mr-1 text-red-500" />Verwijderen
                             </Button>
@@ -829,7 +960,7 @@ export const ZZPTimeTrackingPage = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-3">
-            <Select value={invoicedFilterCustomerId || NO_CUSTOMER} onValueChange={(value) => setInvoicedFilterCustomerId(value === NO_CUSTOMER ? '' : value)}>
+            <Select value={invoicedFilterCustomerId || NO_CUSTOMER} onValueChange={(value) => setInvoicedFilter('inv_customer', value === NO_CUSTOMER ? '' : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Filter op klant" />
               </SelectTrigger>
@@ -840,8 +971,8 @@ export const ZZPTimeTrackingPage = () => {
                 ))}
               </SelectContent>
             </Select>
-            <Input type="date" value={invoicedFilterStart} onChange={(event) => setInvoicedFilterStart(event.target.value)} />
-            <Input type="date" value={invoicedFilterEnd} onChange={(event) => setInvoicedFilterEnd(event.target.value)} />
+            <Input type="date" value={invoicedFilterStart} onChange={(event) => setInvoicedFilter('inv_from', event.target.value)} />
+            <Input type="date" value={invoicedFilterEnd} onChange={(event) => setInvoicedFilter('inv_to', event.target.value)} />
           </div>
 
           {loading ? (
@@ -855,11 +986,18 @@ export const ZZPTimeTrackingPage = () => {
             <div className="space-y-2">
               {filteredInvoicedEntries.map((entry) => (
                 <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 bg-muted/20">
-                  <div>
-                    <p className="font-medium">{entry.description}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(`${entry.entry_date}T00:00:00`).toLocaleDateString('nl-NL')} • {parseHours(entry.hours).toFixed(2)}u
-                    </p>
+                  <div className="flex items-start gap-2">
+                    <LockSimple size={16} weight="fill" className="mt-0.5 shrink-0 text-amber-500" />
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium">{entry.description}</p>
+                        <Badge variant="secondary" className="text-amber-700 border-amber-300 bg-amber-50">Gefactureerd</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(`${entry.entry_date}T00:00:00`).toLocaleDateString('nl-NL')} • {parseHours(entry.hours).toFixed(2)}u
+                        {entry.customer_id && customerMap[entry.customer_id] ? ` • ${customerMap[entry.customer_id]}` : ''}
+                      </p>
+                    </div>
                   </div>
                   <div className="text-right text-sm">
                     <p className="text-muted-foreground">Factuur</p>
@@ -881,6 +1019,33 @@ export const ZZPTimeTrackingPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Invoice confirmation dialog */}
+      <Dialog open={isInvoiceConfirmOpen} onOpenChange={setIsInvoiceConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Factuur aanmaken bevestigen</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">Weet je zeker dat je deze factuur wilt aanmaken?</p>
+            <div className="rounded-lg border p-3 space-y-1 text-sm">
+              <p><span className="text-muted-foreground">Klant:</span> <span className="font-medium">{filters.customer_id ? (customerMap[filters.customer_id] || '—') : '—'}</span></p>
+              <p><span className="text-muted-foreground">Periode:</span> <span className="font-medium">{periodStart} – {periodEnd}</span></p>
+              <p><span className="text-muted-foreground">Totaal uren:</span> <span className="font-medium">{totalOpenHours.toFixed(2)}u</span></p>
+              <p><span className="text-muted-foreground">Totaal bedrag:</span> <span className="font-medium">€ {totalOpenAmount.toFixed(2)}</span></p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsInvoiceConfirmOpen(false)}>Annuleren</Button>
+            <Button
+              disabled={invoicing}
+              onClick={() => { setIsInvoiceConfirmOpen(false); void handleInvoiceWeek() }}
+            >
+              {invoicing ? 'Factuur maken...' : 'Ja, maak factuur'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent>
@@ -929,11 +1094,29 @@ export const ZZPTimeTrackingPage = () => {
             </div>
             <div className="space-y-2">
               <Label>Project</Label>
-              <Input value={formState.project_name} onChange={(event) => setFormState((prev) => ({ ...prev, project_name: event.target.value }))} />
+              <Input
+                list="project-suggestions"
+                value={formState.project_name}
+                onChange={(event) => setFormState((prev) => ({ ...prev, project_name: event.target.value }))}
+                placeholder="Bijv. Website redesign"
+              />
+              <datalist id="project-suggestions">
+                {projectSuggestions.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
             </div>
             <div className="space-y-2">
               <Label>Uurtarief (€)</Label>
               <Input type="number" min="0" step="0.01" value={formState.hourly_rate} onChange={(event) => setFormState((prev) => ({ ...prev, hourly_rate: event.target.value }))} />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="billable-toggle"
+                checked={formState.billable}
+                onCheckedChange={(checked) => setFormState((prev) => ({ ...prev, billable: checked }))}
+              />
+              <Label htmlFor="billable-toggle" className="cursor-pointer">Factureerbaar</Label>
             </div>
             <div className="flex justify-end">
               <Button disabled={isSavingEntry} onClick={() => void saveEntry()}>

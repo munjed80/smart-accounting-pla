@@ -5765,6 +5765,26 @@ export const zzpBtwApi = {
     const response = await api.get<BTWAangifteResponse>('/zzp/btw-aangifte', { params })
     return response.data
   },
+
+  downloadXml: async (year?: number, quarter?: number): Promise<void> => {
+    const params: Record<string, string> = {}
+    if (year) params.year = String(year)
+    if (quarter) params.quarter = String(quarter)
+    const response = await api.get('/zzp/btw-aangifte/xml', {
+      params,
+      responseType: 'blob',
+    })
+    const blob = new Blob([response.data as BlobPart], { type: 'application/xml' })
+    const disposition = (response.headers as Record<string, string>)['content-disposition'] || ''
+    const filenameMatch = disposition.match(/filename="?([^"]+)"?/)
+    const filename = filenameMatch ? filenameMatch[1] : `btw-overzicht.xml`
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  },
 }
 
 // ============================================================================

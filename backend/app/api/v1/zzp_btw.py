@@ -12,12 +12,14 @@ Metrics provided per quarter:
 - Net VAT to pay or reclaim
 - Validation warnings for missing or suspicious data
 """
+import xml.etree.ElementTree as ET
 from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from typing import Annotated, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -527,4 +529,127 @@ async def get_zzp_btw_aangifte(
         previous_quarters=previous_quarters,
         profile_complete=profile_complete,
         btw_number=btw_number,
+    )
+
+
+# ============================================================================
+# XML Export Endpoint
+# ============================================================================
+
+def _format_cents_xml(cents: int) -> str:
+    """Format cents as euros for XML (e.g. 12345 → '123')."""
+    return str(abs(cents) // 100)
+
+
+@router.get(
+    "/btw-aangifte/xml",
+    summary="Download BTW overview as XML for Belastingdienst",
+    description="Generates a simplified BTW aangifte XML based on the quarter overview data.",
+)
+async def download_btw_xml(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    year: Optional[int] = Query(None, description="Year (defaults to current)"),
+    quarter: Optional[int] = Query(None, ge=1, le=4, description="Quarter (1-4, defaults to current)"),
+) -> Response:
+    """Download BTW overview as XML for Belastingdienst reference."""
+    require_zzp(current_user)
+
+    administration = await get_user_administration(current_user.id, db)
+    admin_id = administration.id
+    today = date.today()
+
+    if year and quarter:
+        target_date = date(year, (quarter - 1) * 3 + 1, 1)
+    else:
+        target_date = today
+
+    quarter_label, quarter_start, quarter_end, btw_deadline, q_num, q_year = get_quarter_info(target_date)
+
+    overview = await build_quarter_overview(
+        admin_id, quarter_start, quarter_end, quarter_label, btw_deadline, today, db
+    )
+
+    # Get business profile
+    profile_result = await db.execute(
+        select(BusinessProfile).where(BusinessProfile.administration_id == admin_id)
+    )
+    profile = profile_result.scalar_one_or_none()
+
+    # Build XML
+    root = ET.Element("OB")
+    root.set("xmlns", "http://www.belastingdienst.nl/btw/aangifte/v1")
+
+    # Header
+    header = ET.SubElement(root, "Aangiftegegevens")
+    ET.SubElement(header, "Tijdvak").text = f"{q_year}-Q{q_num}"
+    ET.SubElement(header, "DatumBegin").text = quarter_start.isoformat()
+    ET.SubElement(header, "DatumEinde").text = quarter_end.isoformat()
+    ET.SubElement(header, "AangifteDatum").text = today.isoformat()
+    if profile and profile.btw_number:
+        ET.SubElement(header, "OmzetbelastingNummer").text = profile.btw_number
+
+    # Revenue breakdown by VAT rate
+    omzet = ET.SubElement(root, "Omzet")
+    # Separate 21% and 9% from rate breakdown
+    omzet_21 = 0
+    btw_21 = 0
+    omzet_9 = 0
+    btw_9 = 0
+    omzet_0 = 0
+    for rb in overview.vat_rate_breakdown:
+        rate = float(rb.vat_rate)
+        if rate >= 20:  # 21%
+            omzet_21 += rb.omzet_cents
+            btw_21 += rb.vat_cents
+        elif rate >= 8:  # 9%
+            omzet_9 += rb.omzet_cents
+            btw_9 += rb.vat_cents
+        else:
+            omzet_0 += rb.omzet_cents
+
+    # Rubriek 1a: Omzet belast met hoog tarief
+    r1a = ET.SubElement(omzet, "Rubriek1a")
+    ET.SubElement(r1a, "OmzetHoogTarief").text = _format_cents_xml(omzet_21)
+    ET.SubElement(r1a, "BelastingHoogTarief").text = _format_cents_xml(btw_21)
+
+    # Rubriek 1b: Omzet belast met laag tarief
+    r1b = ET.SubElement(omzet, "Rubriek1b")
+    ET.SubElement(r1b, "OmzetLaagTarief").text = _format_cents_xml(omzet_9)
+    ET.SubElement(r1b, "BelastingLaagTarief").text = _format_cents_xml(btw_9)
+
+    # Rubriek 1e: Omzet belast met 0% / overige
+    if omzet_0 > 0:
+        r1e = ET.SubElement(omzet, "Rubriek1e")
+        ET.SubElement(r1e, "OmzetOverig").text = _format_cents_xml(omzet_0)
+
+    # Rubriek 5a: Totaal output BTW
+    totalen = ET.SubElement(root, "Totalen")
+    r5a = ET.SubElement(totalen, "Rubriek5a")
+    ET.SubElement(r5a, "TotaalOmzetbelasting").text = _format_cents_xml(overview.output_vat_cents)
+
+    # Rubriek 5b: Voorbelasting
+    r5b = ET.SubElement(totalen, "Rubriek5b")
+    ET.SubElement(r5b, "Voorbelasting").text = _format_cents_xml(overview.input_vat_cents)
+
+    # Rubriek 5c/5d: Te betalen / te vorderen
+    if overview.net_vat_cents >= 0:
+        r5c = ET.SubElement(totalen, "Rubriek5c")
+        ET.SubElement(r5c, "TeBetalen").text = _format_cents_xml(overview.net_vat_cents)
+    else:
+        r5d = ET.SubElement(totalen, "Rubriek5d")
+        ET.SubElement(r5d, "TeVorderen").text = _format_cents_xml(overview.net_vat_cents)
+
+    # Generate XML string
+    xml_str = ET.tostring(root, encoding="unicode", xml_declaration=True)
+    xml_bytes = xml_str.encode("utf-8")
+    filename = f"btw-overzicht-Q{q_num}-{q_year}.xml"
+
+    return Response(
+        content=xml_bytes,
+        media_type="application/xml",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(xml_bytes)),
+        },
     )

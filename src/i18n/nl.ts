@@ -177,7 +177,7 @@ export const nl = {
     backToOverzicht: "Terug naar Overzicht",
     // Belastinghulp section
     sectionBelastinghulp: "Belastinghulp",
-    btwAangifte: "BTW Aangifte",
+    btwAangifte: "BTW Overzicht",
     inkomstenbelasting: "Inkomstenbelasting",
     uitlegHulp: "Uitleg & Hulp",
     jaaroverzicht: "Jaaroverzicht",

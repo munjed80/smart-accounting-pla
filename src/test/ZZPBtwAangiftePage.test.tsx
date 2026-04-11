@@ -110,7 +110,7 @@ describe('ZZPBtwAangiftePage', () => {
 
     render(<ZZPBtwAangiftePage />)
 
-    expect(screen.getByText('BTW Aangifte')).toBeDefined()
+    expect(screen.getByText('BTW Overzicht')).toBeDefined()
     expect(screen.getByText(/Bereid je kwartaalaangifte voor/)).toBeDefined()
   })
 

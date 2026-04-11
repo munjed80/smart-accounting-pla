@@ -1,14 +1,14 @@
 /**
- * ZZP BTW Aangifte Page
+ * ZZP BTW Overzicht Page
  *
- * Self-service VAT declaration workspace for ZZP users.
- * Shows quarterly overview of omzet, output/input VAT, net VAT, warnings,
- * and a "ready to submit" summary card.
+ * Self-service quarterly VAT overview for ZZP users.
+ * Shows the key "af te dragen" number prominently, quarterly breakdown,
+ * warnings, and download options (XML + JSON + print).
  *
  * Calm, simple, self-service oriented UI for non-accountants.
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -35,11 +35,24 @@ import {
   CalendarBlank,
   DownloadSimple,
   Printer,
+  FileXls,
 } from '@phosphor-icons/react'
 import { zzpBtwApi, logApiError } from '@/lib/api'
-import type { BTWAangifteResponse, BTWQuarterOverview, BTWWarning } from '@/lib/api'
+import type { BTWAangifteResponse, BTWQuarterOverview } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
 import { formatCurrency, formatCurrencyAbs, TaxWarningItem } from '@/components/belastinghulp/shared'
+import { toast } from 'sonner'
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const QUARTER_MONTHS: Record<number, string> = {
+  1: 'jan – mrt',
+  2: 'apr – jun',
+  3: 'jul – sep',
+  4: 'okt – dec',
+}
 
 // ============================================================================
 // Sub-components
@@ -119,18 +132,77 @@ const StatCard = ({
   )
 }
 
-/** Warning item - uses shared TaxWarningItem */
+/** Hero card: prominent "af te dragen" number */
+const HeroCard = ({ overview, quarterMonths }: { overview: BTWQuarterOverview; quarterMonths: string }) => {
+  const isPayable = overview.net_vat_cents >= 0
+  const label = isPayable ? 'BTW af te dragen' : 'BTW terug te vragen'
+
+  return (
+    <Card className={`border-2 ${isPayable ? 'border-red-200 dark:border-red-900 bg-red-50/30 dark:bg-red-950/10' : 'border-green-200 dark:border-green-900 bg-green-50/30 dark:bg-green-950/10'}`}>
+      <CardContent className="p-6 sm:p-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-lg font-semibold">{overview.quarter}</h2>
+              <span className="text-sm text-muted-foreground">({quarterMonths})</span>
+              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-700">
+                Voorlopig
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">{label}</p>
+            <p className={`text-4xl sm:text-5xl font-bold tracking-tight ${isPayable ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+              {formatCurrencyAbs(overview.net_vat_cents)}
+            </p>
+          </div>
+          <div className="text-sm text-muted-foreground space-y-1 sm:text-right">
+            <p>
+              BTW ontvangen: <span className="font-medium text-foreground">{formatCurrency(overview.output_vat_cents)}</span>
+            </p>
+            <p>
+              Voorbelasting: <span className="font-medium text-green-600 dark:text-green-400">−{formatCurrencyAbs(overview.input_vat_cents)}</span>
+            </p>
+            <Separator className="my-2" />
+            <p className="font-medium text-foreground">
+              {isPayable ? 'Te betalen' : 'Terug te vragen'}: {formatCurrencyAbs(overview.net_vat_cents)}
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 /** Quarter overview detail section */
-const QuarterDetail = ({ overview, showExplanations = true }: { overview: BTWQuarterOverview; showExplanations?: boolean }) => {
-  const isPayable = overview.net_vat_cents >= 0
-  const netVariant = isPayable ? 'negative' : 'positive'
-  const netLabel = isPayable ? 'Te betalen aan Belastingdienst' : 'Terug te vragen van Belastingdienst'
+const QuarterDetail = ({
+  overview,
+  showExplanations = true,
+  selectedYear,
+  selectedQuarter,
+}: {
+  overview: BTWQuarterOverview
+  showExplanations?: boolean
+  selectedYear?: number
+  selectedQuarter?: number
+}) => {
+  const [downloadingXml, setDownloadingXml] = useState(false)
+
+  const handleDownloadXml = async () => {
+    setDownloadingXml(true)
+    try {
+      await zzpBtwApi.downloadXml(selectedYear, selectedQuarter)
+      toast.success('XML gedownload')
+    } catch (err) {
+      logApiError(err, 'BTW XML download')
+      toast.error('Fout bij downloaden van XML')
+    } finally {
+      setDownloadingXml(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
       {/* Key metric cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
           label="Omzet (ex. BTW)"
           value={formatCurrency(overview.omzet_cents)}
@@ -162,17 +234,6 @@ const QuarterDetail = ({ overview, showExplanations = true }: { overview: BTWQua
           explainDescription="De BTW die je zelf hebt betaald op zakelijke uitgaven. Dit mag je aftrekken van de af te dragen BTW."
           explainSource="BTW op geregistreerde uitgaven"
           explainCheck="Heb je alle bonnetjes en facturen van leveranciers ingevoerd?"
-        />
-        <StatCard
-          label={netLabel}
-          value={formatCurrencyAbs(overview.net_vat_cents)}
-          subtitle={isPayable ? 'Je betaalt dit bedrag' : 'Je krijgt dit bedrag terug'}
-          icon={<Calculator size={18} weight="duotone" />}
-          variant={netVariant}
-          explainTitle={showExplanations ? 'Hoe wordt dit berekend?' : undefined}
-          explainDescription={`Af te dragen BTW (${formatCurrency(overview.output_vat_cents)}) min voorbelasting (${formatCurrency(overview.input_vat_cents)}) = ${formatCurrency(overview.net_vat_cents)}`}
-          explainSource="Berekening: output BTW − input BTW"
-          explainCheck="Controleer of zowel omzet als uitgaven compleet zijn."
         />
       </div>
 
@@ -298,9 +359,18 @@ const QuarterDetail = ({ overview, showExplanations = true }: { overview: BTWQua
                 <div className="pt-3 space-y-2">
                   <ExplainBlock
                     title="Hoe dien je je BTW-aangifte in?"
-                    description="Log in op Mijn Belastingdienst (mijn.belastingdienst.nl) en vul de bedragen in bij je BTW-aangifte. Je kunt de samenvatting hieronder printen of downloaden als referentie."
+                    description="Log in op Mijn Belastingdienst (mijn.belastingdienst.nl) en vul de bedragen in bij je BTW-aangifte. Je kunt de samenvatting hieronder downloaden als referentie."
                   />
                   <div className="flex flex-wrap gap-2 pt-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleDownloadXml}
+                      disabled={downloadingXml}
+                    >
+                      <FileXls size={16} className="mr-1" />
+                      {downloadingXml ? 'Downloaden...' : 'Download XML voor Belastingdienst'}
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -318,7 +388,7 @@ const QuarterDetail = ({ overview, showExplanations = true }: { overview: BTWQua
                         const url = URL.createObjectURL(blob)
                         const a = document.createElement('a')
                         a.href = url
-                        a.download = `btw-aangifte-${overview.quarter.replace(' ', '-')}.json`
+                        a.download = `btw-overzicht-${overview.quarter.replace(' ', '-')}.json`
                         a.click()
                         URL.revokeObjectURL(url)
                       }}
@@ -343,8 +413,16 @@ const QuarterDetail = ({ overview, showExplanations = true }: { overview: BTWQua
 
 const LoadingSkeleton = () => (
   <div className="space-y-6">
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {[1, 2, 3, 4].map((i) => (
+    {/* Hero skeleton */}
+    <Card className="border-2">
+      <CardContent className="p-6 sm:p-8">
+        <Skeleton className="h-6 w-32 mb-2" />
+        <Skeleton className="h-4 w-24 mb-3" />
+        <Skeleton className="h-12 w-48" />
+      </CardContent>
+    </Card>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {[1, 2, 3].map((i) => (
         <Card key={i}>
           <CardContent className="p-4 space-y-3">
             <Skeleton className="h-4 w-24" />
@@ -368,19 +446,32 @@ const LoadingSkeleton = () => (
 // ============================================================================
 
 export const ZZPBtwAangiftePage = () => {
+  const currentDate = new Date()
+  const currentYear = currentDate.getFullYear()
+  const currentQuarter = Math.floor(currentDate.getMonth() / 3) + 1
+
   const [data, setData] = useState<BTWAangifteResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedQuarter, setSelectedQuarter] = useState<string>('current')
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear)
+  const [selectedQuarter, setSelectedQuarter] = useState<number>(currentQuarter)
 
-  const fetchData = useCallback(async () => {
+  const yearOptions = useMemo(() => {
+    const years: number[] = []
+    for (let y = currentYear - 2; y <= currentYear; y++) {
+      years.push(y)
+    }
+    return years
+  }, [currentYear])
+
+  const fetchData = useCallback(async (year: number, quarter: number) => {
     setLoading(true)
     setError(null)
     try {
-      const result = await zzpBtwApi.getOverview()
+      const result = await zzpBtwApi.getOverview(year, quarter)
       setData(result)
     } catch (err) {
-      logApiError(err, 'ZZPBtwAangifte')
+      logApiError(err, 'ZZPBtwOverzicht')
       setError('Er is een fout opgetreden bij het laden van je BTW-overzicht. Probeer het later opnieuw.')
     } finally {
       setLoading(false)
@@ -388,21 +479,11 @@ export const ZZPBtwAangiftePage = () => {
   }, [])
 
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    fetchData(selectedYear, selectedQuarter)
+  }, [fetchData, selectedYear, selectedQuarter])
 
-  // Determine which quarter to display
-  const activeOverview = selectedQuarter === 'current'
-    ? data?.current_quarter
-    : data?.previous_quarters.find(q => q.quarter === selectedQuarter)
-
-  // Build quarter options for dropdown
-  const quarterOptions = data
-    ? [
-        { value: 'current', label: data.current_quarter.quarter },
-        ...data.previous_quarters.map(q => ({ value: q.quarter, label: q.quarter })),
-      ]
-    : []
+  const activeOverview = data?.current_quarter
+  const quarterMonths = QUARTER_MONTHS[selectedQuarter] || ''
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto" data-testid="zzp-btw-aangifte-page">
@@ -410,31 +491,40 @@ export const ZZPBtwAangiftePage = () => {
       <div className="space-y-1">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">BTW Aangifte</h1>
+            <h1 className="text-2xl font-bold tracking-tight">BTW Overzicht</h1>
             <p className="text-muted-foreground text-sm">
               Bereid je kwartaalaangifte voor — overzichtelijk en stap voor stap.
             </p>
           </div>
 
-          {data && (
-            <div className="flex items-center gap-3">
-              {data.btw_number && (
-                <Badge variant="outline" className="text-xs">
-                  BTW: {data.btw_number}
-                </Badge>
-              )}
-              <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Kwartaal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {quarterOptions.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div className="flex items-center gap-3 flex-wrap">
+            {data?.btw_number && (
+              <Badge variant="outline" className="text-xs">
+                BTW: {data.btw_number}
+              </Badge>
+            )}
+            <Select value={String(selectedQuarter)} onValueChange={(v) => setSelectedQuarter(Number(v))}>
+              <SelectTrigger className="w-[100px]">
+                <SelectValue placeholder="Kwartaal" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Q1</SelectItem>
+                <SelectItem value="2">Q2</SelectItem>
+                <SelectItem value="3">Q3</SelectItem>
+                <SelectItem value="4">Q4</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+              <SelectTrigger className="w-[100px]">
+                <SelectValue placeholder="Jaar" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Deadline banner */}
@@ -474,14 +564,22 @@ export const ZZPBtwAangiftePage = () => {
           <CardContent className="p-6 text-center space-y-3">
             <WarningCircle size={40} weight="duotone" className="text-red-400 mx-auto" />
             <p className="text-sm text-muted-foreground">{error}</p>
-            <Button variant="outline" size="sm" onClick={fetchData}>Opnieuw proberen</Button>
+            <Button variant="outline" size="sm" onClick={() => fetchData(selectedYear, selectedQuarter)}>Opnieuw proberen</Button>
           </CardContent>
         </Card>
       )}
 
       {/* Main content */}
       {!loading && !error && activeOverview && (
-        <QuarterDetail overview={activeOverview} showExplanations={selectedQuarter === 'current'} />
+        <>
+          <HeroCard overview={activeOverview} quarterMonths={quarterMonths} />
+          <QuarterDetail
+            overview={activeOverview}
+            showExplanations
+            selectedYear={selectedYear}
+            selectedQuarter={selectedQuarter}
+          />
+        </>
       )}
 
       {/* No data state */}

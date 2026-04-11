@@ -1852,26 +1852,25 @@ const ZZPInvoicesPageContent = () => {
     }
   }, [])
 
-  // Handle copy invoice link to clipboard (PDF download URL)
-  // Note: This URL requires authentication, so it's for internal use only
+  // Handle copy invoice link to clipboard (public share URL)
+  // Generates a signed, 30-day share link that doesn't require authentication
   const handleCopyLink = useCallback(async (invoice: ZZPInvoice) => {
-    console.log('[PDF Copy Link] Copying link for invoice:', invoice.id)
+    console.log('[PDF Copy Link] Creating share link for invoice:', invoice.id)
     try {
-      // Copy the PDF download URL (requires authentication)
-      const pdfUrl = zzpApi.invoices.getPdfUrl(invoice.id)
-      console.log('[PDF Copy Link] URL to copy:', pdfUrl)
+      const { url } = await zzpApi.invoices.createShareLink(invoice.id)
+      console.log('[PDF Copy Link] Share URL:', url)
       
-      await navigator.clipboard.writeText(pdfUrl)
+      await navigator.clipboard.writeText(url)
       console.log('[PDF Copy Link] Link copied successfully')
-      toast.success(t('zzpInvoices.invoiceLinkCopied'))
+      toast.success(t('zzpInvoices.shareLinkCopied'))
     } catch (err) {
-      console.error('[PDF Copy Link] Failed to copy link:', err)
+      console.error('[PDF Copy Link] Failed to create share link:', err)
       toast.error(t('common.error'))
     }
   }, [])
 
   // Handle share invoice (Web Share API with PDF file sharing)
-  // Shares the actual PDF file if supported, otherwise falls back to URL sharing
+  // Shares the actual PDF file if supported, otherwise falls back to public share URL
   const handleShare = useCallback(async (invoice: ZZPInvoice) => {
     const invoiceNumber = invoice.invoice_number || `INV-${invoice.id}`
     const filename = `${invoiceNumber}.pdf`
@@ -1909,23 +1908,24 @@ const ZZPInvoicesPageContent = () => {
         }
       }
       
+      // Fallback: generate a public share link and share/copy it
+      console.log('[PDF Share] Generating public share link...')
+      const { url: shareUrl } = await zzpApi.invoices.createShareLink(invoice.id)
+
       if (navigator.share) {
-        // Fallback: Share PDF URL instead of file (for browsers that don't support file sharing)
-        console.log('[PDF Share] File sharing not supported, sharing URL instead...')
-        const pdfUrl = zzpApi.invoices.getPdfUrl(invoice.id)
+        console.log('[PDF Share] Sharing public URL via Web Share API...')
         await navigator.share({
           title: t('zzpInvoices.shareTitle').replace('{number}', invoiceNumber),
           text: t('zzpInvoices.shareText').replace('{number}', invoiceNumber),
-          url: pdfUrl,
+          url: shareUrl,
         })
         console.log('[PDF Share] URL shared successfully')
         toast.success(t('zzpInvoices.shareSuccess'))
       } else {
         // No Web Share API available: copy link to clipboard as fallback
         console.log('[PDF Share] Web Share API not available, copying link to clipboard...')
-        const pdfUrl = zzpApi.invoices.getPdfUrl(invoice.id)
-        await navigator.clipboard.writeText(pdfUrl)
-        toast.success(t('zzpInvoices.invoiceLinkCopied'))
+        await navigator.clipboard.writeText(shareUrl)
+        toast.success(t('zzpInvoices.shareLinkCopied'))
       }
     } catch (err) {
       // AbortError is thrown when user cancels the share dialog - not an error

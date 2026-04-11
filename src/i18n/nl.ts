@@ -652,6 +652,7 @@ export const nl = {
     moreActions: "Meer acties",
     copyInvoiceLink: "Kopieer factuurlink",
     invoiceLinkCopied: "Factuurlink gekopieerd naar klembord",
+    shareLinkCopied: "Factuurlink gekopieerd — geldig voor 30 dagen",
     sendInvoice: "Verzenden",
     invoiceSent: "Factuur verzonden",
     popupBlocked: "Pop-up geblokkeerd. Sta pop-ups toe om de factuur te openen.",

@@ -4183,6 +4183,45 @@ export interface ZZPBankTransactionMatchListResponse {
   total: number
 }
 
+// PSD2 Bank Connection Types (GoCardless)
+export interface ZZPBankConnectionStatus {
+  connected: boolean
+  id?: string
+  institution_name?: string
+  institution_id?: string
+  status?: string
+  last_sync_at?: string
+  consent_expires_at?: string
+  iban?: string
+  created_at?: string
+}
+
+export interface ZZPBankConnectResponse {
+  link: string
+  requisition_id: string
+  institution_name: string
+  connection_id: string
+}
+
+export interface ZZPBankSyncResponse {
+  imported_count: number
+  skipped_count: number
+  total_fetched: number
+  message: string
+}
+
+export interface ZZPBankInstitution {
+  id: string
+  name: string
+  logo?: string
+  countries?: string[]
+}
+
+export interface ZZPBankInstitutionListResponse {
+  institutions: ZZPBankInstitution[]
+  total: number
+}
+
 // AI Insights Types
 export type InsightType = 
   | 'invoice_overdue'
@@ -5306,6 +5345,38 @@ export const zzpApi = {
       if (invoiceId) params.invoice_id = invoiceId
       
       const response = await api.get<ZZPBankTransactionMatchListResponse>('/zzp/bank/matches', { params })
+      return response.data
+    },
+
+    // --- PSD2 Bank Connection (GoCardless) ---
+
+    /** Get current bank connection status */
+    getConnectionStatus: async (): Promise<ZZPBankConnectionStatus> => {
+      const response = await api.get<ZZPBankConnectionStatus>('/zzp/bank/connection/status')
+      return response.data
+    },
+
+    /** List available bank institutions */
+    listInstitutions: async (country: string = 'NL'): Promise<ZZPBankInstitutionListResponse> => {
+      const response = await api.get<ZZPBankInstitutionListResponse>('/zzp/bank/institutions', { params: { country } })
+      return response.data
+    },
+
+    /** Initiate PSD2 bank connection */
+    connect: async (institutionId: string): Promise<ZZPBankConnectResponse> => {
+      const response = await api.post<ZZPBankConnectResponse>('/zzp/bank/connect', { institution_id: institutionId })
+      return response.data
+    },
+
+    /** Handle callback after bank authorization */
+    handleCallback: async (requisitionId: string): Promise<{ status: string; connection_id: string; institution_name: string; iban: string; message: string }> => {
+      const response = await api.get<{ status: string; connection_id: string; institution_name: string; iban: string; message: string }>('/zzp/bank/callback', { params: { ref: requisitionId } })
+      return response.data
+    },
+
+    /** Sync transactions from connected bank */
+    syncTransactions: async (): Promise<ZZPBankSyncResponse> => {
+      const response = await api.post<ZZPBankSyncResponse>('/zzp/bank/sync')
       return response.data
     },
   },

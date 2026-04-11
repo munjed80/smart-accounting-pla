@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.models.bank import BankAccount, BankTransaction, BankTransactionStatus
 from app.models.zzp import ZZPInvoice, InvoiceStatus, ZZPBankTransactionMatch
 from app.models.administration import Administration, AdministrationMember
@@ -42,10 +43,17 @@ from app.schemas.zzp import (
     ZZPUnmatchResponse,
     ZZPBankTransactionMatchResponse,
     ZZPBankTransactionMatchListResponse,
+    ZZPBankConnectRequest,
+    ZZPBankConnectResponse,
+    ZZPBankConnectionStatusResponse,
+    ZZPBankSyncResponse,
+    ZZPBankInstitutionResponse,
+    ZZPBankInstitutionListResponse,
 )
 from app.api.v1.deps import CurrentUser, require_zzp
 from app.repositories.ledger_repository import LedgerRepository
 from app.services.ledger_service import LedgerPostingService, LedgerPostingError
+from app.services.gocardless import GoCardlessService, GoCardlessError
 
 router = APIRouter()
 
@@ -987,4 +995,201 @@ async def list_matches(
     return ZZPBankTransactionMatchListResponse(
         matches=response_matches,
         total=len(response_matches),
+    )
+
+
+# =============================================================================
+# PSD2 Bank Connection Endpoints (GoCardless)
+# =============================================================================
+
+@router.get("/bank/connection/status", response_model=ZZPBankConnectionStatusResponse)
+async def get_bank_connection_status(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Get the current PSD2 bank connection status.
+    
+    Returns connection details if one exists, or connected=False if none.
+    """
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
+    
+    service = GoCardlessService(db, administration.id)
+    status = await service.get_connection_status()
+    
+    if not status:
+        return ZZPBankConnectionStatusResponse(connected=False)
+    
+    return ZZPBankConnectionStatusResponse(
+        connected=True,
+        **status,
+    )
+
+
+@router.get("/bank/institutions", response_model=ZZPBankInstitutionListResponse)
+async def list_bank_institutions(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    country: str = Query("NL", description="ISO 3166-1 alpha-2 landcode"),
+):
+    """
+    List available bank institutions for PSD2 connection.
+    
+    Returns institutions available in the specified country (default: NL).
+    Requires GoCardless to be configured.
+    """
+    require_zzp(current_user)
+    
+    if not settings.gocardless_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "GOCARDLESS_NOT_CONFIGURED", "message": "Bankkoppeling is niet geconfigureerd."}
+        )
+    
+    administration = await get_user_administration(current_user.id, db)
+    service = GoCardlessService(db, administration.id)
+    
+    try:
+        institutions = await service.list_institutions(country)
+    except GoCardlessError as e:
+        raise HTTPException(status_code=e.status_code or 502, detail={"code": "GOCARDLESS_ERROR", "message": e.message})
+    
+    return ZZPBankInstitutionListResponse(
+        institutions=[
+            ZZPBankInstitutionResponse(
+                id=inst.get("id", ""),
+                name=inst.get("name", ""),
+                logo=inst.get("logo"),
+                countries=inst.get("countries"),
+            )
+            for inst in institutions
+        ],
+        total=len(institutions),
+    )
+
+
+@router.post("/bank/connect", response_model=ZZPBankConnectResponse)
+async def connect_bank(
+    request: ZZPBankConnectRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Initiate a PSD2 bank connection.
+    
+    Creates a GoCardless requisition and returns the authorization link.
+    The user should be redirected to this link to authorize access at their bank.
+    After authorization, the bank redirects back to our callback URL.
+    """
+    require_zzp(current_user)
+    
+    if not settings.gocardless_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "GOCARDLESS_NOT_CONFIGURED", "message": "Bankkoppeling is niet geconfigureerd."}
+        )
+    
+    administration = await get_user_administration(current_user.id, db)
+    
+    # Build the callback URL
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
+    redirect_url = f"{frontend_url}/zzp/instellingen?bank_callback=true"
+    
+    service = GoCardlessService(db, administration.id)
+    
+    try:
+        result = await service.create_requisition(
+            institution_id=request.institution_id,
+            redirect_url=redirect_url,
+        )
+    except GoCardlessError as e:
+        raise HTTPException(
+            status_code=e.status_code or 502,
+            detail={"code": "GOCARDLESS_ERROR", "message": e.message},
+        )
+    
+    return ZZPBankConnectResponse(**result)
+
+
+@router.get("/bank/callback")
+async def bank_callback(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    ref: str = Query(..., description="GoCardless requisition ID"),
+):
+    """
+    Handle the callback after user authorizes at bank.
+    
+    Called by the frontend after redirect from GoCardless/bank.
+    Fetches account details and activates the connection.
+    """
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
+    
+    service = GoCardlessService(db, administration.id)
+    
+    try:
+        connection = await service.handle_callback(ref)
+    except GoCardlessError as e:
+        raise HTTPException(
+            status_code=e.status_code or 502,
+            detail={"code": "GOCARDLESS_ERROR", "message": e.message},
+        )
+    
+    return {
+        "status": "ok",
+        "connection_id": str(connection.id),
+        "institution_name": connection.institution_name,
+        "iban": (connection.connection_metadata or {}).get("iban", ""),
+        "message": f"Verbonden met {connection.institution_name}",
+    }
+
+
+@router.post("/bank/sync", response_model=ZZPBankSyncResponse)
+async def sync_bank_transactions(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Manually sync transactions from connected bank.
+    
+    Pulls new transactions from GoCardless and creates BankTransaction records.
+    Uses idempotent import to avoid duplicates.
+    """
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
+    
+    # Find active connection
+    from app.models.bank import BankConnectionModel, BankConnectionStatus
+    result = await db.execute(
+        select(BankConnectionModel).where(
+            BankConnectionModel.administration_id == administration.id,
+            BankConnectionModel.provider_name == "gocardless",
+            BankConnectionModel.status == BankConnectionStatus.ACTIVE,
+        ).order_by(BankConnectionModel.created_at.desc()).limit(1)
+    )
+    connection = result.scalar_one_or_none()
+    
+    if not connection:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "NO_CONNECTION", "message": "Geen actieve bankkoppeling gevonden. Koppel eerst je bank."}
+        )
+    
+    service = GoCardlessService(db, administration.id)
+    
+    try:
+        sync_result = await service.sync_transactions(connection.id)
+    except GoCardlessError as e:
+        raise HTTPException(
+            status_code=e.status_code or 502,
+            detail={"code": "GOCARDLESS_ERROR", "message": e.message},
+        )
+    
+    return ZZPBankSyncResponse(
+        imported_count=sync_result["imported_count"],
+        skipped_count=sync_result["skipped_count"],
+        total_fetched=sync_result["total_fetched"],
+        message=f"{sync_result['imported_count']} nieuwe transacties geïmporteerd.",
     )

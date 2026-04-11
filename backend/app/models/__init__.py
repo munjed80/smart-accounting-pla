@@ -27,6 +27,8 @@ from app.models.bank import (
     ReconciliationActionType,
     CategorizationRule,
     CategorizationRuleMatchType,
+    BankConnectionModel,
+    BankConnectionStatus,
 )
 from app.models.zzp import (
     ZZPCustomer, 
@@ -119,6 +121,8 @@ __all__ = [
     "ReconciliationActionType",
     "CategorizationRule",
     "CategorizationRuleMatchType",
+    "BankConnectionModel",
+    "BankConnectionStatus",
     "ZZPCustomer",
     "BusinessProfile",
     "InvoiceStatus",

@@ -38,6 +38,7 @@ def verify_orm_mappings() -> None:
         AuthToken,
         BankAccount, BankTransaction, ReconciliationAction,
         CategorizationRule,
+        BankConnectionModel,
         ZZPCustomer, BusinessProfile,
         ZZPInvoice, ZZPInvoiceLine, ZZPInvoiceCounter,
         ZZPExpense, ZZPTimeEntry, ZZPCalendarEvent,

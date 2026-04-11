@@ -1,4 +1,4 @@
-"""renew free trial for all existing free-plan users
+"""renew free trial for all existing free-plan users (3-month window)
 
 Revision ID: 051_renew_free_trials
 Revises: 050_update_saas_pricing_plans
@@ -6,8 +6,15 @@ Create Date: 2026-04-11 10:00:00.000000
 
 One-time data migration: resets the trial window for every subscription on
 the 'free' plan that is currently TRIALING or EXPIRED.  This gives all
-registered users a fresh 30-day trial starting from the moment this
-migration runs.
+non-paid users a fresh 3-month (90-day) trial starting from the moment
+this migration runs.
+
+Fields updated (real access-control source of truth):
+  - status           → 'TRIALING'  (checked by compute_entitlements)
+  - trial_end_at     → NOW() + 90 days  (deadline used by paywall guard)
+  - trial_start_at   → NOW()  (tracking; entitlement logic does not gate on it)
+  - cancel_at_period_end → FALSE  (prevents stale cancellation state)
+  - updated_at       → NOW()
 
 Subscriptions with status ACTIVE, CANCELED, or PAST_DUE are intentionally
 left untouched so paid / billing-managed subscriptions are never affected.
@@ -22,14 +29,15 @@ depends_on = None
 
 
 def upgrade() -> None:
-    """Reset trial_start_at / trial_end_at and status for free-plan trials."""
+    """Reset trial window to 3 months for all free-plan non-paid users."""
     op.execute(
         """
         UPDATE subscriptions
-        SET status        = 'TRIALING',
-            trial_start_at = NOW(),
-            trial_end_at   = NOW() + INTERVAL '30 days',
-            updated_at     = NOW()
+        SET status                = 'TRIALING',
+            trial_start_at        = NOW(),
+            trial_end_at          = NOW() + INTERVAL '90 days',
+            cancel_at_period_end  = FALSE,
+            updated_at            = NOW()
         WHERE plan_code = 'free'
           AND status IN ('TRIALING', 'EXPIRED')
         """

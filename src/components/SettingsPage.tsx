@@ -993,20 +993,28 @@ export const SettingsPage = () => {
                       <span className="font-medium">Status:</span>
                       {subscriptionMe.status === 'trial' && (
                         <Badge className="bg-blue-100 text-blue-800 border-blue-300">
-                          Trial
+                          Proefperiode
                         </Badge>
                       )}
                       {subscriptionMe.status === 'active' && (
                         <Badge className="bg-green-100 text-green-800 border-green-300">
-                          Active
+                          Actief
                         </Badge>
                       )}
                       {subscriptionMe.status === 'expired' && (
                         <Badge variant="secondary">
-                          Expired
+                          Verlopen
                         </Badge>
                       )}
                     </div>
+
+                    {/* Plan Info */}
+                    {subscriptionMe.planName && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Huidig plan</span>
+                        <span className="font-medium">{subscriptionMe.planName}</span>
+                      </div>
+                    )}
 
                     {/* Date Info */}
                     <div className="space-y-2 text-sm">
@@ -1025,7 +1033,7 @@ export const SettingsPage = () => {
                         <div className="flex justify-between">
                           <span className="text-muted-foreground flex items-center gap-1">
                             <Calendar size={14} />
-                            Einddatum
+                            {subscriptionMe.status === 'trial' ? 'Proefperiode eindigt' : 'Einddatum'}
                           </span>
                           <span className="font-medium">
                             {new Date(subscriptionMe.endDate).toLocaleDateString('nl-NL')}

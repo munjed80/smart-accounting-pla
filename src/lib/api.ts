@@ -4864,7 +4864,18 @@ export const zzpApi = {
       const tokenParam = token ? `&token=${encodeURIComponent(token)}` : ''
       return `${api.defaults.baseURL}/zzp/invoices/${invoiceId}/pdf?download=1${tokenParam}`
     },
-    
+
+    /**
+     * Generate a public share link for an invoice (signed, 30-day expiry).
+     * The returned URL can be accessed without authentication.
+     */
+    createShareLink: async (invoiceId: string): Promise<{ url: string; expires_in_days: number }> => {
+      const response = await api.post<{ url: string; expires_in_days: number }>(
+        `/zzp/invoices/${invoiceId}/share-link`
+      )
+      return response.data
+    },
+
     /**
      * Mark an invoice as paid by creating a payment record.
      */
@@ -5619,6 +5630,8 @@ export interface ReactivateSubscriptionResponse {
 
 export interface SubscriptionMeResponse {
   status: 'trial' | 'active' | 'expired'
+  planCode: string | null
+  planName: string | null
   startDate: string | null
   endDate: string | null
   daysRemaining: number

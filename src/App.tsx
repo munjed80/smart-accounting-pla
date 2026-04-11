@@ -644,7 +644,6 @@ const AppContent = () => {
   if (route.type === 'onboarding' || needsOnboarding === true) {
     return (
       <OnboardingPage
-        userRole={user?.role as 'zzp' | 'accountant' | 'admin'}
         userName={user?.full_name || 'daar'}
         onComplete={() => {
           setNeedsOnboarding(false)

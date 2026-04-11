@@ -30,6 +30,9 @@ import { EmptyState } from '@/components/EmptyState'
 
 const NO_CUSTOMER = '__none__'
 
+/** Escapes a value for CSV output: wraps in quotes and escapes internal quotes. */
+const csvEscape = (value: string) => `"${value.replace(/"/g, '""')}"`
+
 const defaultTimeFilters: TimeEntryFilters = {
   q: '',
   from: '',
@@ -378,6 +381,12 @@ export const ZZPTimeTrackingPage = () => {
     }
   }
 
+  /**
+   * Opens the entry form dialog.
+   * @param entry - When provided, pre-fills the form with this entry's data (for editing or duplicating).
+   * @param duplicate - When true, sets today's date and clears editingEntry so a new entry is created
+   *                    instead of updating the original. Used for the "Dupliceren" action.
+   */
   const openForm = (entry?: ZZPTimeEntry, duplicate?: boolean) => {
     setFormError(null)
     setFormValidationErrors([])
@@ -601,7 +610,6 @@ export const ZZPTimeTrackingPage = () => {
 
   const handleExportCSV = () => {
     const headers = ['Datum', 'Uren', 'Omschrijving', 'Klant', 'Project', 'Uurtarief', 'Factureerbaar']
-    const csvEscape = (value: string) => `"${value.replace(/"/g, '""')}"`
     const rows = filteredOpenEntries.map((entry) => [
       csvEscape(entry.entry_date),
       csvEscape(parseHours(entry.hours).toFixed(2)),
@@ -1114,8 +1122,9 @@ export const ZZPTimeTrackingPage = () => {
                 id="billable-toggle"
                 checked={formState.billable}
                 onCheckedChange={(checked) => setFormState((prev) => ({ ...prev, billable: checked }))}
+                aria-labelledby="billable-toggle-label"
               />
-              <Label htmlFor="billable-toggle" className="cursor-pointer">Factureerbaar</Label>
+              <Label id="billable-toggle-label" htmlFor="billable-toggle" className="cursor-pointer">Factureerbaar</Label>
             </div>
             <div className="flex justify-end">
               <Button disabled={isSavingEntry} onClick={() => void saveEntry()}>

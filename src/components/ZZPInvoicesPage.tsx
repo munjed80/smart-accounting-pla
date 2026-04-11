@@ -1791,8 +1791,13 @@ const ZZPInvoicesPageContent = () => {
     setUpdatingStatusInvoiceId(invoice.id)
     try {
       toast.info(t('zzpInvoices.sending'))
-      await zzpApi.invoices.sendEmail(invoice.id)
-      toast.success(t('zzpInvoices.invoiceSent'))
+      const result = await zzpApi.invoices.sendEmail(invoice.id)
+      // Check if email was actually sent or just status updated
+      if ((result as Record<string, unknown>)._email_status === 'not_configured') {
+        toast.success('Status bijgewerkt (e-mail niet geconfigureerd)')
+      } else {
+        toast.success(t('zzpInvoices.invoiceSent'))
+      }
       await loadData()
     } catch (err) {
       console.error('Failed to send invoice:', err)

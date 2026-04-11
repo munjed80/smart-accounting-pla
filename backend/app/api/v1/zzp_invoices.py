@@ -12,7 +12,7 @@ from typing import Annotated, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -984,13 +984,30 @@ info@zzpershub.nl
 
         # Send via Resend
         if not email_service.client:
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "code": "EMAIL_SERVICE_UNAVAILABLE",
-                    "message": "E-mailservice is momenteel niet beschikbaar. Controleer de configuratie."
+            # Graceful degradation: update status without sending email
+            logger.warning(
+                "Email service not configured, updating invoice status without sending email",
+                extra={
+                    "event": "invoice_email_skipped",
+                    "invoice_id": str(invoice_id),
+                    "reason": "RESEND_API_KEY not configured",
                 }
             )
+            invoice.status = InvoiceStatus.SENT.value
+            await db.commit()
+
+            # Reload invoice with lines eagerly loaded
+            result = await db.execute(
+                select(ZZPInvoice)
+                .options(selectinload(ZZPInvoice.lines))
+                .where(ZZPInvoice.id == invoice.id)
+            )
+            invoice = result.scalar_one()
+
+            resp = invoice_to_response(invoice)
+            resp_dict = resp.model_dump(mode="json")
+            resp_dict["_email_status"] = "not_configured"
+            return JSONResponse(content=resp_dict)
 
         # Encode PDF as base64 for attachment
         pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')

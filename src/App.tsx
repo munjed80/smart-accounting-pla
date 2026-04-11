@@ -820,7 +820,7 @@ const AppContent = () => {
       case 'lease-loans': return 'Lease & Leningen'
       case 'subscriptions': return 'Abonnementen'
       case 'documents': return 'Documenten'
-      case 'tax-btw': return 'BTW Aangifte'
+      case 'tax-btw': return 'BTW Overzicht'
       case 'tax-income': return 'Inkomstenbelasting'
       case 'tax-help': return 'Uitleg & Hulp'
       case 'tax-annual': return 'Jaaroverzicht'

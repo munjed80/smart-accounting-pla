@@ -253,9 +253,11 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
             <span>{t('api.configError')}</span>
           </div>
           <p className="text-sm mt-1">{misconfigurationReason}</p>
-          <p className="text-xs mt-1 opacity-90">
-            {t('api.currentApiUrl')}: <code className="bg-red-800 px-2 py-0.5 rounded">{apiUrl || '(not set)'}</code>
-          </p>
+          {import.meta.env.DEV && (
+            <p className="text-xs mt-1 opacity-90">
+              {t('api.currentApiUrl')}: <code className="bg-red-800 px-2 py-0.5 rounded">{apiUrl || '(not set)'}</code>
+            </p>
+          )}
         </div>
       )}
       

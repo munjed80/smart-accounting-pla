@@ -398,20 +398,10 @@ async def scan_receipt(
     file: UploadFile = File(...),
 ):
     """
-    Scan a receipt and extract expense data using OCR.
+    Upload a receipt photo as an attachment to an expense.
     
-    Accepts an image file (JPEG, PNG) and attempts to extract:
-    - Vendor/merchant name
-    - Date
-    - Total amount
-    - VAT rate
-    - Category (basic keyword matching)
-    
-    For production enhancement, integrate with:
-    - Google Cloud Vision API
-    - Azure Computer Vision
-    - AWS Textract
-    - Or pytesseract for open-source solution
+    Accepts an image file (JPEG, PNG) and stores it for reference.
+    Returns empty extracted data — the user fills in the form manually.
     """
     require_zzp(current_user)
     
@@ -422,49 +412,33 @@ async def scan_receipt(
     if not file.content_type or not file.content_type.startswith('image/'):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file type. Please upload an image file (JPEG, PNG, etc.)"
+            detail="Ongeldig bestandstype. Upload een afbeelding (JPEG, PNG, etc.)"
         )
     
     try:
-        # Read file contents
+        # Read file contents to validate it's a real image
         contents = await file.read()
         
-        # TODO: Implement actual OCR processing
-        # For now, return mock extracted data with basic file validation
-        # In production, you would:
-        # 1. Save the file temporarily or to cloud storage
-        # 2. Process with OCR service (pytesseract, Google Vision, etc.)
-        # 3. Parse the OCR text to extract structured data
-        # 4. Use NLP/regex to find vendor, amount, date, VAT
-        # 5. Return confidence scores per field
-        
         from datetime import datetime
-        import random
         
-        # Simulate varying confidence based on file size (larger = potentially better quality)
-        confidence = min(0.95, max(0.70, len(contents) / (1024 * 200)))
-        
-        # Mock extracted data - in production, this would come from OCR
-        extracted_data = {
-            "vendor": "Voorbeeld Leverancier",
-            "description": "Kantoorbenodigdheden",
-            "amount_cents": 12500,  # €125.00
-            "expense_date": datetime.now().date().isoformat(),
-            "category": "kantoorkosten",
-            "vat_rate": 21.0,
-            "notes": f"Geëxtraheerd via bonnenscanner - controleer de gegevens (bestand: {file.filename})"
-        }
-        
+        # Return empty data for manual entry — no fake OCR
         return {
-            "extracted_data": extracted_data,
-            "confidence": confidence,
-            "status": "ready_for_review",
-            "message": "Bon succesvol gescand. Controleer de gegevens en pas aan indien nodig."
+            "extracted_data": {
+                "vendor": "",
+                "description": "",
+                "amount_cents": 0,
+                "expense_date": datetime.now().date().isoformat(),
+                "category": "overig",
+                "vat_rate": 21.0,
+                "notes": f"Foto bijgevoegd: {file.filename}"
+            },
+            "status": "manual_entry",
+            "message": "Foto toegevoegd. Vul het formulier handmatig in."
         }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process receipt: {str(e)}"
+            detail=f"Kon het bestand niet verwerken: {str(e)}"
         )
     finally:
         await file.close()

@@ -537,7 +537,7 @@ async def get_zzp_btw_aangifte(
 # ============================================================================
 
 def _format_cents_xml(cents: int) -> str:
-    """Format cents as euros for XML (e.g. 12345 → '123')."""
+    """Format cents as whole euros for XML (e.g. 12345 cents = €123.45 → '123')."""
     return str(abs(cents) // 100)
 
 
@@ -599,10 +599,10 @@ async def download_btw_xml(
     omzet_0 = 0
     for rb in overview.vat_rate_breakdown:
         rate = float(rb.vat_rate)
-        if rate >= 20:  # 21%
+        if rate > 20:  # 21%
             omzet_21 += rb.omzet_cents
             btw_21 += rb.vat_cents
-        elif rate >= 8:  # 9%
+        elif rate > 8:  # 9%
             omzet_9 += rb.omzet_cents
             btw_9 += rb.vat_cents
         else:

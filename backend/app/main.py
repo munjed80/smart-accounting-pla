@@ -37,6 +37,7 @@ def verify_orm_mappings() -> None:
         AccountantClientAssignment, BulkOperation, ClientReminder,
         AuthToken,
         BankAccount, BankTransaction, ReconciliationAction,
+        BankMatchProposal, BankMatchRule, BankTransactionSplit,
         CategorizationRule,
         BankConnectionModel,
         ZZPCustomer, BusinessProfile,
@@ -49,6 +50,7 @@ def verify_orm_mappings() -> None:
         AuditLog,
         Certificate,
         ContactMessage,
+        ClientReadinessCache, EscalationEvent, EvidencePack, DashboardAuditLog,
         ZZPDocument,
     )
     
@@ -209,6 +211,12 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("Application startup initiated")
+
+    # Fail fast if production secrets are not properly configured
+    from app.core.config import settings as _settings
+    _settings.validate_production_secrets()
+    _settings.validate_production_database()
+
     try:
         verify_orm_mappings()
     except Exception as e:

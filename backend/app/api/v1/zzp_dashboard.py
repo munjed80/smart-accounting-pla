@@ -549,7 +549,6 @@ async def get_zzp_dashboard_actions(
     administration = await get_user_administration(current_user.id, db)
     admin_id = administration.id
     today = date.today()
-    _, _, _, btw_deadline = get_quarter_info(today)
     quarter_label, _, _, btw_deadline = get_quarter_info(today)
     days_until_deadline = (btw_deadline - today).days
 

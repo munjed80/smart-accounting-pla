@@ -307,13 +307,15 @@ export const ZZPTimeTrackingPage = () => {
   }, [openEntries])
 
   const projectSuggestions = useMemo(() => {
-    const names = new Set<string>()
-    openEntries.forEach((e) => { if (e.project_name) names.add(e.project_name) })
-    invoicedEntries.forEach((e) => { if (e.project_name) names.add(e.project_name) })
+    const names = new Set(
+      [...openEntries, ...invoicedEntries].flatMap((e) => (e.project_name ? [e.project_name] : []))
+    )
     return Array.from(names).sort()
   }, [openEntries, invoicedEntries])
 
-  // Keyboard shortcut: press N (when not in an input) to open the add-entry form
+  // Keyboard shortcut: press N (when not in an input) to open the add-entry form.
+  // openForm() without args only calls stable state setters so a stale closure is not a concern.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isFormOpen || isStartSessionDialogOpen || isInvoiceConfirmOpen) return
@@ -326,8 +328,6 @@ export const ZZPTimeTrackingPage = () => {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  // openForm is defined below but stable — we use a ref pattern to avoid stale closure
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFormOpen, isStartSessionDialogOpen, isInvoiceConfirmOpen])
 
   const handleClockIn = async (customer_id: string, description: string, hourly_rate: string) => {
@@ -601,16 +601,17 @@ export const ZZPTimeTrackingPage = () => {
 
   const handleExportCSV = () => {
     const headers = ['Datum', 'Uren', 'Omschrijving', 'Klant', 'Project', 'Uurtarief', 'Factureerbaar']
+    const csvEscape = (value: string) => `"${value.replace(/"/g, '""')}"`
     const rows = filteredOpenEntries.map((entry) => [
-      entry.entry_date,
-      parseHours(entry.hours).toFixed(2),
-      `"${entry.description.replace(/"/g, '""')}"`,
-      `"${(entry.customer_id && customerMap[entry.customer_id]) || ''}"`,
-      `"${(entry.project_name || '').replace(/"/g, '""')}"`,
-      entry.hourly_rate ? Number(entry.hourly_rate).toFixed(2) : '',
-      entry.billable !== false ? 'Ja' : 'Nee',
+      csvEscape(entry.entry_date),
+      csvEscape(parseHours(entry.hours).toFixed(2)),
+      csvEscape(entry.description),
+      csvEscape((entry.customer_id && customerMap[entry.customer_id]) || ''),
+      csvEscape(entry.project_name || ''),
+      csvEscape(entry.hourly_rate ? Number(entry.hourly_rate).toFixed(2) : ''),
+      csvEscape(entry.billable !== false ? 'Ja' : 'Nee'),
     ])
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    const csvContent = [headers.map(csvEscape).join(','), ...rows.map((r) => r.join(','))].join('\n')
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -836,30 +837,28 @@ export const ZZPTimeTrackingPage = () => {
             <div className="mb-6 rounded-lg border p-4">
               <p className="text-sm font-medium mb-3 text-muted-foreground">Uren deze week</p>
               <div className="flex items-end gap-2" style={{ height: 72 }}>
-                {weeklyBarData.map((d) => {
+                {(() => {
+                  const todayIso = toLocalISODate(new Date())
                   const maxH = Math.max(...weeklyBarData.map((x) => x.hours), 1)
-                  const barH = Math.max((d.hours / maxH) * 56, d.hours > 0 ? 4 : 0)
-                  const isToday = d.iso === toLocalISODate(new Date())
-                  return (
-                    <div key={d.label} className="flex flex-1 flex-col items-center gap-1">
-                      {d.hours > 0 && (
-                        <span className="text-[10px] text-muted-foreground">{d.hours.toFixed(1)}u</span>
-                      )}
-                      <div
-                        className="w-full rounded-t"
-                        style={{
-                          height: barH,
-                          background: isToday
-                            ? 'hsl(var(--primary))'
-                            : d.hours > 0
-                              ? 'hsl(var(--primary) / 0.4)'
-                              : 'hsl(var(--muted))',
-                        }}
-                      />
-                      <span className={`text-[11px] font-medium ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>{d.label}</span>
-                    </div>
-                  )
-                })}
+                  return weeklyBarData.map((d) => {
+                    const barH = Math.max((d.hours / maxH) * 56, d.hours > 0 ? 4 : 0)
+                    const isToday = d.iso === todayIso
+                    const barBg = isToday
+                      ? 'hsl(var(--primary))'
+                      : d.hours > 0
+                        ? 'hsl(var(--primary) / 0.4)'
+                        : 'hsl(var(--muted))'
+                    return (
+                      <div key={d.label} className="flex flex-1 flex-col items-center gap-1">
+                        {d.hours > 0 && (
+                          <span className="text-[10px] text-muted-foreground">{d.hours.toFixed(1)}u</span>
+                        )}
+                        <div className="w-full rounded-t" style={{ height: barH, background: barBg }} />
+                        <span className={`text-[11px] font-medium ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>{d.label}</span>
+                      </div>
+                    )
+                  })
+                })()}
               </div>
             </div>
           )}

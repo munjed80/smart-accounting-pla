@@ -2336,6 +2336,8 @@ export const nl = {
     },
     applySuccess: "Actie succesvol toegepast",
     applyError: "Actie mislukt",
+    learnedRule: "Eerdere keuze",
+    basedOnPrevious: "Op basis van eerdere boekingen",
     expenseCategory: "Kostenrekening",
     expenseCategoryPlaceholder: "Bijv. 4000",
     vatRate: "BTW-percentage",

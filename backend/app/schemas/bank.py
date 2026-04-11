@@ -123,6 +123,8 @@ class MatchSuggestion(BaseModel):
     date: Date = Field(..., description="Date of the matched entity")
     explanation: str = Field(..., description="Dutch explanation of why this match is suggested")
     proposed_action: ReconciliationActionEnum = Field(..., description="Suggested action")
+    learned_rule: bool = Field(False, description="True when suggestion is based on a learned categorization rule")
+    expense_category: Optional[str] = Field(None, description="Ledger account code for learned CREATE_EXPENSE suggestions")
 
 
 class SuggestMatchResponse(BaseModel):

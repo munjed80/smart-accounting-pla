@@ -3671,6 +3671,8 @@ export interface MatchSuggestion {
   date: string
   explanation: string
   proposed_action: ReconciliationAction
+  learned_rule?: boolean
+  expense_category?: string
 }
 
 export interface SuggestMatchResponse {

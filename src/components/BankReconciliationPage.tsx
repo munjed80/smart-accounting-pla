@@ -526,7 +526,7 @@ const SuggestionCard = ({
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <Badge variant="outline">
                 {typeLabels[suggestion.entity_type]}
               </Badge>
@@ -536,11 +536,22 @@ const SuggestionCard = ({
               >
                 {suggestion.confidence_score}%
               </Badge>
+              {suggestion.learned_rule && (
+                <Badge variant="outline" className="bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30">
+                  <Sparkle size={12} className="mr-1" weight="fill" />
+                  {t('reconciliation.learnedRule')}
+                </Badge>
+              )}
             </div>
             <p className="font-medium">{suggestion.entity_reference}</p>
             <p className="text-sm text-muted-foreground mt-1">
               {suggestion.explanation}
             </p>
+            {suggestion.learned_rule && (
+              <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                {t('reconciliation.basedOnPrevious')}
+              </p>
+            )}
             <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
               <span>
                 {format(new Date(suggestion.date), 'd MMM yyyy', { locale: nlLocale })}
@@ -629,11 +640,19 @@ const TransactionDrawer = ({
   }
 
   const handleAcceptMatch = (suggestion: MatchSuggestion) => {
-    applyAction({
-      action_type: 'APPLY_MATCH',
-      match_entity_type: suggestion.entity_type,
-      match_entity_id: suggestion.entity_id,
-    })
+    if (suggestion.learned_rule && suggestion.proposed_action === 'CREATE_EXPENSE') {
+      // Learned rule: one-click confirm creates an expense with the learned category
+      applyAction({
+        action_type: 'CREATE_EXPENSE',
+        expense_category: suggestion.expense_category || undefined,
+      })
+    } else {
+      applyAction({
+        action_type: 'APPLY_MATCH',
+        match_entity_type: suggestion.entity_type,
+        match_entity_id: suggestion.entity_id,
+      })
+    }
   }
 
   const handleIgnore = () => {

@@ -478,18 +478,32 @@ async def update_administration_subscription(
         plan = (await db.execute(select(Plan).where(Plan.id == payload.plan_id))).scalar_one_or_none()
         if not plan:
             raise HTTPException(status_code=400, detail="Plan not found")
+
+        now = datetime.now(timezone.utc)
+        target_status = _parse_subscription_status(payload.status) or SubscriptionStatus.TRIALING
         
         subscription = Subscription(
             administration_id=admin_id,
             plan_id=payload.plan_id,
             plan_code=plan.code,
-            status=_parse_subscription_status(payload.status) or SubscriptionStatus.TRIALING,
-            starts_at=payload.starts_at or datetime.now(timezone.utc),
+            status=target_status,
+            starts_at=payload.starts_at or now,
             ends_at=payload.ends_at,
+            cancel_at_period_end=False,
         )
+
+        # Set the real source-of-truth date fields based on status
+        if target_status == SubscriptionStatus.TRIALING:
+            subscription.trial_start_at = payload.starts_at or now
+            subscription.trial_end_at = payload.ends_at or (now + timedelta(days=30))
+        elif target_status == SubscriptionStatus.ACTIVE:
+            subscription.current_period_start = payload.starts_at or now
+            subscription.current_period_end = payload.ends_at
+
         db.add(subscription)
         action = "subscription_created"
     else:
+        now = datetime.now(timezone.utc)
         if payload.plan_id:
             # If updating plan_id, also update plan_code
             plan = (await db.execute(select(Plan).where(Plan.id == payload.plan_id))).scalar_one_or_none()
@@ -501,11 +515,40 @@ async def update_administration_subscription(
             parsed_status = _parse_subscription_status(payload.status)
             if not parsed_status:
                 raise HTTPException(status_code=400, detail="Unsupported subscription status")
+
+            old_status = subscription.status
             subscription.status = parsed_status
+
+            # Sync real source-of-truth fields when status changes
+            if parsed_status == SubscriptionStatus.TRIALING:
+                # Ensure trial dates are set so entitlement logic works
+                if not subscription.trial_start_at:
+                    subscription.trial_start_at = now
+                if not subscription.trial_end_at or subscription.trial_end_at <= now:
+                    subscription.trial_end_at = now + timedelta(days=30)
+            elif parsed_status == SubscriptionStatus.ACTIVE:
+                # Ensure billing period dates are set
+                if not subscription.current_period_start:
+                    subscription.current_period_start = now
+                if not subscription.current_period_end or subscription.current_period_end <= now:
+                    subscription.current_period_end = now + timedelta(days=30)
+
+            # Clear cancellation flag when reviving from canceled/expired
+            if (
+                old_status in (SubscriptionStatus.CANCELED, SubscriptionStatus.EXPIRED)
+                and parsed_status in (SubscriptionStatus.TRIALING, SubscriptionStatus.ACTIVE)
+            ):
+                subscription.cancel_at_period_end = False
+
         if payload.starts_at:
             subscription.starts_at = payload.starts_at
         if payload.ends_at is not None:
             subscription.ends_at = payload.ends_at
+            # Also update the real date field based on current status
+            if subscription.status == SubscriptionStatus.TRIALING:
+                subscription.trial_end_at = payload.ends_at
+            elif subscription.status in (SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELED):
+                subscription.current_period_end = payload.ends_at
         action = "subscription_updated"
 
     await _write_audit_log(
@@ -665,6 +708,7 @@ async def extend_trial(
     now = datetime.now(timezone.utc)
     old_status = subscription.status.value if subscription.status else None
     old_trial_end = subscription.trial_end_at
+    old_cancel_at_period_end = subscription.cancel_at_period_end
 
     # Compute new trial end
     if payload.new_trial_end is not None:
@@ -685,9 +729,14 @@ async def extend_trial(
                 base = te
         subscription.trial_end_at = base + timedelta(days=payload.extend_days)  # type: ignore[arg-type]
 
-    # If the subscription was expired, revert to TRIALING
+    # If the subscription was expired or canceled, revert to TRIALING
     if subscription.status in (SubscriptionStatus.EXPIRED, SubscriptionStatus.CANCELED):
         subscription.status = SubscriptionStatus.TRIALING
+
+    # Clear cancel_at_period_end so the user is not re-blocked by stale
+    # cancellation state (e.g. Mollie webhooks, or a future status change).
+    if subscription.cancel_at_period_end:
+        subscription.cancel_at_period_end = False
 
     # If trial_start_at was never set (unlikely), set it to now
     if not subscription.trial_start_at:
@@ -707,6 +756,8 @@ async def extend_trial(
             "old_trial_end": old_trial_end.isoformat() if old_trial_end else None,
             "new_trial_end": subscription.trial_end_at.isoformat() if subscription.trial_end_at else None,
             "extend_days": payload.extend_days,
+            "old_cancel_at_period_end": old_cancel_at_period_end,
+            "new_cancel_at_period_end": subscription.cancel_at_period_end,
         },
     )
     await db.commit()

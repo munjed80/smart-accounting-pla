@@ -24,7 +24,7 @@ class Plan(Base):
     code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)  # e.g., "zzp_basic"
     name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     price_monthly: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
-    trial_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    trial_days: Mapped[int] = mapped_column(Integer, nullable=False, default=90)
     max_invoices: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_storage_mb: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_users: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

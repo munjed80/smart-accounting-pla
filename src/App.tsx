@@ -44,6 +44,7 @@ import { ZZPSubscriptionsPage } from '@/components/ZZPSubscriptionsPage'
 import { BelastinghulpInkomstenbelastingPage } from '@/components/BelastinghulpInkomstenbelastingPage'
 import { BelastinghulpUitlegPage } from '@/components/BelastinghulpUitlegPage'
 import { BelastinghulpJaaroverzichtPage } from '@/components/BelastinghulpJaaroverzichtPage'
+import { DataImportPage } from '@/components/DataImportPage'
 import { ClientDossierPage } from '@/components/ClientDossierPage'
 import { BulkOperationsHistoryPage } from '@/components/BulkOperationsHistoryPage'
 import { BankReconciliationPage } from '@/components/BankReconciliationPage'
@@ -780,6 +781,8 @@ const AppContent = () => {
         return isZzp ? <BelastinghulpUitlegPage /> : <SmartDashboard />
       case 'tax-annual':
         return isZzp ? <BelastinghulpJaaroverzichtPage /> : <SmartDashboard />
+      case 'data-import':
+        return !isAccountant ? <DataImportPage /> : <SmartDashboard />
       case 'dashboard':
         return <SmartDashboard />
       case 'transactions':
@@ -824,6 +827,7 @@ const AppContent = () => {
       case 'tax-income': return 'Inkomstenbelasting'
       case 'tax-help': return 'Uitleg & Hulp'
       case 'tax-annual': return 'Jaaroverzicht'
+      case 'data-import': return 'Data importeren'
       case 'dashboard': return 'Overzicht'
       case 'transactions': return 'Transacties'
       case 'upload': return 'Upload'

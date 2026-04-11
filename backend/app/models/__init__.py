@@ -29,6 +29,11 @@ from app.models.bank import (
     CategorizationRuleMatchType,
     BankConnectionModel,
     BankConnectionStatus,
+    BankMatchProposal,
+    ProposalStatus,
+    BankMatchRule,
+    MatchRuleType,
+    BankTransactionSplit,
 )
 from app.models.zzp import (
     ZZPCustomer, 
@@ -74,6 +79,18 @@ from app.models.vat_submission import VatSubmission
 from app.models.certificate import Certificate
 from app.models.audit_log import AuditLog
 from app.models.contact_message import ContactMessage, ContactMessageStatus
+from app.models.work_queue import (
+    ClientReadinessCache,
+    EscalationEvent,
+    EscalationType,
+    EscalationSeverity,
+    EvidencePack,
+    EvidencePackType,
+    DashboardAuditLog,
+    DashboardAuditActionType,
+    ReminderChannel,
+    ReminderStatus,
+)
 
 __all__ = [
     "User",
@@ -123,6 +140,11 @@ __all__ = [
     "CategorizationRuleMatchType",
     "BankConnectionModel",
     "BankConnectionStatus",
+    "BankMatchProposal",
+    "ProposalStatus",
+    "BankMatchRule",
+    "MatchRuleType",
+    "BankTransactionSplit",
     "ZZPCustomer",
     "BusinessProfile",
     "InvoiceStatus",
@@ -160,4 +182,14 @@ __all__ = [
     "AuditLog",
     "ContactMessage",
     "ContactMessageStatus",
+    "ClientReadinessCache",
+    "EscalationEvent",
+    "EscalationType",
+    "EscalationSeverity",
+    "EvidencePack",
+    "EvidencePackType",
+    "DashboardAuditLog",
+    "DashboardAuditActionType",
+    "ReminderChannel",
+    "ReminderStatus",
 ]

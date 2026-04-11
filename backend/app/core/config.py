@@ -150,6 +150,58 @@ class Settings(BaseSettings):
         """Return trial override days if set, else None."""
         return self.BILLING_TRIAL_OVERRIDE_DAYS
 
+    def validate_production_secrets(self) -> None:
+        """
+        Fail fast if SECRET_KEY is unsafe in production.
+
+        In non-production environments a warning is logged but startup continues,
+        so local development with the default key still works.
+        """
+        import logging
+        _logger = logging.getLogger(__name__)
+
+        UNSAFE_KEYS = {
+            "change-me-in-production-use-openssl-rand-hex-32",
+            "change-me",
+            "secret",
+            "",
+        }
+        if self.ENV.lower() == "production":
+            if self.SECRET_KEY in UNSAFE_KEYS or len(self.SECRET_KEY) < 32:
+                raise ValueError(
+                    "FATAL: SECRET_KEY is not configured for production. "
+                    "Set a strong SECRET_KEY (min 32 chars) via environment variable. "
+                    "Generate one with: openssl rand -hex 32"
+                )
+        else:
+            if self.SECRET_KEY in UNSAFE_KEYS or len(self.SECRET_KEY) < 32:
+                _logger.warning(
+                    "SECRET_KEY is using an insecure default. "
+                    "Set a strong SECRET_KEY before deploying to production."
+                )
+
+    def validate_production_database(self) -> None:
+        """
+        Fail fast if DATABASE_URL contains default/placeholder credentials in production.
+
+        In non-production environments a warning is logged but startup continues.
+        """
+        import logging
+        _logger = logging.getLogger(__name__)
+
+        if self.ENV.lower() == "production":
+            if "change_me" in self.DATABASE_URL:
+                raise ValueError(
+                    "FATAL: DATABASE_URL contains default credentials ('change_me'). "
+                    "Set proper database credentials via environment variables for production."
+                )
+        else:
+            if "change_me" in self.DATABASE_URL:
+                _logger.warning(
+                    "DATABASE_URL contains default credentials ('change_me'). "
+                    "Set proper database credentials before deploying to production."
+                )
+
     class Config:
         env_file = ".env"
         case_sensitive = True

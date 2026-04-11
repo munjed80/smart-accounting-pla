@@ -279,7 +279,7 @@ const AppContent = () => {
   const isSuperAdmin = user?.role === 'super_admin'
   const isAccountantOnly = user?.role === 'accountant'
   const isZzp = user?.role === 'zzp'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'offertes' | 'expenses' | 'time' | 'agenda' | 'obligations-overview' | 'lease-loans' | 'subscriptions' | 'documents' | 'admin' | 'tax-btw' | 'tax-income' | 'tax-help' | 'tax-annual'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'offertes' | 'expenses' | 'time' | 'agenda' | 'obligations-overview' | 'lease-loans' | 'subscriptions' | 'documents' | 'admin' | 'tax-btw' | 'tax-income' | 'tax-help' | 'tax-annual' | 'data-import'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
   // Onboarding state - tracks if user needs onboarding (no administrations for ZZP, no clients for accountants)

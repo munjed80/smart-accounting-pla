@@ -557,7 +557,7 @@ export function DataImportPage() {
                           {hasError && (
                             <div className="text-xs text-red-500 mt-0.5">
                               {row.errors
-                                .filter((e) => e.field === col || e.field === col.replace('bedrag_incl_btw', 'bedrag_incl_btw'))
+                                .filter((e) => e.field === col)
                                 .map((e) => e.message)
                                 .join(', ')}
                             </div>

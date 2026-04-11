@@ -653,7 +653,11 @@ def validate_expense_row(row: dict, row_num: int) -> Tuple[dict, List[ImportRowE
         else:
             data["vat_amount_cents"] = amount_to_cents(btw)
     else:
-        data["vat_amount_cents"] = None  # Will be auto-calculated
+        # Auto-calculate assuming 21% VAT
+        if "amount_cents" in data:
+            data["vat_amount_cents"] = calculate_vat_amount(data["amount_cents"], 21.0)
+        else:
+            data["vat_amount_cents"] = 0
 
     # categorie (optional)
     cat_raw = row.get("categorie", "").strip()
@@ -801,28 +805,24 @@ async def confirm_expense_import(
             errors.extend(row_errors)
             continue
 
-        vat_amount = data.get("vat_amount_cents")
-        if vat_amount is None:
-            # Auto-calculate assuming 21% VAT
-            vat_amount = calculate_vat_amount(data["amount_cents"], 21.0)
+        vat_amount = data["vat_amount_cents"]
 
-        # Determine vat_rate from amounts if btw_bedrag was provided
+        # Determine vat_rate from amounts
         vat_rate = Decimal("21")
-        if data.get("vat_amount_cents") is not None:
-            if data["vat_amount_cents"] == 0:
-                vat_rate = Decimal("0")
-            elif data["amount_cents"] > 0:
-                # Calculate approximate rate
-                excl = data["amount_cents"] - data["vat_amount_cents"]
-                if excl > 0:
-                    rate = Decimal(str(data["vat_amount_cents"])) / Decimal(str(excl)) * 100
-                    # Snap to nearest standard rate
-                    if abs(rate - 9) < 2:
-                        vat_rate = Decimal("9")
-                    elif abs(rate - 21) < 3:
-                        vat_rate = Decimal("21")
-                    elif abs(rate) < 1:
-                        vat_rate = Decimal("0")
+        if vat_amount == 0:
+            vat_rate = Decimal("0")
+        elif data["amount_cents"] > 0:
+            # Calculate approximate rate
+            excl = data["amount_cents"] - vat_amount
+            if excl > 0:
+                rate = Decimal(str(vat_amount)) / Decimal(str(excl)) * 100
+                # Snap to nearest standard rate
+                if abs(rate - 9) < 2:
+                    vat_rate = Decimal("9")
+                elif abs(rate - 21) < 3:
+                    vat_rate = Decimal("21")
+                elif abs(rate) < 1:
+                    vat_rate = Decimal("0")
 
         expense = ZZPExpense(
             administration_id=administration.id,

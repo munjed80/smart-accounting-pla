@@ -30,6 +30,7 @@ depends_on = None
 
 def upgrade() -> None:
     """Reset trial window to 3 months for all free-plan non-paid users."""
+    # 1. Backfill existing subscription records
     op.execute(
         """
         UPDATE subscriptions
@@ -43,13 +44,28 @@ def upgrade() -> None:
         """
     )
 
+    # 2. Update plans table so NEW signups also get 90-day trials
+    op.execute(
+        """
+        UPDATE plans
+        SET trial_days = 90
+        WHERE code = 'free'
+        """
+    )
+
 
 def downgrade() -> None:
     """
-    Downgrade is a no-op: we cannot reliably restore the original
-    trial_start_at / trial_end_at timestamps because they were
-    overwritten in place.  A rollback of the application code is
-    sufficient – the next compute_entitlements() call will re-expire
+    Revert plans.trial_days back to 30 for the free plan.
+    Subscription record timestamps cannot be reliably restored because
+    they were overwritten in place.  A rollback of the application code
+    is sufficient – the next compute_entitlements() call will re-expire
     any trial whose trial_end_at has passed.
     """
-    pass
+    op.execute(
+        """
+        UPDATE plans
+        SET trial_days = 30
+        WHERE code = 'free'
+        """
+    )

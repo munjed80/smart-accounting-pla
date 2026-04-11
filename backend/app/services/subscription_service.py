@@ -69,7 +69,7 @@ class SubscriptionService:
     """Service for managing subscriptions and computing entitlements"""
     
     ZZP_FREE_PLAN_CODE = "free"
-    DEFAULT_TRIAL_DAYS = 30
+    DEFAULT_TRIAL_DAYS = 90
     
     async def ensure_trial_started(
         self,

@@ -518,15 +518,20 @@ class BankReconciliationService:
 
         # ── Rule 0: Learned categorization rules ───────────────────
         # Layered on top — checked first so user's own history has priority.
+        # Confidence score: base 70 + 5 per confirmation, capped at 95.
+        LEARNED_BASE_SCORE = 70
+        LEARNED_SCORE_PER_CONFIRM = 5
+        LEARNED_MAX_SCORE = 95
         try:
             learner = CategorizationLearningService(self.db, self.administration_id)
             learned = await learner.get_learned_suggestions(transaction)
             for item in learned:
+                score = min(LEARNED_MAX_SCORE, LEARNED_BASE_SCORE + item["confidence"] * LEARNED_SCORE_PER_CONFIRM)
                 suggestions.append(MatchSuggestion(
                     entity_type="EXPENSE",
                     entity_id=item["ledger_account_id"],
                     entity_reference=item["category_nl"],
-                    confidence_score=min(95, 70 + item["confidence"] * 5),
+                    confidence_score=score,
                     amount=abs(transaction.amount),
                     date=transaction.booking_date,
                     explanation=f"Eerdere keuze: {item['category_nl']}",

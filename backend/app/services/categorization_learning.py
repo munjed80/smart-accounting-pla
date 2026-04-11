@@ -80,7 +80,14 @@ class CategorizationLearningService:
         ledger_account_id: uuid.UUID,
         category_nl: str,
     ) -> CategorizationRule:
-        """Insert a new rule or increment confidence of the existing one."""
+        """
+        Insert a new rule or update an existing one.
+
+        If a rule with the same match already exists:
+        - Same ledger account → increment confidence (user confirmed again)
+        - Different ledger account → reset to the new account with confidence=1
+          (user overrode their previous choice)
+        """
         result = await self.db.execute(
             select(CategorizationRule).where(
                 CategorizationRule.administration_id == self.administration_id,

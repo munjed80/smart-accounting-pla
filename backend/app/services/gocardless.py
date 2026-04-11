@@ -46,6 +46,10 @@ logger = logging.getLogger(__name__)
 # GoCardless Bank Account Data API base URL
 GOCARDLESS_BASE_URL = "https://bankaccountdata.gocardless.com/api/v2"
 
+# GoCardless consent configuration
+GOCARDLESS_CONSENT_DAYS = 90  # PSD2 max consent period
+GOCARDLESS_HISTORY_DAYS = 90  # Max historical transaction days
+
 
 class GoCardlessError(Exception):
     """Error communicating with GoCardless API."""
@@ -184,8 +188,8 @@ class GoCardlessService:
         # Build end-user agreement (90-day access, transactions)
         agreement_data = await self._api_request("POST", "/agreements/enduser/", json={
             "institution_id": institution_id,
-            "max_historical_days": 90,
-            "access_valid_for_days": 90,
+            "max_historical_days": GOCARDLESS_HISTORY_DAYS,
+            "access_valid_for_days": GOCARDLESS_CONSENT_DAYS,
             "access_scope": ["balances", "details", "transactions"],
         })
         agreement_id = agreement_data["id"]
@@ -217,7 +221,7 @@ class GoCardlessService:
             institution_id=institution_id,
             institution_name=institution_name,
             status=BankConnectionStatus.PENDING,
-            consent_expires_at=datetime.now(timezone.utc) + timedelta(days=90),
+            consent_expires_at=datetime.now(timezone.utc) + timedelta(days=GOCARDLESS_CONSENT_DAYS),
             connection_metadata={
                 "agreement_id": agreement_id,
             },
@@ -375,7 +379,7 @@ class GoCardlessService:
             if connection.last_sync_at:
                 date_from = connection.last_sync_at.date() - timedelta(days=2)  # Overlap for safety
             else:
-                date_from = date.today() - timedelta(days=90)
+                date_from = date.today() - timedelta(days=GOCARDLESS_HISTORY_DAYS)
 
         # Fetch transactions from GoCardless
         params: Dict[str, str] = {"date_from": date_from.isoformat()}

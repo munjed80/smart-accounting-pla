@@ -57,6 +57,9 @@ from app.services.gocardless import GoCardlessService, GoCardlessError
 
 router = APIRouter()
 
+# Frontend path for GoCardless redirect callback
+BANK_CALLBACK_PATH = "/zzp/instellingen"
+
 
 # =============================================================================
 # Helper Functions
@@ -1094,7 +1097,7 @@ async def connect_bank(
     
     # Build the callback URL
     frontend_url = settings.FRONTEND_URL.rstrip("/")
-    redirect_url = f"{frontend_url}/zzp/instellingen?bank_callback=true"
+    redirect_url = f"{frontend_url}{BANK_CALLBACK_PATH}?bank_callback=true"
     
     service = GoCardlessService(db, administration.id)
     

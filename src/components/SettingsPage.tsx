@@ -323,6 +323,7 @@ export const SettingsPage = () => {
   // Fetch bank connection status on mount
   useEffect(() => {
     fetchBankConnectionStatus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isZzp])
 
   // Handle bank callback (redirect back from GoCardless/bank)
@@ -349,6 +350,7 @@ export const SettingsPage = () => {
       }
     }
     handleBankCallback()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleConnectBank = async () => {

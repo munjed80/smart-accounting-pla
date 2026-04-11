@@ -351,3 +351,48 @@ class BankTransactionSplit(Base):
     bank_transaction = relationship("BankTransaction", back_populates="splits")
 
 
+class CategorizationRuleMatchType(str, enum.Enum):
+    """Type of field to match against for learned categorization rules."""
+    COUNTERPARTY_NAME = "counterparty_name"
+    COUNTERPARTY_IBAN = "counterparty_iban"
+    DESCRIPTION_KEYWORD = "description_keyword"
+
+
+class CategorizationRule(Base):
+    """
+    Learned categorization rule for bank transactions.
+
+    Created automatically when a user categorizes/reconciles a bank transaction.
+    Used to auto-suggest categories for future transactions from the same
+    counterparty. Confidence is incremented each time the user confirms the
+    same mapping.
+    """
+    __tablename__ = "categorization_rules"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    administration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("administrations.id", ondelete="CASCADE"), nullable=False
+    )
+    match_type: Mapped[CategorizationRuleMatchType] = mapped_column(
+        SQLEnum(CategorizationRuleMatchType), nullable=False
+    )
+    match_value: Mapped[str] = mapped_column(String(300), nullable=False)
+    ledger_account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("chart_of_accounts.id", ondelete="CASCADE"), nullable=False
+    )
+    category_nl: Mapped[str] = mapped_column(String(255), nullable=False)
+    confidence: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    administration = relationship("Administration", back_populates="categorization_rules")
+    ledger_account = relationship("ChartOfAccount")
+
+

@@ -58,6 +58,7 @@ class Administration(Base):
     bank_match_proposals = relationship("BankMatchProposal", back_populates="administration", cascade="all, delete-orphan")
     bank_match_rules = relationship("BankMatchRule", back_populates="administration", cascade="all, delete-orphan")
     bank_transaction_splits = relationship("BankTransactionSplit", back_populates="administration", cascade="all, delete-orphan")
+    categorization_rules = relationship("CategorizationRule", back_populates="administration", cascade="all, delete-orphan")
     subscriptions = relationship("Subscription", back_populates="administration", cascade="all, delete-orphan")
 
 

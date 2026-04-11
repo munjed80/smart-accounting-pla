@@ -120,6 +120,16 @@ class Settings(BaseSettings):
     BILLING_FORCE_PAYWALL: bool = False
     BILLING_TRIAL_OVERRIDE_DAYS: Optional[int] = None  # e.g. 0 or 1
 
+    # GoCardless Bank Account Data (PSD2 bank connection)
+    # Get credentials from https://bankaccountdata.gocardless.com/
+    GOCARDLESS_SECRET_ID: Optional[str] = None
+    GOCARDLESS_SECRET_KEY: Optional[str] = None
+
+    @property
+    def gocardless_enabled(self) -> bool:
+        """Check if GoCardless bank connection is configured."""
+        return bool(self.GOCARDLESS_SECRET_ID and self.GOCARDLESS_SECRET_KEY)
+
     # Web Push (VAPID) keys – optional, enables push notifications
     # Generate with: npx web-push generate-vapid-keys
     VAPID_PUBLIC_KEY: Optional[str] = None

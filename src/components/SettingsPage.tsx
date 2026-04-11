@@ -33,6 +33,8 @@ import {
   zzpApi,
   ZZPBusinessProfile,
   ZZPBusinessProfileCreate,
+  ZZPBankConnectionStatus,
+  ZZPBankInstitution,
   subscriptionApi,
   SubscriptionMeResponse,
   authApi,
@@ -57,6 +59,9 @@ import {
   BellRinging,
   CreditCard,
   Calendar,
+  Link as LinkIcon,
+  PlugsConnected,
+  CloudArrowDown,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { parseApiError } from '@/lib/utils'
@@ -134,6 +139,15 @@ export const SettingsPage = () => {
     confirmPassword: '',
   })
   const [isChangingPassword, setIsChangingPassword] = useState(false)
+
+  // PSD2 bank connection state
+  const [bankConnection, setBankConnection] = useState<ZZPBankConnectionStatus | null>(null)
+  const [isLoadingBankConnection, setIsLoadingBankConnection] = useState(false)
+  const [isSyncingBank, setIsSyncingBank] = useState(false)
+  const [isConnectingBank, setIsConnectingBank] = useState(false)
+  const [bankInstitutions, setBankInstitutions] = useState<ZZPBankInstitution[]>([])
+  const [showBankPicker, setShowBankPicker] = useState(false)
+  const [isLoadingInstitutions, setIsLoadingInstitutions] = useState(false)
 
   // Detect return from Mollie payment (?payment=complete) and poll for ACTIVE status
   const PAYMENT_POLL_INTERVAL_MS = 3_000
@@ -290,6 +304,93 @@ export const SettingsPage = () => {
   
   const updateProfileField = (field: keyof ZZPBusinessProfileCreate, value: string) => {
     setProfileForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  // PSD2 Bank Connection handlers
+  const fetchBankConnectionStatus = async () => {
+    if (!isZzp) return
+    setIsLoadingBankConnection(true)
+    try {
+      const status = await zzpApi.bank.getConnectionStatus()
+      setBankConnection(status)
+    } catch {
+      // Silently handle — connection status is optional
+    } finally {
+      setIsLoadingBankConnection(false)
+    }
+  }
+
+  // Fetch bank connection status on mount
+  useEffect(() => {
+    fetchBankConnectionStatus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isZzp])
+
+  // Handle bank callback (redirect back from GoCardless/bank)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (!params.has('bank_callback')) return
+
+    const ref = params.get('ref')
+    // Clean query params
+    params.delete('bank_callback')
+    params.delete('ref')
+    const cleanUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`
+    window.history.replaceState({}, '', cleanUrl)
+
+    if (!ref) return
+
+    const handleBankCallback = async () => {
+      try {
+        const result = await zzpApi.bank.handleCallback(ref)
+        toast.success(result.message || 'Bank gekoppeld')
+        await fetchBankConnectionStatus()
+      } catch (error) {
+        toast.error('Bankkoppeling mislukt', { description: parseApiError(error) })
+      }
+    }
+    handleBankCallback()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleConnectBank = async () => {
+    setShowBankPicker(true)
+    if (bankInstitutions.length === 0) {
+      setIsLoadingInstitutions(true)
+      try {
+        const result = await zzpApi.bank.listInstitutions()
+        setBankInstitutions(result.institutions)
+      } catch (error) {
+        toast.error('Kan banken niet laden', { description: parseApiError(error) })
+      } finally {
+        setIsLoadingInstitutions(false)
+      }
+    }
+  }
+
+  const handleSelectInstitution = async (institutionId: string) => {
+    setIsConnectingBank(true)
+    try {
+      const result = await zzpApi.bank.connect(institutionId)
+      // Redirect to bank authorization page
+      window.location.href = result.link
+    } catch (error) {
+      toast.error('Bankkoppeling mislukt', { description: parseApiError(error) })
+      setIsConnectingBank(false)
+    }
+  }
+
+  const handleSyncBank = async () => {
+    setIsSyncingBank(true)
+    try {
+      const result = await zzpApi.bank.syncTransactions()
+      toast.success(result.message || `${result.imported_count} transacties geïmporteerd`)
+      await fetchBankConnectionStatus()
+    } catch (error) {
+      toast.error('Synchronisatie mislukt', { description: parseApiError(error) })
+    } finally {
+      setIsSyncingBank(false)
+    }
   }
 
   // Subscription management handlers
@@ -780,6 +881,102 @@ export const SettingsPage = () => {
                       placeholder={t('settings.ibanPlaceholder')}
                     />
                   </div>
+                </div>
+
+                <Separator />
+
+                {/* PSD2 Bank Connection */}
+                <div>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <PlugsConnected size={16} />
+                    Bankrekening koppelen
+                  </h4>
+
+                  {isLoadingBankConnection ? (
+                    <Skeleton className="h-20 w-full" />
+                  ) : bankConnection?.connected && bankConnection.status === 'ACTIVE' ? (
+                    <div className="space-y-3">
+                      <Alert>
+                        <CheckCircle size={16} className="text-green-600" />
+                        <AlertDescription className="flex items-center justify-between">
+                          <div>
+                            <span className="font-medium">Verbonden met {bankConnection.institution_name}</span>
+                            {bankConnection.iban && (
+                              <span className="text-muted-foreground ml-2">({bankConnection.iban})</span>
+                            )}
+                            {bankConnection.last_sync_at && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Laatst gesynchroniseerd: {new Date(bankConnection.last_sync_at).toLocaleString('nl-NL')}
+                              </p>
+                            )}
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleSyncBank} 
+                        disabled={isSyncingBank}
+                        className="gap-2"
+                      >
+                        {isSyncingBank ? (
+                          <ArrowsClockwise size={16} className="animate-spin" />
+                        ) : (
+                          <CloudArrowDown size={16} />
+                        )}
+                        Synchroniseren
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Koppel je bankrekening om automatisch transacties te importeren via PSD2.
+                      </p>
+                      {!showBankPicker ? (
+                        <Button variant="outline" size="sm" onClick={handleConnectBank} className="gap-2">
+                          <LinkIcon size={16} />
+                          Koppel je bank
+                        </Button>
+                      ) : (
+                        <div className="space-y-2">
+                          {isLoadingInstitutions ? (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <ArrowsClockwise size={14} className="animate-spin" />
+                              Banken laden...
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-sm font-medium">Selecteer je bank:</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+                                {bankInstitutions.map((inst) => (
+                                  <Button
+                                    key={inst.id}
+                                    variant="outline"
+                                    size="sm"
+                                    className="justify-start gap-2 h-auto py-2"
+                                    onClick={() => handleSelectInstitution(inst.id)}
+                                    disabled={isConnectingBank}
+                                  >
+                                    {inst.logo && (
+                                      <img src={inst.logo} alt={inst.name} className="h-5 w-5 object-contain" />
+                                    )}
+                                    <span className="truncate">{inst.name}</span>
+                                  </Button>
+                                ))}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowBankPicker(false)}
+                              >
+                                Annuleren
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <Separator />

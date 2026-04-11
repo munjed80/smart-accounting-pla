@@ -922,6 +922,57 @@ class ZZPBankTransactionMatchListResponse(BaseModel):
     total: int
 
 
+# ============================================================================
+# PSD2 Bank Connection Schemas (GoCardless)
+# ============================================================================
+
+class ZZPBankConnectRequest(BaseModel):
+    """Request to connect a bank account via PSD2."""
+    institution_id: str  # GoCardless institution ID (e.g., "ING_INGBNL2A")
+
+
+class ZZPBankConnectResponse(BaseModel):
+    """Response with the authorization link."""
+    link: str
+    requisition_id: str
+    institution_name: str
+    connection_id: str
+
+
+class ZZPBankConnectionStatusResponse(BaseModel):
+    """Current bank connection status."""
+    connected: bool
+    id: Optional[str] = None
+    institution_name: Optional[str] = None
+    institution_id: Optional[str] = None
+    status: Optional[str] = None
+    last_sync_at: Optional[str] = None
+    consent_expires_at: Optional[str] = None
+    iban: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class ZZPBankSyncResponse(BaseModel):
+    """Response after syncing transactions."""
+    imported_count: int
+    skipped_count: int
+    total_fetched: int
+    message: str
+
+
+class ZZPBankInstitutionResponse(BaseModel):
+    """Bank institution available for PSD2 connection."""
+    id: str
+    name: str
+    logo: Optional[str] = None
+    countries: Optional[List[str]] = None
+
+
+class ZZPBankInstitutionListResponse(BaseModel):
+    """List of available institutions."""
+    institutions: List[ZZPBankInstitutionResponse]
+    total: int
+
 
 # ============================================================================
 # AI Insights Schemas (for ZZP insights service)

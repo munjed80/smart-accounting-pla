@@ -41,6 +41,7 @@ from app.schemas.bank import (
     ReconciliationActionEnum,
 )
 from app.services.vat.posting import VatPostingService
+from app.services.categorization_learning import CategorizationLearningService
 from app.services.bank.parsers import (
     BaseStatementParser,
     ParsedTransaction,
@@ -494,7 +495,8 @@ class BankReconciliationService:
         """
         Generate match suggestions for a bank transaction.
         
-        Enhanced matching rules:
+        Enhanced matching rules (in priority order):
+        0. Learned user rules (counterparty name / IBAN / keyword) → very high confidence
         1. Invoice number in description/reference → very high confidence
         2. Amount + date proximity (±7 days) → high confidence
         3. Amount match (±1%) → medium confidence
@@ -513,6 +515,33 @@ class BankReconciliationService:
             raise ValueError("Transactie niet gevonden")
         
         suggestions: List[MatchSuggestion] = []
+
+        # ── Rule 0: Learned categorization rules ───────────────────
+        # Layered on top — checked first so user's own history has priority.
+        # Confidence score: base 70 + 5 per confirmation, capped at 95.
+        LEARNED_BASE_SCORE = 70
+        LEARNED_SCORE_PER_CONFIRM = 5
+        LEARNED_MAX_SCORE = 95
+        try:
+            learner = CategorizationLearningService(self.db, self.administration_id)
+            learned = await learner.get_learned_suggestions(transaction)
+            for item in learned:
+                score = min(LEARNED_MAX_SCORE, LEARNED_BASE_SCORE + item["confidence"] * LEARNED_SCORE_PER_CONFIRM)
+                suggestions.append(MatchSuggestion(
+                    entity_type="EXPENSE",
+                    entity_id=item["ledger_account_id"],
+                    entity_reference=item["category_nl"],
+                    confidence_score=score,
+                    amount=abs(transaction.amount),
+                    date=transaction.booking_date,
+                    explanation=f"Eerdere keuze: {item['category_nl']}",
+                    proposed_action="CREATE_EXPENSE",
+                    learned_rule=True,
+                    expense_category=item.get("account_code"),
+                ))
+        except Exception:
+            # Learning layer is best-effort
+            logger.warning("Failed to fetch learned suggestions", exc_info=True)
         
         # Rule 1: Invoice number in description/reference (VERY HIGH confidence: 90-95)
         search_text = " ".join(filter(None, [transaction.description, transaction.reference]))
@@ -913,6 +942,24 @@ class BankReconciliationService:
             }
         )
         self.db.add(action)
+        
+        # ── Categorization learning ──────────────────────────────
+        # When the user creates an expense (with a ledger code), learn the
+        # mapping so future transactions from the same counterparty can be
+        # auto-suggested.
+        if request.action_type == ReconciliationActionEnum.CREATE_EXPENSE and request.expense_category:
+            try:
+                account = await self._get_account_by_code(request.expense_category)
+                if account:
+                    learner = CategorizationLearningService(self.db, self.administration_id)
+                    await learner.learn_from_categorization(
+                        transaction=transaction,
+                        ledger_account_id=account.id,
+                        category_nl=account.account_name,
+                    )
+            except Exception:
+                # Learning is best-effort; never block the main action
+                logger.warning("Categorization learning failed", exc_info=True)
         
         await self.db.commit()
         await self.db.refresh(transaction)

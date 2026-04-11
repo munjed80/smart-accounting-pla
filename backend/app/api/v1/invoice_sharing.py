@@ -70,7 +70,7 @@ def verify_share_token(token: str) -> UUID:
         raise HTTPException(status_code=404, detail="Ongeldige of verlopen link.")
 
     if time.time() > expires:
-        raise HTTPException(status_code=404, detail="Deze link is verlopen.")
+        raise HTTPException(status_code=404, detail="Ongeldige of verlopen link.")
 
     # ── Signature check ──
     expected = _make_signature(raw_id, expires)

@@ -49,6 +49,7 @@ import {
   Calculator,
   BookOpen,
   ChartPie,
+  UploadSimple,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 import { getBrandName } from '@/lib/roles'
@@ -309,6 +310,14 @@ const menuItems: MenuItem[] = [
     section: 'main',
   },
   // === ZZP Secondary items ===
+  // Data Import
+  {
+    label: t('dataImport.title'),
+    tabValue: 'data-import',
+    icon: <UploadSimple size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'secondary',
+  },
   // Settings
   {
     label: t('sidebar.settings'),

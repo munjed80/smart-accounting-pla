@@ -2591,6 +2591,71 @@ export const nl = {
     emptyImportBank: "Importeer bankafschrift om matching te starten.",
     emptyNoData: "Nog geen data beschikbaar. Begin met een transactie of import.",
   },
+
+  dataImport: {
+    title: "Data importeren",
+    description: "Importeer klanten, facturen of uitgaven vanuit een CSV-bestand.",
+    
+    // Cards
+    customersTitle: "Klanten importeren",
+    customersDescription: "Importeer je klantenbestand vanuit een CSV-bestand.",
+    invoicesTitle: "Facturen importeren",
+    invoicesDescription: "Importeer historische facturen vanuit een CSV-bestand.",
+    expensesTitle: "Uitgaven importeren",
+    expensesDescription: "Importeer uitgaven vanuit een CSV-bestand.",
+    
+    // Actions
+    downloadTemplate: "Download template",
+    uploadCsv: "CSV uploaden",
+    selectFile: "Selecteer CSV-bestand",
+    importButton: "Importeren",
+    backToOverview: "Terug naar overzicht",
+    
+    // Preview
+    previewTitle: "Voorbeeld van import",
+    previewDescription: "Controleer de gegevens hieronder voordat je importeert.",
+    rowNumber: "Rij",
+    totalRows: "Totaal rijen",
+    validRows: "Geldig",
+    errorRows: "Fouten",
+    
+    // Results
+    importSuccess: "Import voltooid",
+    importedCount: "geïmporteerd",
+    skippedCount: "overgeslagen (fouten)",
+    
+    // Errors
+    noFileSelected: "Selecteer eerst een CSV-bestand.",
+    uploadFailed: "Upload mislukt",
+    importFailed: "Import mislukt",
+    maxRows: "Maximaal 500 rijen per import.",
+    
+    // Column headers - Customers
+    colNaam: "Naam",
+    colEmail: "E-mail",
+    colAdres: "Adres",
+    colPostcode: "Postcode",
+    colStad: "Stad",
+    colKvkNummer: "KVK-nummer",
+    colBtwNummer: "BTW-nummer",
+    
+    // Column headers - Invoices
+    colFactuurnummer: "Factuurnummer",
+    colDatum: "Datum",
+    colKlantNaam: "Klantnaam",
+    colBedragInclBtw: "Bedrag incl. BTW",
+    colBtwBedrag: "BTW-bedrag",
+    colStatus: "Status",
+    
+    // Column headers - Expenses
+    colBedrag: "Bedrag",
+    colCategorie: "Categorie",
+    colOmschrijving: "Omschrijving",
+    colLeverancier: "Leverancier",
+
+    // Instructions
+    csvRequirements: "UTF-8 CSV, puntkomma of komma gescheiden, eerste rij = kolomnamen.",
+  },
 };
 
 /**

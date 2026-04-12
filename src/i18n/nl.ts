@@ -120,7 +120,7 @@ export const nl = {
     tryAgain: "Opnieuw proberen",
     noAccount: "Geen account?",
     createAccountCta: "Maak er nu één aan",
-    trialInfo: "1 maand gratis. Daarna vanaf €4,95/maand.",
+    trialInfo: "1 maand gratis. Daarna vanaf €4,99/maand.",
   },
 
   // Roles

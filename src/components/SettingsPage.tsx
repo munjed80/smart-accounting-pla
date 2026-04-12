@@ -1261,7 +1261,7 @@ export const SettingsPage = () => {
                             disabled={isActivating}
                           >
                             {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Starter (€4,95/mnd)
+                            Starter (€4,99/mnd)
                           </Button>
                           <Button
                             onClick={handleActivateSubscriptionPro}
@@ -1306,7 +1306,7 @@ export const SettingsPage = () => {
                             disabled={isActivating}
                           >
                             {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Starter (€4,95/mnd)
+                            Starter (€4,99/mnd)
                           </Button>
                           <Button
                             onClick={handleActivateSubscriptionPro}

@@ -242,7 +242,7 @@ const TrialExpiredScreen = ({ onGoToSubscriptions, onLogout }: { onGoToSubscript
       </div>
       <div className="space-y-3 text-left">
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-          <p className="text-sm font-semibold text-blue-900 mb-1">Starter — €4,95/maand</p>
+          <p className="text-sm font-semibold text-blue-900 mb-1">Starter — €4,99/maand</p>
           <ul className="space-y-1 text-xs text-blue-800">
             <li>✓ Onbeperkt facturen</li>
             <li>✓ Urenregistratie & agenda</li>

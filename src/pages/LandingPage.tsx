@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { navigateTo } from '@/lib/navigation'
+import { cn } from '@/lib/utils'
 import { useSeoMeta } from '@/hooks/useSeoMeta'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   ArrowRight,
   CheckCircle,
+  Clock,
   ClipboardList,
   FileText,
   ShieldCheck,
@@ -39,7 +41,7 @@ export const LandingPage = () => {
 
   useSeoMeta({
     title: "Jouw boekhouding, simpel en duidelijk | ZZPers Hub",
-    description: "Altijd weten wat je moet betalen. Facturen, uitgaven, BTW-overzicht en jaaroverzicht op één plek — speciaal voor zzp'ers. Start 30 dagen gratis, daarna €4,95/maand.",
+    description: "Altijd weten wat je moet betalen. Facturen, uitgaven, BTW-overzicht en jaaroverzicht op één plek — speciaal voor zzp'ers. Start 30 dagen gratis, daarna €4,99/maand.",
     canonical: 'https://zzpershub.nl/',
   })
 
@@ -186,7 +188,7 @@ export const LandingPage = () => {
               </div>
               {/* Helper text */}
               <div className="mt-5 space-y-1.5">
-                <p className="text-sm text-muted-foreground">30 dagen gratis, daarna €4,95 per maand. Geen verplichtingen.</p>
+                <p className="text-sm text-muted-foreground">30 dagen gratis, daarna €4,99 per maand. Geen verplichtingen.</p>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold lg:justify-start" style={{ color: 'var(--accent2)' }}>
                   <CheckCircle className="h-3.5 w-3.5 shrink-0" />
                   Binnen 60 seconden gestart.
@@ -288,7 +290,7 @@ export const LandingPage = () => {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm lg:text-base">
-                  {['Facturatie & klantbeheer', 'Urenregistratie', 'BTW-overzicht met drilldown', 'Uitgaven & bonnetjes', 'Bankimport', 'Mobiele app (PWA)', 'Accountant uitnodigen'].map((item) => (
+                  {['Facturatie (max 5 facturen)', 'Klantbeheer (max 3 klanten)', 'BTW-overzicht (basis)', 'Mobiele app (PWA)'].map((item) => (
                     <li key={item} className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-accent shrink-0" />
                       {item}
@@ -310,7 +312,7 @@ export const LandingPage = () => {
               <CardHeader>
                 <CardTitle className="text-2xl">Starter</CardTitle>
                 <div>
-                  <p className="text-3xl font-bold text-primary">€4,95 <span className="text-sm font-normal text-muted-foreground">/ maand</span></p>
+                  <p className="text-3xl font-bold text-primary">€4,99 <span className="text-sm font-normal text-muted-foreground">/ maand</span></p>
                 </div>
               </CardHeader>
               <CardContent>
@@ -350,12 +352,19 @@ export const LandingPage = () => {
                     'Exports (PDF, CSV)',
                     '10 GB opslag (binnenkort)',
                     'Prioriteit support (binnenkort)',
-                  ].map((item) => (
-                    <li key={item} className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-accent shrink-0" />
-                      {item}
-                    </li>
-                  ))}
+                  ].map((item) => {
+                    const isComingSoon = item.includes('(binnenkort)')
+                    return (
+                      <li key={item} className={cn('flex items-center gap-2', isComingSoon && 'text-muted-foreground')}>
+                        {isComingSoon ? (
+                          <Clock className="h-4 w-4 shrink-0" />
+                        ) : (
+                          <CheckCircle className="h-4 w-4 text-accent shrink-0" />
+                        )}
+                        {item}
+                      </li>
+                    )
+                  })}
                 </ul>
               </CardContent>
               <CardFooter>

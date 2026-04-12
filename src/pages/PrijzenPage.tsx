@@ -22,7 +22,7 @@ export const PrijzenPage = () => {
           </button>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={() => navigateTo('/login')}>Inloggen</Button>
-            <Button size="sm" onClick={() => navigateTo('/login')}>Start gratis</Button>
+            <Button size="sm" onClick={() => navigateTo('/register')}>Start gratis</Button>
           </div>
         </div>
       </nav>
@@ -64,7 +64,7 @@ export const PrijzenPage = () => {
                   </ul>
                 </CardContent>
                 <CardFooter>
-                  <Button className="w-full" onClick={() => navigateTo('/login')}>
+                  <Button className="w-full" onClick={() => navigateTo('/register')}>
                     Start 30 dagen gratis
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>

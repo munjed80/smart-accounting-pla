@@ -118,7 +118,7 @@ export const SubscriptionBanner = () => {
         <AlertCircle className="h-4 w-4 text-orange-600" />
         <AlertDescription className="flex items-center justify-between">
           <span className="text-orange-900">
-            <strong>Proefperiode afgelopen</strong> — activeer abonnement om door te gaan (vanaf €4,95/maand)
+            <strong>Proefperiode afgelopen</strong> — activeer abonnement om door te gaan (vanaf €4,99/maand)
           </span>
           <Button 
             variant="default" 
@@ -136,7 +136,7 @@ export const SubscriptionBanner = () => {
   
   // Active paid subscription
   if (status === 'ACTIVE' && can_use_pro_features) {
-    const planLabel = entitlements.plan_code === 'zzp_pro' ? 'Pro (€6,95/maand)' : 'Starter (€4,95/maand)'
+    const planLabel = entitlements.plan_code === 'zzp_pro' ? 'Pro (€6,95/maand)' : 'Starter (€4,99/maand)'
     return (
       <Alert className="mb-4 border-green-200 bg-green-50">
         <CheckCircle className="h-4 w-4 text-green-600" />

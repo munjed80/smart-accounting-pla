@@ -49,6 +49,7 @@ import {
   Info,
   Book,
   ClockCounterClockwise,
+  Shield,
 } from '@phosphor-icons/react'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
@@ -63,10 +64,11 @@ import { ClientAuditTab } from '@/components/ClientAuditTab'
 import { ClientVatTab } from '@/components/ClientVatTab'
 import { ClientDossierDataTab } from '@/components/ClientDossierDataTab'
 import { ClientCommitmentsTab } from '@/components/ClientCommitmentsTab'
+import { ClientCertificatesTab } from '@/components/ClientCertificatesTab'
 
 interface ClientDossierPageProps {
   clientId: string
-  initialTab?: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'periods' | 'decisions' | 'bookkeeping' | 'audit' | 'commitments'
+  initialTab?: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'periods' | 'decisions' | 'bookkeeping' | 'audit' | 'commitments' | 'certificates'
 }
 
 // Session storage key for today's completed actions
@@ -571,6 +573,10 @@ export const ClientDossierPage = ({ clientId, initialTab = 'invoices' }: ClientD
               <ClockCounterClockwise size={18} />
               {t('dossier.tabs.audit')}
             </TabsTrigger>
+            <TabsTrigger value="certificates" className={dossierTabTriggerClassName}>
+              <Shield size={18} />
+              Certificaten
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="invoices">
@@ -614,6 +620,10 @@ export const ClientDossierPage = ({ clientId, initialTab = 'invoices' }: ClientD
 
           <TabsContent value="audit">
             <ClientAuditTab clientId={clientId} />
+          </TabsContent>
+
+          <TabsContent value="certificates">
+            <ClientCertificatesTab clientId={clientId} />
           </TabsContent>
         </Tabs>
       </div>

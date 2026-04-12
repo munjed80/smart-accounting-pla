@@ -137,15 +137,26 @@ export const RecentActionsPanel = () => {
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-medium">{t('actionLog.recentActions')}</CardTitle>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => navigateTo('/accountant/acties')}
-            className="text-xs"
-          >
-            {t('actionLog.viewAll')}
-            <ArrowRight size={14} className="ml-1" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => navigateTo('/accountant/bulk-operations')}
+              className="text-xs"
+            >
+              {t('bulkHistory.title')}
+              <ArrowRight size={14} className="ml-1" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => navigateTo('/accountant/acties')}
+              className="text-xs"
+            >
+              {t('actionLog.viewAll')}
+              <ArrowRight size={14} className="ml-1" />
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pt-0">

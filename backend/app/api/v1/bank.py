@@ -51,17 +51,17 @@ from app.schemas.bank import (
 )
 from app.services.bank_reconciliation import BankReconciliationService
 from app.services.bank_matching_engine import BankMatchingEngine
-from app.api.v1.deps import CurrentUser, require_assigned_accountant_client
+from app.api.v1.deps import CurrentUser, require_assigned_client
 
 router = APIRouter()
 
 
-@router.post("/bank/import", response_model=BankImportResponse)
+@router.post("/clients/{client_id}/bank/import", response_model=BankImportResponse)
 async def import_bank_file(
+    client_id: UUID,
     file: Annotated[UploadFile, File(..., description="Bank statement file (CSV, CAMT.053, MT940)")],
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    administration_id: UUID = Query(..., description="Administration ID"),
     bank_account_iban: Optional[str] = Form(None),
     bank_name: Optional[str] = Form(None),
 ):
@@ -78,19 +78,19 @@ async def import_bank_file(
     Transactions are imported idempotently using a hash of key fields.
     Duplicates are silently skipped.
     """
-    await require_assigned_accountant_client(administration_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
 
-    service = BankReconciliationService(db, administration_id, current_user.id)
+    service = BankReconciliationService(db, client_id, current_user.id)
     file_bytes = await file.read()
     result = await service.import_file(file_bytes, file.filename, bank_account_iban, bank_name)
     return result
 
 
-@router.get("/bank/transactions", response_model=BankTransactionListResponse)
+@router.get("/clients/{client_id}/bank/transactions", response_model=BankTransactionListResponse)
 async def list_bank_transactions(
+    client_id: UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    administration_id: UUID = Query(..., description="Administration ID"),
     status: Optional[BankTransactionStatusEnum] = Query(None, description="Filter by status"),
     q: Optional[str] = Query(None, description="Search in description/counterparty"),
     date_from: Optional[date] = Query(None, description="Filter from date"),
@@ -105,18 +105,18 @@ async def list_bank_transactions(
     
     Supports filtering by status, search query, and date range.
     """
-    await require_assigned_accountant_client(administration_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     # Build query
     query = (
         select(BankTransaction)
-        .where(BankTransaction.administration_id == administration_id)
+        .where(BankTransaction.administration_id == client_id)
         .order_by(BankTransaction.booking_date.desc(), BankTransaction.created_at.desc())
     )
     
     count_query = (
         select(func.count(BankTransaction.id))
-        .where(BankTransaction.administration_id == administration_id)
+        .where(BankTransaction.administration_id == client_id)
     )
     
     # Apply filters
@@ -172,12 +172,12 @@ async def list_bank_transactions(
     )
 
 
-@router.post("/bank/transactions/{transaction_id}/suggest", response_model=SuggestMatchResponse)
+@router.post("/clients/{client_id}/bank/transactions/{transaction_id}/suggest", response_model=SuggestMatchResponse)
 async def suggest_matches(
+    client_id: UUID,
     transaction_id: UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    administration_id: UUID = Query(..., description="Administration ID"),
 ):
     """
     Get match suggestions for a bank transaction.
@@ -187,21 +187,21 @@ async def suggest_matches(
     - Amount matching open invoices/payables
     - Counterparty IBAN matching known vendors
     """
-    # Get transaction to verify access
+    await require_assigned_client(client_id, current_user, db)
+    
+    # Get transaction to verify it belongs to this client
     result = await db.execute(
         select(BankTransaction)
         .where(BankTransaction.id == transaction_id)
-        .where(BankTransaction.administration_id == administration_id)
+        .where(BankTransaction.administration_id == client_id)
     )
     transaction = result.scalar_one_or_none()
     
     if not transaction:
         raise HTTPException(status_code=404, detail="Transactie niet gevonden")
     
-    await require_assigned_accountant_client(administration_id, current_user, db)
-    
     # Get suggestions
-    service = BankReconciliationService(db, administration_id, current_user.id)
+    service = BankReconciliationService(db, client_id, current_user.id)
     try:
         transaction, suggestions = await service.get_match_suggestions(transaction_id)
     except ValueError as e:
@@ -219,13 +219,13 @@ async def suggest_matches(
     )
 
 
-@router.post("/bank/transactions/{transaction_id}/apply", response_model=ApplyActionResponse)
+@router.post("/clients/{client_id}/bank/transactions/{transaction_id}/apply", response_model=ApplyActionResponse)
 async def apply_action(
+    client_id: UUID,
     transaction_id: UUID,
     request: ApplyActionRequest,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    administration_id: UUID = Query(..., description="Administration ID"),
 ):
     """
     Apply a reconciliation action to a bank transaction.
@@ -242,21 +242,21 @@ async def apply_action(
     2. Creates a journal entry (for CREATE_EXPENSE)
     3. Records the action for audit trail
     """
-    # Get transaction to verify access
+    await require_assigned_client(client_id, current_user, db)
+    
+    # Get transaction to verify it belongs to this client
     result = await db.execute(
         select(BankTransaction)
         .where(BankTransaction.id == transaction_id)
-        .where(BankTransaction.administration_id == administration_id)
+        .where(BankTransaction.administration_id == client_id)
     )
     transaction = result.scalar_one_or_none()
     
     if not transaction:
         raise HTTPException(status_code=404, detail="Transactie niet gevonden")
     
-    await require_assigned_accountant_client(administration_id, current_user, db)
-    
     # Apply action
-    service = BankReconciliationService(db, administration_id, current_user.id)
+    service = BankReconciliationService(db, client_id, current_user.id)
     try:
         updated_transaction, journal_entry_id = await service.apply_action(transaction_id, request)
     except ValueError as e:
@@ -279,11 +279,11 @@ async def apply_action(
     )
 
 
-@router.get("/bank/actions", response_model=ReconciliationActionsListResponse)
+@router.get("/clients/{client_id}/bank/actions", response_model=ReconciliationActionsListResponse)
 async def list_reconciliation_actions(
+    client_id: UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    administration_id: UUID = Query(..., description="Administration ID"),
     action_type: Optional[str] = Query(None, description="Filter by action type"),
     date_from: Optional[date] = Query(None, description="Filter from date"),
     date_to: Optional[date] = Query(None, description="Filter to date"),
@@ -295,19 +295,19 @@ async def list_reconciliation_actions(
     
     Returns all actions with user information for a given administration.
     """
-    await require_assigned_accountant_client(administration_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     # Build query to get actions for transactions in this administration
     query = (
         select(ReconciliationAction)
         .options(selectinload(ReconciliationAction.accountant))
-        .where(ReconciliationAction.administration_id == administration_id)
+        .where(ReconciliationAction.administration_id == client_id)
         .order_by(ReconciliationAction.created_at.desc())
     )
     
     count_query = (
         select(func.count(ReconciliationAction.id))
-        .where(ReconciliationAction.administration_id == administration_id)
+        .where(ReconciliationAction.administration_id == client_id)
     )
 
     if action_type:
@@ -352,7 +352,7 @@ async def list_reconciliation_actions(
 
 # ============ Matching Engine Endpoints ============
 
-@router.post("/accountant/clients/{client_id}/bank/proposals/generate", response_model=GenerateProposalsResponse)
+@router.post("/clients/{client_id}/bank/proposals/generate", response_model=GenerateProposalsResponse)
 async def generate_proposals(
     client_id: UUID,
     request: GenerateProposalsRequest,
@@ -367,7 +367,7 @@ async def generate_proposals(
     
     Requires: Active Machtiging (consent) for the client.
     """
-    await require_assigned_accountant_client(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     engine = BankMatchingEngine(db, client_id, current_user.id)
     result = await engine.generate_proposals(
@@ -384,7 +384,7 @@ async def generate_proposals(
     )
 
 
-@router.get("/accountant/clients/{client_id}/bank/transactions/{tx_id}/proposals", response_model=ProposalsListResponse)
+@router.get("/clients/{client_id}/bank/transactions/{tx_id}/proposals", response_model=ProposalsListResponse)
 async def get_transaction_proposals(
     client_id: UUID,
     tx_id: UUID,
@@ -398,7 +398,7 @@ async def get_transaction_proposals(
     
     Requires: Active Machtiging (consent) for the client.
     """
-    await require_assigned_accountant_client(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     # Verify transaction belongs to this client
     tx_result = await db.execute(
@@ -428,7 +428,7 @@ async def get_transaction_proposals(
     )
 
 
-@router.post("/accountant/clients/{client_id}/bank/proposals/{proposal_id}/accept", response_model=AcceptProposalResponse)
+@router.post("/clients/{client_id}/bank/proposals/{proposal_id}/accept", response_model=AcceptProposalResponse)
 async def accept_proposal(
     client_id: UUID,
     proposal_id: UUID,
@@ -443,7 +443,7 @@ async def accept_proposal(
     
     Requires: Active Machtiging (consent) for the client.
     """
-    await require_assigned_accountant_client(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     # Get proposal to find transaction
     proposal_result = await db.execute(
@@ -462,7 +462,7 @@ async def accept_proposal(
     return AcceptProposalResponse(**result)
 
 
-@router.post("/accountant/clients/{client_id}/bank/proposals/{proposal_id}/reject", response_model=RejectProposalResponse)
+@router.post("/clients/{client_id}/bank/proposals/{proposal_id}/reject", response_model=RejectProposalResponse)
 async def reject_proposal(
     client_id: UUID,
     proposal_id: UUID,
@@ -477,7 +477,7 @@ async def reject_proposal(
     
     Requires: Active Machtiging (consent) for the client.
     """
-    await require_assigned_accountant_client(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     # Get proposal to find transaction
     proposal_result = await db.execute(
@@ -496,7 +496,7 @@ async def reject_proposal(
     return RejectProposalResponse(**result)
 
 
-@router.post("/accountant/clients/{client_id}/bank/transactions/{tx_id}/unmatch", response_model=UnmatchResponse)
+@router.post("/clients/{client_id}/bank/transactions/{tx_id}/unmatch", response_model=UnmatchResponse)
 async def unmatch_transaction(
     client_id: UUID,
     tx_id: UUID,
@@ -511,7 +511,7 @@ async def unmatch_transaction(
     
     Requires: Active Machtiging (consent) for the client.
     """
-    await require_assigned_accountant_client(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     # Verify transaction belongs to this client
     tx_result = await db.execute(
@@ -530,7 +530,7 @@ async def unmatch_transaction(
     return UnmatchResponse(**result)
 
 
-@router.post("/accountant/clients/{client_id}/bank/transactions/{tx_id}/split", response_model=SplitTransactionResponse)
+@router.post("/clients/{client_id}/bank/transactions/{tx_id}/split", response_model=SplitTransactionResponse)
 async def split_transaction(
     client_id: UUID,
     tx_id: UUID,
@@ -546,7 +546,7 @@ async def split_transaction(
     
     Requires: Active Machtiging (consent) for the client.
     """
-    await require_assigned_accountant_client(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     # Verify transaction belongs to this client
     tx_result = await db.execute(
@@ -567,7 +567,7 @@ async def split_transaction(
 
 # ============ Rules Engine Endpoints ============
 
-@router.get("/accountant/clients/{client_id}/bank/rules", response_model=MatchRulesListResponse)
+@router.get("/clients/{client_id}/bank/rules", response_model=MatchRulesListResponse)
 async def list_match_rules(
     client_id: UUID,
     current_user: CurrentUser,
@@ -580,7 +580,7 @@ async def list_match_rules(
     
     Requires: Active Machtiging (consent) for the client.
     """
-    await require_assigned_accountant_client(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     query = (
         select(BankMatchRule)
@@ -597,7 +597,7 @@ async def list_match_rules(
     )
 
 
-@router.post("/accountant/clients/{client_id}/bank/rules", response_model=BankMatchRuleResponse)
+@router.post("/clients/{client_id}/bank/rules", response_model=BankMatchRuleResponse)
 async def create_match_rule(
     client_id: UUID,
     request: BankMatchRuleRequest,
@@ -612,7 +612,7 @@ async def create_match_rule(
     
     Requires: Active Machtiging (consent) for the client.
     """
-    await require_assigned_accountant_client(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     rule = BankMatchRule(
         client_id=client_id,
@@ -631,7 +631,7 @@ async def create_match_rule(
     return BankMatchRuleResponse.from_orm(rule)
 
 
-@router.patch("/accountant/clients/{client_id}/bank/rules/{rule_id}", response_model=BankMatchRuleResponse)
+@router.patch("/clients/{client_id}/bank/rules/{rule_id}", response_model=BankMatchRuleResponse)
 async def update_match_rule(
     client_id: UUID,
     rule_id: UUID,
@@ -644,7 +644,7 @@ async def update_match_rule(
     
     Requires: Active Machtiging (consent) for the client.
     """
-    await require_assigned_accountant_client(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     # Get rule
     rule_result = await db.execute(
@@ -670,7 +670,7 @@ async def update_match_rule(
     return BankMatchRuleResponse.from_orm(rule)
 
 
-@router.delete("/accountant/clients/{client_id}/bank/rules/{rule_id}")
+@router.delete("/clients/{client_id}/bank/rules/{rule_id}")
 async def delete_match_rule(
     client_id: UUID,
     rule_id: UUID,
@@ -682,7 +682,7 @@ async def delete_match_rule(
     
     Requires: Active Machtiging (consent) for the client.
     """
-    await require_assigned_accountant_client(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     # Get rule
     rule_result = await db.execute(
@@ -703,7 +703,7 @@ async def delete_match_rule(
 
 # ============ KPI Endpoints ============
 
-@router.get("/accountant/clients/{client_id}/bank/kpi", response_model=BankReconciliationKPI)
+@router.get("/clients/{client_id}/bank/kpi", response_model=BankReconciliationKPI)
 async def get_reconciliation_kpi(
     client_id: UUID,
     current_user: CurrentUser,
@@ -720,7 +720,7 @@ async def get_reconciliation_kpi(
     
     Requires: Active Machtiging (consent) for the client.
     """
-    await require_assigned_accountant_client(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     from datetime import datetime, timedelta
     from decimal import Decimal

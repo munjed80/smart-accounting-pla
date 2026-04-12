@@ -58,10 +58,13 @@ import {
   ClockCounterClockwise,
   FileText,
   Shield,
+  FileArchive,
 } from '@phosphor-icons/react'
 import { format, formatDistanceToNow } from 'date-fns'
 import { nl as nlLocale } from 'date-fns/locale'
 import { t } from '@/i18n'
+import { EvidencePackPanel } from '@/components/EvidencePackPanel'
+import { ClosingChecklist } from '@/components/ClosingChecklist'
 
 interface ClientPeriodsTabProps {
   clientId: string
@@ -103,6 +106,13 @@ const periodStatusConfig: Record<PeriodStatus, {
     icon: Lock,
     label: t('periods.statusBadge.LOCKED'),
   },
+  READY_FOR_FILING: {
+    bg: 'bg-emerald-500/20',
+    text: 'text-emerald-700 dark:text-emerald-400',
+    border: 'border-emerald-500/40',
+    icon: Flag,
+    label: 'Klaar voor aangifte',
+  },
 }
 
 // Period Card Component
@@ -130,6 +140,8 @@ const PeriodCard = ({
   const [showLockDialog, setShowLockDialog] = useState(false)
   const [showSnapshotDialog, setShowSnapshotDialog] = useState(false)
   const [showAuditDialog, setShowAuditDialog] = useState(false)
+  const [showEvidenceDialog, setShowEvidenceDialog] = useState(false)
+  const [showChecklistDialog, setShowChecklistDialog] = useState(false)
   
   // Finalize form state
   const [acknowledgeYellow, setAcknowledgeYellow] = useState(false)
@@ -348,6 +360,22 @@ const PeriodCard = ({
                 <ClockCounterClockwise size={14} className="mr-1" />
                 {t('periods.viewAuditLog')}
               </Button>
+
+              {/* Evidence pack - available for REVIEW, FINALIZED, LOCKED */}
+              {(period.status === 'REVIEW' || period.status === 'FINALIZED' || period.status === 'LOCKED') && (
+                <Button size="sm" variant="ghost" onClick={() => setShowEvidenceDialog(true)} disabled={isLoading}>
+                  <FileArchive size={14} className="mr-1" />
+                  Bewijspakketten
+                </Button>
+              )}
+
+              {/* Closing checklist - available for REVIEW periods */}
+              {period.status === 'REVIEW' && (
+                <Button size="sm" variant="ghost" onClick={() => setShowChecklistDialog(true)} disabled={isLoading}>
+                  <Shield size={14} className="mr-1" />
+                  Afsluitchecklist
+                </Button>
+              )}
             </div>
           </div>
           
@@ -684,6 +712,59 @@ const PeriodCard = ({
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAuditDialog(false)}>
+              {t('common.close')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Evidence Pack Dialog */}
+      <Dialog open={showEvidenceDialog} onOpenChange={setShowEvidenceDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileArchive size={20} />
+              Bewijspakketten — {period.name}
+            </DialogTitle>
+            <DialogDescription>
+              Genereer en download BTW-bewijspakketten en audit trails voor deze periode.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-2">
+            <EvidencePackPanel 
+              clientId={clientId} 
+              periodId={period.id} 
+              periodName={period.name}
+            />
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEvidenceDialog(false)}>
+              {t('common.close')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Closing Checklist Dialog */}
+      <Dialog open={showChecklistDialog} onOpenChange={setShowChecklistDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <div className="py-2">
+            <ClosingChecklist 
+              clientId={clientId}
+              clientName=""
+              periodId={period.id}
+              periodName={period.name}
+              onFinalize={() => {
+                setShowChecklistDialog(false)
+                handleOpenFinalizeDialog()
+              }}
+            />
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowChecklistDialog(false)}>
               {t('common.close')}
             </Button>
           </DialogFooter>

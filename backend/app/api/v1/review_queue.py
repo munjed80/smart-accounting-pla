@@ -19,11 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models.administration import Administration, AdministrationMember, MemberRole
 from app.models.document import Document, DocumentStatus, DocumentSuggestedAction
 from app.models.subledger import Party
 from app.models.ledger import AccountingPeriod
-from app.models.accountant_dashboard import AccountantClientAssignment
 from app.schemas.document import (
     DocumentReviewResponse,
     DocumentReviewListResponse,
@@ -37,49 +35,9 @@ from app.schemas.document import (
     ClosingChecklistItem,
 )
 from app.services.documents import DocumentMatchingService, DocumentPostingService, ClosingChecklistService
-from app.api.v1.deps import CurrentUser, require_accountant
+from app.api.v1.deps import CurrentUser, require_assigned_client
 
 router = APIRouter()
-
-
-async def verify_accountant_access(
-    client_id: UUID,
-    current_user: CurrentUser,
-    db: AsyncSession,
-) -> Administration:
-    """
-    Verify user has accountant access to the client.
-    
-    Checks both AdministrationMember and AccountantClientAssignment tables.
-    """
-    require_accountant(current_user)
-    
-    # First check via AdministrationMember (direct membership)
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(Administration.id == client_id)
-        .where(AdministrationMember.user_id == current_user.id)
-        .where(AdministrationMember.role.in_([MemberRole.OWNER, MemberRole.ADMIN, MemberRole.ACCOUNTANT]))
-    )
-    administration = result.scalar_one_or_none()
-    
-    if administration:
-        return administration
-    
-    # Also check via AccountantClientAssignment (assignment-based access)
-    assignment_result = await db.execute(
-        select(Administration)
-        .join(AccountantClientAssignment, AccountantClientAssignment.administration_id == Administration.id)
-        .where(Administration.id == client_id)
-        .where(AccountantClientAssignment.accountant_id == current_user.id)
-    )
-    administration = assignment_result.scalar_one_or_none()
-    
-    if not administration:
-        raise HTTPException(status_code=404, detail="Client not found or access denied")
-    
-    return administration
 
 
 @router.get("/clients/{client_id}/documents", response_model=DocumentReviewListResponse)
@@ -94,7 +52,7 @@ async def list_client_documents(
     
     Common use: GET /clients/{id}/documents?status=NEEDS_REVIEW
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     # Build query
     query = (
@@ -185,7 +143,7 @@ async def get_document_detail(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get detailed information about a specific document."""
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     result = await db.execute(
         select(Document)
@@ -269,7 +227,7 @@ async def post_document(
     Creates a journal entry from the document with proper VAT handling.
     This is idempotent - if already posted, returns the existing entry.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     # Get client IP for audit
     client_ip = request.client.host if request.client else None
@@ -316,7 +274,7 @@ async def reject_document(
     
     The document will be marked as rejected with the provided reason.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     # Get client IP for audit
     client_ip = request.client.host if request.client else None
@@ -358,7 +316,7 @@ async def reprocess_document(
     
     Resets the document for re-extraction. This is idempotent.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     # Get client IP for audit
     client_ip = request.client.host if request.client else None
@@ -396,7 +354,7 @@ async def run_document_matching(
     This is typically called after extraction to find duplicates,
     match to parties, and generate suggestions.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     try:
         matching_service = DocumentMatchingService(db, client_id)
@@ -429,7 +387,7 @@ async def get_closing_checklist(
     
     Returns a checklist showing readiness to finalize the period.
     """
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     try:
         checklist_service = ClosingChecklistService(db, client_id)

@@ -18,7 +18,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.models.administration import Administration, AdministrationMember, MemberRole
 from app.models.ledger import AccountingPeriod, PeriodStatus as ModelPeriodStatus
 from app.models.accounting import VatCode
 from app.schemas.vat import (
@@ -50,43 +49,9 @@ from app.schemas.vat import (
 from app.services.vat import VatReportService, VatLineageService, generate_vat_overview_pdf
 from app.services.vat.report import VatReportError, PeriodNotEligibleError
 from app.services.vat.submission import SubmissionPackageService, SubmissionPackageError
-from app.api.v1.deps import CurrentUser
+from app.api.v1.deps import CurrentUser, require_assigned_client
 
 router = APIRouter()
-
-
-async def verify_accountant_access(
-    client_id: UUID,
-    current_user: CurrentUser,
-    db: AsyncSession,
-) -> Administration:
-    """Verify user has accountant access to the client."""
-    if current_user.role not in ["accountant", "admin", "super_admin"]:
-        raise HTTPException(
-            status_code=403,
-            detail="This endpoint is only available for accountants"
-        )
-
-    if current_user.role == "super_admin":
-        administration_result = await db.execute(select(Administration).where(Administration.id == client_id))
-        administration = administration_result.scalar_one_or_none()
-        if not administration:
-            raise HTTPException(status_code=404, detail="Client not found")
-        return administration
-
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(Administration.id == client_id)
-        .where(AdministrationMember.user_id == current_user.id)
-        .where(AdministrationMember.role.in_([MemberRole.OWNER, MemberRole.ADMIN, MemberRole.ACCOUNTANT]))
-    )
-    administration = result.scalar_one_or_none()
-    
-    if not administration:
-        raise HTTPException(status_code=404, detail="Client not found or access denied")
-    
-    return administration
 
 
 def generate_mapping_reason(
@@ -213,7 +178,7 @@ async def get_vat_report(
     allow_draft: bool = Query(False, description="Allow report generation for OPEN periods"),
 ):
     """Get VAT report (BTW Aangifte) for a period."""
-    await verify_accountant_access(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     service = VatReportService(db, client_id)
     
@@ -308,7 +273,7 @@ async def get_icp_report(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get ICP (Intra-Community) supplies report for a period."""
-    await verify_accountant_access(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     service = VatReportService(db, client_id)
     
@@ -367,7 +332,7 @@ async def validate_vat(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Validate VAT data for a period."""
-    await verify_accountant_access(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     service = VatReportService(db, client_id)
     
@@ -472,7 +437,7 @@ async def download_vat_report_pdf(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Download a printable VAT overview PDF for manual filing."""
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
 
     service = VatReportService(db, client_id)
     try:
@@ -528,7 +493,7 @@ async def generate_btw_submission_package(
     import uuid as uuid_module
     
     # Verify accountant access
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     try:
         # Generate submission package
@@ -603,7 +568,7 @@ async def generate_icp_submission_package(
     import uuid as uuid_module
     
     # Verify accountant access
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     try:
         # Generate submission package
@@ -666,7 +631,7 @@ async def get_vat_box_totals(
 ):
     """Get VAT box totals for a period."""
     # Enforce consent/active-client isolation
-    await verify_accountant_access(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     # Get period
     result = await db.execute(
@@ -764,7 +729,7 @@ async def get_vat_box_lines(
 ):
     """Get drilldown lines for a specific VAT box."""
     # Enforce consent/active-client isolation
-    await verify_accountant_access(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     # Get period
     result = await db.execute(
@@ -887,7 +852,7 @@ async def download_evidence_pack(
     from app.services.vat.evidence_pack import VatEvidencePackService
     
     # Enforce consent/active-client isolation
-    await verify_accountant_access(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     try:
         # Generate evidence pack
@@ -940,7 +905,7 @@ async def list_vat_submissions(
     from app.models.vat_submission import VatSubmission
     
     # Enforce consent/active-client isolation
-    await verify_accountant_access(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     # Build query
     query = select(VatSubmission).where(VatSubmission.administration_id == client_id)
@@ -1006,7 +971,7 @@ async def create_vat_submission(
     import uuid
     
     # Enforce consent/active-client isolation
-    await verify_accountant_access(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     # Verify period exists
     result = await db.execute(
@@ -1077,7 +1042,7 @@ async def mark_submission_submitted(
     from app.models.vat_submission import VatSubmission
     
     # Enforce consent/active-client isolation
-    await verify_accountant_access(client_id, current_user, db)
+    await require_assigned_client(client_id, current_user, db)
     
     # Get submission
     result = await db.execute(
@@ -1151,7 +1116,7 @@ async def submit_btw_via_connector(
     import uuid as uuid_module
     
     # Verify accountant access
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     # Verify period is READY_FOR_FILING
     result = await db.execute(
@@ -1261,7 +1226,7 @@ async def submit_icp_via_connector(
     import uuid as uuid_module
     
     # Verify accountant access
-    administration = await verify_accountant_access(client_id, current_user, db)
+    administration = await require_assigned_client(client_id, current_user, db)
     
     # Verify period is READY_FOR_FILING
     result = await db.execute(

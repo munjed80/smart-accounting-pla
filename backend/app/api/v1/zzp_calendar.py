@@ -2,13 +2,15 @@
 ZZP Calendar Events API Endpoints
 
 CRUD operations for ZZP calendar events with month view support.
+Supports recurring events (daily/weekly/monthly) with expansion.
 """
-from datetime import datetime, date
-from typing import Annotated, Optional
+import calendar as cal_module
+from datetime import datetime, date, timedelta
+from typing import Annotated, Optional, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, extract, and_
+from sqlalchemy import select, extract, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -53,6 +55,9 @@ async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administra
 
 def event_to_response(event: ZZPCalendarEvent) -> CalendarEventResponse:
     """Convert calendar event model to response schema."""
+    rec_end = None
+    if event.recurrence_end_date:
+        rec_end = event.recurrence_end_date.isoformat()
     return CalendarEventResponse(
         id=event.id,
         administration_id=event.administration_id,
@@ -61,6 +66,9 @@ def event_to_response(event: ZZPCalendarEvent) -> CalendarEventResponse:
         end_datetime=event.end_datetime.isoformat(),
         location=event.location,
         notes=event.notes,
+        recurrence=event.recurrence,
+        recurrence_end_date=rec_end,
+        color=event.color,
         created_at=event.created_at,
         updated_at=event.updated_at,
     )
@@ -69,6 +77,99 @@ def event_to_response(event: ZZPCalendarEvent) -> CalendarEventResponse:
 def parse_datetime(dt_str: str) -> datetime:
     """Parse ISO 8601 datetime string."""
     return datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+
+
+def expand_recurring_event(
+    event: ZZPCalendarEvent,
+    from_dt: datetime,
+    to_dt: datetime,
+) -> List[CalendarEventResponse]:
+    """
+    Expand a recurring event into individual occurrences within [from_dt, to_dt].
+    The original occurrence is always included if it falls within the range.
+    """
+    recurrence = event.recurrence
+    if not recurrence or recurrence == 'none':
+        # Non-recurring — include if it falls within the range
+        if event.start_datetime <= to_dt and event.end_datetime >= from_dt:
+            return [event_to_response(event)]
+        return []
+
+    # Determine recurrence end boundary
+    rec_end_date = event.recurrence_end_date
+    rec_end_dt = datetime(rec_end_date.year, rec_end_date.month, rec_end_date.day, 23, 59, 59) if rec_end_date else None
+
+    duration = event.end_datetime - event.start_datetime
+    occurrences: List[CalendarEventResponse] = []
+
+    current_start = event.start_datetime
+    # Advance to the first occurrence that could be >= from_dt
+    if recurrence == 'daily':
+        step = timedelta(days=1)
+    elif recurrence == 'weekly':
+        step = timedelta(weeks=1)
+    elif recurrence == 'monthly':
+        step = None  # handled specially
+    else:
+        # Unknown recurrence — treat as non-recurring
+        if event.start_datetime <= to_dt:
+            return [event_to_response(event)]
+        return []
+
+    iteration = 0
+    # Safety limit: prevents infinite loops; allows ~2.7 years of daily events
+    max_iterations = 1000
+
+    while iteration < max_iterations:
+        current_end = current_start + duration
+
+        # Stop if we've passed the recurrence end date
+        if rec_end_dt and current_start > rec_end_dt:
+            break
+
+        # Stop if we've passed the query range
+        if current_start > to_dt:
+            break
+
+        # Include if within range
+        if current_end >= from_dt:
+            # Build a synthetic response reusing the event's ID and metadata
+            rec_end_str = rec_end_date.isoformat() if rec_end_date else None
+            occurrences.append(CalendarEventResponse(
+                id=event.id,
+                administration_id=event.administration_id,
+                title=event.title,
+                start_datetime=current_start.isoformat(),
+                end_datetime=current_end.isoformat(),
+                location=event.location,
+                notes=event.notes,
+                recurrence=event.recurrence,
+                recurrence_end_date=rec_end_str,
+                color=event.color,
+                created_at=event.created_at,
+                updated_at=event.updated_at,
+            ))
+
+        # Advance to next occurrence
+        if recurrence == 'monthly':
+            month = current_start.month + 1
+            year = current_start.year
+            if month > 12:
+                month = 1
+                year += 1
+            # Clamp day to last day of the month
+            last_day = cal_module.monthrange(year, month)[1]
+            day = min(event.start_datetime.day, last_day)
+            try:
+                current_start = current_start.replace(year=year, month=month, day=day)
+            except ValueError:
+                break
+        else:
+            current_start = current_start + step
+
+        iteration += 1
+
+    return occurrences
 
 
 @router.get("/calendar-events", response_model=CalendarEventListResponse)
@@ -84,39 +185,82 @@ async def list_calendar_events(
     List all calendar events for the current user's administration.
     
     Supports filtering by year/month or date range.
+    Recurring events are expanded into individual occurrences within the queried range.
     """
     require_zzp(current_user)
     
     administration = await get_user_administration(current_user.id, db)
     
-    # Build query
+    # Determine the query date range for expansion
+    range_from: Optional[datetime] = None
+    range_to: Optional[datetime] = None
+
+    if from_date:
+        range_from = datetime.fromisoformat(f"{from_date}T00:00:00")
+    elif year and month:
+        range_from = datetime(year, month, 1, 0, 0, 0)
+
+    if to_date:
+        range_to = datetime.fromisoformat(f"{to_date}T23:59:59")
+    elif year and month:
+        last_day = cal_module.monthrange(year, month)[1]
+        range_to = datetime(year, month, last_day, 23, 59, 59)
+
+    # Build query — for recurring events we need to fetch events that could
+    # produce occurrences in the target range, so we relax the start_datetime
+    # filter for recurring events.
     query = select(ZZPCalendarEvent).where(
         ZZPCalendarEvent.administration_id == administration.id
     )
-    
-    # Apply filters
-    if year:
+
+    # For non-recurring events apply strict date filters.
+    # For recurring events we can't filter by start_datetime alone, so we
+    # fetch all recurring events and do expansion in Python.
+    # We apply only an upper-bound on start_datetime for non-recurring events.
+    if range_from is not None and range_to is not None:
+        query = query.where(
+            or_(
+                # Non-recurring: start within range
+                and_(
+                    or_(
+                        ZZPCalendarEvent.recurrence == None,
+                        ZZPCalendarEvent.recurrence == 'none',
+                    ),
+                    ZZPCalendarEvent.start_datetime >= range_from,
+                    ZZPCalendarEvent.start_datetime <= range_to,
+                ),
+                # Recurring: started on or before range_to (could have occurrences in range)
+                and_(
+                    ZZPCalendarEvent.recurrence != None,
+                    ZZPCalendarEvent.recurrence != 'none',
+                    ZZPCalendarEvent.start_datetime <= range_to,
+                ),
+            )
+        )
+    elif year:
         query = query.where(extract('year', ZZPCalendarEvent.start_datetime) == year)
-    
-    if month:
-        query = query.where(extract('month', ZZPCalendarEvent.start_datetime) == month)
-    
-    if from_date:
-        from_dt = datetime.fromisoformat(f"{from_date}T00:00:00")
-        query = query.where(ZZPCalendarEvent.start_datetime >= from_dt)
-    
-    if to_date:
-        to_dt = datetime.fromisoformat(f"{to_date}T23:59:59")
-        query = query.where(ZZPCalendarEvent.start_datetime <= to_dt)
+        if month:
+            query = query.where(extract('month', ZZPCalendarEvent.start_datetime) == month)
     
     query = query.order_by(ZZPCalendarEvent.start_datetime.asc())
     
     result = await db.execute(query)
     events = result.scalars().all()
     
+    # Expand recurring events
+    expanded: List[CalendarEventResponse] = []
+    if range_from is not None and range_to is not None:
+        for event in events:
+            expanded.extend(expand_recurring_event(event, range_from, range_to))
+    else:
+        expanded = [event_to_response(e) for e in events]
+
+    # Sort by start_datetime
+    expanded.sort(key=lambda e: e.start_datetime)
+
     return CalendarEventListResponse(
-        events=[event_to_response(e) for e in events],
-        total=len(events),
+        events=expanded,
+        total=len(expanded),
     )
 
 
@@ -151,6 +295,9 @@ async def create_calendar_event(
         end_datetime=end_dt,
         location=event_in.location,
         notes=event_in.notes,
+        recurrence=event_in.recurrence,
+        recurrence_end_date=date.fromisoformat(event_in.recurrence_end_date) if event_in.recurrence_end_date else None,
+        color=event_in.color,
     )
     
     db.add(event)
@@ -224,6 +371,8 @@ async def update_calendar_event(
     for field, value in update_data.items():
         if field in ('start_datetime', 'end_datetime') and value:
             setattr(event, field, parse_datetime(value))
+        elif field == 'recurrence_end_date' and value:
+            setattr(event, field, date.fromisoformat(value))
         else:
             setattr(event, field, value)
     

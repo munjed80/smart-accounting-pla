@@ -4607,6 +4607,9 @@ export interface ZZPCalendarEvent {
   end_datetime: string
   location?: string
   notes?: string
+  recurrence?: string | null
+  recurrence_end_date?: string | null
+  color?: string | null
   created_at: string
   updated_at: string
 }
@@ -4617,6 +4620,9 @@ export interface ZZPCalendarEventCreate {
   end_datetime: string
   location?: string
   notes?: string
+  recurrence?: string | null
+  recurrence_end_date?: string | null
+  color?: string | null
 }
 
 export interface ZZPCalendarEventUpdate extends Partial<ZZPCalendarEventCreate> {}

@@ -327,12 +327,21 @@ def _mandate_status_to_api(status: AssignmentStatus) -> str:
     return mapping[status]
 
 
-@router.get('/mandates/incoming', response_model=MandateListResponse)
+@router.get(
+    '/mandates/incoming',
+    response_model=MandateListResponse,
+    deprecated=True,
+    summary="[Deprecated] Use GET /zzp/links instead",
+)
 async def list_incoming_mandates(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """List incoming mandate requests for the current ZZP client."""
+    """List incoming mandate requests for the current ZZP client.
+    
+    Deprecated: Use GET /zzp/links instead. This endpoint is kept for backward
+    compatibility only.
+    """
     require_zzp(current_user)
 
     result = await db.execute(
@@ -366,13 +375,22 @@ async def list_incoming_mandates(
     return MandateListResponse(mandates=mandates, total_count=len(mandates))
 
 
-@router.post('/mandates/{mandate_id}/accept', response_model=MandateActionResponse)
+@router.post(
+    '/mandates/{mandate_id}/accept',
+    response_model=MandateActionResponse,
+    deprecated=True,
+    summary="[Deprecated] Use POST /zzp/links/{id}/approve instead",
+)
 async def accept_mandate(
     mandate_id: UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Approve a pending mandate request."""
+    """Approve a pending mandate request.
+    
+    Deprecated: Use POST /zzp/links/{id}/approve instead. This endpoint is kept
+    for backward compatibility only.
+    """
     require_zzp(current_user)
     
     logger.info(f"ZZP user {current_user.id} ({current_user.email}) approving mandate {mandate_id}")
@@ -398,13 +416,22 @@ async def accept_mandate(
     return MandateActionResponse(id=assignment.id, status='approved', message='Machtiging goedgekeurd.')
 
 
-@router.post('/mandates/{mandate_id}/reject', response_model=MandateActionResponse)
+@router.post(
+    '/mandates/{mandate_id}/reject',
+    response_model=MandateActionResponse,
+    deprecated=True,
+    summary="[Deprecated] Use POST /zzp/links/{id}/reject instead",
+)
 async def reject_mandate(
     mandate_id: UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Reject a pending mandate request."""
+    """Reject a pending mandate request.
+    
+    Deprecated: Use POST /zzp/links/{id}/reject instead. This endpoint is kept
+    for backward compatibility only.
+    """
     require_zzp(current_user)
     
     logger.info(f"ZZP user {current_user.id} ({current_user.email}) rejecting mandate {mandate_id}")

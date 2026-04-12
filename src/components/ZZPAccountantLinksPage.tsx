@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
-import { zzpApi, PendingLinkRequest, ActiveAccountantLink, getErrorMessage } from '@/lib/api'
+import { zzpApi, type PendingLinkRequest, type ActiveAccountantLink, getErrorMessage } from '@/lib/api'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
@@ -225,16 +225,8 @@ export const ZZPAccountantLinksPage = () => {
     setPendingError(null)
 
     try {
-      const response = await zzpApi.getMandates()
-      setPendingRequests(response.mandates.map((m) => ({
-        assignment_id: m.id,
-        accountant_id: m.accountant_user_id,
-        accountant_email: m.accountant_email || '',
-        accountant_name: m.accountant_name || '',
-        administration_id: m.client_company_id,
-        administration_name: m.client_company_name,
-        invited_at: m.created_at,
-      })))
+      const response = await zzpApi.getPendingLinks()
+      setPendingRequests(response.pending_requests)
     } catch (error) {
       setPendingRequests([])
       setPendingError(reportLoadFailure('pending', error))
@@ -268,7 +260,7 @@ export const ZZPAccountantLinksPage = () => {
     setApprovingIds(prev => new Set(prev).add(assignmentId))
 
     try {
-      await zzpApi.approveMandate(assignmentId)
+      await zzpApi.approveLink(assignmentId)
       toast.success(t('zzpAccountantLinks.approvedSuccess'))
 
       setPendingRequests(prev => prev.filter(r => r.assignment_id !== assignmentId))
@@ -296,7 +288,7 @@ export const ZZPAccountantLinksPage = () => {
     setRejectingIds(prev => new Set(prev).add(assignmentId))
 
     try {
-      await zzpApi.rejectMandate(assignmentId)
+      await zzpApi.rejectLink(assignmentId)
       toast.success(t('zzpAccountantLinks.rejectedSuccess'))
       setPendingRequests(prev => prev.filter(r => r.assignment_id !== assignmentId))
     } catch (err) {

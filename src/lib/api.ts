@@ -3258,21 +3258,6 @@ const zzpConsentApi = {
     const response = await api.post<RejectLinkResponse>(`/zzp/links/${assignmentId}/revoke`)
     return response.data
   },
-
-  getMandates: async (): Promise<MandateListResponse> => {
-    const response = await api.get<MandateListResponse>('/zzp/mandates/incoming')
-    return response.data
-  },
-
-  approveMandate: async (mandateId: string): Promise<MandateActionResponse> => {
-    const response = await api.post<MandateActionResponse>(`/zzp/mandates/${mandateId}/accept`)
-    return response.data
-  },
-
-  rejectMandate: async (mandateId: string): Promise<MandateActionResponse> => {
-    const response = await api.post<MandateActionResponse>(`/zzp/mandates/${mandateId}/reject`)
-    return response.data
-  },
 }
 
 // Accountant Client Assignment API (legacy endpoints)

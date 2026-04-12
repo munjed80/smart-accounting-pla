@@ -5,10 +5,10 @@ import { zzpApi } from '@/lib/api'
 
 vi.mock('@/lib/api', () => ({
   zzpApi: {
-    getMandates: vi.fn(),
+    getPendingLinks: vi.fn(),
     getActiveLinks: vi.fn(),
-    approveMandate: vi.fn(),
-    rejectMandate: vi.fn(),
+    approveLink: vi.fn(),
+    rejectLink: vi.fn(),
     revokeLink: vi.fn(),
   },
   getErrorMessage: (error: unknown) => (error instanceof Error ? error.message : 'Unknown error'),
@@ -35,18 +35,16 @@ describe('ZZPAccountantLinksPage', () => {
   })
 
   it('keeps pending requests visible when active links endpoint fails', async () => {
-    vi.mocked(zzpApi.getMandates).mockResolvedValue({
-      mandates: [
+    vi.mocked(zzpApi.getPendingLinks).mockResolvedValue({
+      pending_requests: [
         {
-          id: 'assignment-1',
-          accountant_user_id: 'accountant-1',
+          assignment_id: 'assignment-1',
+          accountant_id: 'accountant-1',
           accountant_email: 'bookkeeper@example.com',
           accountant_name: 'Book Keeper',
-          client_company_id: 'company-1',
-          client_company_name: 'Test Company',
-          status: 'pending',
-          created_at: '2026-01-01T10:00:00Z',
-          updated_at: '2026-01-01T10:00:00Z',
+          administration_id: 'company-1',
+          administration_name: 'Test Company',
+          invited_at: '2026-01-01T10:00:00Z',
         },
       ],
       total_count: 1,
@@ -63,7 +61,7 @@ describe('ZZPAccountantLinksPage', () => {
   })
 
   it('retries only the active section when Retry active is clicked', async () => {
-    vi.mocked(zzpApi.getMandates).mockResolvedValue({ mandates: [], total_count: 0 })
+    vi.mocked(zzpApi.getPendingLinks).mockResolvedValue({ pending_requests: [], total_count: 0 })
     vi.mocked(zzpApi.getActiveLinks)
       .mockRejectedValueOnce(new Error('Temporary active error'))
       .mockResolvedValueOnce({ active_links: [], total_count: 0 })
@@ -81,6 +79,6 @@ describe('ZZPAccountantLinksPage', () => {
     })
 
     expect(zzpApi.getActiveLinks).toHaveBeenCalledTimes(2)
-    expect(zzpApi.getMandates).toHaveBeenCalledTimes(1)
+    expect(zzpApi.getPendingLinks).toHaveBeenCalledTimes(1)
   })
 })

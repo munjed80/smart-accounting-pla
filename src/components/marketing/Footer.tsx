@@ -1,9 +1,20 @@
+import { useState } from 'react'
 import { navigateTo } from '@/lib/navigation'
 import { Button } from '@/components/ui/button'
+import { Linkedin, Twitter } from 'lucide-react'
 
 const CURRENT_YEAR = new Date().getFullYear()
 
 export const MarketingFooter = () => {
+  const [email, setEmail] = useState('')
+  const [subscribed, setSubscribed] = useState(false)
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault()
+    setSubscribed(true)
+    setEmail('')
+  }
+
   return (
     <footer id="contact" className="border-t border-border bg-muted/50">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -47,7 +58,7 @@ export const MarketingFooter = () => {
               Inloggen
             </button>
             <button
-              onClick={() => navigateTo('/login')}
+              onClick={() => navigateTo('/register')}
               className="block text-muted-foreground hover:text-foreground transition-colors text-left"
             >
               Start gratis
@@ -92,12 +103,36 @@ export const MarketingFooter = () => {
               1825 RL Alkmaar<br />
               KvK: 69779716
             </address>
+            <div className="flex items-center gap-3 pt-1">
+              <a
+                href="#"
+                aria-label="ZZPers Hub op LinkedIn"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                onClick={(e) => e.preventDefault()}
+              >
+                <Linkedin className="h-4 w-4" />
+              </a>
+              <a
+                href="#"
+                aria-label="ZZPers Hub op X / Twitter"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                onClick={(e) => e.preventDefault()}
+              >
+                <Twitter className="h-4 w-4" />
+              </a>
+            </div>
           </div>
 
           {/* Column 4: Contact */}
           <div className="space-y-3">
             <p className="text-sm font-semibold">Contact</p>
             <p className="text-xs text-muted-foreground">Vragen of interesse? Neem contact op en wij reageren binnen één werkdag.</p>
+            <a
+              href="mailto:info@zzpershub.nl"
+              className="block text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              info@zzpershub.nl
+            </a>
             <Button
               variant="outline"
               size="sm"
@@ -109,8 +144,38 @@ export const MarketingFooter = () => {
           </div>
         </div>
 
-        <div className="mt-8 border-t border-border pt-6 text-center text-xs text-muted-foreground">
-          © {CURRENT_YEAR} ZZPers Hub — Alle rechten voorbehouden.
+        {/* Newsletter CTA */}
+        <div className="mt-10 rounded-lg border border-border/80 bg-background p-6">
+          <p className="text-sm font-semibold mb-1">Blijf op de hoogte</p>
+          <p className="text-xs text-muted-foreground mb-3">Ontvang tips, updates en nieuws over ZZPers Hub direct in je inbox.</p>
+          {subscribed ? (
+            <p className="text-sm font-medium text-accent">Bedankt voor je aanmelding! 🎉</p>
+          ) : (
+            <form onSubmit={handleSubscribe} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                type="email"
+                required
+                placeholder="jouw@email.nl"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+              <Button type="submit" size="sm" variant="outline">
+                Aanmelden
+              </Button>
+            </form>
+          )}
+        </div>
+
+        <div className="mt-8 border-t border-border pt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-between text-xs text-muted-foreground">
+          <span>© {CURRENT_YEAR} ZZPers Hub — Alle rechten voorbehouden.</span>
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="hover:text-foreground transition-colors"
+            aria-label="Terug naar boven"
+          >
+            ↑ Terug naar boven
+          </button>
         </div>
       </div>
     </footer>

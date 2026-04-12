@@ -26,12 +26,12 @@ import { ProductShowcaseSection } from '@/components/landing/ProductShowcaseSect
 
 
 const usps = [
-  { icon: FileText, title: 'Professionele facturen in seconden' },
-  { icon: Smartphone, title: 'Werkt op mobiel & desktop' },
-  { icon: ClipboardList, title: 'Transparant BTW-overzicht' },
-  { icon: Wallet, title: 'Eenvoudige, eerlijke prijs' },
-  { icon: Users, title: 'Klanten en uren op één plek' },
-  { icon: ShieldCheck, title: 'Veilig en privacybewust' },
+  { icon: FileText, title: 'Professionele facturen in seconden', description: 'Maak en verstuur facturen met een paar klikken. Automatische nummering en PDF-export.' },
+  { icon: Smartphone, title: 'Werkt op mobiel & desktop', description: 'Gebruik ZZPers Hub overal — als PWA op je telefoon of in de browser op je laptop.' },
+  { icon: ClipboardList, title: 'Transparant BTW-overzicht', description: 'Altijd inzicht in je BTW-verplichtingen met automatische berekeningen en drilldown.' },
+  { icon: Wallet, title: 'Eenvoudige, eerlijke prijs', description: 'Geen verborgen kosten. Start gratis, daarna vanaf €4,95 per maand.' },
+  { icon: Users, title: 'Klanten en uren op één plek', description: 'Beheer je klanten, registreer uren en zet ze direct om in facturen.' },
+  { icon: ShieldCheck, title: 'Veilig en privacybewust', description: 'Je gegevens worden veilig opgeslagen in Europa, volledig AVG-conform.' },
 ]
 
 export const LandingPage = () => {
@@ -45,10 +45,23 @@ export const LandingPage = () => {
 
   const navigation = [
     { name: 'Functies', href: '#product-showcase' },
+    { name: 'Waarom ZZPers Hub?', href: '#waarom' },
+    { name: 'Voor boekhouders', href: '#voor-accountants' },
     { name: 'Pakketten', href: '/prijzen' },
     { name: 'FAQ', href: '/faq' },
+    { name: 'Help', href: '/help' },
     { name: 'Contact', href: '/contact' },
   ]
+
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href.startsWith('#')) {
+      e.preventDefault()
+      document.querySelector(href)?.scrollIntoView({ behavior: 'smooth' })
+      setMobileMenuOpen(false)
+    } else {
+      setMobileMenuOpen(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -69,7 +82,7 @@ export const LandingPage = () => {
 
           <div className="hidden items-center space-x-6 md:flex">
             {navigation.map((item) => (
-              <a key={item.name} href={item.href} className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+              <a key={item.name} href={item.href} onClick={(e) => handleNavClick(e, item.href)} className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
                 {item.name}
               </a>
             ))}
@@ -90,12 +103,23 @@ export const LandingPage = () => {
 
         {mobileMenuOpen && (
           <div className="border-t border-border px-2 pb-3 pt-2 md:hidden">
+            <div className="flex items-center gap-2 px-3 py-2 mb-1">
+              <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/25 to-accent/20 ring-1 ring-primary/30">
+                <svg width="18" height="18" viewBox="0 0 22 22" fill="none" aria-hidden="true" className="text-primary">
+                  <rect x="3" y="1" width="13" height="17" rx="2" stroke="currentColor" strokeWidth="1.7" />
+                  <path d="M6 6h7M6 10h7M6 14h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <circle cx="17" cy="16" r="4" fill="var(--accent)" />
+                  <text x="17" y="19.5" textAnchor="middle" fontSize="5.5" fontWeight="700" fill="white" fontFamily="system-ui">€</text>
+                </svg>
+              </span>
+              <span className="brand-shimmer text-base font-bold">ZZPers Hub</span>
+            </div>
             {navigation.map((item) => (
               <a
                 key={item.name}
                 href={item.href}
                 className="block rounded-md px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={(e) => handleNavClick(e, item.href)}
               >
                 {item.name}
               </a>
@@ -224,7 +248,7 @@ export const LandingPage = () => {
       </section>
 
       {/* Why this platform */}
-      <section className="py-14 sm:py-20 lg:py-28">
+      <section id="waarom" className="py-14 sm:py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Waarom ZZPers Hub?</h2>
           <p className="mt-3 text-muted-foreground max-w-2xl lg:text-lg">Gemaakt voor zzp'ers die snel willen werken zonder gedoe.</p>
@@ -238,6 +262,7 @@ export const LandingPage = () => {
                       <Icon className="h-5 w-5" />
                     </div>
                     <CardTitle className="text-lg lg:text-xl">{usp.title}</CardTitle>
+                    <CardDescription>{usp.description}</CardDescription>
                   </CardHeader>
                 </Card>
               )

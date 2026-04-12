@@ -106,6 +106,13 @@ const periodStatusConfig: Record<PeriodStatus, {
     icon: Lock,
     label: t('periods.statusBadge.LOCKED'),
   },
+  READY_FOR_FILING: {
+    bg: 'bg-emerald-500/20',
+    text: 'text-emerald-700 dark:text-emerald-400',
+    border: 'border-emerald-500/40',
+    icon: Flag,
+    label: 'Klaar voor aangifte',
+  },
 }
 
 // Period Card Component

@@ -773,7 +773,7 @@ export const ZZPAgendaPage = () => {
   const [formInitialDate, setFormInitialDate] = useState<Date | undefined>()
 
   useEffect(() => {
-    try { localStorage.setItem('zzpAgendaViewMode', viewMode) } catch {}
+    try { localStorage.setItem('zzpAgendaViewMode', viewMode) } catch { /* localStorage may be unavailable */ }
   }, [viewMode])
 
   const loadEvents = useCallback(async () => {

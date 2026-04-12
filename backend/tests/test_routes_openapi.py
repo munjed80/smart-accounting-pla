@@ -26,10 +26,9 @@ class TestOpenAPIRouteExistence:
 
     def test_bank_transactions_route_exists_in_openapi(self, client):
         """
-        Verify /api/v1/accountant/bank/transactions exists in OpenAPI.
+        Verify /api/v1/accountant/clients/{client_id}/bank/transactions exists in OpenAPI.
         
         This ensures the bank router is properly included in the FastAPI app.
-        The route returning 404 in production indicates it wasn't mounted.
         """
         response = client.get("/openapi.json")
         assert response.status_code == 200
@@ -38,7 +37,7 @@ class TestOpenAPIRouteExistence:
         paths = openapi.get("paths", {})
         
         # Check that the bank transactions endpoint is registered
-        bank_transactions_path = "/api/v1/accountant/bank/transactions"
+        bank_transactions_path = "/api/v1/accountant/clients/{client_id}/bank/transactions"
         assert bank_transactions_path in paths, (
             f"Route {bank_transactions_path} not found in OpenAPI. "
             f"Available /accountant/bank paths: "
@@ -51,14 +50,14 @@ class TestOpenAPIRouteExistence:
         )
 
     def test_bank_import_route_exists_in_openapi(self, client):
-        """Verify /api/v1/accountant/bank/import exists in OpenAPI."""
+        """Verify /api/v1/accountant/clients/{client_id}/bank/import exists in OpenAPI."""
         response = client.get("/openapi.json")
         assert response.status_code == 200
         
         openapi = response.json()
         paths = openapi.get("paths", {})
         
-        bank_import_path = "/api/v1/accountant/bank/import"
+        bank_import_path = "/api/v1/accountant/clients/{client_id}/bank/import"
         assert bank_import_path in paths, (
             f"Route {bank_import_path} not found in OpenAPI"
         )
@@ -93,8 +92,7 @@ class TestBankRouteAuthentication:
         A 404 response would indicate the route isn't mounted at all.
         """
         response = client.get(
-            "/api/v1/accountant/bank/transactions",
-            params={"administration_id": "00000000-0000-0000-0000-000000000000"}
+            "/api/v1/accountant/clients/00000000-0000-0000-0000-000000000000/bank/transactions",
         )
         
         # Should return 401 (Unauthorized) or 403 (Forbidden), NOT 404
@@ -107,8 +105,7 @@ class TestBankRouteAuthentication:
     def test_bank_import_returns_401_or_403_when_unauthenticated(self, client):
         """Bank import should return 401 or 403 when unauthenticated."""
         response = client.post(
-            "/api/v1/accountant/bank/import",
-            params={"administration_id": "00000000-0000-0000-0000-000000000000"}
+            "/api/v1/accountant/clients/00000000-0000-0000-0000-000000000000/bank/import",
         )
         
         # Should return 401 or 403, NOT 404

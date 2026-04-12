@@ -108,6 +108,7 @@ export const MarketingFooter = () => {
                 href="#"
                 aria-label="ZZPers Hub op LinkedIn"
                 className="text-muted-foreground hover:text-foreground transition-colors"
+                onClick={(e) => e.preventDefault()}
               >
                 <Linkedin className="h-4 w-4" />
               </a>
@@ -115,6 +116,7 @@ export const MarketingFooter = () => {
                 href="#"
                 aria-label="ZZPers Hub op X / Twitter"
                 className="text-muted-foreground hover:text-foreground transition-colors"
+                onClick={(e) => e.preventDefault()}
               >
                 <Twitter className="h-4 w-4" />
               </a>

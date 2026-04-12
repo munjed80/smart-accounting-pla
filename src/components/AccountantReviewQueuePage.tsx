@@ -12,16 +12,14 @@
  * Handles PENDING_APPROVAL and ACCESS_REVOKED errors from backend
  */
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { EmptyState } from '@/components/EmptyState'
 import { WorkQueueSummary } from '@/components/WorkQueueSummary'
-import { ClientAccessError, parseClientAccessError } from '@/components/ClientAccessError'
+import { ClientAccessError } from '@/components/ClientAccessError'
 import { useAuth } from '@/lib/AuthContext'
 import { useActiveClient } from '@/lib/ActiveClientContext'
-import { useDelayedLoading } from '@/hooks/useDelayedLoading'
-import { accountantMasterDashboardApi, ClientStatusCard, getErrorMessage } from '@/lib/api'
 import { 
   WarningCircle,
   UsersThree,
@@ -34,55 +32,8 @@ export const AccountantReviewQueuePage = () => {
   const { user } = useAuth()
   const { activeClient, hasActiveClients, hasPendingClients } = useActiveClient()
   
-  // Client details state
-  const [selectedClient, setSelectedClient] = useState<ClientStatusCard | null>(null)
-  
-  // Loading and error state
-  const [isLoading, setIsLoading] = useState(true)
+  // Error state
   const [error, setError] = useState<string | null>(null)
-  const [clientAccessError, setClientAccessError] = useState<'pending_approval' | 'access_revoked' | 'not_assigned' | 'no_client' | null>(null)
-  const showLoading = useDelayedLoading(isLoading, 300, !!selectedClient)
-  
-  // Fetch client details when activeClient changes
-  useEffect(() => {
-    if (activeClient) {
-      fetchClientDetails(activeClient.administrationId)
-    } else {
-      setSelectedClient(null)
-      setIsLoading(false)
-    }
-  }, [activeClient])
-  
-  const fetchClientDetails = async (clientId: string) => {
-    setIsLoading(true)
-    setError(null)
-    setClientAccessError(null)
-    
-    try {
-      const response = await accountantMasterDashboardApi.getClients()
-      const client = response.clients.find(c => c.id === clientId)
-      if (client) {
-        setSelectedClient(client)
-      }
-    } catch (err) {
-      // Check for client access errors (PENDING_APPROVAL, ACCESS_REVOKED)
-      const accessError = parseClientAccessError(err)
-      if (accessError && accessError !== 'no_client') {
-        setClientAccessError(accessError)
-      } else {
-        setError(getErrorMessage(err))
-      }
-    } finally {
-      setIsLoading(false)
-    }
-  }
-  
-  const handleRetry = () => {
-    setError(null)
-    if (activeClient) {
-      fetchClientDetails(activeClient.administrationId)
-    }
-  }
   
   // Navigate to clients page to select a client
   const handleGoToClients = () => {
@@ -105,19 +56,8 @@ export const AccountantReviewQueuePage = () => {
     )
   }
   
-  // Show client access error if there's one
-  if (clientAccessError) {
-    return (
-      <ClientAccessError 
-        type={clientAccessError} 
-        clientName={activeClient?.name}
-        onGoToClients={handleGoToClients}
-      />
-    )
-  }
-  
   // Show empty state if no client selected
-  if (!isLoading && !activeClient) {
+  if (!activeClient) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -160,11 +100,9 @@ export const AccountantReviewQueuePage = () => {
             <h1 className="text-3xl font-bold text-foreground mb-1">
               {t('sidebar.reviewQueue')}
             </h1>
-            {activeClient && (
-              <p className="text-muted-foreground">
-                {t('clientSwitcher.activeClient')}: <span className="font-semibold">{activeClient.name || activeClient.email}</span>
-              </p>
-            )}
+            <p className="text-muted-foreground">
+              {t('clientSwitcher.activeClient')}: <span className="font-semibold">{activeClient.name || activeClient.email}</span>
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleGoToClients}>
@@ -183,7 +121,7 @@ export const AccountantReviewQueuePage = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleRetry}
+                onClick={() => setError(null)}
                 className="shrink-0"
               >
                 <ArrowClockwise size={16} className="mr-2" />
@@ -194,12 +132,10 @@ export const AccountantReviewQueuePage = () => {
         )}
         
         {/* Work Queue Summary */}
-        {activeClient && (
-          <WorkQueueSummary 
-            clientId={activeClient.administrationId}
-            clientName={activeClient.name || activeClient.email}
-          />
-        )}
+        <WorkQueueSummary 
+          clientId={activeClient.administrationId}
+          clientName={activeClient.name || activeClient.email}
+        />
       </div>
     </div>
   )

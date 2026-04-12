@@ -109,14 +109,6 @@ async def require_assigned_client(
                     "message": "Machtiging is afgewezen door de klant."
                 }
             )
-        elif assignment.status == AssignmentStatus.REJECTED:
-            raise HTTPException(
-                status_code=403,
-                detail={
-                    "code": "MANDATE_REJECTED",
-                    "message": "Machtiging is afgewezen door de klant."
-                }
-            )
         else:  # REVOKED
             raise HTTPException(
                 status_code=403,

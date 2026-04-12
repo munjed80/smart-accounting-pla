@@ -277,7 +277,6 @@ const AppContent = () => {
   const { user, isAuthenticated, isLoading, checkSession, logout } = useAuth()
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
   const isSuperAdmin = user?.role === 'super_admin'
-  const isAccountantOnly = user?.role === 'accountant'
   const isZzp = user?.role === 'zzp'
   const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'offertes' | 'expenses' | 'time' | 'agenda' | 'obligations-overview' | 'lease-loans' | 'subscriptions' | 'documents' | 'admin' | 'tax-btw' | 'tax-income' | 'tax-help' | 'tax-annual' | 'data-import'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
@@ -711,7 +710,7 @@ const AppContent = () => {
   }
 
   // Show bank reconciliation page for accountants
-  if (route.type === 'bank-reconciliation' && isAccountantOnly) {
+  if (route.type === 'bank-reconciliation' && isAccountant) {
     return (
       <AppShell 
         activeTab="bank" 
@@ -738,7 +737,7 @@ const AppContent = () => {
       case 'acties':
         return isAccountant ? <AccountantActionsPage /> : <SmartDashboard />
       case 'bank':
-        return isAccountantOnly ? <BankReconciliationPage /> : <SmartDashboard />
+        return isAccountant ? <BankReconciliationPage /> : <SmartDashboard />
       case 'crediteuren':
         return isAccountant ? <CrediteurenPage onNavigate={handleTabChange} /> : <SmartDashboard />
       case 'profitloss':

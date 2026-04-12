@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { navigateTo } from '@/lib/navigation'
+import { cn } from '@/lib/utils'
 import { useSeoMeta } from '@/hooks/useSeoMeta'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -326,16 +327,19 @@ export const LandingPage = () => {
                     'Exports (PDF, CSV)',
                     '10 GB opslag (binnenkort)',
                     'Prioriteit support (binnenkort)',
-                  ].map((item) => (
-                    <li key={item} className={`flex items-center gap-2${item.includes('(binnenkort)') ? ' text-muted-foreground' : ''}`}>
-                      {item.includes('(binnenkort)') ? (
-                        <Clock className="h-4 w-4 shrink-0" />
-                      ) : (
-                        <CheckCircle className="h-4 w-4 text-accent shrink-0" />
-                      )}
-                      {item}
-                    </li>
-                  ))}
+                  ].map((item) => {
+                    const isComingSoon = item.includes('(binnenkort)')
+                    return (
+                      <li key={item} className={cn('flex items-center gap-2', isComingSoon && 'text-muted-foreground')}>
+                        {isComingSoon ? (
+                          <Clock className="h-4 w-4 shrink-0" />
+                        ) : (
+                          <CheckCircle className="h-4 w-4 text-accent shrink-0" />
+                        )}
+                        {item}
+                      </li>
+                    )
+                  })}
                 </ul>
               </CardContent>
               <CardFooter>

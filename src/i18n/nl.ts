@@ -426,9 +426,15 @@ export const nl = {
     pageDescription: "Plan je afspraken en deadlines",
     // Navigation
     today: "Vandaag",
+    viewMonth: "Maand",
+    viewWeek: "Week",
+    thisWeek: "Deze week",
+    thisMonth: "Deze maand",
     // Events
     newEvent: "Nieuwe afspraak",
     editEvent: "Afspraak bewerken",
+    duplicateEvent: "Kopiëren",
+    eventDuplicated: "Afspraak gekopieerd",
     newEventDescription: "Voeg een nieuwe afspraak toe aan je agenda.",
     editEventDescription: "Wijzig de gegevens van deze afspraak.",
     deleteEvent: "Afspraak verwijderen",
@@ -442,7 +448,18 @@ export const nl = {
     // List titles
     eventsOnDay: "Afspraken op",
     eventsInMonth: "Afspraken in",
+    eventsInWeek: "Afspraken in week",
     showAllMonth: "Toon hele maand",
+    // Search & filter
+    searchPlaceholder: "Zoeken op titel, locatie of notities...",
+    noSearchResults: "Geen afspraken gevonden voor deze zoekopdracht",
+    // Summary card
+    summaryThisMonth: "afspraken in",
+    summaryThisWeek: "deze week",
+    summaryNextEvent: "Volgende afspraak",
+    summaryNextEventIn: "over",
+    summaryNextEventDays: "dag(en)",
+    summaryNextEventToday: "vandaag",
     // Empty states
     noEvents: "Nog geen afspraken",
     noEventsDescription: "Voeg je eerste afspraak toe om je agenda te vullen.",
@@ -451,6 +468,7 @@ export const nl = {
     // Table columns
     columnDateTime: "Datum/tijd",
     columnTitle: "Titel",
+    columnDuration: "Duur",
     columnLocation: "Locatie",
     columnActions: "Acties",
     // Form fields
@@ -466,7 +484,16 @@ export const nl = {
     formLocationPlaceholder: "Adres of online meeting link",
     formNotes: "Notities",
     formNotesPlaceholder: "Extra informatie over deze afspraak",
+    formRecurrence: "Herhaling",
+    formRecurrenceNone: "Geen",
+    formRecurrenceDaily: "Dagelijks",
+    formRecurrenceWeekly: "Wekelijks",
+    formRecurrenceMonthly: "Maandelijks",
+    formRecurrenceEndDate: "Herhaling eindigt op",
+    formColor: "Kleur",
     helperOptional: "optioneel",
+    // ICS export
+    exportIcs: "Exporteer (.ics)",
     // Errors
     errorLoadingEvents: "Fout bij laden van afspraken",
     errorSavingEvent: "Fout bij opslaan van afspraak",

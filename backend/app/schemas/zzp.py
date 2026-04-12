@@ -579,6 +579,9 @@ class CalendarEventCreate(BaseModel):
     end_datetime: str = Field(..., description="End datetime (ISO 8601)")
     location: Optional[str] = Field(None, max_length=500, description="Event location")
     notes: Optional[str] = Field(None, description="Event notes")
+    recurrence: Optional[str] = Field(None, description="Recurrence pattern: none/daily/weekly/monthly")
+    recurrence_end_date: Optional[str] = Field(None, description="Recurrence end date (YYYY-MM-DD)")
+    color: Optional[str] = Field(None, description="Event color: blue/green/red/orange/purple/pink or null")
     
     @field_validator('start_datetime', 'end_datetime')
     @classmethod
@@ -597,6 +600,9 @@ class CalendarEventUpdate(BaseModel):
     end_datetime: Optional[str] = Field(None)
     location: Optional[str] = Field(None, max_length=500)
     notes: Optional[str] = Field(None)
+    recurrence: Optional[str] = Field(None)
+    recurrence_end_date: Optional[str] = Field(None)
+    color: Optional[str] = Field(None)
     
     @field_validator('start_datetime', 'end_datetime')
     @classmethod
@@ -619,6 +625,9 @@ class CalendarEventResponse(BaseModel):
     end_datetime: str  # ISO 8601
     location: Optional[str]
     notes: Optional[str]
+    recurrence: Optional[str]
+    recurrence_end_date: Optional[str]
+    color: Optional[str]
     created_at: datetime
     updated_at: datetime
 

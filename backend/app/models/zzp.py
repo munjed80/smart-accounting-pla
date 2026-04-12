@@ -624,6 +624,13 @@ class ZZPCalendarEvent(Base):
     location: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
+    # Recurrence fields
+    recurrence: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    recurrence_end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    
+    # Color/category label
+    color: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

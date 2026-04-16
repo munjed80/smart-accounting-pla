@@ -60,7 +60,7 @@ export const BelastinghulpBTWPage = () => {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary">Binnenkort beschikbaar</Badge>
+            <Badge variant="secondary">In ontwikkeling</Badge>
             <span className="text-sm text-muted-foreground">
               Automatische berekening en indienen via Digipoort
             </span>

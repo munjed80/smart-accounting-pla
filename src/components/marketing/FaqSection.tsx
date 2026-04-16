@@ -46,7 +46,7 @@ const faqItems: FaqItem[] = [
   {
     question: 'Wat kost het na de proefperiode?',
     answer:
-      'De eerste 30 dagen zijn volledig gratis — geen creditcard nodig bij aanmelding. Daarna is ZZPers Hub €4,99 per maand. Je kunt op elk moment opzeggen; er zijn geen opzegtermijnen of verborgen kosten.',
+      'De eerste 90 dagen zijn volledig gratis — geen creditcard nodig bij aanmelding. Daarna is ZZPers Hub €4,99 per maand. Je kunt op elk moment opzeggen; er zijn geen opzegtermijnen of verborgen kosten.',
   },
   // Getting started (detail)
   {
@@ -80,7 +80,7 @@ const faqItems: FaqItem[] = [
   {
     question: 'Hoe werkt de gratis proefperiode?',
     answer:
-      'Je krijgt 30 dagen gratis toegang tot alle functies, zonder creditcard bij aanmelding. Na 30 dagen wordt je account automatisch beperkt tot alleen-lezen modus tenzij je een abonnement activeert. Je gegevens blijven bewaard. Je ontvangt een herinnering per e-mail voor het einde van de proefperiode.',
+      'Je krijgt 90 dagen gratis toegang tot alle functies, zonder creditcard bij aanmelding. Na 90 dagen wordt je account automatisch beperkt tot alleen-lezen modus tenzij je een abonnement activeert. Je gegevens blijven bewaard. Je ontvangt een herinnering per e-mail voor het einde van de proefperiode.',
   },
   {
     question: 'Hoe activeer of annuleer ik mijn abonnement?',

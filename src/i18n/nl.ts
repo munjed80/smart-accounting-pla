@@ -120,7 +120,7 @@ export const nl = {
     tryAgain: "Opnieuw proberen",
     noAccount: "Nog geen account?",
     createAccountCta: "Maak er nu één aan",
-    trialInfo: "1 maand gratis. Daarna vanaf €4,99/maand.",
+    trialInfo: "3 maanden gratis. Daarna vanaf €4,99/maand.",
   },
 
   // Roles
@@ -1394,7 +1394,7 @@ export const nl = {
     documentProcessed: "Document verwerkt",
     documentProcessedDescription: "Waarschuw me wanneer documentverwerking is voltooid",
     savePreferences: "Voorkeuren opslaan",
-    comingSoon: "Binnenkort beschikbaar:",
+    comingSoon: "Nog niet beschikbaar:",
     emailNotificationsFinalized: "E-mailmeldingen worden afgerond. Je voorkeuren worden opgeslagen en toegepast zodra beschikbaar.",
     version: "Versie",
     build: "Build",
@@ -2423,8 +2423,8 @@ export const nl = {
       categorizedExpenses: "Kosten worden gecategoriseerd per grootboekrekening",
       periodSelection: "Bekijk resultaten per kwartaal of boekjaar",
     },
-    comingSoon: "Binnenkort beschikbaar",
-    comingSoonDescription: "Geavanceerde rapportage en analyse worden binnenkort toegevoegd.",
+    comingSoon: "Nog niet beschikbaar",
+    comingSoonDescription: "Geavanceerde rapportage en analyse worden later toegevoegd.",
     goToWorkqueue: "Naar Werklijst",
     goToReview: "Naar Beoordelen",
   },

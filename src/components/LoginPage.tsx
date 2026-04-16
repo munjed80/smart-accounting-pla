@@ -27,7 +27,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   useSeoMeta({
     title: activeTab === 'register' ? "Start gratis — ZZPers Hub | Gratis factuur maken voor zzp'ers" : 'Inloggen | ZZPers Hub',
     description: activeTab === 'register'
-      ? "Maak gratis een account aan bij ZZPers Hub. 30 dagen gratis facturen maken als zzp'er — geen creditcard vereist."
+      ? "Maak gratis een account aan bij ZZPers Hub. 90 dagen gratis facturen maken als zzp'er — geen creditcard vereist."
       : "Log in op uw ZZPers Hub account en beheer uw facturen, klanten en uren.",
     canonical: 'https://zzpershub.nl/login',
   })

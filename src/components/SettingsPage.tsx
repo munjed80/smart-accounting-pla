@@ -1285,7 +1285,7 @@ export const SettingsPage = () => {
                         <>
                           <Button
                             variant="outline"
-                            onClick={() => toast.info('Abonnementsbeheer wordt binnenkort beschikbaar.')}
+                            onClick={() => navigateTo('/instellingen')}
                           >
                             Abonnement beheren
                           </Button>

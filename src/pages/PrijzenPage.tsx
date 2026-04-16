@@ -9,7 +9,7 @@ import { CookieBanner } from '@/components/marketing/CookieBanner'
 export const PrijzenPage = () => {
   useSeoMeta({
     title: "Pakketten en prijzen | ZZPers Hub",
-    description: "Bekijk de prijzen van ZZPers Hub. Start 30 dagen gratis en maak professionele facturen als zzp'er. Daarna slechts €4,99 per maand. Geen creditcard vereist.",
+    description: "Bekijk de prijzen van ZZPers Hub. Start 90 dagen gratis en maak professionele facturen als zzp'er. Daarna slechts €4,99 per maand. Geen creditcard vereist.",
     canonical: 'https://zzpershub.nl/prijzen',
   })
 
@@ -41,7 +41,7 @@ export const PrijzenPage = () => {
                   <CardTitle className="text-2xl">ZZP</CardTitle>
                   <div>
                     <p className="text-3xl font-bold text-primary">Gratis</p>
-                    <p className="text-sm text-muted-foreground">eerste 30 dagen</p>
+                    <p className="text-sm text-muted-foreground">eerste 90 dagen</p>
                   </div>
                   <p className="text-lg font-semibold">Daarna €4,99 <span className="text-sm font-normal text-muted-foreground">/ maand</span></p>
                 </CardHeader>
@@ -65,7 +65,7 @@ export const PrijzenPage = () => {
                 </CardContent>
                 <CardFooter>
                   <Button className="w-full" onClick={() => navigateTo('/register')}>
-                    Start 30 dagen gratis
+                    Start 90 dagen gratis
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </CardFooter>

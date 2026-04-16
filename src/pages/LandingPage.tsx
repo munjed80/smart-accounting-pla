@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import { navigateTo } from '@/lib/navigation'
-import { cn } from '@/lib/utils'
 import { useSeoMeta } from '@/hooks/useSeoMeta'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   ArrowRight,
   CheckCircle,
-  Clock,
   ClipboardList,
   FileText,
   ShieldCheck,
@@ -41,7 +39,7 @@ export const LandingPage = () => {
 
   useSeoMeta({
     title: "Jouw boekhouding, simpel en duidelijk | ZZPers Hub",
-    description: "Altijd weten wat je moet betalen. Facturen, uitgaven, BTW-overzicht en jaaroverzicht op één plek — speciaal voor zzp'ers. Start 30 dagen gratis, daarna €4,99/maand.",
+    description: "Altijd weten wat je moet betalen. Facturen, uitgaven, BTW-overzicht en jaaroverzicht op één plek — speciaal voor zzp'ers. Start 90 dagen gratis, daarna €4,99/maand.",
     canonical: 'https://zzpershub.nl/',
   })
 
@@ -147,7 +145,7 @@ export const LandingPage = () => {
               {/* Premium badge */}
               <div className="hero-badge-premium mb-6 inline-flex items-center gap-2 rounded-full border border-accent/45 bg-accent/10 px-4 py-1.5 text-xs font-semibold text-accent shadow-[inset_0_1px_0_oklch(1_0_0/0.08),0_1px_8px_oklch(0_0_0/0.25)] backdrop-blur-sm">
                 <Star className="h-3.5 w-3.5 shrink-0 fill-current opacity-90" />
-                <span>30 dagen gratis uitproberen — geen creditcard vereist</span>
+                <span>90 dagen gratis uitproberen — geen creditcard vereist</span>
               </div>
               {/* Headline */}
               <h1 className="text-4xl font-extrabold leading-[1.15] tracking-tight sm:text-5xl lg:text-6xl lg:tracking-[-0.03em]">
@@ -188,7 +186,7 @@ export const LandingPage = () => {
               </div>
               {/* Helper text */}
               <div className="mt-5 space-y-1.5">
-                <p className="text-sm text-muted-foreground">30 dagen gratis, daarna €4,99 per maand. Geen verplichtingen.</p>
+                <p className="text-sm text-muted-foreground">90 dagen gratis, daarna €4,99 per maand. Geen verplichtingen.</p>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold lg:justify-start" style={{ color: 'var(--accent2)' }}>
                   <CheckCircle className="h-3.5 w-3.5 shrink-0" />
                   Binnen 60 seconden gestart.
@@ -285,7 +283,7 @@ export const LandingPage = () => {
                 <CardTitle className="text-2xl">Free</CardTitle>
                 <div>
                   <p className="text-3xl font-bold text-primary">Gratis</p>
-                  <p className="text-sm text-muted-foreground">1 maand gratis</p>
+                  <p className="text-sm text-muted-foreground">3 maanden gratis</p>
                 </div>
               </CardHeader>
               <CardContent>
@@ -347,24 +345,17 @@ export const LandingPage = () => {
                 <ul className="space-y-2 text-sm lg:text-base">
                   {[
                     'Alles van Starter',
-                    'BTW-aangifte met Digipoort (binnenkort)',
-                    'Bankrekening koppeling (binnenkort)',
+                    'BTW-aangifte met Digipoort',
+                    'Bankrekening koppeling',
                     'Exports (PDF, CSV)',
-                    '10 GB opslag (binnenkort)',
-                    'Prioriteit support (binnenkort)',
-                  ].map((item) => {
-                    const isComingSoon = item.includes('(binnenkort)')
-                    return (
-                      <li key={item} className={cn('flex items-center gap-2', isComingSoon && 'text-muted-foreground')}>
-                        {isComingSoon ? (
-                          <Clock className="h-4 w-4 shrink-0" />
-                        ) : (
-                          <CheckCircle className="h-4 w-4 text-accent shrink-0" />
-                        )}
-                        {item}
-                      </li>
-                    )
-                  })}
+                    '10 GB opslag',
+                    'Prioriteit support',
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-accent shrink-0" />
+                      {item}
+                    </li>
+                  ))}
                 </ul>
               </CardContent>
               <CardFooter>
@@ -424,7 +415,7 @@ export const LandingPage = () => {
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
           <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Klaar om te beginnen?</h2>
           <p className="mt-4 text-muted-foreground lg:text-lg lg:leading-relaxed">
-            Start vandaag nog met uw gratis proefperiode van 30 dagen. Geen creditcard, geen verplichtingen.
+            Start vandaag nog met uw gratis proefperiode van 90 dagen. Geen creditcard, geen verplichtingen.
           </p>
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Button size="lg" onClick={() => navigateTo('/register')}>

@@ -150,8 +150,8 @@ export const ErrorMessages = {
   TIMEOUT: 'Verzoek duurde te lang. Probeer het opnieuw.',
   
   // Feature Availability
-  BETA_TITLE: 'Binnenkort beschikbaar',
-  BETA_FEATURE_UNAVAILABLE: 'Deze functie is binnenkort beschikbaar. We werken hard om deze module voor je klaar te maken.',
+  BETA_TITLE: 'Nog niet beschikbaar',
+  BETA_FEATURE_UNAVAILABLE: 'Deze functie is nog niet beschikbaar. We werken hard om deze module voor je klaar te maken.',
   BETA_NOTE: 'Houd je terugkerende kosten voor nu bij in de uitgaven module, of kom later terug wanneer deze functie actief is.',
   
   // Generic

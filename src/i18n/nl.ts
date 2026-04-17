@@ -2696,6 +2696,15 @@ export const nl = {
     // Instructions
     csvRequirements: "UTF-8 CSV, puntkomma of komma gescheiden, eerste rij = kolomnamen.",
   },
+
+  // E-commerce integrations
+  integrations: {
+    title: "Integraties",
+    menuLabel: "Integraties",
+    description: "Koppel je webshop en importeer bestellingen, klanten en restitutie automatisch.",
+    proRequired: "Pro-abonnement vereist",
+    proRequiredDescription: "E-commerce integraties zoals Shopify en WooCommerce zijn beschikbaar met het Pro-abonnement. Upgrade om je webshop te koppelen.",
+  },
 };
 
 /**

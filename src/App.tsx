@@ -45,6 +45,7 @@ import { BelastinghulpInkomstenbelastingPage } from '@/components/BelastinghulpI
 import { BelastinghulpUitlegPage } from '@/components/BelastinghulpUitlegPage'
 import { BelastinghulpJaaroverzichtPage } from '@/components/BelastinghulpJaaroverzichtPage'
 import { DataImportPage } from '@/components/DataImportPage'
+import { ZZPIntegrationsPage } from '@/components/ZZPIntegrationsPage'
 import { ClientDossierPage } from '@/components/ClientDossierPage'
 import { BulkOperationsHistoryPage } from '@/components/BulkOperationsHistoryPage'
 import { BankReconciliationPage } from '@/components/BankReconciliationPage'
@@ -278,7 +279,7 @@ const AppContent = () => {
   const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
   const isSuperAdmin = user?.role === 'super_admin'
   const isZzp = user?.role === 'zzp'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'offertes' | 'expenses' | 'time' | 'agenda' | 'obligations-overview' | 'lease-loans' | 'subscriptions' | 'documents' | 'admin' | 'tax-btw' | 'tax-income' | 'tax-help' | 'tax-annual' | 'data-import'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'offertes' | 'expenses' | 'time' | 'agenda' | 'obligations-overview' | 'lease-loans' | 'subscriptions' | 'documents' | 'admin' | 'tax-btw' | 'tax-income' | 'tax-help' | 'tax-annual' | 'data-import' | 'integrations'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
   // Onboarding state - tracks if user needs onboarding (no administrations for ZZP, no clients for accountants)
@@ -782,6 +783,8 @@ const AppContent = () => {
         return isZzp ? <BelastinghulpJaaroverzichtPage /> : <SmartDashboard />
       case 'data-import':
         return !isAccountant ? <DataImportPage /> : <SmartDashboard />
+      case 'integrations':
+        return isZzp ? <ZZPIntegrationsPage /> : <SmartDashboard />
       case 'dashboard':
         return <SmartDashboard />
       case 'transactions':
@@ -827,6 +830,7 @@ const AppContent = () => {
       case 'tax-help': return 'Uitleg & Hulp'
       case 'tax-annual': return 'Jaaroverzicht'
       case 'data-import': return 'Data importeren'
+      case 'integrations': return 'Integraties'
       case 'dashboard': return 'Overzicht'
       case 'transactions': return 'Transacties'
       case 'upload': return 'Upload'

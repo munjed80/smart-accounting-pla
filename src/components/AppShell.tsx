@@ -50,6 +50,7 @@ import {
   BookOpen,
   ChartPie,
   UploadSimple,
+  PlugsConnected,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 import { getBrandName } from '@/lib/roles'
@@ -269,6 +270,13 @@ const menuItems: MenuItem[] = [
   },
 
   // === Belastinghulp section (ZZP self-service tax) ===
+  {
+    label: t('integrations.menuLabel'),
+    tabValue: 'integrations',
+    icon: <PlugsConnected size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
   {
     label: t('sidebar.btwAangifte'),
     tabValue: 'tax-btw',

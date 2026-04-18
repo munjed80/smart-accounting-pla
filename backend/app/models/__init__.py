@@ -79,6 +79,17 @@ from app.models.vat_submission import VatSubmission
 from app.models.certificate import Certificate
 from app.models.audit_log import AuditLog
 from app.models.contact_message import ContactMessage, ContactMessageStatus
+from app.models.ecommerce import (
+    EcommerceConnection,
+    EcommerceOrder,
+    EcommerceCustomer,
+    EcommerceRefund,
+    EcommerceSyncLog,
+    EcommerceProvider,
+    ConnectionStatus,
+    SyncStatus,
+    EcommerceOrderStatus,
+)
 from app.models.work_queue import (
     ClientReadinessCache,
     EscalationEvent,
@@ -192,4 +203,13 @@ __all__ = [
     "DashboardAuditActionType",
     "ReminderChannel",
     "ReminderStatus",
+    "EcommerceConnection",
+    "EcommerceOrder",
+    "EcommerceCustomer",
+    "EcommerceRefund",
+    "EcommerceSyncLog",
+    "EcommerceProvider",
+    "ConnectionStatus",
+    "SyncStatus",
+    "EcommerceOrderStatus",
 ]

@@ -4,7 +4,7 @@
  * Review workspace for imported Shopify/WooCommerce orders and refunds.
  * Pro-plan gated. Lets the user review, approve, and post records.
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   salesReviewApi,
@@ -227,9 +227,37 @@ export const ZZPSalesReviewPage = () => {
   const mappings = mappingsQuery.data?.mappings ?? []
   const totalMappings = mappingsQuery.data?.total ?? 0
   const statusCounts = summaryQuery.data?.status_counts ?? {}
+  const totalFromSummary = summaryQuery.data?.total ?? 0
   const totalPages = Math.ceil(totalMappings / perPage)
   const connections = connectionsQuery.data?.connections ?? []
   const hasConnections = connections.length > 0
+
+  // Derive aggregate workflow progress for the progress bar
+  const progressData = useMemo(() => {
+    const pending = (statusCounts.new ?? 0) + (statusCounts.needs_review ?? 0)
+    const inReview = (statusCounts.mapped ?? 0)
+    const approved = (statusCounts.approved ?? 0)
+    const posted = (statusCounts.posted ?? 0)
+    const dismissed = (statusCounts.skipped ?? 0) + (statusCounts.duplicate ?? 0)
+    const errors = (statusCounts.error ?? 0)
+    const total = totalFromSummary || 1 // avoid divide by zero
+
+    return {
+      pending,
+      inReview,
+      approved,
+      posted,
+      dismissed,
+      errors,
+      total: totalFromSummary,
+      completionPct: totalFromSummary > 0 ? Math.round(((posted + dismissed) / total) * 100) : 0,
+      actionablePct: totalFromSummary > 0 ? Math.round(((pending) / total) * 100) : 0,
+    }
+  }, [statusCounts, totalFromSummary])
+
+  // Check if we're in a "filter shows no results" state vs. truly empty
+  const hasAnyRecords = totalFromSummary > 0
+  const isFilteredEmpty = hasAnyRecords && mappings.length === 0 && (statusFilter || typeFilter || providerFilter)
 
   // ============================================================================
   // Render
@@ -295,6 +323,76 @@ export const ZZPSalesReviewPage = () => {
         })}
       </div>
 
+      {/* Workflow progress bar — shown when records exist */}
+      {hasAnyRecords && (
+        <div className="rounded-lg border bg-card p-3 sm:p-4 space-y-2">
+          <div className="flex items-center justify-between text-xs sm:text-sm">
+            <span className="text-muted-foreground">
+              Voortgang: <span className="font-semibold text-foreground">{progressData.completionPct}%</span> afgerond
+            </span>
+            <span className="text-muted-foreground">
+              {progressData.total} totaal
+              {progressData.pending > 0 && (
+                <> · <span className="text-amber-600 font-medium">{progressData.pending} te beoordelen</span></>
+              )}
+              {progressData.approved > 0 && (
+                <> · <span className="text-green-600 font-medium">{progressData.approved} klaar om te boeken</span></>
+              )}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden flex">
+            {/* Posted (completed) — green */}
+            {progressData.posted > 0 && (
+              <div
+                className="h-full bg-emerald-500 transition-all"
+                style={{ width: `${(progressData.posted / progressData.total) * 100}%` }}
+                title={`${progressData.posted} geboekt`}
+              />
+            )}
+            {/* Approved — light green */}
+            {progressData.approved > 0 && (
+              <div
+                className="h-full bg-green-400 transition-all"
+                style={{ width: `${(progressData.approved / progressData.total) * 100}%` }}
+                title={`${progressData.approved} goedgekeurd`}
+              />
+            )}
+            {/* Mapped/in-review — purple */}
+            {progressData.inReview > 0 && (
+              <div
+                className="h-full bg-purple-400 transition-all"
+                style={{ width: `${(progressData.inReview / progressData.total) * 100}%` }}
+                title={`${progressData.inReview} gemapped`}
+              />
+            )}
+            {/* Pending — amber */}
+            {progressData.pending > 0 && (
+              <div
+                className="h-full bg-amber-400 transition-all"
+                style={{ width: `${(progressData.pending / progressData.total) * 100}%` }}
+                title={`${progressData.pending} te beoordelen`}
+              />
+            )}
+            {/* Dismissed (skipped + duplicate) — gray */}
+            {progressData.dismissed > 0 && (
+              <div
+                className="h-full bg-gray-300 transition-all"
+                style={{ width: `${(progressData.dismissed / progressData.total) * 100}%` }}
+                title={`${progressData.dismissed} overgeslagen/duplicaat`}
+              />
+            )}
+            {/* Errors — red */}
+            {progressData.errors > 0 && (
+              <div
+                className="h-full bg-red-400 transition-all"
+                style={{ width: `${(progressData.errors / progressData.total) * 100}%` }}
+                title={`${progressData.errors} fouten`}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Filters row — stacks on mobile */}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="flex items-center gap-2">
@@ -358,6 +456,19 @@ export const ZZPSalesReviewPage = () => {
       {mappingsQuery.isLoading ? (
         <div className="flex items-center justify-center py-16">
           <ArrowsClockwise size={24} className="animate-spin text-muted-foreground" />
+        </div>
+      ) : isFilteredEmpty ? (
+        /* Filter returned no results but records exist */
+        <div className="text-center py-12 space-y-3">
+          <Funnel size={40} className="mx-auto text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">Geen records gevonden voor de huidige filters.</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setStatusFilter(''); setTypeFilter(''); setProviderFilter(''); setPage(1) }}
+          >
+            Filters wissen
+          </Button>
         </div>
       ) : mappings.length === 0 ? (
         <SmartEmptyState

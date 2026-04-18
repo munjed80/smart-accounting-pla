@@ -4,10 +4,11 @@
  * Integration Hub for Shopify and WooCommerce.
  * Pro-plan gated: non-Pro users see a clear upgrade prompt.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   integrationsApi,
+  salesReviewApi,
   subscriptionApi,
   type EcommerceConnectionResponse,
   type EcommerceOrderResponse,
@@ -82,11 +83,68 @@ export const ZZPIntegrationsPage = () => {
     enabled: hasAccess,
   })
 
+  // Sales review summary — used to power workflow steps 3 & 4
+  const { data: reviewSummary } = useQuery({
+    queryKey: ['sales-review-summary'],
+    queryFn: () => salesReviewApi.getSummary(),
+    enabled: hasAccess,
+    staleTime: 30_000,
+  })
+
   const connections = connectionsData?.connections || []
 
   // Find active connections
   const shopifyConn = connections.find(c => c.provider === 'shopify')
   const wooConn = connections.find(c => c.provider === 'woocommerce')
+
+  // Compute workflow step statuses from real data
+  const workflowSteps = useMemo(() => {
+    const counts = reviewSummary?.status_counts ?? {}
+    const totalRecords = reviewSummary?.total ?? 0
+    const hasConnected = connections.some(c => c.status === 'connected')
+    const hasSynced = connections.some(c => c.last_sync_at)
+    // Step 3: review/map — done when at least one record was approved or posted
+    const reviewedCount = (counts.approved ?? 0) + (counts.posted ?? 0) + (counts.mapped ?? 0)
+    const pendingReviewCount = (counts.new ?? 0) + (counts.needs_review ?? 0)
+    const step3Done = reviewedCount > 0 && pendingReviewCount === 0
+    const step3InProgress = reviewedCount > 0 && pendingReviewCount > 0
+    // Step 4: boeken — done when at least one record is posted
+    const postedCount = counts.posted ?? 0
+    const approvedCount = counts.approved ?? 0
+    const step4Done = postedCount > 0 && approvedCount === 0
+    const step4InProgress = postedCount > 0 && approvedCount > 0
+
+    return [
+      {
+        step: 1,
+        label: t('integrations.workflowStep1'),
+        desc: t('integrations.workflowStep1Desc'),
+        status: hasConnected ? 'done' as const : 'pending' as const,
+      },
+      {
+        step: 2,
+        label: t('integrations.workflowStep2'),
+        desc: hasSynced ? `${totalRecords} records` : t('integrations.workflowStep2Desc'),
+        status: hasSynced ? 'done' as const : 'pending' as const,
+      },
+      {
+        step: 3,
+        label: t('integrations.workflowStep3'),
+        desc: totalRecords > 0
+          ? (pendingReviewCount > 0 ? `${pendingReviewCount} te beoordelen` : 'Alles beoordeeld')
+          : t('integrations.workflowStep3Desc'),
+        status: step3Done ? 'done' as const : step3InProgress ? 'in-progress' as const : 'pending' as const,
+      },
+      {
+        step: 4,
+        label: t('integrations.workflowStep4'),
+        desc: postedCount > 0
+          ? `${postedCount} geboekt`
+          : (approvedCount > 0 ? `${approvedCount} klaar om te boeken` : t('integrations.workflowStep4Desc')),
+        status: step4Done ? 'done' as const : step4InProgress ? 'in-progress' as const : 'pending' as const,
+      },
+    ]
+  }, [connections, reviewSummary])
 
   // ============================================================================
   // Pro-plan gate: show upgrade prompt
@@ -117,20 +175,23 @@ export const ZZPIntegrationsPage = () => {
         )}
       </div>
 
-      {/* Workflow steps — visual guide */}
+      {/* Workflow steps — visual guide connected to real data */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-        {[
-          { step: 1, label: t('integrations.workflowStep1'), desc: t('integrations.workflowStep1Desc'), done: connections.some(c => c.status === 'connected') },
-          { step: 2, label: t('integrations.workflowStep2'), desc: t('integrations.workflowStep2Desc'), done: connections.some(c => c.last_sync_at) },
-          { step: 3, label: t('integrations.workflowStep3'), desc: t('integrations.workflowStep3Desc'), done: false },
-          { step: 4, label: t('integrations.workflowStep4'), desc: t('integrations.workflowStep4Desc'), done: false },
-        ].map(({ step, label, desc, done }) => (
+        {workflowSteps.map(({ step, label, desc, status }) => (
           <div
             key={step}
-            className={`rounded-lg border p-3 text-center transition-colors ${done ? 'bg-green-50 border-green-200' : 'bg-muted/30 border-border'}`}
+            className={`rounded-lg border p-3 text-center transition-colors ${
+              status === 'done' ? 'bg-green-50 border-green-200' :
+              status === 'in-progress' ? 'bg-amber-50 border-amber-200' :
+              'bg-muted/30 border-border'
+            }`}
           >
-            <div className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold mb-1.5 ${done ? 'bg-green-600 text-white' : 'bg-muted text-muted-foreground'}`}>
-              {done ? '✓' : step}
+            <div className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold mb-1.5 ${
+              status === 'done' ? 'bg-green-600 text-white' :
+              status === 'in-progress' ? 'bg-amber-500 text-white' :
+              'bg-muted text-muted-foreground'
+            }`}>
+              {status === 'done' ? '✓' : step}
             </div>
             <div className="text-xs font-medium leading-tight">{label}</div>
             <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 hidden sm:block">{desc}</div>

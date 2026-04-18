@@ -1,10 +1,11 @@
-import { ReactNode, useState, useEffect } from 'react'
+import { ReactNode, useState, useEffect, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/lib/AuthContext'
 import { useActiveClient } from '@/lib/ActiveClientContext'
 import { useCloseOverlayOnRouteChange } from '@/hooks/useCloseOverlayOnRouteChange'
 import { usePreventBodyScrollLock } from '@/hooks/usePreventBodyScrollLock'
 import { navigateTo } from '@/lib/navigation'
-import { getApiBaseUrl } from '@/lib/api'
+import { getApiBaseUrl, salesReviewApi } from '@/lib/api'
 import { TourHelpButton } from '@/components/OnboardingTour'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -75,6 +76,8 @@ interface MenuItem {
   zzpSection?: 'belastinghulp'
   // Hidden from menu but code remains
   hidden?: boolean
+  // Dynamic badge count (set at runtime, not in static config)
+  badgeCount?: number
 }
 
 // Define menu items for both roles
@@ -385,6 +388,21 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
   const isSuperAdmin = user?.role === 'super_admin'
   const isZZP = user?.role === 'zzp'
 
+  // Fetch sales-review summary for ZZP users (used for nav badge)
+  const { data: salesReviewSummary } = useQuery({
+    queryKey: ['sales-review-summary'],
+    queryFn: () => salesReviewApi.getSummary(),
+    enabled: isZZP,
+    staleTime: 60_000, // re-fetch at most once per minute
+    refetchOnWindowFocus: false,
+  })
+
+  // Compute pending-review count for badge: records that need attention
+  const salesReviewPendingCount = useMemo(() => {
+    const counts = salesReviewSummary?.status_counts ?? {}
+    return (counts.new ?? 0) + (counts.needs_review ?? 0)
+  }, [salesReviewSummary])
+
   const { canInstall, showIosHelper, promptInstall, dismiss: dismissInstallCard } = useInstallPrompt()
   const { updateAvailable, applyUpdate, dismiss: dismissUpdateBanner } = useServiceWorkerUpdate()
   
@@ -411,11 +429,22 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
   const homeLabel = isSuperAdmin ? 'Terug naar Systeembeheer' : isAccountant ? t('sidebar.backToWorkQueue') : t('sidebar.backToOverzicht')
 
   // Filter menu items based on user role and hidden flag
-  const visibleMenuItems = menuItems.filter(item => 
-    user?.role && 
-    item.rolesAllowed.includes(user.role as 'zzp' | 'accountant' | 'admin' | 'super_admin') &&
-    !item.hidden
-  )
+  const visibleMenuItems = useMemo(() => {
+    const items = menuItems.filter(item => 
+      user?.role && 
+      item.rolesAllowed.includes(user.role as 'zzp' | 'accountant' | 'admin' | 'super_admin') &&
+      !item.hidden
+    )
+    // Inject dynamic badge counts
+    if (salesReviewPendingCount > 0) {
+      return items.map(item =>
+        item.tabValue === 'sales-review'
+          ? { ...item, badgeCount: salesReviewPendingCount }
+          : item
+      )
+    }
+    return items
+  }, [user?.role, salesReviewPendingCount])
   
   // Group items by accounting section for accountants
   // Workflow section at top for daily tasks, followed by accounting concepts
@@ -550,7 +579,12 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
                           style={{ minHeight: '44px' }}
                         >
                           {item.icon}
-                          <span>{item.label}</span>
+                          <span className="flex-1 text-left">{item.label}</span>
+                          {item.badgeCount != null && item.badgeCount > 0 && (
+                            <Badge variant="secondary" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                              {item.badgeCount}
+                            </Badge>
+                          )}
                         </button>
                       </li>
                     )
@@ -583,7 +617,12 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
                       style={{ minHeight: '44px' }}
                     >
                       {item.icon}
-                      <span>{item.label}</span>
+                      <span className="flex-1 text-left">{item.label}</span>
+                      {item.badgeCount != null && item.badgeCount > 0 && (
+                        <Badge variant="secondary" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                          {item.badgeCount}
+                        </Badge>
+                      )}
                     </button>
                   </li>
                 )
@@ -619,7 +658,12 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
                             style={{ minHeight: '44px' }}
                           >
                             {item.icon}
-                            <span>{item.label}</span>
+                            <span className="flex-1 text-left">{item.label}</span>
+                            {item.badgeCount != null && item.badgeCount > 0 && (
+                              <Badge variant="secondary" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                                {item.badgeCount}
+                              </Badge>
+                            )}
                           </button>
                         </li>
                       )

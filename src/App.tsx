@@ -834,7 +834,7 @@ const AppContent = () => {
       case 'tax-annual': return 'Jaaroverzicht'
       case 'data-import': return 'Data importeren'
       case 'integrations': return 'Integraties'
-      case 'sales-review': return 'Verkoop Review'
+      case 'sales-review': return 'Webshop Boekingen'
       case 'dashboard': return 'Overzicht'
       case 'transactions': return 'Transacties'
       case 'upload': return 'Upload'

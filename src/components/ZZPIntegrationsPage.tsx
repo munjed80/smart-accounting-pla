@@ -4,10 +4,11 @@
  * Integration Hub for Shopify and WooCommerce.
  * Pro-plan gated: non-Pro users see a clear upgrade prompt.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   integrationsApi,
+  salesReviewApi,
   subscriptionApi,
   type EcommerceConnectionResponse,
   type EcommerceOrderResponse,
@@ -40,6 +41,9 @@ import {
   Sparkle,
   CaretRight,
   ArrowCounterClockwise,
+  Receipt,
+  Users,
+  CurrencyEur,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { t } from '@/i18n'
@@ -79,11 +83,68 @@ export const ZZPIntegrationsPage = () => {
     enabled: hasAccess,
   })
 
+  // Sales review summary — used to power workflow steps 3 & 4
+  const { data: reviewSummary } = useQuery({
+    queryKey: ['sales-review-summary'],
+    queryFn: () => salesReviewApi.getSummary(),
+    enabled: hasAccess,
+    staleTime: 30_000,
+  })
+
   const connections = connectionsData?.connections || []
 
   // Find active connections
   const shopifyConn = connections.find(c => c.provider === 'shopify')
   const wooConn = connections.find(c => c.provider === 'woocommerce')
+
+  // Compute workflow step statuses from real data
+  const workflowSteps = useMemo(() => {
+    const counts = reviewSummary?.status_counts ?? {}
+    const totalRecords = reviewSummary?.total ?? 0
+    const hasConnected = connections.some(c => c.status === 'connected')
+    const hasSynced = connections.some(c => c.last_sync_at)
+    // Step 3: review/map — done when at least one record was approved or posted
+    const reviewedCount = (counts.approved ?? 0) + (counts.posted ?? 0) + (counts.mapped ?? 0)
+    const pendingReviewCount = (counts.new ?? 0) + (counts.needs_review ?? 0)
+    const step3Done = reviewedCount > 0 && pendingReviewCount === 0
+    const step3InProgress = reviewedCount > 0 && pendingReviewCount > 0
+    // Step 4: boeken — done when at least one record is posted
+    const postedCount = counts.posted ?? 0
+    const approvedCount = counts.approved ?? 0
+    const step4Done = postedCount > 0 && approvedCount === 0
+    const step4InProgress = postedCount > 0 && approvedCount > 0
+
+    return [
+      {
+        step: 1,
+        label: t('integrations.workflowStep1'),
+        desc: t('integrations.workflowStep1Desc'),
+        status: hasConnected ? 'done' as const : 'pending' as const,
+      },
+      {
+        step: 2,
+        label: t('integrations.workflowStep2'),
+        desc: hasSynced ? `${totalRecords} records` : t('integrations.workflowStep2Desc'),
+        status: hasSynced ? 'done' as const : 'pending' as const,
+      },
+      {
+        step: 3,
+        label: t('integrations.workflowStep3'),
+        desc: totalRecords > 0
+          ? (pendingReviewCount > 0 ? `${pendingReviewCount} te beoordelen` : 'Alles beoordeeld')
+          : t('integrations.workflowStep3Desc'),
+        status: step3Done ? 'done' as const : step3InProgress ? 'in-progress' as const : 'pending' as const,
+      },
+      {
+        step: 4,
+        label: t('integrations.workflowStep4'),
+        desc: postedCount > 0
+          ? `${postedCount} geboekt`
+          : (approvedCount > 0 ? `${approvedCount} klaar om te boeken` : t('integrations.workflowStep4Desc')),
+        status: step4Done ? 'done' as const : step4InProgress ? 'in-progress' as const : 'pending' as const,
+      },
+    ]
+  }, [connections, reviewSummary])
 
   // ============================================================================
   // Pro-plan gate: show upgrade prompt
@@ -95,23 +156,71 @@ export const ZZPIntegrationsPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t('integrations.title')}</h1>
-          <p className="text-muted-foreground mt-1">{t('integrations.description')}</p>
+      {/* Header — mobile-friendly stacked layout */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">{t('integrations.title')}</h1>
+          <p className="text-muted-foreground text-sm mt-1">{t('integrations.description')}</p>
         </div>
         {connections.length > 0 && (
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
+            className="self-start sm:self-auto shrink-0"
             onClick={() => navigateTo('/zzp/verkoop-review')}
           >
-            <CaretRight size={16} className="mr-1" />
-            Verkoop Review
+            <Receipt size={16} className="mr-1.5" />
+            {t('integrations.goToReview')}
           </Button>
         )}
       </div>
+
+      {/* Workflow steps — visual guide connected to real data */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        {workflowSteps.map(({ step, label, desc, status }) => (
+          <div
+            key={step}
+            className={`rounded-lg border p-3 text-center transition-colors ${
+              status === 'done' ? 'bg-green-50 border-green-200' :
+              status === 'in-progress' ? 'bg-amber-50 border-amber-200' :
+              'bg-muted/30 border-border'
+            }`}
+          >
+            <div className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold mb-1.5 ${
+              status === 'done' ? 'bg-green-600 text-white' :
+              status === 'in-progress' ? 'bg-amber-500 text-white' :
+              'bg-muted text-muted-foreground'
+            }`}>
+              {status === 'done' ? '✓' : step}
+            </div>
+            <div className="text-xs font-medium leading-tight">{label}</div>
+            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 hidden sm:block">{desc}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Feature benefits — shown when no connections */}
+      {connections.length === 0 && (
+        <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start gap-4">
+            <div className="shrink-0 rounded-lg bg-primary/10 p-3">
+              <Storefront size={28} className="text-primary" weight="duotone" />
+            </div>
+            <div className="space-y-3 min-w-0">
+              <div>
+                <h3 className="font-semibold text-sm sm:text-base">{t('integrations.noConnectionsYet')}</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1">{t('integrations.noConnectionsDesc')}</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs sm:text-sm text-muted-foreground">
+                <span className="flex items-center gap-1.5"><ShoppingCart size={14} className="text-primary shrink-0" />{t('integrations.benefitOrders')}</span>
+                <span className="flex items-center gap-1.5"><Users size={14} className="text-primary shrink-0" />{t('integrations.benefitCustomers')}</span>
+                <span className="flex items-center gap-1.5"><CurrencyEur size={14} className="text-primary shrink-0" />{t('integrations.benefitRefunds')}</span>
+                <span className="flex items-center gap-1.5"><Receipt size={14} className="text-primary shrink-0" />{t('integrations.benefitVat')}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Provider cards */}
       <div className="grid gap-4 md:grid-cols-2">
@@ -132,6 +241,29 @@ export const ZZPIntegrationsPage = () => {
           onViewDetails={() => wooConn && setSelectedConnection(wooConn)}
         />
       </div>
+
+      {/* Next step CTA — shown when connected but never synced */}
+      {connections.some(c => c.status === 'connected') && (
+        <div className="rounded-lg border bg-blue-50 border-blue-200 p-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <CaretRight size={18} className="text-blue-700 shrink-0" />
+              <div className="text-sm">
+                <span className="font-medium text-blue-900">{t('integrations.nextStepLabel')} </span>
+                <span className="text-blue-800">{t('integrations.nextStepDesc')}</span>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              className="shrink-0 self-start sm:self-auto"
+              onClick={() => navigateTo('/zzp/verkoop-review')}
+            >
+              <Receipt size={16} className="mr-1.5" />
+              {t('integrations.goToReview')}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Connection dialog */}
       {connectDialog === 'shopify' && (
@@ -287,6 +419,7 @@ const PROVIDER_META = {
     iconBg: 'bg-green-100',
     iconColor: 'text-green-700',
     description: 'Koppel je Shopify-webshop en importeer bestellingen, klanten en restitutie.',
+    features: ['Bestellingen', 'Klanten', 'Restitutie', 'BTW-berekening'],
   },
   woocommerce: {
     name: 'WooCommerce',
@@ -294,6 +427,7 @@ const PROVIDER_META = {
     iconBg: 'bg-violet-100',
     iconColor: 'text-violet-700',
     description: 'Koppel je WooCommerce-webshop en importeer bestellingen, klanten en restitutie.',
+    features: ['Bestellingen', 'Klanten', 'Restitutie', 'BTW-berekening'],
   },
 }
 
@@ -303,82 +437,104 @@ function ProviderCard({ provider, connection, onConnect, onSync, onDisconnect, o
   const hasError = connection?.status === 'error' || !!connection?.last_sync_error
 
   return (
-    <div className={`rounded-lg border p-5 space-y-4 ${isConnected ? meta.color : 'bg-card border-border'}`}>
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
-          <div className={`rounded-lg p-2.5 ${meta.iconBg}`}>
-            <ShoppingCart size={24} weight="duotone" className={meta.iconColor} />
+    <div className={`rounded-lg border p-4 sm:p-5 space-y-3 sm:space-y-4 ${isConnected ? meta.color : 'bg-card border-border'}`}>
+      {/* Provider header — stacked on mobile */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`rounded-lg p-2 sm:p-2.5 shrink-0 ${meta.iconBg}`}>
+            <ShoppingCart size={22} weight="duotone" className={meta.iconColor} />
           </div>
-          <div>
-            <h3 className="font-semibold">{meta.name}</h3>
-            <p className="text-xs text-muted-foreground">{meta.description}</p>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-sm sm:text-base">{meta.name}</h3>
+            <p className="text-xs text-muted-foreground line-clamp-2">{meta.description}</p>
           </div>
         </div>
-        {isConnected ? (
-          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-            <CheckCircle size={14} weight="fill" className="mr-1" />
-            Verbonden
-          </Badge>
-        ) : connection?.status === 'disconnected' ? (
-          <Badge variant="outline" className="text-muted-foreground">
-            <Plug size={14} className="mr-1" />
-            Ontkoppeld
-          </Badge>
-        ) : connection?.status === 'error' ? (
-          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">
-            <Warning size={14} weight="fill" className="mr-1" />
-            Fout
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="text-muted-foreground">Niet verbonden</Badge>
-        )}
+        <div className="self-start sm:self-auto shrink-0">
+          {isConnected ? (
+            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">
+              <CheckCircle size={14} weight="fill" className="mr-1" />
+              Verbonden
+            </Badge>
+          ) : connection?.status === 'disconnected' ? (
+            <Badge variant="outline" className="text-muted-foreground text-xs">
+              <Plug size={14} className="mr-1" />
+              Ontkoppeld
+            </Badge>
+          ) : connection?.status === 'error' ? (
+            <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300 text-xs">
+              <Warning size={14} weight="fill" className="mr-1" />
+              Fout
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-muted-foreground text-xs">Niet verbonden</Badge>
+          )}
+        </div>
       </div>
 
-      {/* Connection info */}
+      {/* Feature chips — shown when not connected to show value */}
+      {!isConnected && (
+        <div className="flex flex-wrap gap-1.5">
+          {meta.features.map((f) => (
+            <span key={f} className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-[11px] text-muted-foreground">
+              {f}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Connection info — sync stats to show value */}
       {connection && isConnected && (
-        <div className="text-xs space-y-1 text-muted-foreground">
+        <div className="text-xs space-y-1.5 text-muted-foreground">
           {connection.shop_name && <p>Winkel: <span className="font-medium text-foreground">{connection.shop_name}</span></p>}
           {connection.last_sync_at && (
             <p className="flex items-center gap-1">
-              <Clock size={12} />
-              Laatste sync: {new Date(connection.last_sync_at).toLocaleString('nl-NL')}
-              {connection.last_sync_orders_count > 0 && ` (${connection.last_sync_orders_count} orders)`}
+              <Clock size={12} className="shrink-0" />
+              <span className="truncate">
+                Laatste sync: {new Date(connection.last_sync_at).toLocaleString('nl-NL')}
+                {connection.last_sync_orders_count > 0 && ` · ${connection.last_sync_orders_count} orders`}
+              </span>
+            </p>
+          )}
+          {!connection.last_sync_at && (
+            <p className="flex items-center gap-1 text-blue-600">
+              <ArrowsClockwise size={12} className="shrink-0" />
+              <span>{t('integrations.notSyncedYet')}</span>
             </p>
           )}
           {hasError && connection.last_sync_error && (
             <p className="text-red-600 flex items-center gap-1">
-              <Warning size={12} weight="fill" />
-              {connection.last_sync_error.slice(0, 100)}
+              <Warning size={12} weight="fill" className="shrink-0" />
+              <span className="truncate">{connection.last_sync_error.slice(0, 100)}</span>
             </p>
           )}
         </div>
       )}
 
-      {/* Actions */}
+      {/* Actions — wrapping on mobile */}
       <div className="flex flex-wrap gap-2">
         {isConnected ? (
           <>
-            <Button size="sm" variant="outline" onClick={onSync}>
-              <ArrowsClockwise size={16} className="mr-1" />
+            <Button size="sm" variant="outline" onClick={onSync} className="text-xs sm:text-sm">
+              <ArrowsClockwise size={16} className="mr-1 shrink-0" />
               Sync nu
             </Button>
-            <Button size="sm" variant="outline" onClick={onViewDetails}>
-              <CaretRight size={16} className="mr-1" />
+            <Button size="sm" variant="outline" onClick={onViewDetails} className="text-xs sm:text-sm">
+              <CaretRight size={16} className="mr-1 shrink-0" />
               Details
             </Button>
-            <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={onDisconnect}>
-              <Plug size={16} className="mr-1" />
+            <Button size="sm" variant="ghost" className="text-muted-foreground text-xs sm:text-sm" onClick={onDisconnect}>
+              <Plug size={16} className="mr-1 shrink-0" />
               Ontkoppelen
             </Button>
           </>
         ) : connection?.status === 'disconnected' ? (
-          <Button size="sm" onClick={onConnect}>
-            <ArrowCounterClockwise size={16} className="mr-1" />
+          <Button size="sm" onClick={onConnect} className="text-xs sm:text-sm">
+            <ArrowCounterClockwise size={16} className="mr-1 shrink-0" />
             Opnieuw verbinden
           </Button>
         ) : (
-          <Button size="sm" onClick={onConnect}>
-            <PlugsConnected size={16} className="mr-1" />
+          <Button size="sm" onClick={onConnect} className="text-xs sm:text-sm">
+            <PlugsConnected size={16} className="mr-1 shrink-0" />
             Verbinden
           </Button>
         )}
@@ -624,10 +780,10 @@ function ConnectionDetailPanel({
   })
 
   return (
-    <div className="rounded-lg border bg-card p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-lg">{providerName} — {connection.shop_name || connection.shop_url}</h3>
-        <Button variant="ghost" size="sm" onClick={onClose}>Sluiten</Button>
+    <div className="rounded-lg border bg-card p-4 sm:p-5 space-y-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <h3 className="font-semibold text-base sm:text-lg truncate">{providerName} — {connection.shop_name || connection.shop_url}</h3>
+        <Button variant="ghost" size="sm" onClick={onClose} className="self-start sm:self-auto shrink-0">Sluiten</Button>
       </div>
 
       {/* Tabs */}

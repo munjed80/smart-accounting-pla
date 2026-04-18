@@ -4,7 +4,7 @@
  * Review workspace for imported Shopify/WooCommerce orders and refunds.
  * Pro-plan gated. Lets the user review, approve, and post records.
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   salesReviewApi,
@@ -42,6 +42,10 @@ import {
   Funnel,
   CaretDown,
   CaretRight,
+  PlugsConnected,
+  NumberCircleOne,
+  NumberCircleTwo,
+  NumberCircleThree,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { t } from '@/i18n'
@@ -223,47 +227,80 @@ export const ZZPSalesReviewPage = () => {
   const mappings = mappingsQuery.data?.mappings ?? []
   const totalMappings = mappingsQuery.data?.total ?? 0
   const statusCounts = summaryQuery.data?.status_counts ?? {}
+  const totalFromSummary = summaryQuery.data?.total ?? 0
   const totalPages = Math.ceil(totalMappings / perPage)
-  const hasConnections = (connectionsQuery.data?.connections?.length ?? 0) > 0
+  const connections = connectionsQuery.data?.connections ?? []
+  const hasConnections = connections.length > 0
+
+  // Derive aggregate workflow progress for the progress bar
+  const progressData = useMemo(() => {
+    const pending = (statusCounts.new ?? 0) + (statusCounts.needs_review ?? 0)
+    const inReview = (statusCounts.mapped ?? 0)
+    const approved = (statusCounts.approved ?? 0)
+    const posted = (statusCounts.posted ?? 0)
+    const dismissed = (statusCounts.skipped ?? 0) + (statusCounts.duplicate ?? 0)
+    const errors = (statusCounts.error ?? 0)
+
+    return {
+      pending,
+      inReview,
+      approved,
+      posted,
+      dismissed,
+      errors,
+      total: totalFromSummary,
+      completionPct: totalFromSummary > 0 ? Math.round(((posted + dismissed) / totalFromSummary) * 100) : 0,
+      actionablePct: totalFromSummary > 0 ? Math.round(((pending) / totalFromSummary) * 100) : 0,
+    }
+  }, [statusCounts, totalFromSummary])
+
+  // Check if we're in a "filter shows no results" state vs. truly empty
+  const hasAnyRecords = totalFromSummary > 0
+  const isFilteredEmpty = hasAnyRecords && mappings.length === 0 && (statusFilter || typeFilter || providerFilter)
 
   // ============================================================================
   // Render
   // ============================================================================
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Receipt size={28} />
-            {t('salesReview.title')}
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header — mobile-friendly stacked layout */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+            <Receipt size={24} className="shrink-0 sm:hidden" />
+            <Receipt size={28} className="shrink-0 hidden sm:block" />
+            <span className="truncate">{t('salesReview.title')}</span>
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             {t('salesReview.description')}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
           <Button
             variant="outline"
             size="sm"
+            className="text-xs sm:text-sm"
             onClick={() => navigateTo('/zzp/integraties')}
           >
-            <Storefront size={16} className="mr-1" />
-            Integraties
+            <Storefront size={16} className="mr-1 shrink-0" />
+            <span className="hidden sm:inline">Integraties</span>
+            <span className="sm:hidden">Shop</span>
           </Button>
           <Button
             size="sm"
+            className="text-xs sm:text-sm"
             disabled={generateMutation.isPending || !hasConnections}
             onClick={() => generateMutation.mutate()}
           >
-            <ArrowsClockwise size={16} className={`mr-1 ${generateMutation.isPending ? 'animate-spin' : ''}`} />
-            {generateMutation.isPending ? t('salesReview.generating') : t('salesReview.generateMappings')}
+            <ArrowsClockwise size={16} className={`mr-1 shrink-0 ${generateMutation.isPending ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{generateMutation.isPending ? t('salesReview.generating') : t('salesReview.generateMappings')}</span>
+            <span className="sm:hidden">{generateMutation.isPending ? '...' : 'Genereer'}</span>
           </Button>
         </div>
       </div>
 
-      {/* Status summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+      {/* Status summary cards — responsive grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2">
         {(Object.keys(STATUS_CONFIG) as MappingReviewStatus[]).map((key) => {
           const cfg = STATUS_CONFIG[key]
           const count = statusCounts[key] ?? 0
@@ -272,50 +309,123 @@ export const ZZPSalesReviewPage = () => {
             <button
               key={key}
               onClick={() => { setStatusFilter(isActive ? '' : key); setPage(1) }}
-              className={`rounded-lg border p-2 text-center transition-colors text-xs
+              className={`rounded-lg border p-1.5 sm:p-2 text-center transition-colors text-xs
                 ${isActive ? 'ring-2 ring-primary border-primary' : 'hover:border-primary/40'}`}
             >
-              <div className="flex items-center justify-center gap-1 mb-1">
+              <div className="flex items-center justify-center gap-1 mb-0.5 sm:mb-1">
                 {cfg.icon}
-                <span className="font-medium">{cfg.label}</span>
+                <span className="font-medium truncate">{cfg.label}</span>
               </div>
-              <div className="text-lg font-bold">{count}</div>
+              <div className="text-base sm:text-lg font-bold">{count}</div>
             </button>
           )
         })}
       </div>
 
-      {/* Filters row */}
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={typeFilter}
-          onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }}
-          className="text-sm border rounded-md px-2 py-1.5"
-        >
-          <option value="">{t('salesReview.allTypes')}</option>
-          <option value="order">{t('salesReview.recordTypeOrder')}</option>
-          <option value="refund">{t('salesReview.recordTypeRefund')}</option>
-        </select>
+      {/* Workflow progress bar — shown when records exist */}
+      {hasAnyRecords && (
+        <div className="rounded-lg border bg-card p-3 sm:p-4 space-y-2">
+          <div className="flex items-center justify-between text-xs sm:text-sm">
+            <span className="text-muted-foreground">
+              Voortgang: <span className="font-semibold text-foreground">{progressData.completionPct}%</span> afgerond
+            </span>
+            <span className="text-muted-foreground">
+              {progressData.total} totaal
+              {progressData.pending > 0 && (
+                <> · <span className="text-amber-600 font-medium">{progressData.pending} te beoordelen</span></>
+              )}
+              {progressData.approved > 0 && (
+                <> · <span className="text-green-600 font-medium">{progressData.approved} klaar om te boeken</span></>
+              )}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden flex">
+            {/* Posted (completed) — green */}
+            {progressData.posted > 0 && (
+              <div
+                className="h-full bg-emerald-500 transition-all"
+                style={{ width: `${(progressData.posted / progressData.total) * 100}%` }}
+                title={`${progressData.posted} geboekt`}
+              />
+            )}
+            {/* Approved — light green */}
+            {progressData.approved > 0 && (
+              <div
+                className="h-full bg-green-400 transition-all"
+                style={{ width: `${(progressData.approved / progressData.total) * 100}%` }}
+                title={`${progressData.approved} goedgekeurd`}
+              />
+            )}
+            {/* Mapped/in-review — purple */}
+            {progressData.inReview > 0 && (
+              <div
+                className="h-full bg-purple-400 transition-all"
+                style={{ width: `${(progressData.inReview / progressData.total) * 100}%` }}
+                title={`${progressData.inReview} gemapped`}
+              />
+            )}
+            {/* Pending — amber */}
+            {progressData.pending > 0 && (
+              <div
+                className="h-full bg-amber-400 transition-all"
+                style={{ width: `${(progressData.pending / progressData.total) * 100}%` }}
+                title={`${progressData.pending} te beoordelen`}
+              />
+            )}
+            {/* Dismissed (skipped + duplicate) — gray */}
+            {progressData.dismissed > 0 && (
+              <div
+                className="h-full bg-gray-300 transition-all"
+                style={{ width: `${(progressData.dismissed / progressData.total) * 100}%` }}
+                title={`${progressData.dismissed} overgeslagen/duplicaat`}
+              />
+            )}
+            {/* Errors — red */}
+            {progressData.errors > 0 && (
+              <div
+                className="h-full bg-red-400 transition-all"
+                style={{ width: `${(progressData.errors / progressData.total) * 100}%` }}
+                title={`${progressData.errors} fouten`}
+              />
+            )}
+          </div>
+        </div>
+      )}
 
-        <select
-          value={providerFilter}
-          onChange={(e) => { setProviderFilter(e.target.value); setPage(1) }}
-          className="text-sm border rounded-md px-2 py-1.5"
-        >
-          <option value="">{t('salesReview.allProviders')}</option>
-          <option value="shopify">Shopify</option>
-          <option value="woocommerce">WooCommerce</option>
-        </select>
+      {/* Filters row — stacks on mobile */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex items-center gap-2">
+          <select
+            value={typeFilter}
+            onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }}
+            className="text-xs sm:text-sm border rounded-md px-2 py-1.5 bg-background"
+          >
+            <option value="">{t('salesReview.allTypes')}</option>
+            <option value="order">{t('salesReview.recordTypeOrder')}</option>
+            <option value="refund">{t('salesReview.recordTypeRefund')}</option>
+          </select>
+
+          <select
+            value={providerFilter}
+            onChange={(e) => { setProviderFilter(e.target.value); setPage(1) }}
+            className="text-xs sm:text-sm border rounded-md px-2 py-1.5 bg-background"
+          >
+            <option value="">{t('salesReview.allProviders')}</option>
+            <option value="shopify">Shopify</option>
+            <option value="woocommerce">WooCommerce</option>
+          </select>
+        </div>
 
         {/* Bulk actions when items selected */}
         {selected.size > 0 && (
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <span className="text-xs sm:text-sm text-muted-foreground">
               {selected.size} {t('salesReview.selected')}
             </span>
             <Button
               size="sm"
               variant="outline"
+              className="text-xs sm:text-sm"
               onClick={() => bulkActionMutation.mutate({ ids: Array.from(selected), action: 'approve' })}
               disabled={bulkActionMutation.isPending}
             >
@@ -325,6 +435,7 @@ export const ZZPSalesReviewPage = () => {
             <Button
               size="sm"
               variant="ghost"
+              className="text-xs sm:text-sm"
               onClick={() => bulkActionMutation.mutate({ ids: Array.from(selected), action: 'skip' })}
               disabled={bulkActionMutation.isPending}
             >
@@ -345,16 +456,26 @@ export const ZZPSalesReviewPage = () => {
         <div className="flex items-center justify-center py-16">
           <ArrowsClockwise size={24} className="animate-spin text-muted-foreground" />
         </div>
-      ) : mappings.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground space-y-3">
-          <ShoppingCart size={48} className="mx-auto opacity-50" />
-          <p>{t('salesReview.noMappings')}</p>
-          {hasConnections && (
-            <Button size="sm" onClick={() => generateMutation.mutate()}>
-              {t('salesReview.generateMappings')}
-            </Button>
-          )}
+      ) : isFilteredEmpty ? (
+        /* Filter returned no results but records exist */
+        <div className="text-center py-12 space-y-3">
+          <Funnel size={40} className="mx-auto text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">Geen records gevonden voor de huidige filters.</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setStatusFilter(''); setTypeFilter(''); setProviderFilter(''); setPage(1) }}
+          >
+            Filters wissen
+          </Button>
         </div>
+      ) : mappings.length === 0 ? (
+        <SmartEmptyState
+          hasConnections={hasConnections}
+          hasSyncedOrders={connections.some(c => c.last_sync_at != null)}
+          onGenerate={() => generateMutation.mutate()}
+          isGenerating={generateMutation.isPending}
+        />
       ) : (
         <div className="border rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
@@ -494,10 +615,10 @@ export const ZZPSalesReviewPage = () => {
         </div>
       )}
 
-      {/* Pagination */}
+      {/* Pagination — stacks on mobile */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-sm">
+          <span className="text-muted-foreground text-xs sm:text-sm">
             {totalMappings} {t('salesReview.totalRecords')}
           </span>
           <div className="flex items-center gap-2">
@@ -509,8 +630,8 @@ export const ZZPSalesReviewPage = () => {
             >
               Vorige
             </Button>
-            <span>
-              Pagina {page} van {totalPages}
+            <span className="text-xs sm:text-sm">
+              {page} / {totalPages}
             </span>
             <Button
               variant="outline"
@@ -701,6 +822,106 @@ export const ZZPSalesReviewPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+// ============================================================================
+// Smart Empty State — contextual guidance based on user's current situation
+// ============================================================================
+
+function SmartEmptyState({
+  hasConnections,
+  hasSyncedOrders,
+  onGenerate,
+  isGenerating,
+}: {
+  hasConnections: boolean
+  hasSyncedOrders: boolean
+  onGenerate: () => void
+  isGenerating: boolean
+}) {
+  // Determine which step the user is at
+  const currentStep = !hasConnections ? 1 : !hasSyncedOrders ? 2 : 3
+
+  return (
+    <div className="rounded-lg border border-dashed p-6 sm:p-10">
+      <div className="max-w-md mx-auto text-center space-y-5">
+        {/* Icon */}
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+          <Receipt size={28} className="text-muted-foreground" />
+        </div>
+
+        {/* Title & description based on step */}
+        <div className="space-y-2">
+          <h3 className="text-base sm:text-lg font-semibold">{t('salesReview.emptyTitle')}</h3>
+          <p className="text-sm text-muted-foreground">
+            {currentStep === 1 && t('salesReview.emptyNoConnection')}
+            {currentStep === 2 && t('salesReview.emptyNoSync')}
+            {currentStep === 3 && t('salesReview.emptyNoMappings')}
+          </p>
+        </div>
+
+        {/* Workflow steps */}
+        <div className="text-left space-y-2 mx-auto max-w-xs">
+          <StepIndicator
+            step={1}
+            label={t('salesReview.emptyStep1')}
+            status={currentStep > 1 ? 'done' : currentStep === 1 ? 'current' : 'pending'}
+          />
+          <StepIndicator
+            step={2}
+            label={t('salesReview.emptyStep2')}
+            status={currentStep > 2 ? 'done' : currentStep === 2 ? 'current' : 'pending'}
+          />
+          <StepIndicator
+            step={3}
+            label={t('salesReview.emptyStep3')}
+            status={currentStep === 3 ? 'current' : 'pending'}
+          />
+        </div>
+
+        {/* CTA based on step */}
+        <div className="pt-1">
+          {currentStep === 1 && (
+            <Button onClick={() => navigateTo('/zzp/integraties')}>
+              <PlugsConnected size={16} className="mr-1.5" />
+              Naar Integraties
+            </Button>
+          )}
+          {currentStep === 2 && (
+            <Button variant="outline" onClick={() => navigateTo('/zzp/integraties')}>
+              <ArrowsClockwise size={16} className="mr-1.5" />
+              Ga naar Integraties om te synchroniseren
+            </Button>
+          )}
+          {currentStep === 3 && (
+            <Button onClick={onGenerate} disabled={isGenerating}>
+              <ArrowsClockwise size={16} className={`mr-1.5 ${isGenerating ? 'animate-spin' : ''}`} />
+              {isGenerating ? t('salesReview.generating') : t('salesReview.generateMappings')}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StepIndicator({ step, label, status }: { step: number; label: string; status: 'done' | 'current' | 'pending' }) {
+  return (
+    <div className={`flex items-center gap-3 text-sm ${status === 'pending' ? 'text-muted-foreground/50' : ''}`}>
+      <div
+        className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold shrink-0 ${
+          status === 'done'
+            ? 'bg-green-600 text-white'
+            : status === 'current'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground'
+        }`}
+      >
+        {status === 'done' ? '✓' : step}
+      </div>
+      <span className={status === 'current' ? 'font-medium' : ''}>{label}</span>
     </div>
   )
 }

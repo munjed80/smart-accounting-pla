@@ -188,8 +188,8 @@ export const ZZPIntegrationsPage = () => {
             <div className="flex items-center gap-2 min-w-0">
               <CaretRight size={18} className="text-blue-700 shrink-0" />
               <div className="text-sm">
-                <span className="font-medium text-blue-900">Volgende stap: </span>
-                <span className="text-blue-800">Ga naar Webshop Boekingen om je geïmporteerde orders te controleren en te boeken.</span>
+                <span className="font-medium text-blue-900">{t('integrations.nextStepLabel')} </span>
+                <span className="text-blue-800">{t('integrations.nextStepDesc')}</span>
               </div>
             </div>
             <Button
@@ -437,7 +437,7 @@ function ProviderCard({ provider, connection, onConnect, onSync, onDisconnect, o
           {!connection.last_sync_at && (
             <p className="flex items-center gap-1 text-blue-600">
               <ArrowsClockwise size={12} className="shrink-0" />
-              <span>Nog niet gesynchroniseerd — klik op &quot;Sync nu&quot; om te starten</span>
+              <span>{t('integrations.notSyncedYet')}</span>
             </p>
           )}
           {hasError && connection.last_sync_error && (

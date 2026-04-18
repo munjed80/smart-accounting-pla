@@ -2726,9 +2726,12 @@ export const nl = {
     syncedRefundsCount: "restitutie(s) verwerkt",
     noConnectionsYet: "Nog geen webshop verbonden",
     noConnectionsDesc: "Koppel je Shopify of WooCommerce winkel om automatisch bestellingen, klanten en restitutie te importeren voor je boekhouding.",
+    notSyncedYet: "Nog niet gesynchroniseerd \u2014 klik op 'Sync nu' om te starten",
+    nextStepLabel: "Volgende stap:",
+    nextStepDesc: "Ga naar Webshop Boekingen om je geïmporteerde orders te controleren en te boeken.",
   },
 
-  // E-commerce Sales Review (Phase 2) — renamed to "Webshop Boekingen"
+  // E-commerce Sales Review (Phase 2) -- renamed to "Webshop Boekingen"
   salesReview: {
     title: "Webshop Boekingen",
     menuLabel: "Webshop Boekingen",

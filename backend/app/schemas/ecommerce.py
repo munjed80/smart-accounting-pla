@@ -185,3 +185,108 @@ class SyncTriggerResponse(BaseModel):
     customers_imported: int = 0
     refunds_imported: int = 0
     error: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 – Review & Mapping schemas
+# ---------------------------------------------------------------------------
+
+class MappingResponse(BaseModel):
+    """Response for a single ecommerce mapping record."""
+    id: UUID
+    administration_id: UUID
+    connection_id: UUID
+    order_id: Optional[UUID] = None
+    refund_id: Optional[UUID] = None
+    record_type: str = "order"
+    review_status: str = "new"
+    provider: str
+    external_ref: Optional[str] = None
+
+    # Mapped amounts
+    revenue_cents: int = 0
+    tax_cents: int = 0
+    shipping_cents: int = 0
+    discount_cents: int = 0
+    refund_cents: int = 0
+    net_amount_cents: int = 0
+
+    # VAT
+    vat_rate: Optional[float] = None
+    vat_amount_cents: int = 0
+    vat_status: str = "auto"
+
+    currency: str = "EUR"
+    accounting_date: Optional[str] = None
+    notes: Optional[str] = None
+
+    # Posting reference
+    posted_entity_type: Optional[str] = None
+    posted_entity_id: Optional[UUID] = None
+
+    # Audit
+    reviewed_by: Optional[UUID] = None
+    reviewed_at: Optional[datetime] = None
+    approved_by: Optional[UUID] = None
+    approved_at: Optional[datetime] = None
+    posted_by: Optional[UUID] = None
+    posted_at: Optional[datetime] = None
+
+    created_at: datetime
+    updated_at: datetime
+
+    # Denormalized source data for display
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    total_amount_cents: int = 0
+    ordered_at: Optional[datetime] = None
+    external_order_number: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MappingListResponse(BaseModel):
+    """Paginated list of mapping records."""
+    mappings: List[MappingResponse]
+    total: int
+    page: int
+    per_page: int
+    status_counts: dict = {}
+
+
+class MappingActionRequest(BaseModel):
+    """Request to perform an action on a mapping."""
+    action: str = Field(
+        ...,
+        description="Action: approve, post, skip, mark_duplicate, reset, needs_review",
+    )
+    notes: Optional[str] = Field(None, description="Optional notes")
+    vat_rate: Optional[float] = Field(None, description="Override VAT rate")
+    accounting_date: Optional[str] = Field(None, description="Override accounting date (YYYY-MM-DD)")
+
+
+class BulkMappingActionRequest(BaseModel):
+    """Request to perform an action on multiple mappings."""
+    mapping_ids: List[UUID] = Field(..., description="List of mapping IDs to act on")
+    action: str = Field(
+        ...,
+        description="Action: approve, post, skip, mark_duplicate, reset",
+    )
+    notes: Optional[str] = Field(None, description="Optional notes")
+
+
+class BulkMappingActionResponse(BaseModel):
+    """Response after a bulk action."""
+    processed: int = 0
+    skipped: int = 0
+    errors: int = 0
+    details: List[dict] = []
+
+
+class GenerateMappingsResponse(BaseModel):
+    """Response after generating mapping records from imported orders/refunds."""
+    created: int = 0
+    skipped_existing: int = 0
+    total_orders: int = 0
+    total_refunds: int = 0

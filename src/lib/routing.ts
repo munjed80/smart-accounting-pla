@@ -73,6 +73,8 @@ export const pathToTab = (path: string, isAccountant: boolean, isSuperAdmin = fa
       return 'data-import'
     case '/zzp/integraties':
       return 'integrations'
+    case '/zzp/verkoop-review':
+      return 'sales-review'
     case '/':
     default:
       return isSuperAdmin ? 'admin' : isAccountant ? 'workqueue' : 'dashboard'
@@ -145,6 +147,8 @@ export const tabToPath = (tab: string, isAccountant: boolean, isSuperAdmin = fal
       return '/zzp/importeren'
     case 'integrations':
       return '/zzp/integraties'
+    case 'sales-review':
+      return '/zzp/verkoop-review'
     default:
       return isSuperAdmin ? '/admin' : isAccountant ? '/accountant' : '/dashboard'
   }

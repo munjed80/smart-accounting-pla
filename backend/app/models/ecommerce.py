@@ -3,15 +3,16 @@ E-commerce Integration Models
 
 SQLAlchemy models for e-commerce integrations (Shopify, WooCommerce).
 Phase 1: connection management, imported orders/customers/refunds, sync logs.
+Phase 2: review-and-map workflow (EcommerceMapping).
 """
 import uuid
 import enum
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import (
-    String, DateTime, Integer, Boolean, Text, Numeric,
+    String, DateTime, Date, Integer, Boolean, Text, Numeric,
     ForeignKey, Enum as SQLEnum, func, UniqueConstraint, Index,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -51,6 +52,17 @@ class EcommerceOrderStatus(str, enum.Enum):
     PARTIALLY_REFUNDED = "partially_refunded"
     CANCELLED = "cancelled"
     CLOSED = "closed"
+
+
+class MappingReviewStatus(str, enum.Enum):
+    NEW = "new"
+    NEEDS_REVIEW = "needs_review"
+    MAPPED = "mapped"
+    APPROVED = "approved"
+    POSTED = "posted"
+    SKIPPED = "skipped"
+    DUPLICATE = "duplicate"
+    ERROR = "error"
 
 
 # ---------------------------------------------------------------------------
@@ -320,4 +332,112 @@ class EcommerceSyncLog(Base):
 
     __table_args__ = (
         Index("ix_ecommerce_sync_logs_conn_started", "connection_id", "started_at"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# EcommerceMapping – Phase 2 review-and-map intermediate layer
+# ---------------------------------------------------------------------------
+
+class EcommerceMapping(Base):
+    """
+    Phase 2 review-and-map layer.
+
+    Each row maps one imported order or refund into accounting-ready data.
+    The user reviews, approves, and posts records through this table.
+
+    Duplicate safety: unique constraints on order_id and refund_id prevent
+    creating multiple mappings for the same source record.
+    """
+    __tablename__ = "ecommerce_mappings"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+    )
+    administration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("administrations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    connection_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("ecommerce_connections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # Source record – exactly one of these is set
+    order_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("ecommerce_orders.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    refund_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("ecommerce_refunds.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
+    record_type: Mapped[str] = mapped_column(String(20), nullable=False, default="order")
+
+    # Review workflow status
+    review_status: Mapped[MappingReviewStatus] = mapped_column(
+        SQLEnum(MappingReviewStatus, values_callable=lambda e: [x.value for x in e]),
+        nullable=False,
+        default=MappingReviewStatus.NEW,
+        index=True,
+    )
+
+    provider: Mapped[str] = mapped_column(String(30), nullable=False)
+    external_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Mapped accounting amounts (all in cents)
+    revenue_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    tax_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    shipping_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    discount_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    refund_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    net_amount_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # VAT handling
+    vat_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
+    vat_amount_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # auto = derived from source, manual = user-overridden, unknown = insufficient data
+    vat_status: Mapped[str] = mapped_column(String(30), nullable=False, default="auto")
+
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
+    accounting_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Duplicate-safe posting reference: what was created in accounting
+    posted_entity_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    posted_entity_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+
+    # Audit trail
+    reviewed_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    posted_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    posted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False,
+    )
+
+    # Relationships
+    connection = relationship("EcommerceConnection")
+    order = relationship("EcommerceOrder")
+    refund = relationship("EcommerceRefund")
+
+    __table_args__ = (
+        UniqueConstraint("order_id", name="uq_ecommerce_mapping_order"),
+        UniqueConstraint("refund_id", name="uq_ecommerce_mapping_refund"),
+        Index("ix_ecommerce_mappings_admin_status", "administration_id", "review_status"),
     )

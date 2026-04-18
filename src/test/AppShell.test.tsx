@@ -6,6 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import React from 'react'
 import { AppShell } from '../components/AppShell'
 import * as AuthContext from '../lib/AuthContext'
 import * as ActiveClientContext from '../lib/ActiveClientContext'
@@ -60,9 +62,21 @@ vi.mock('../lib/api', () => ({
   getApiBaseUrl: vi.fn(() => 'http://localhost:8000/api/v1'),
   subscribeApiOfflineStatus: vi.fn(() => () => undefined),
   retryLastFailedApiRequest: vi.fn(async () => false),
+  salesReviewApi: {
+    getSummary: vi.fn(async () => ({ total: 0, status_counts: {} })),
+  },
 }))
 
 describe('AppShell - ZZP Menu', () => {
+  function createWrapper() {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    return ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     
@@ -94,7 +108,8 @@ describe('AppShell - ZZP Menu', () => {
     render(
       <AppShell activeTab="dashboard">
         <div>Test Content</div>
-      </AppShell>
+      </AppShell>,
+      { wrapper: createWrapper() }
     )
 
     // Check that Overzicht appears in the menu
@@ -106,7 +121,8 @@ describe('AppShell - ZZP Menu', () => {
     render(
       <AppShell activeTab="dashboard">
         <div>Test Content</div>
-      </AppShell>
+      </AppShell>,
+      { wrapper: createWrapper() }
     )
 
     // Check that all menu items are present
@@ -125,7 +141,8 @@ describe('AppShell - ZZP Menu', () => {
     render(
       <AppShell activeTab="dashboard">
         <div>Test Content</div>
-      </AppShell>
+      </AppShell>,
+      { wrapper: createWrapper() }
     )
 
     // Verify ZZP user does not see accountant items

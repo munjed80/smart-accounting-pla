@@ -51,6 +51,7 @@ import {
   ChartPie,
   UploadSimple,
   PlugsConnected,
+  ShoppingCart,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
 import { getBrandName } from '@/lib/roles'
@@ -274,6 +275,13 @@ const menuItems: MenuItem[] = [
     label: t('integrations.menuLabel'),
     tabValue: 'integrations',
     icon: <PlugsConnected size={20} weight="duotone" />,
+    rolesAllowed: ['zzp'],
+    section: 'main',
+  },
+  {
+    label: t('salesReview.menuLabel'),
+    tabValue: 'sales-review',
+    icon: <ShoppingCart size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',
   },

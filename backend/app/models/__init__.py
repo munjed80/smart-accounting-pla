@@ -89,6 +89,8 @@ from app.models.ecommerce import (
     ConnectionStatus,
     SyncStatus,
     EcommerceOrderStatus,
+    EcommerceMapping,
+    MappingReviewStatus,
 )
 from app.models.work_queue import (
     ClientReadinessCache,
@@ -212,4 +214,6 @@ __all__ = [
     "ConnectionStatus",
     "SyncStatus",
     "EcommerceOrderStatus",
+    "EcommerceMapping",
+    "MappingReviewStatus",
 ]

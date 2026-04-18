@@ -46,6 +46,7 @@ import { BelastinghulpUitlegPage } from '@/components/BelastinghulpUitlegPage'
 import { BelastinghulpJaaroverzichtPage } from '@/components/BelastinghulpJaaroverzichtPage'
 import { DataImportPage } from '@/components/DataImportPage'
 import { ZZPIntegrationsPage } from '@/components/ZZPIntegrationsPage'
+import { ZZPSalesReviewPage } from '@/components/ZZPSalesReviewPage'
 import { ClientDossierPage } from '@/components/ClientDossierPage'
 import { BulkOperationsHistoryPage } from '@/components/BulkOperationsHistoryPage'
 import { BankReconciliationPage } from '@/components/BankReconciliationPage'
@@ -785,6 +786,8 @@ const AppContent = () => {
         return !isAccountant ? <DataImportPage /> : <SmartDashboard />
       case 'integrations':
         return isZzp ? <ZZPIntegrationsPage /> : <SmartDashboard />
+      case 'sales-review':
+        return isZzp ? <ZZPSalesReviewPage /> : <SmartDashboard />
       case 'dashboard':
         return <SmartDashboard />
       case 'transactions':
@@ -831,6 +834,7 @@ const AppContent = () => {
       case 'tax-annual': return 'Jaaroverzicht'
       case 'data-import': return 'Data importeren'
       case 'integrations': return 'Integraties'
+      case 'sales-review': return 'Verkoop Review'
       case 'dashboard': return 'Overzicht'
       case 'transactions': return 'Transacties'
       case 'upload': return 'Upload'

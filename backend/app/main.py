@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.core.database import engine
-from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta, zzp_customers, zzp_profile, zzp_invoices, zzp_expenses, zzp_time, zzp_calendar, zzp_work_sessions, zzp_bank, zzp_insights, zzp_quotes, zzp_dashboard, bookkeeping, client_data, zzp_payments, zzp_ledger, zzp_commitments, certificates, subscriptions, webhooks, contact_messages, zzp_documents, push, zzp_btw, zzp_income_tax, invoice_sharing, zzp_import, zzp_integrations
+from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta, zzp_customers, zzp_profile, zzp_invoices, zzp_expenses, zzp_time, zzp_calendar, zzp_work_sessions, zzp_bank, zzp_insights, zzp_quotes, zzp_dashboard, bookkeeping, client_data, zzp_payments, zzp_ledger, zzp_commitments, certificates, subscriptions, webhooks, contact_messages, zzp_documents, push, zzp_btw, zzp_income_tax, invoice_sharing, zzp_import, zzp_integrations, zzp_ecommerce_review
 logger = logging.getLogger(__name__)
 
 
@@ -351,6 +351,7 @@ api_v1_router.include_router(zzp_btw.router, prefix="/zzp", tags=["zzp-btw-aangi
 api_v1_router.include_router(zzp_income_tax.router, prefix="/zzp", tags=["zzp-income-tax"], dependencies=_zzp_paywall_deps)
 api_v1_router.include_router(zzp_import.router, prefix="/zzp", tags=["zzp-csv-import"], dependencies=_zzp_paywall_deps)
 api_v1_router.include_router(zzp_integrations.router, prefix="/zzp", tags=["zzp-ecommerce-integrations"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_ecommerce_review.router, prefix="/zzp", tags=["zzp-ecommerce-sales-review"], dependencies=_zzp_paywall_deps)
 api_v1_router.include_router(invoice_sharing.authenticated_router, prefix="/zzp", tags=["zzp-invoice-sharing"], dependencies=_zzp_paywall_deps)
 api_v1_router.include_router(invoice_sharing.public_router, prefix="", tags=["public-invoice-sharing"])
 api_v1_router.include_router(subscriptions.router, prefix="", tags=["subscriptions"])

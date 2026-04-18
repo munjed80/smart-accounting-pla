@@ -2705,6 +2705,69 @@ export const nl = {
     proRequired: "Pro-abonnement vereist",
     proRequiredDescription: "E-commerce integraties zoals Shopify en WooCommerce zijn beschikbaar met het Pro-abonnement. Upgrade om je webshop te koppelen.",
   },
+
+  // E-commerce Sales Review (Phase 2)
+  salesReview: {
+    title: "Verkoop Review",
+    menuLabel: "Verkoop Review",
+    description: "Beoordeel en boek geïmporteerde webshopbestellingen en restitutie.",
+    generateMappings: "Genereer mappings",
+    generating: "Bezig met genereren...",
+    generateSuccess: "Mappings gegenereerd",
+    noMappings: "Geen records gevonden. Synchroniseer eerst je webshop en genereer mappings.",
+    proRequired: "Pro-abonnement vereist",
+    // Status labels
+    statusNew: "Nieuw",
+    statusNeedsReview: "Controle nodig",
+    statusMapped: "Gemapped",
+    statusApproved: "Goedgekeurd",
+    statusPosted: "Geboekt",
+    statusSkipped: "Overgeslagen",
+    statusDuplicate: "Duplicaat",
+    statusError: "Fout",
+    // Actions
+    actionApprove: "Goedkeuren",
+    actionPost: "Boeken",
+    actionSkip: "Overslaan",
+    actionMarkDuplicate: "Markeer als duplicaat",
+    actionReset: "Terugzetten",
+    actionNeedsReview: "Controle nodig",
+    // Table headers
+    orderNumber: "Bestelnummer",
+    customer: "Klant",
+    amount: "Bedrag",
+    tax: "BTW",
+    shipping: "Verzending",
+    discount: "Korting",
+    refundAmount: "Restitutie",
+    netAmount: "Nettobedrag",
+    vatRate: "BTW-tarief",
+    vatStatus: "BTW-status",
+    date: "Datum",
+    provider: "Platform",
+    status: "Status",
+    recordType: "Type",
+    recordTypeOrder: "Bestelling",
+    recordTypeRefund: "Restitutie",
+    // VAT status labels
+    vatStatusAuto: "Automatisch",
+    vatStatusManual: "Handmatig",
+    vatStatusUnknown: "Onbekend",
+    vatStatusNeedsReview: "Controle nodig",
+    // Filter
+    allStatuses: "Alle statussen",
+    allProviders: "Alle platforms",
+    allTypes: "Alle typen",
+    // Bulk
+    bulkApprove: "Selectie goedkeuren",
+    bulkSkip: "Selectie overslaan",
+    selected: "geselecteerd",
+    // Summary
+    totalRecords: "Totaal records",
+    // VAT notice
+    vatNotice: "BTW wordt automatisch afgeleid uit de brondata. Bij onbekend tarief wordt handmatige controle gevraagd.",
+    vatManualOverride: "BTW handmatig aanpassen",
+  },
 };
 
 /**

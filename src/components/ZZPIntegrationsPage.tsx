@@ -43,6 +43,7 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { t } from '@/i18n'
+import { navigateTo } from '@/lib/navigation'
 
 // ============================================================================
 // Types
@@ -95,9 +96,21 @@ export const ZZPIntegrationsPage = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t('integrations.title')}</h1>
-        <p className="text-muted-foreground mt-1">{t('integrations.description')}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{t('integrations.title')}</h1>
+          <p className="text-muted-foreground mt-1">{t('integrations.description')}</p>
+        </div>
+        {connections.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigateTo('/zzp/verkoop-review')}
+          >
+            <CaretRight size={16} className="mr-1" />
+            Verkoop Review
+          </Button>
+        )}
       </div>
 
       {/* Provider cards */}

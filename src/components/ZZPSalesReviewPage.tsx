@@ -240,7 +240,6 @@ export const ZZPSalesReviewPage = () => {
     const posted = (statusCounts.posted ?? 0)
     const dismissed = (statusCounts.skipped ?? 0) + (statusCounts.duplicate ?? 0)
     const errors = (statusCounts.error ?? 0)
-    const total = totalFromSummary || 1 // avoid divide by zero
 
     return {
       pending,
@@ -250,8 +249,8 @@ export const ZZPSalesReviewPage = () => {
       dismissed,
       errors,
       total: totalFromSummary,
-      completionPct: totalFromSummary > 0 ? Math.round(((posted + dismissed) / total) * 100) : 0,
-      actionablePct: totalFromSummary > 0 ? Math.round(((pending) / total) * 100) : 0,
+      completionPct: totalFromSummary > 0 ? Math.round(((posted + dismissed) / totalFromSummary) * 100) : 0,
+      actionablePct: totalFromSummary > 0 ? Math.round(((pending) / totalFromSummary) * 100) : 0,
     }
   }, [statusCounts, totalFromSummary])
 

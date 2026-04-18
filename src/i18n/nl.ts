@@ -2699,23 +2699,53 @@ export const nl = {
 
   // E-commerce integrations
   integrations: {
-    title: "Integraties",
+    title: "Webshop Integraties",
     menuLabel: "Integraties",
     description: "Koppel je webshop en importeer bestellingen, klanten en restitutie automatisch.",
     proRequired: "Pro-abonnement vereist",
     proRequiredDescription: "E-commerce integraties zoals Shopify en WooCommerce zijn beschikbaar met het Pro-abonnement. Upgrade om je webshop te koppelen.",
+    // Workflow steps
+    workflowStep1: "Webshop koppelen",
+    workflowStep1Desc: "Verbind Shopify of WooCommerce",
+    workflowStep2: "Synchroniseren",
+    workflowStep2Desc: "Bestellingen en klanten importeren",
+    workflowStep3: "Controleren",
+    workflowStep3Desc: "Orders nakijken en goedkeuren",
+    workflowStep4: "Boeken",
+    workflowStep4Desc: "Goedgekeurde orders verwerken",
+    // Feature benefits
+    benefitOrders: "Bestellingen automatisch importeren",
+    benefitCustomers: "Klantgegevens synchroniseren",
+    benefitRefunds: "Restitutie bijhouden",
+    benefitVat: "BTW automatisch berekenen",
+    benefitBookkeeping: "Klaar voor boekhouding",
+    // CTA
+    goToReview: "Naar Webshop Boekingen",
+    syncedOrdersCount: "bestellingen geïmporteerd",
+    syncedCustomersCount: "klanten gesynchroniseerd",
+    syncedRefundsCount: "restitutie(s) verwerkt",
+    noConnectionsYet: "Nog geen webshop verbonden",
+    noConnectionsDesc: "Koppel je Shopify of WooCommerce winkel om automatisch bestellingen, klanten en restitutie te importeren voor je boekhouding.",
   },
 
-  // E-commerce Sales Review (Phase 2)
+  // E-commerce Sales Review (Phase 2) — renamed to "Webshop Boekingen"
   salesReview: {
-    title: "Verkoop Review",
-    menuLabel: "Verkoop Review",
-    description: "Beoordeel en boek geïmporteerde webshopbestellingen en restitutie.",
-    generateMappings: "Genereer mappings",
+    title: "Webshop Boekingen",
+    menuLabel: "Webshop Boekingen",
+    description: "Controleer en boek geïmporteerde webshopbestellingen en restitutie.",
+    generateMappings: "Boekingen genereren",
     generating: "Bezig met genereren...",
-    generateSuccess: "Mappings gegenereerd",
-    noMappings: "Geen records gevonden. Synchroniseer eerst je webshop en genereer mappings.",
+    generateSuccess: "Boekingen gegenereerd",
+    noMappings: "Geen records gevonden. Synchroniseer eerst je webshop en genereer boekingen.",
     proRequired: "Pro-abonnement vereist",
+    // Empty state
+    emptyTitle: "Nog geen webshop boekingen",
+    emptyNoConnection: "Je hebt nog geen webshop verbonden. Koppel eerst je Shopify of WooCommerce winkel via Integraties.",
+    emptyNoSync: "Je webshop is gekoppeld maar er zijn nog geen orders gesynchroniseerd. Ga naar Integraties en klik op 'Sync nu'.",
+    emptyNoMappings: "Er zijn orders geïmporteerd maar er zijn nog geen boekingen gegenereerd. Klik hieronder om te starten.",
+    emptyStep1: "Webshop koppelen via Integraties",
+    emptyStep2: "Orders synchroniseren",
+    emptyStep3: "Boekingen genereren en controleren",
     // Status labels
     statusNew: "Nieuw",
     statusNeedsReview: "Controle nodig",

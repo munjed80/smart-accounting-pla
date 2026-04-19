@@ -572,6 +572,9 @@ const InvoiceFormDialog = ({
     if (isEdit && !invoiceNumber.trim()) {
       setInvoiceNumberError(t('zzpInvoices.formInvoiceNumberRequired'))
       hasError = true
+    } else if (isEdit && invoiceNumber.trim().length > 50) {
+      setInvoiceNumberError(t('zzpInvoices.formInvoiceNumberTooLong'))
+      hasError = true
     }
 
     // Validate date

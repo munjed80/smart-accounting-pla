@@ -481,8 +481,8 @@ async def update_invoice(
     if invoice.status == InvoiceStatus.CANCELLED.value:
         invoice.status = InvoiceStatus.DRAFT.value
 
-    # Update invoice number if provided
-    if invoice_in.invoice_number is not None and invoice_in.invoice_number != invoice.invoice_number:
+    # Update invoice number if provided and different from the current one
+    if invoice_in.invoice_number is not None and invoice_in.invoice_number != (invoice.invoice_number or ''):
         # Enforce uniqueness within this administration
         conflict_result = await db.execute(
             select(ZZPInvoice.id).where(

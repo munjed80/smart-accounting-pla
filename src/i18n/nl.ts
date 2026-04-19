@@ -647,6 +647,7 @@ export const nl = {
     formInvoiceNumber: "Factuurnummer",
     formInvoiceNumberPlaceholder: "Bijv. INV-2026-0001",
     formInvoiceNumberRequired: "Factuurnummer is verplicht",
+    formInvoiceNumberTooLong: "Factuurnummer mag maximaal 50 tekens bevatten",
     formInvoiceNumberTaken: "Dit factuurnummer is al in gebruik",
     formDate: "Datum",
     formDateRequired: "Datum is verplicht",

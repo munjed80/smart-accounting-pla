@@ -237,11 +237,24 @@ class InvoiceCreate(BaseModel):
 class InvoiceUpdate(BaseModel):
     """Update an invoice."""
     customer_id: Optional[UUID] = Field(None, description="Customer ID")
+    invoice_number: Optional[str] = Field(None, description="Invoice number (must be unique per administration)")
     issue_date: Optional[str] = Field(None, description="Issue date (ISO 8601)")
     due_date: Optional[str] = Field(None, description="Due date (ISO 8601)")
     notes: Optional[str] = Field(None, description="Invoice notes")
     lines: Optional[List[InvoiceLineCreate]] = Field(None, description="Invoice lines")
-    
+
+    @field_validator('invoice_number')
+    @classmethod
+    def validate_invoice_number(cls, v):
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            raise ValueError("Invoice number cannot be empty")
+        if len(v) > 50:
+            raise ValueError("Invoice number must be 50 characters or fewer")
+        return v
+
     @field_validator('issue_date', 'due_date')
     @classmethod
     def validate_date(cls, v):

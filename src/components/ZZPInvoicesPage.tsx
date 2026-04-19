@@ -375,6 +375,7 @@ const InvoiceFormDialog = ({
 }) => {
   const isEdit = !!invoice
   const [customerId, setCustomerId] = useState('')
+  const [invoiceNumber, setInvoiceNumber] = useState('')
   const [issueDate, setIssueDate] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [notes, setNotes] = useState('')
@@ -385,6 +386,7 @@ const InvoiceFormDialog = ({
   
   // Validation errors
   const [customerError, setCustomerError] = useState('')
+  const [invoiceNumberError, setInvoiceNumberError] = useState('')
   const [dateError, setDateError] = useState('')
   const [linesError, setLinesError] = useState('')
 
@@ -399,6 +401,7 @@ const InvoiceFormDialog = ({
     if (open) {
       if (invoice) {
         setCustomerId(invoice.customer_id)
+        setInvoiceNumber(invoice.invoice_number)
         setIssueDate(extractDatePart(invoice.issue_date))
         setDueDate(extractDatePart(invoice.due_date))
         setNotes(invoice.notes || '')
@@ -417,12 +420,14 @@ const InvoiceFormDialog = ({
       } else {
         // New invoice - use pre-selected customer if available
         setCustomerId(preSelectedCustomerId || '')
+        setInvoiceNumber('')
         setIssueDate(extractDatePart(new Date().toISOString()))
         setDueDate('')
         setNotes('')
         setLines([createEmptyLine()])
       }
       setCustomerError('')
+      setInvoiceNumberError('')
       setDateError('')
       setLinesError('')
       setIsSubmitting(false)
@@ -563,6 +568,15 @@ const InvoiceFormDialog = ({
       hasError = true
     }
 
+    // Validate invoice number (required when editing)
+    if (isEdit && !invoiceNumber.trim()) {
+      setInvoiceNumberError(t('zzpInvoices.formInvoiceNumberRequired'))
+      hasError = true
+    } else if (isEdit && invoiceNumber.trim().length > 50) {
+      setInvoiceNumberError(t('zzpInvoices.formInvoiceNumberTooLong'))
+      hasError = true
+    }
+
     // Validate date
     if (!issueDate) {
       setDateError(t('zzpInvoices.formDateRequired'))
@@ -589,6 +603,7 @@ const InvoiceFormDialog = ({
         due_date: dueDate || undefined, // Already in YYYY-MM-DD format from input
         notes: notes.trim() || undefined,
         lines: validLines,
+        ...(isEdit && { invoice_number: invoiceNumber.trim() }),
       }
       await onSave(invoiceData, isEdit)
     } catch (err) {
@@ -692,6 +707,34 @@ const InvoiceFormDialog = ({
               </p>
             )}
           </div>
+
+          {/* Invoice Number field - only shown when editing */}
+          {isEdit && (
+            <div className="space-y-2">
+              <Label htmlFor="invoice-number" className="text-sm font-medium flex items-center gap-2">
+                <FileText size={14} className="text-muted-foreground" />
+                {t('zzpInvoices.formInvoiceNumber')} <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="invoice-number"
+                type="text"
+                value={invoiceNumber}
+                onChange={(e) => {
+                  setInvoiceNumber(e.target.value)
+                  setInvoiceNumberError('')
+                }}
+                placeholder={t('zzpInvoices.formInvoiceNumberPlaceholder')}
+                className={`h-11 font-mono ${invoiceNumberError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                disabled={formDisabled}
+              />
+              {invoiceNumberError && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <XCircle size={14} />
+                  {invoiceNumberError}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Date fields - two columns */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1730,6 +1773,7 @@ const ZZPInvoicesPageContent = () => {
         // Update existing (if cancelled, backend auto-restores to draft)
         await zzpApi.invoices.update(editingInvoice.id, {
           customer_id: data.customer_id,
+          invoice_number: data.invoice_number,
           issue_date: data.issue_date,
           due_date: data.due_date,
           notes: data.notes,

@@ -480,7 +480,24 @@ async def update_invoice(
     # Auto-restore cancelled invoices to draft before applying changes
     if invoice.status == InvoiceStatus.CANCELLED.value:
         invoice.status = InvoiceStatus.DRAFT.value
-    
+
+    # Update invoice number if provided and different from the current one
+    if invoice_in.invoice_number is not None and invoice_in.invoice_number != (invoice.invoice_number or ''):
+        # Enforce uniqueness within this administration
+        conflict_result = await db.execute(
+            select(ZZPInvoice.id).where(
+                ZZPInvoice.administration_id == administration.id,
+                ZZPInvoice.invoice_number == invoice_in.invoice_number,
+                ZZPInvoice.id != invoice.id,
+            )
+        )
+        if conflict_result.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "INVOICE_NUMBER_CONFLICT", "message": "Dit factuurnummer is al in gebruik binnen jouw administratie."}
+            )
+        invoice.invoice_number = invoice_in.invoice_number
+
     # Update basic fields
     if invoice_in.issue_date:
         invoice.issue_date = date.fromisoformat(invoice_in.issue_date)

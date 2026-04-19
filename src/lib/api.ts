@@ -4062,6 +4062,7 @@ export interface ZZPInvoice {
 
 export interface ZZPInvoiceCreate {
   customer_id: string
+  invoice_number?: string
   issue_date: string
   due_date?: string
   notes?: string
@@ -4070,6 +4071,7 @@ export interface ZZPInvoiceCreate {
 
 export interface ZZPInvoiceUpdate {
   customer_id?: string
+  invoice_number?: string
   issue_date?: string
   due_date?: string
   notes?: string

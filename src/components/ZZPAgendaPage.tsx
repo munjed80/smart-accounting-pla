@@ -79,6 +79,7 @@ import {
 import { useAuth } from '@/lib/AuthContext'
 import { zzpApi, ZZPCalendarEvent, ZZPCalendarEventCreate, ZZPCalendarEventUpdate } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
+import { NetworkError } from '@/lib/errors'
 import { t } from '@/i18n'
 import { toast } from 'sonner'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
@@ -793,7 +794,9 @@ export const ZZPAgendaPage = () => {
       setEvents(response.events)
     } catch (error) {
       console.error('Failed to load events:', error)
-      toast.error(parseApiError(error))
+      if (!(error instanceof NetworkError)) {
+        toast.error(parseApiError(error))
+      }
     } finally {
       setIsLoading(false)
     }
@@ -902,7 +905,10 @@ export const ZZPAgendaPage = () => {
       setIsDuplicating(false)
     } catch (error) {
       console.error('Failed to save event:', error)
-      toast.error(parseApiError(error))
+      // Skip duplicate toast for network errors — the offline banner already covers those.
+      if (!(error instanceof NetworkError)) {
+        toast.error(parseApiError(error))
+      }
     }
   }, [user?.id, editingEvent, isDuplicating, loadEvents])
 
@@ -914,7 +920,9 @@ export const ZZPAgendaPage = () => {
       await loadEvents()
     } catch (error) {
       console.error('Failed to delete event:', error)
-      toast.error(parseApiError(error))
+      if (!(error instanceof NetworkError)) {
+        toast.error(parseApiError(error))
+      }
     }
     setDeletingEvent(undefined)
   }, [user?.id, deletingEvent, loadEvents])

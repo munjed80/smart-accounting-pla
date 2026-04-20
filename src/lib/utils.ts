@@ -2,6 +2,7 @@ import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { toast } from 'sonner'
 import axios from 'axios'
+import { ApiHttpError, NetworkError } from './errors'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -91,7 +92,14 @@ export async function withToast<T>(
  * ```
  */
 export function parseApiError(error: unknown): string {
+  // Handle typed API errors from the interceptor (ApiHttpError, NetworkError, etc.)
+  // These are already parsed with user-friendly messages by the interceptor.
+  if (error instanceof ApiHttpError) {
+    return error.message
+  }
+
   // Handle Axios errors using the built-in type guard
+  // (Fallback for errors that bypass the interceptor)
   if (axios.isAxiosError(error)) {
     const status = error.response?.status
     const detail = error.response?.data?.detail

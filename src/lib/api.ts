@@ -268,32 +268,40 @@ const extractApiErrorInfo = (error: AxiosError): ApiErrorInfo => {
     undefined
 
   const errorCode = responseData?.detail?.code || responseData?.code
-  const backendMessage = responseData?.detail?.message || responseData?.detail || responseData?.message
+  const backendMessage = responseData?.detail?.message || (typeof responseData?.detail === 'string' ? responseData.detail : null) || responseData?.message
 
-  let message = backendMessage || error.message || 'Er is een onbekende fout opgetreden'
+  // Prefer the backend message when available — it contains specific, actionable info.
+  // Only fall back to generic Dutch messages when the backend didn't provide one.
+  let message: string
 
-  switch (statusCode) {
-    case 401:
-      message = 'Sessie verlopen, log opnieuw in'
-      break
-    case 402:
-      // For 402, prefer backend message_nl if provided
-      message = responseData?.message_nl || backendMessage || 'Abonnement vereist om deze functie te gebruiken'
-      break
-    case 403:
-      message = 'Geen rechten voor deze pagina'
-      break
-    case 404:
-      message = 'Endpoint ontbreekt (configuratie)'
-      break
-    case 500:
-    case 502:
-    case 503:
-    case 504:
-      message = 'Serverfout, probeer later'
-      break
-    default:
-      break
+  if (backendMessage) {
+    message = backendMessage
+  } else {
+    switch (statusCode) {
+      case 400:
+        message = 'Ongeldige gegevens. Controleer je invoer.'
+        break
+      case 401:
+        message = 'Sessie verlopen, log opnieuw in'
+        break
+      case 402:
+        message = responseData?.message_nl || 'Abonnement vereist om deze functie te gebruiken'
+        break
+      case 403:
+        message = 'Geen rechten voor deze actie'
+        break
+      case 404:
+        message = 'Het gevraagde item is niet gevonden.'
+        break
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        message = 'Serverfout, probeer later'
+        break
+      default:
+        message = error.message || 'Er is een onbekende fout opgetreden'
+    }
   }
 
   return { message, statusCode, correlationId, errorCode }
@@ -489,7 +497,11 @@ api.interceptors.response.use(
 
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
-    if (isOfflineError(error)) {
+    // Only show the offline banner for TRUE network errors (no response at all).
+    // Server-side errors (500, 503, 504) DO have a response with an error message —
+    // the catch handler should show that message, not a misleading "offline" banner.
+    const isTrueNetworkError = !error.response && error.message !== 'canceled'
+    if (isTrueNetworkError) {
       lastFailedRequest = originalRequest
       emitOfflineStatus({
         isOffline: true,

@@ -4,6 +4,7 @@ ZZP Calendar Events API Endpoints
 CRUD operations for ZZP calendar events with month view support.
 Supports recurring events (daily/weekly/monthly) with expansion.
 """
+import logging
 import calendar as cal_module
 from datetime import datetime, date, timedelta
 from typing import Annotated, Optional, List
@@ -11,6 +12,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, extract, and_, or_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -23,6 +25,11 @@ from app.schemas.zzp import (
     CalendarEventListResponse,
 )
 from app.api.v1.deps import CurrentUser, require_zzp
+
+logger = logging.getLogger(__name__)
+
+VALID_RECURRENCE_VALUES = {None, "none", "daily", "weekly", "monthly"}
+VALID_COLOR_VALUES = {None, "blue", "green", "red", "orange", "purple", "pink"}
 
 router = APIRouter()
 
@@ -278,8 +285,14 @@ async def create_calendar_event(
     administration = await get_user_administration(current_user.id, db)
     
     # Parse datetimes
-    start_dt = parse_datetime(event_in.start_datetime)
-    end_dt = parse_datetime(event_in.end_datetime)
+    try:
+        start_dt = parse_datetime(event_in.start_datetime)
+        end_dt = parse_datetime(event_in.end_datetime)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_DATETIME_FORMAT", "message": f"Ongeldige datum/tijd: {exc}"}
+        )
     
     # Validate end is after start
     if end_dt <= start_dt:
@@ -288,21 +301,54 @@ async def create_calendar_event(
             detail={"code": "INVALID_DATES", "message": "Eindtijd moet na begintijd liggen."}
         )
     
-    event = ZZPCalendarEvent(
-        administration_id=administration.id,
-        title=event_in.title,
-        start_datetime=start_dt,
-        end_datetime=end_dt,
-        location=event_in.location,
-        notes=event_in.notes,
-        recurrence=event_in.recurrence,
-        recurrence_end_date=date.fromisoformat(event_in.recurrence_end_date) if event_in.recurrence_end_date else None,
-        color=event_in.color,
-    )
+    # Validate recurrence value
+    if event_in.recurrence and event_in.recurrence not in VALID_RECURRENCE_VALUES:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_RECURRENCE", "message": f"Ongeldige herhaling: '{event_in.recurrence}'. Gebruik: daily, weekly, monthly of leeg."}
+        )
     
-    db.add(event)
-    await db.commit()
-    await db.refresh(event)
+    # Validate color value
+    if event_in.color and event_in.color not in VALID_COLOR_VALUES:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_COLOR", "message": f"Ongeldige kleur: '{event_in.color}'. Gebruik: blue, green, red, orange, purple, pink of leeg."}
+        )
+    
+    # Parse recurrence end date
+    recurrence_end = None
+    if event_in.recurrence_end_date:
+        try:
+            recurrence_end = date.fromisoformat(event_in.recurrence_end_date)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "INVALID_RECURRENCE_DATE", "message": f"Ongeldige einddatum herhaling: {exc}"}
+            )
+    
+    try:
+        event = ZZPCalendarEvent(
+            administration_id=administration.id,
+            title=event_in.title,
+            start_datetime=start_dt,
+            end_datetime=end_dt,
+            location=event_in.location,
+            notes=event_in.notes,
+            recurrence=event_in.recurrence,
+            recurrence_end_date=recurrence_end,
+            color=event_in.color,
+        )
+        
+        db.add(event)
+        await db.commit()
+        await db.refresh(event)
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error(f"Database error creating calendar event: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "DB_ERROR", "message": "Kon de afspraak niet opslaan. Probeer het opnieuw."}
+        )
     
     return event_to_response(event)
 
@@ -365,16 +411,34 @@ async def update_calendar_event(
             detail={"code": "EVENT_NOT_FOUND", "message": "Afspraak niet gevonden."}
         )
     
-    # Update fields
+    # Validate recurrence value if provided
     update_data = event_in.model_dump(exclude_unset=True)
+    if 'recurrence' in update_data and update_data['recurrence'] not in VALID_RECURRENCE_VALUES:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_RECURRENCE", "message": f"Ongeldige herhaling: '{update_data['recurrence']}'. Gebruik: daily, weekly, monthly of leeg."}
+        )
     
-    for field, value in update_data.items():
-        if field in ('start_datetime', 'end_datetime') and value:
-            setattr(event, field, parse_datetime(value))
-        elif field == 'recurrence_end_date' and value:
-            setattr(event, field, date.fromisoformat(value))
-        else:
-            setattr(event, field, value)
+    # Validate color value if provided
+    if 'color' in update_data and update_data['color'] not in VALID_COLOR_VALUES:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_COLOR", "message": f"Ongeldige kleur: '{update_data['color']}'. Gebruik: blue, green, red, orange, purple, pink of leeg."}
+        )
+    
+    try:
+        for field, value in update_data.items():
+            if field in ('start_datetime', 'end_datetime') and value:
+                setattr(event, field, parse_datetime(value))
+            elif field == 'recurrence_end_date' and value:
+                setattr(event, field, date.fromisoformat(value))
+            else:
+                setattr(event, field, value)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_FIELD_VALUE", "message": f"Ongeldige waarde: {exc}"}
+        )
     
     # Validate end is after start
     if event.end_datetime <= event.start_datetime:
@@ -383,8 +447,16 @@ async def update_calendar_event(
             detail={"code": "INVALID_DATES", "message": "Eindtijd moet na begintijd liggen."}
         )
     
-    await db.commit()
-    await db.refresh(event)
+    try:
+        await db.commit()
+        await db.refresh(event)
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error(f"Database error updating calendar event {event_id}: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "DB_ERROR", "message": "Kon de afspraak niet bijwerken. Probeer het opnieuw."}
+        )
     
     return event_to_response(event)
 
@@ -416,7 +488,15 @@ async def delete_calendar_event(
             detail={"code": "EVENT_NOT_FOUND", "message": "Afspraak niet gevonden."}
         )
     
-    await db.delete(event)
-    await db.commit()
+    try:
+        await db.delete(event)
+        await db.commit()
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error(f"Database error deleting calendar event {event_id}: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "DB_ERROR", "message": "Kon de afspraak niet verwijderen. Probeer het opnieuw."}
+        )
     
     return None

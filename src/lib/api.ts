@@ -564,7 +564,7 @@ api.interceptors.response.use(
           typedError = new NotFoundError(parsedError.message, metadata)
           break
         case 409:
-          typedError = new ValidationError(parsedError.message, metadata)
+          typedError = new ApiHttpError(parsedError.message, metadata)
           break
         case 422:
           typedError = new ValidationError(parsedError.message, metadata)

@@ -291,7 +291,7 @@ async def create_calendar_event(
     except (ValueError, TypeError) as exc:
         raise HTTPException(
             status_code=400,
-            detail={"code": "INVALID_DATETIME_FORMAT", "message": f"Ongeldige datum/tijd: {exc}"}
+            detail={"code": "INVALID_DATETIME_FORMAT", "message": "Ongeldige datum/tijd formaat. Gebruik ISO 8601 formaat."}
         )
     
     # Validate end is after start
@@ -323,7 +323,7 @@ async def create_calendar_event(
         except (ValueError, TypeError) as exc:
             raise HTTPException(
                 status_code=400,
-                detail={"code": "INVALID_RECURRENCE_DATE", "message": f"Ongeldige einddatum herhaling: {exc}"}
+                detail={"code": "INVALID_RECURRENCE_DATE", "message": "Ongeldige einddatum herhaling. Gebruik YYYY-MM-DD formaat."}
             )
     
     try:
@@ -437,7 +437,7 @@ async def update_calendar_event(
     except (ValueError, TypeError) as exc:
         raise HTTPException(
             status_code=400,
-            detail={"code": "INVALID_FIELD_VALUE", "message": f"Ongeldige waarde: {exc}"}
+            detail={"code": "INVALID_FIELD_VALUE", "message": "Ongeldige waarde in een van de velden. Controleer je invoer."}
         )
     
     # Validate end is after start

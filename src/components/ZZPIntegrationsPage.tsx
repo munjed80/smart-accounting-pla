@@ -334,7 +334,7 @@ export const ZZPIntegrationsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['ecommerce-connections'] })
     } catch (err: any) {
       toast.error('Synchronisatie mislukt', {
-        description: err?.response?.data?.detail || 'Onbekende fout',
+        description: err?.message || 'Onbekende fout',
       })
     }
   }
@@ -358,7 +358,7 @@ function ProUpgradePrompt() {
       toast.success('Abonnement geactiveerd')
     } catch (err: any) {
       toast.error('Activatie mislukt', {
-        description: err?.response?.data?.detail?.message || 'Er is een fout opgetreden.',
+        description: err?.message || 'Er is een fout opgetreden.',
       })
     } finally {
       setActivating(false)
@@ -568,9 +568,8 @@ function ShopifyConnectDialog({ open, onClose, onSuccess }: { open: boolean; onC
       toast.success('Shopify succesvol verbonden!')
       onSuccess()
     } catch (err: any) {
-      const detail = err?.response?.data?.detail
       toast.error('Verbinding mislukt', {
-        description: typeof detail === 'string' ? detail : detail?.message || 'Controleer je gegevens.',
+        description: err?.message || 'Controleer je gegevens.',
       })
     } finally {
       setLoading(false)
@@ -655,9 +654,8 @@ function WooCommerceConnectDialog({ open, onClose, onSuccess }: { open: boolean;
       toast.success('WooCommerce succesvol verbonden!')
       onSuccess()
     } catch (err: any) {
-      const detail = err?.response?.data?.detail
       toast.error('Verbinding mislukt', {
-        description: typeof detail === 'string' ? detail : detail?.message || 'Controleer je gegevens.',
+        description: err?.message || 'Controleer je gegevens.',
       })
     } finally {
       setLoading(false)

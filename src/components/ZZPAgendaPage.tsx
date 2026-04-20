@@ -109,7 +109,9 @@ const EVENT_COLORS: Record<string, { bg: string; border: string; dot: string; la
 // --- Helper Functions ---
 
 const formatDateTime = (isoString: string): string => {
+  if (!isoString) return '-'
   const date = new Date(isoString)
+  if (isNaN(date.getTime())) return '-'
   return date.toLocaleString('nl-NL', {
     day: 'numeric',
     month: 'short',
@@ -120,7 +122,9 @@ const formatDateTime = (isoString: string): string => {
 }
 
 const formatTime = (isoString: string): string => {
+  if (!isoString) return '-'
   const date = new Date(isoString)
+  if (isNaN(date.getTime())) return '-'
   return date.toLocaleTimeString('nl-NL', {
     hour: '2-digit',
     minute: '2-digit',
@@ -129,10 +133,12 @@ const formatTime = (isoString: string): string => {
 }
 
 const formatDateForInput = (date: Date): string => {
+  if (!date || isNaN(date.getTime())) return new Date().toISOString().split('T')[0]
   return date.toISOString().split('T')[0]
 }
 
 const formatTimeForInput = (date: Date): string => {
+  if (!date || isNaN(date.getTime())) return '09:00'
   return date.toTimeString().slice(0, 5)
 }
 
@@ -165,7 +171,11 @@ const getWeekStart = (date: Date): Date => {
 }
 
 const formatDuration = (startIso: string, endIso: string): string => {
-  const ms = new Date(endIso).getTime() - new Date(startIso).getTime()
+  if (!startIso || !endIso) return '-'
+  const startMs = new Date(endIso).getTime()
+  const endMs = new Date(startIso).getTime()
+  if (isNaN(startMs) || isNaN(endMs)) return '-'
+  const ms = startMs - endMs
   if (ms <= 0) return '0m'
   const totalMinutes = Math.round(ms / 60000)
   const hours = Math.floor(totalMinutes / 60)
@@ -176,9 +186,11 @@ const formatDuration = (startIso: string, endIso: string): string => {
 }
 
 const generateICS = (events: ZZPCalendarEvent[], label: string): string => {
-  const escape = (s: string) => s.replace(/[\\;,]/g, c => `\\${c}`).replace(/\n/g, '\\n')
+  const escape = (s: string) => (s || '').replace(/[\\;,]/g, c => `\\${c}`).replace(/\n/g, '\\n')
   const toICSDate = (iso: string) => {
+    if (!iso) return '19700101T000000Z'
     const d = new Date(iso)
+    if (isNaN(d.getTime())) return '19700101T000000Z'
     const pad = (n: number) => String(n).padStart(2, '0')
     return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`
   }
@@ -189,7 +201,9 @@ const generateICS = (events: ZZPCalendarEvent[], label: string): string => {
     `X-WR-CALNAME:${escape(label)}`,
     'CALSCALE:GREGORIAN',
   ]
-  events.forEach(ev => {
+  const safeEvents = Array.isArray(events) ? events : []
+  safeEvents.forEach(ev => {
+    if (!ev?.title || !ev?.start_datetime || !ev?.end_datetime) return
     lines.push(
       'BEGIN:VEVENT',
       `UID:${ev.id}@zzp-boekhouden`,
@@ -317,9 +331,9 @@ const EventFormDialog = ({
   useEffect(() => {
     if (open) {
       if (event) {
-        const start = new Date(event.start_datetime)
-        const end = new Date(event.end_datetime)
-        setTitle(event.title)
+        const start = event.start_datetime ? new Date(event.start_datetime) : new Date()
+        const end = event.end_datetime ? new Date(event.end_datetime) : new Date()
+        setTitle(event.title || '')
         setStartDate(formatDateForInput(start))
         setStartTime(formatTimeForInput(start))
         setEndDate(formatDateForInput(end))
@@ -373,6 +387,10 @@ const EventFormDialog = ({
         recurrence_end_date: (recurrence !== 'none' && recurrenceEndDate) ? recurrenceEndDate : null,
         color: color || null,
       })
+    } catch (error) {
+      // Error is already handled by the parent onSave handler (handleSaveEvent).
+      // Catch here to prevent unhandled promise rejection from crashing the page.
+      console.error('Event save failed:', error)
     } finally {
       setIsSubmitting(false)
     }
@@ -541,6 +559,7 @@ const EventCard = ({
   onDelete: () => void
   onDuplicate: () => void
 }) => {
+  if (!event) return null
   const colorKey = event.color
   const colorStyle = colorKey && EVENT_COLORS[colorKey]
   return (
@@ -553,7 +572,7 @@ const EventCard = ({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h4 className="font-semibold truncate">{event.title}</h4>
+                <h4 className="font-semibold truncate">{event.title || '-'}</h4>
                 {event.recurrence && event.recurrence !== 'none' && (
                   <ArrowsCounterClockwise size={14} className="text-muted-foreground flex-shrink-0" />
                 )}
@@ -611,7 +630,8 @@ const CalendarDayCell = ({
   onClick: () => void
   onDoubleClick: () => void
 }) => {
-  const eventCount = events.length
+  const safeEvents = Array.isArray(events) ? events : []
+  const eventCount = safeEvents.length
   return (
     <div className="relative group">
       <button
@@ -629,13 +649,13 @@ const CalendarDayCell = ({
         {eventCount > 0 && (
           <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
             {eventCount <= 3 ? (
-              events.map((ev, i) => (
+              safeEvents.map((ev, i) => (
                 <div key={i} className={`h-1.5 w-1.5 rounded-full ${getDotClass(ev.color)}`} />
               ))
             ) : (
               <>
-                <div className={`h-1.5 w-1.5 rounded-full ${getDotClass(events[0].color)}`} />
-                <div className={`h-1.5 w-1.5 rounded-full ${getDotClass(events[1].color)}`} />
+                <div className={`h-1.5 w-1.5 rounded-full ${getDotClass(safeEvents[0]?.color)}`} />
+                <div className={`h-1.5 w-1.5 rounded-full ${getDotClass(safeEvents[1]?.color)}`} />
                 <span className="text-[10px] text-primary font-medium">+{eventCount - 2}</span>
               </>
             )}
@@ -645,10 +665,10 @@ const CalendarDayCell = ({
       {eventCount > 0 && (
         <div className="hidden sm:block absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-1 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="bg-popover border border-border shadow-md rounded-md p-2 min-w-[140px] max-w-[200px] text-xs">
-            {events.slice(0, 3).map((ev, i) => (
+            {safeEvents.slice(0, 3).map((ev, i) => (
               <div key={i} className="flex items-center gap-1.5 py-0.5">
                 <div className={`h-2 w-2 rounded-full flex-shrink-0 ${getDotClass(ev.color)}`} />
-                <span className="truncate font-medium">{ev.title}</span>
+                <span className="truncate font-medium">{ev.title || '-'}</span>
               </div>
             ))}
             {eventCount > 3 && <div className="text-muted-foreground mt-1">+{eventCount - 3} meer</div>}
@@ -679,7 +699,8 @@ const WeekView = ({
     d.setDate(weekStart.getDate() + i)
     return d
   })
-  const eventsByDay = days.map(day => events.filter(ev => isSameDay(new Date(ev.start_datetime), day)))
+  const safeEvents = Array.isArray(events) ? events : []
+  const eventsByDay = days.map(day => safeEvents.filter(ev => ev?.start_datetime && isSameDay(new Date(ev.start_datetime), day)))
   const hourHeight = 48
 
   return (
@@ -714,8 +735,10 @@ const WeekView = ({
                 <div key={hour} className="absolute left-0 right-0 border-t border-border/20" style={{ top: (hour - WEEK_START_HOUR) * hourHeight }} />
               ))}
               {dayEvents.map((ev, evIdx) => {
+                if (!ev?.start_datetime || !ev?.end_datetime) return null
                 const start = new Date(ev.start_datetime)
                 const end = new Date(ev.end_datetime)
+                if (isNaN(start.getTime()) || isNaN(end.getTime())) return null
                 const startHour = start.getHours() + start.getMinutes() / 60
                 const endHour = end.getHours() + end.getMinutes() / 60
                 const clampedStart = Math.max(startHour, WEEK_START_HOUR)
@@ -745,7 +768,7 @@ export const ZZPAgendaPage = () => {
   const { user } = useAuth()
   const [events, setEvents] = useState<ZZPCalendarEvent[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const showLoading = useDelayedLoading(isLoading, 300, events.length > 0)
+  const showLoading = useDelayedLoading(isLoading, 300, Array.isArray(events) && events.length > 0)
 
   const [viewMode, setViewMode] = useState<'month' | 'week'>(() => {
     try { return (localStorage.getItem('zzpAgendaViewMode') as 'month' | 'week') || 'month' } catch { return 'month' }
@@ -791,7 +814,7 @@ export const ZZPAgendaPage = () => {
       } else {
         response = await zzpApi.calendarEvents.list({ year: viewYear, month: viewMonth + 1 })
       }
-      setEvents(response.events)
+      setEvents(Array.isArray(response.events) ? response.events : [])
     } catch (error) {
       console.error('Failed to load events:', error)
       if (!(error instanceof NetworkError)) {
@@ -806,8 +829,11 @@ export const ZZPAgendaPage = () => {
 
   const eventsByDay = useMemo(() => {
     const map = new Map<number, ZZPCalendarEvent[]>()
+    if (!Array.isArray(events)) return map
     events.forEach(event => {
+      if (!event?.start_datetime) return
       const eventDate = new Date(event.start_datetime)
+      if (isNaN(eventDate.getTime())) return
       if (eventDate.getMonth() === viewMonth && eventDate.getFullYear() === viewYear) {
         const day = eventDate.getDate()
         const existing = map.get(day) || []
@@ -819,18 +845,23 @@ export const ZZPAgendaPage = () => {
   }, [events, viewMonth, viewYear])
 
   const displayedEvents = useMemo(() => {
+    const safeEvents = Array.isArray(events) ? events : []
     let base: ZZPCalendarEvent[]
     if (selectedDate && selectedDate.getMonth() === viewMonth && selectedDate.getFullYear() === viewYear) {
-      base = events.filter(event => isSameDay(new Date(event.start_datetime), selectedDate))
+      base = safeEvents.filter(event => event?.start_datetime && isSameDay(new Date(event.start_datetime), selectedDate))
     } else {
-      base = [...events].sort((a, b) => new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime())
+      base = [...safeEvents].sort((a, b) => {
+        const aTime = a?.start_datetime ? new Date(a.start_datetime).getTime() : 0
+        const bTime = b?.start_datetime ? new Date(b.start_datetime).getTime() : 0
+        return aTime - bTime
+      })
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
       base = base.filter(ev =>
-        ev.title.toLowerCase().includes(q) ||
-        (ev.location || '').toLowerCase().includes(q) ||
-        (ev.notes || '').toLowerCase().includes(q)
+        (ev?.title || '').toLowerCase().includes(q) ||
+        (ev?.location || '').toLowerCase().includes(q) ||
+        (ev?.notes || '').toLowerCase().includes(q)
       )
     }
     return base
@@ -851,19 +882,27 @@ export const ZZPAgendaPage = () => {
   }, [viewYear, viewMonth])
 
   const summaryStats = useMemo(() => {
+    const safeEvents = Array.isArray(events) ? events : []
     const now = new Date()
-    const thisMonthEvents = events.filter(ev => {
+    const thisMonthEvents = safeEvents.filter(ev => {
+      if (!ev?.start_datetime) return false
       const d = new Date(ev.start_datetime)
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+      return !isNaN(d.getTime()) && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
     })
     const weekS = getWeekStart(now)
     const weekE = new Date(weekS); weekE.setDate(weekS.getDate() + 6)
-    const thisWeekEvents = events.filter(ev => {
-      const d = new Date(ev.start_datetime); return d >= weekS && d <= weekE
+    const thisWeekEvents = safeEvents.filter(ev => {
+      if (!ev?.start_datetime) return false
+      const d = new Date(ev.start_datetime)
+      return !isNaN(d.getTime()) && d >= weekS && d <= weekE
     })
-    const futureEvents = events.filter(ev => new Date(ev.start_datetime) >= now).sort((a, b) => new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime())
+    const futureEvents = safeEvents.filter(ev => {
+      if (!ev?.start_datetime) return false
+      const d = new Date(ev.start_datetime)
+      return !isNaN(d.getTime()) && d >= now
+    }).sort((a, b) => new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime())
     const nextEvent = futureEvents[0] || null
-    const nextEventDays = nextEvent ? Math.floor((new Date(nextEvent.start_datetime).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null
+    const nextEventDays = nextEvent ? Math.max(0, Math.floor((new Date(nextEvent.start_datetime).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) : null
     return { thisMonthCount: thisMonthEvents.length, thisWeekCount: thisWeekEvents.length, nextEvent, nextEventDays }
   }, [events])
 
@@ -899,16 +938,21 @@ export const ZZPAgendaPage = () => {
         await zzpApi.calendarEvents.create(data)
       }
       toast.success(t('zzpAgenda.eventSaved'))
-      await loadEvents()
+      // Close dialog and reset form state BEFORE reloading events,
+      // so the dialog doesn't stay open during the data fetch.
       setIsFormOpen(false)
       setEditingEvent(undefined)
       setIsDuplicating(false)
+      // Reload events in the background — errors are handled within loadEvents.
+      await loadEvents()
     } catch (error) {
       console.error('Failed to save event:', error)
       // Skip duplicate toast for network errors — the offline banner already covers those.
       if (!(error instanceof NetworkError)) {
         toast.error(parseApiError(error))
       }
+      // Re-throw so the EventFormDialog's catch block can log it too
+      throw error
     }
   }, [user?.id, editingEvent, isDuplicating, loadEvents])
 
@@ -917,14 +961,15 @@ export const ZZPAgendaPage = () => {
     try {
       await zzpApi.calendarEvents.delete(deletingEvent.id)
       toast.success(t('zzpAgenda.eventDeleted'))
+      setDeletingEvent(undefined)
       await loadEvents()
     } catch (error) {
       console.error('Failed to delete event:', error)
       if (!(error instanceof NetworkError)) {
         toast.error(parseApiError(error))
       }
+      setDeletingEvent(undefined)
     }
-    setDeletingEvent(undefined)
   }, [user?.id, deletingEvent, loadEvents])
 
   const openNewForm = useCallback((date?: Date) => {
@@ -942,8 +987,10 @@ export const ZZPAgendaPage = () => {
   }, [])
 
   const duplicateEvent = useCallback((event: ZZPCalendarEvent) => {
+    if (!event?.start_datetime || !event?.end_datetime) return
     const start = new Date(event.start_datetime); start.setDate(start.getDate() + 7)
     const end = new Date(event.end_datetime); end.setDate(end.getDate() + 7)
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return
     // Create a copy with shifted dates; treat as a new event (isDuplicating=true)
     const copy: ZZPCalendarEvent = { ...event, start_datetime: start.toISOString(), end_datetime: end.toISOString() }
     setEditingEvent(copy)
@@ -1058,7 +1105,7 @@ export const ZZPAgendaPage = () => {
         </div>
 
         {/* Summary Card */}
-        {!showLoading && events.length > 0 && (
+        {!showLoading && Array.isArray(events) && events.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
             <Card className="bg-card/80 backdrop-blur-sm">
               <CardContent className="p-3 sm:p-4">
@@ -1144,7 +1191,7 @@ export const ZZPAgendaPage = () => {
         )}
 
         {/* Events List */}
-        {showLoading ? <EventListLoadingSkeleton /> : events.length === 0 ? (
+        {showLoading ? <EventListLoadingSkeleton /> : !Array.isArray(events) || events.length === 0 ? (
           <EmptyState onAddEvent={() => openNewForm()} />
         ) : (
           <Card className="bg-card/80 backdrop-blur-sm" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>

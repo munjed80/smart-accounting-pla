@@ -891,10 +891,7 @@ export const ZZPAgendaPage = () => {
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
         const now = new Date()
-        setToday(prev => {
-          if (prev.getFullYear() === now.getFullYear() && prev.getMonth() === now.getMonth() && prev.getDate() === now.getDate()) return prev
-          return now
-        })
+        setToday(prev => isSameDay(prev, now) ? prev : now)
       }
     }
     document.addEventListener('visibilitychange', onVisibility)

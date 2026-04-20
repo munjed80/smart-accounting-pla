@@ -145,7 +145,7 @@ export const ZZPSalesReviewPage = () => {
       queryClient.invalidateQueries({ queryKey: ['sales-review-mappings'] })
       queryClient.invalidateQueries({ queryKey: ['sales-review-summary'] })
     },
-    onError: () => toast.error('Fout bij genereren van mappings'),
+    onError: (err: any) => toast.error(err?.message || 'Fout bij genereren van mappings'),
   })
 
   const actionMutation = useMutation({
@@ -172,7 +172,7 @@ export const ZZPSalesReviewPage = () => {
       queryClient.invalidateQueries({ queryKey: ['sales-review-mappings'] })
       queryClient.invalidateQueries({ queryKey: ['sales-review-summary'] })
     },
-    onError: () => toast.error('Bulk actie mislukt'),
+    onError: (err: any) => toast.error(err?.message || 'Bulk actie mislukt'),
   })
 
   const handleAction = useCallback((id: string, action: string, data?: { vat_rate?: number }) => {

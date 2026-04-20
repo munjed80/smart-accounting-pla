@@ -172,10 +172,10 @@ const getWeekStart = (date: Date): Date => {
 
 const formatDuration = (startIso: string, endIso: string): string => {
   if (!startIso || !endIso) return '-'
-  const startMs = new Date(endIso).getTime()
-  const endMs = new Date(startIso).getTime()
+  const endMs = new Date(endIso).getTime()
+  const startMs = new Date(startIso).getTime()
   if (isNaN(startMs) || isNaN(endMs)) return '-'
-  const ms = startMs - endMs
+  const ms = endMs - startMs
   if (ms <= 0) return '0m'
   const totalMinutes = Math.round(ms / 60000)
   const hours = Math.floor(totalMinutes / 60)
@@ -390,7 +390,7 @@ const EventFormDialog = ({
     } catch (error) {
       // Error is already handled by the parent onSave handler (handleSaveEvent).
       // Catch here to prevent unhandled promise rejection from crashing the page.
-      console.error('Event save failed:', error)
+      console.error('[EventFormDialog] Save failed:', error)
     } finally {
       setIsSubmitting(false)
     }
@@ -951,8 +951,6 @@ export const ZZPAgendaPage = () => {
       if (!(error instanceof NetworkError)) {
         toast.error(parseApiError(error))
       }
-      // Re-throw so the EventFormDialog's catch block can log it too
-      throw error
     }
   }, [user?.id, editingEvent, isDuplicating, loadEvents])
 

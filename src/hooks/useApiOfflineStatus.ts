@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import { ApiOfflineStatus, retryLastFailedApiRequest, subscribeApiOfflineStatus } from '@/lib/api'
 
 const INITIAL_STATUS: ApiOfflineStatus = {
@@ -16,16 +15,11 @@ export const useApiOfflineStatus = () => {
     const unsubscribe = subscribeApiOfflineStatus((nextStatus) => {
       setStatus(nextStatus)
 
-      if (nextStatus.isOffline && !wasOffline.current) {
-        toast.error(nextStatus.message || 'Offline of verbinding weggevallen', {
-          action: {
-            label: 'Opnieuw proberen',
-            onClick: () => {
-              void retryLastFailedApiRequest()
-            },
-          },
-        })
-      }
+      // NOTE: We intentionally do NOT fire a toast here.
+      // The OfflineBanner component (rendered in AppShell) already provides
+      // a persistent, visible indicator with a "Retry" button.
+      // Showing a toast as well would cause duplicate messaging for every
+      // network failure, confusing users.
 
       wasOffline.current = nextStatus.isOffline
     })

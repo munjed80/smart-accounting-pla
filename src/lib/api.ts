@@ -268,32 +268,74 @@ const extractApiErrorInfo = (error: AxiosError): ApiErrorInfo => {
     undefined
 
   const errorCode = responseData?.detail?.code || responseData?.code
-  const backendMessage = responseData?.detail?.message || responseData?.detail || responseData?.message
 
-  let message = backendMessage || error.message || 'Er is een onbekende fout opgetreden'
+  // Extract backend error message from various response formats:
+  // 1. {detail: [{loc:[], msg:"..."}]} — FastAPI 422 validation error array
+  // 2. {detail: {message: "..."}} — structured error with code+message
+  // 3. {detail: "..."} — FastAPI string detail
+  // 4. {message: "..."} — simple message format
+  let backendMessage: string | null = null
 
-  switch (statusCode) {
-    case 401:
-      message = 'Sessie verlopen, log opnieuw in'
-      break
-    case 402:
-      // For 402, prefer backend message_nl if provided
-      message = responseData?.message_nl || backendMessage || 'Abonnement vereist om deze functie te gebruiken'
-      break
-    case 403:
-      message = 'Geen rechten voor deze pagina'
-      break
-    case 404:
-      message = 'Endpoint ontbreekt (configuratie)'
-      break
-    case 500:
-    case 502:
-    case 503:
-    case 504:
-      message = 'Serverfout, probeer later'
-      break
-    default:
-      break
+  // Handle 422 field-level validation errors from FastAPI
+  if (statusCode === 422 && Array.isArray(responseData?.detail)) {
+    const fieldErrors = (responseData.detail as Array<{ loc?: string[]; msg?: string }>)
+      .map((err) => {
+        const field = err.loc?.[err.loc.length - 1] || 'veld'
+        return `${field}: ${err.msg || 'ongeldig'}`
+      })
+    backendMessage = fieldErrors.length > 0 ? fieldErrors.join('; ') : null
+  }
+
+  if (!backendMessage) {
+    const detailMessage = responseData?.detail?.message
+    const stringDetail = typeof responseData?.detail === 'string' ? responseData.detail : null
+    const topLevelMessage = responseData?.message
+    backendMessage = detailMessage || stringDetail || topLevelMessage || null
+  }
+
+  // Prefer the backend message when available — it contains specific, actionable info.
+  // Only fall back to generic Dutch messages when the backend didn't provide one.
+  let message: string
+
+  if (backendMessage) {
+    message = backendMessage
+  } else {
+    switch (statusCode) {
+      case 400:
+      case 422:
+        message = 'Ongeldige gegevens. Controleer je invoer.'
+        break
+      case 401:
+        message = 'Sessie verlopen, log opnieuw in'
+        break
+      case 402:
+        message = responseData?.message_nl || 'Abonnement vereist om deze functie te gebruiken'
+        break
+      case 403:
+        message = 'Geen rechten voor deze actie'
+        break
+      case 404:
+        message = 'Het gevraagde item is niet gevonden.'
+        break
+      case 409:
+        message = 'Dit item bestaat al of conflicteert met bestaande gegevens.'
+        break
+      case 429:
+        message = 'Te veel verzoeken. Wacht even en probeer het opnieuw.'
+        break
+      case 500:
+      case 502:
+        message = 'Serverfout, probeer later'
+        break
+      case 503:
+        message = 'Service tijdelijk niet beschikbaar. Probeer het later opnieuw.'
+        break
+      case 504:
+        message = 'Server reageert niet op tijd. Probeer het later opnieuw.'
+        break
+      default:
+        message = error.message || 'Er is een onbekende fout opgetreden'
+    }
   }
 
   return { message, statusCode, correlationId, errorCode }
@@ -340,33 +382,6 @@ const emitOfflineStatus = (status: ApiOfflineStatus) => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent<ApiOfflineStatus>(API_OFFLINE_EVENT, { detail: status }))
   }
-}
-
-const isOfflineError = (error: AxiosError) => {
-  // True offline conditions:
-  // 1. No response at all (network-level failure: connection refused, CORS, DNS resolution failed, network unreachable)
-  //    Note: Axios timeout errors MAY include a response object depending on timing and configuration.
-  //    We treat "no response" as a true network error, not all timeouts.
-  // 2. Status 503 (Service Unavailable) or 504 (Gateway Timeout)
-  // 
-  // NOT offline:
-  // - 401 (Unauthorized) - auth issue, not network issue
-  // - 402 (Payment Required) - subscription/payment issue, not network issue
-  // - 403 (Forbidden) - permission issue, not network issue
-  // - 404 (Not Found) - routing/endpoint issue, not network issue
-  // - Other 4xx errors - client errors, not network issues
-  // - 500/502 - server errors, not network issues (server is reachable)
-  
-  if (!error.response) {
-    // No response object means a connection-level network error
-    // This includes: connection refused, CORS, DNS resolution failed, network unreachable
-    // Some timeout scenarios may also fall here if no response was received
-    return true
-  }
-  
-  // Service unavailable or gateway timeout = infrastructure offline
-  const status = error.response.status
-  return status === 503 || status === 504
 }
 
 const isOfflineSimulationEnabled = () => {
@@ -489,7 +504,11 @@ api.interceptors.response.use(
 
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
-    if (isOfflineError(error)) {
+    // Only show the offline banner for TRUE network errors (no response at all).
+    // Server-side errors (500, 503, 504) DO have a response with an error message —
+    // the catch handler should show that message, not a misleading "offline" banner.
+    const isTrueNetworkError = !error.response && error.message !== 'canceled'
+    if (isTrueNetworkError) {
       lastFailedRequest = originalRequest
       emitOfflineStatus({
         isOffline: true,
@@ -543,6 +562,15 @@ api.interceptors.response.use(
           break
         case 404:
           typedError = new NotFoundError(parsedError.message, metadata)
+          break
+        case 409:
+          typedError = new ApiHttpError(parsedError.message, metadata)
+          break
+        case 422:
+          typedError = new ValidationError(parsedError.message, metadata)
+          break
+        case 429:
+          typedError = new ApiHttpError(parsedError.message, metadata)
           break
         case 500:
         case 502:

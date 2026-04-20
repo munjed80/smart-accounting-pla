@@ -12,6 +12,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { navigateTo } from '@/lib/navigation'
+import { ApiHttpError } from '@/lib/errors'
 import { t } from '@/i18n'
 import {
   Lock,
@@ -38,7 +39,9 @@ interface ApiErrorStateProps {
 }
 
 /**
- * Parse an error object and determine the ApiErrorType
+ * Parse an error object and determine the ApiErrorType.
+ * Handles both typed errors from the API interceptor (ApiHttpError subclasses)
+ * and raw axios errors (fallback for any that bypass the interceptor).
  */
 export const parseApiError = (error: unknown): { type: ApiErrorType; message: string } => {
   // Default values
@@ -48,8 +51,35 @@ export const parseApiError = (error: unknown): { type: ApiErrorType; message: st
   if (!error) {
     return { type, message }
   }
+
+  // Handle typed errors from the API interceptor (ApiHttpError and subclasses).
+  // The interceptor converts all axios errors to typed errors, so this is the
+  // primary path. The statusCode is stored on the error object by the interceptor.
+  if (error instanceof ApiHttpError) {
+    const status = error.statusCode
+    message = error.message
+
+    if (status === 401) {
+      type = 'unauthorized'
+    } else if (status === 403) {
+      type = 'forbidden'
+    } else if (status === 404) {
+      type = 'not_found'
+    } else if (status && status >= 500) {
+      type = 'server_error'
+    } else if (message) {
+      type = 'unknown'
+    }
+
+    if (type !== 'unknown') {
+      console.warn(`[ApiError] ${type}: HTTP ${status}${message ? ` - ${message}` : ''}`)
+    }
+
+    return { type, message }
+  }
   
-  // Handle axios/fetch error response structure
+  // Fallback: Handle raw axios/fetch error response structure
+  // (for errors that bypass the interceptor, e.g. from non-api calls)
   const err = error as { 
     response?: { 
       status?: number
@@ -63,19 +93,22 @@ export const parseApiError = (error: unknown): { type: ApiErrorType; message: st
   
   if (status === 401) {
     type = 'unauthorized'
-    message = detail
+    message = typeof detail === 'string' ? detail : String(detail)
   } else if (status === 403) {
     type = 'forbidden'
-    message = detail
+    message = typeof detail === 'string' ? detail : String(detail)
   } else if (status === 404) {
     type = 'not_found'
-    message = detail
+    message = typeof detail === 'string' ? detail : String(detail)
   } else if (status && status >= 500) {
     type = 'server_error'
-    message = detail
+    message = typeof detail === 'string' ? detail : String(detail)
   } else if (detail) {
     type = 'unknown'
     message = typeof detail === 'string' ? detail : String(detail)
+  } else if (error instanceof Error) {
+    type = 'unknown'
+    message = error.message
   }
   
   // Log warning for debugging (no secrets)

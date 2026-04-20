@@ -302,14 +302,14 @@ async def create_calendar_event(
         )
     
     # Validate recurrence value
-    if event_in.recurrence and event_in.recurrence not in VALID_RECURRENCE_VALUES:
+    if event_in.recurrence is not None and event_in.recurrence not in VALID_RECURRENCE_VALUES:
         raise HTTPException(
             status_code=400,
             detail={"code": "INVALID_RECURRENCE", "message": f"Ongeldige herhaling: '{event_in.recurrence}'. Gebruik: daily, weekly, monthly of leeg."}
         )
     
     # Validate color value
-    if event_in.color and event_in.color not in VALID_COLOR_VALUES:
+    if event_in.color is not None and event_in.color not in VALID_COLOR_VALUES:
         raise HTTPException(
             status_code=400,
             detail={"code": "INVALID_COLOR", "message": f"Ongeldige kleur: '{event_in.color}'. Gebruik: blue, green, red, orange, purple, pink of leeg."}
@@ -413,14 +413,14 @@ async def update_calendar_event(
     
     # Validate recurrence value if provided
     update_data = event_in.model_dump(exclude_unset=True)
-    if 'recurrence' in update_data and update_data['recurrence'] not in VALID_RECURRENCE_VALUES:
+    if 'recurrence' in update_data and update_data['recurrence'] is not None and update_data['recurrence'] not in VALID_RECURRENCE_VALUES:
         raise HTTPException(
             status_code=400,
             detail={"code": "INVALID_RECURRENCE", "message": f"Ongeldige herhaling: '{update_data['recurrence']}'. Gebruik: daily, weekly, monthly of leeg."}
         )
     
     # Validate color value if provided
-    if 'color' in update_data and update_data['color'] not in VALID_COLOR_VALUES:
+    if 'color' in update_data and update_data['color'] is not None and update_data['color'] not in VALID_COLOR_VALUES:
         raise HTTPException(
             status_code=400,
             detail={"code": "INVALID_COLOR", "message": f"Ongeldige kleur: '{update_data['color']}'. Gebruik: blue, green, red, orange, purple, pink of leeg."}

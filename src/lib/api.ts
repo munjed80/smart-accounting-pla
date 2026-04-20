@@ -268,7 +268,15 @@ const extractApiErrorInfo = (error: AxiosError): ApiErrorInfo => {
     undefined
 
   const errorCode = responseData?.detail?.code || responseData?.code
-  const backendMessage = responseData?.detail?.message || (typeof responseData?.detail === 'string' ? responseData.detail : null) || responseData?.message
+
+  // Extract backend error message from various response formats:
+  // 1. {detail: {message: "..."}} — structured error with code+message
+  // 2. {detail: "..."} — FastAPI string detail
+  // 3. {message: "..."} — simple message format
+  const detailMessage = responseData?.detail?.message
+  const stringDetail = typeof responseData?.detail === 'string' ? responseData.detail : null
+  const topLevelMessage = responseData?.message
+  const backendMessage = detailMessage || stringDetail || topLevelMessage
 
   // Prefer the backend message when available — it contains specific, actionable info.
   // Only fall back to generic Dutch messages when the backend didn't provide one.

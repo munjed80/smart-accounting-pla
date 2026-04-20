@@ -304,14 +304,16 @@ const EventFormDialog = ({
   event,
   onSave,
   selectedDate,
+  isDuplicate,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   event?: ZZPCalendarEvent
   onSave: (data: ZZPCalendarEventCreate) => Promise<void>
   selectedDate?: Date
+  isDuplicate?: boolean
 }) => {
-  const isEdit = !!event
+  const isEdit = !!event && !isDuplicate
 
   const [title, setTitle] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -762,6 +764,114 @@ const WeekView = ({
   )
 }
 
+const MobileWeekView = ({
+  weekStart,
+  events,
+  today,
+  selectedDate,
+  onDayClick,
+  onCreateEvent,
+}: {
+  weekStart: Date
+  events: ZZPCalendarEvent[]
+  today: Date
+  selectedDate: Date | null
+  onDayClick: (date: Date) => void
+  onCreateEvent: (date: Date) => void
+}) => {
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart)
+    d.setDate(weekStart.getDate() + i)
+    return d
+  })
+  const safeEvents = Array.isArray(events) ? events : []
+  const activeDay = selectedDate || today
+  const dayEvents = safeEvents
+    .filter(ev => ev?.start_datetime && isSameDay(new Date(ev.start_datetime), activeDay))
+    .sort((a, b) => new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime())
+
+  return (
+    <div>
+      {/* Horizontal day strip */}
+      <div className="flex gap-1.5 overflow-x-auto pb-3 -mx-1 px-1 scrollbar-hide">
+        {days.map((day, i) => {
+          const dayIsToday = isSameDay(day, today)
+          const isActive = isSameDay(day, activeDay)
+          const dayEventCount = safeEvents.filter(ev => ev?.start_datetime && isSameDay(new Date(ev.start_datetime), day)).length
+          return (
+            <button
+              key={i}
+              onClick={() => onDayClick(day)}
+              className={[
+                'flex flex-col items-center flex-shrink-0 rounded-xl px-3 py-2 min-w-[52px] transition-all',
+                isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-secondary',
+                dayIsToday && !isActive ? 'ring-2 ring-primary/40' : '',
+              ].join(' ')}
+            >
+              <span className="text-[10px] font-medium uppercase opacity-70">
+                {WEEKDAY_NAMES[i]}
+              </span>
+              <span className={`text-lg font-bold leading-tight ${isActive ? '' : dayIsToday ? 'text-primary' : ''}`}>
+                {day.getDate()}
+              </span>
+              {dayEventCount > 0 && (
+                <div className={`h-1.5 w-1.5 rounded-full mt-0.5 ${isActive ? 'bg-primary-foreground' : 'bg-primary'}`} />
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Events list for selected day */}
+      <div className="mt-3 space-y-2">
+        {dayEvents.length === 0 ? (
+          <div className="flex flex-col items-center py-8 text-muted-foreground">
+            <CalendarBlank size={32} className="mb-2 opacity-50" weight="duotone" />
+            <p className="text-sm font-medium">{t('zzpAgenda.noEventsOnDay')}</p>
+            <Button variant="outline" size="sm" className="mt-3 gap-2" onClick={() => onCreateEvent(activeDay)}>
+              <Plus size={16} />
+              {t('zzpAgenda.newEvent')}
+            </Button>
+          </div>
+        ) : (
+          dayEvents.map((ev) => {
+            const colorKey = ev.color
+            const colorStyle = colorKey && EVENT_COLORS[colorKey]
+            return (
+              <div
+                key={`${ev.id}-${ev.start_datetime}`}
+                className={`flex items-center gap-3 rounded-lg border p-3 ${colorStyle ? `border-l-4 ${colorStyle.border} ${colorStyle.bg}` : 'bg-card/50 border-border/50'}`}
+              >
+                <div className="flex-shrink-0 text-center min-w-[44px]">
+                  <div className="text-sm font-bold">{formatTime(ev.start_datetime)}</div>
+                  <div className="text-[10px] text-muted-foreground">{formatTime(ev.end_datetime)}</div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                    {ev.title}
+                    {ev.recurrence && ev.recurrence !== 'none' && (
+                      <ArrowsCounterClockwise size={12} className="text-muted-foreground flex-shrink-0" />
+                    )}
+                  </div>
+                  {ev.location && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                      <MapPin size={10} />
+                      <span className="truncate">{ev.location}</span>
+                    </div>
+                  )}
+                </div>
+                <Badge variant="secondary" className="text-[10px] flex-shrink-0">
+                  {formatDuration(ev.start_datetime, ev.end_datetime)}
+                </Badge>
+              </div>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+}
+
 // --- Main Page Component ---
 
 export const ZZPAgendaPage = () => {
@@ -774,7 +884,22 @@ export const ZZPAgendaPage = () => {
     try { return (localStorage.getItem('zzpAgendaViewMode') as 'month' | 'week') || 'month' } catch { return 'month' }
   })
 
-  const today = useMemo(() => new Date(), [])
+  const [today, setToday] = useState(() => new Date())
+
+  // Refresh "today" when the user returns to the tab (e.g., after midnight)
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        const now = new Date()
+        setToday(prev => {
+          if (prev.getFullYear() === now.getFullYear() && prev.getMonth() === now.getMonth() && prev.getDate() === now.getDate()) return prev
+          return now
+        })
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
   const [weekStart, setWeekStart] = useState(() => getWeekStart(today))
@@ -937,7 +1062,7 @@ export const ZZPAgendaPage = () => {
       } else {
         await zzpApi.calendarEvents.create(data)
       }
-      toast.success(t('zzpAgenda.eventSaved'))
+      toast.success(isDuplicating ? t('zzpAgenda.eventDuplicated') : t('zzpAgenda.eventSaved'))
       // Close dialog and reset form state BEFORE reloading events,
       // so the dialog doesn't stay open during the data fetch.
       setIsFormOpen(false)
@@ -1137,10 +1262,32 @@ export const ZZPAgendaPage = () => {
         {showLoading ? <CalendarLoadingSkeleton /> : (
           <Card className="bg-card/80 backdrop-blur-sm mb-6" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
             <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-                <h2 className="text-lg sm:text-xl font-semibold capitalize">{navLabel}</h2>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button variant="outline" size="sm" onClick={() => { goToToday(); }} className="h-9 px-3">
+              {/* Navigation — mobile: stacked, touch-friendly */}
+              <div className="flex flex-col gap-3 mb-4 sm:hidden">
+                <div className="flex items-center justify-between">
+                  <Button variant="outline" size="icon" onClick={goToPrev} className="h-10 w-10"><CaretLeft size={20} /></Button>
+                  <h2 className="text-lg font-semibold capitalize text-center flex-1 px-2">{navLabel}</h2>
+                  <Button variant="outline" size="icon" onClick={goToNext} className="h-10 w-10"><CaretRight size={20} /></Button>
+                </div>
+                <div className="flex items-center gap-2 justify-center">
+                  <Button variant="outline" size="sm" onClick={goToToday} className="h-9 px-3">
+                    {t('zzpAgenda.today')}
+                  </Button>
+                  <div className="flex rounded-md border border-border overflow-hidden">
+                    <button onClick={() => setViewMode('month')} className={`px-3 h-9 text-sm transition-colors ${viewMode === 'month' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'}`}>
+                      {t('zzpAgenda.viewMonth')}
+                    </button>
+                    <button onClick={() => setViewMode('week')} className={`px-3 h-9 text-sm transition-colors border-l border-border ${viewMode === 'week' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'}`}>
+                      {t('zzpAgenda.viewWeek')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              {/* Navigation — desktop: single row */}
+              <div className="hidden sm:flex items-center justify-between mb-4 gap-2">
+                <h2 className="text-xl font-semibold capitalize">{navLabel}</h2>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={goToToday} className="h-9 px-3">
                     {t('zzpAgenda.today')}
                   </Button>
                   <div className="flex rounded-md border border-border overflow-hidden">
@@ -1157,10 +1304,22 @@ export const ZZPAgendaPage = () => {
               </div>
 
               {viewMode === 'week' ? (
-                <WeekView weekStart={weekStart} events={events} today={today} selectedDate={selectedDate}
-                  onDayClick={(date) => setSelectedDate(prev => prev && isSameDay(prev, date) ? null : date)}
-                  onDoubleClick={(date) => openNewForm(date)}
-                />
+                <>
+                  {/* Desktop: full timeline grid */}
+                  <div className="hidden sm:block">
+                    <WeekView weekStart={weekStart} events={events} today={today} selectedDate={selectedDate}
+                      onDayClick={(date) => setSelectedDate(prev => prev && isSameDay(prev, date) ? null : date)}
+                      onDoubleClick={(date) => openNewForm(date)}
+                    />
+                  </div>
+                  {/* Mobile: day strip + event list */}
+                  <div className="sm:hidden">
+                    <MobileWeekView weekStart={weekStart} events={events} today={today} selectedDate={selectedDate}
+                      onDayClick={(date) => setSelectedDate(prev => prev && isSameDay(prev, date) ? null : date)}
+                      onCreateEvent={(date) => openNewForm(date)}
+                    />
+                  </div>
+                </>
               ) : (
                 <>
                   <div className="grid grid-cols-7 gap-1 mb-1">
@@ -1303,9 +1462,10 @@ export const ZZPAgendaPage = () => {
       <EventFormDialog
         open={isFormOpen}
         onOpenChange={(open) => { setIsFormOpen(open); if (!open) { setEditingEvent(undefined); setIsDuplicating(false); setFormInitialDate(undefined) } }}
-        event={editingEvent && !isDuplicating ? editingEvent : undefined}
+        event={editingEvent}
         onSave={handleSaveEvent}
         selectedDate={formSelectedDate}
+        isDuplicate={isDuplicating}
       />
 
       <DeleteConfirmDialog

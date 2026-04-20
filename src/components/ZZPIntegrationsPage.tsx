@@ -334,7 +334,7 @@ export const ZZPIntegrationsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['ecommerce-connections'] })
     } catch (err: any) {
       toast.error('Synchronisatie mislukt', {
-        description: err?.response?.data?.detail || 'Onbekende fout',
+        description: err?.message || 'Onbekende fout',
       })
     }
   }

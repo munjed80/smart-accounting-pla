@@ -387,6 +387,41 @@ async def list_mappings(
 
 
 # ---------------------------------------------------------------------------
+# Status summary — must be before /{mapping_id} to avoid FastAPI routing it
+# as a UUID path parameter.
+# ---------------------------------------------------------------------------
+
+@router.get("/integrations/sales-review/summary")
+async def mapping_summary(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Get aggregate status counts for the review workspace dashboard."""
+    administration = await _require_pro_plan(current_user, db)
+
+    counts_result = await db.execute(
+        select(
+            EcommerceMapping.review_status,
+            func.count().label("cnt"),
+        )
+        .where(EcommerceMapping.administration_id == administration.id)
+        .group_by(EcommerceMapping.review_status)
+    )
+
+    status_counts = {}
+    total = 0
+    for row in counts_result:
+        key = row[0].value if isinstance(row[0], MappingReviewStatus) else str(row[0])
+        status_counts[key] = row[1]
+        total += row[1]
+
+    return {
+        "total": total,
+        "status_counts": status_counts,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Get single mapping
 # ---------------------------------------------------------------------------
 
@@ -659,35 +694,3 @@ async def bulk_mapping_action(
     )
 
 
-# ---------------------------------------------------------------------------
-# Status summary
-# ---------------------------------------------------------------------------
-
-@router.get("/integrations/sales-review/summary")
-async def mapping_summary(
-    current_user: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    """Get aggregate status counts for the review workspace dashboard."""
-    administration = await _require_pro_plan(current_user, db)
-
-    counts_result = await db.execute(
-        select(
-            EcommerceMapping.review_status,
-            func.count().label("cnt"),
-        )
-        .where(EcommerceMapping.administration_id == administration.id)
-        .group_by(EcommerceMapping.review_status)
-    )
-
-    status_counts = {}
-    total = 0
-    for row in counts_result:
-        key = row[0].value if isinstance(row[0], MappingReviewStatus) else str(row[0])
-        status_counts[key] = row[1]
-        total += row[1]
-
-    return {
-        "total": total,
-        "status_counts": status_counts,
-    }

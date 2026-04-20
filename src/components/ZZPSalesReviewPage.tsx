@@ -159,8 +159,7 @@ export const ZZPSalesReviewPage = () => {
       setDetailMapping(data)
     },
     onError: (err: any) => {
-      const detail = err?.response?.data?.detail
-      toast.error(typeof detail === 'string' ? detail : 'Actie mislukt')
+      toast.error(err?.message || 'Actie mislukt')
     },
   })
 

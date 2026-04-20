@@ -57,6 +57,19 @@ vi.mock('../hooks/usePreventBodyScrollLock', () => ({
   usePreventBodyScrollLock: vi.fn(),
 }))
 
+vi.mock('../hooks/useEntitlements', () => ({
+  useEntitlements: vi.fn(() => ({
+    entitlements: null,
+    subscription: null,
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+    canUseFeature: () => false,
+    isAccountantBypass: false,
+    forcePaywall: false,
+  })),
+}))
+
 // Mock API
 vi.mock('../lib/api', () => ({
   getApiBaseUrl: vi.fn(() => 'http://localhost:8000/api/v1'),

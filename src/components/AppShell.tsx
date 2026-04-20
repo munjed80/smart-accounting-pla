@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/AuthContext'
 import { useActiveClient } from '@/lib/ActiveClientContext'
 import { useCloseOverlayOnRouteChange } from '@/hooks/useCloseOverlayOnRouteChange'
 import { usePreventBodyScrollLock } from '@/hooks/usePreventBodyScrollLock'
+import { useEntitlements } from '@/hooks/useEntitlements'
 import { navigateTo } from '@/lib/navigation'
 import { getApiBaseUrl, salesReviewApi } from '@/lib/api'
 import { TourHelpButton } from '@/components/OnboardingTour'
@@ -388,12 +389,19 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
   const isSuperAdmin = user?.role === 'super_admin'
   const isZZP = user?.role === 'zzp'
 
-  // Fetch sales-review summary for ZZP users (used for nav badge)
+  // Entitlements: only ZZP users need subscription checks; accountants bypass
+  const { entitlements } = useEntitlements()
+  const hasProAccess = isZZP && (entitlements?.can_use_pro_features === true)
+
+  // Fetch sales-review summary only for ZZP users with Pro entitlement
+  // (e-commerce endpoints require Pro plan; calling them for all ZZP users
+  //  causes 403/500 errors that pollute unrelated pages)
   const { data: salesReviewSummary } = useQuery({
     queryKey: ['sales-review-summary'],
     queryFn: () => salesReviewApi.getSummary(),
-    enabled: isZZP,
+    enabled: hasProAccess,
     staleTime: 60_000, // re-fetch at most once per minute
+    retry: false, // don't retry on failure – badge is non-critical
     refetchOnWindowFocus: false,
   })
 

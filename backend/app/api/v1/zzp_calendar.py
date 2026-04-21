@@ -6,7 +6,7 @@ Supports recurring events (daily/weekly/monthly) with expansion.
 """
 import logging
 import calendar as cal_module
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Annotated, Optional, List
 from uuid import UUID
 
@@ -102,9 +102,19 @@ def expand_recurring_event(
             return [event_to_response(event)]
         return []
 
-    # Determine recurrence end boundary
+    # Determine recurrence end boundary.
+    # event.start_datetime is timezone-aware (TIMESTAMPTZ); rec_end_dt must be
+    # too so the comparison `current_start > rec_end_dt` does not raise
+    # "can't compare offset-naive and offset-aware datetimes".
     rec_end_date = event.recurrence_end_date
-    rec_end_dt = datetime(rec_end_date.year, rec_end_date.month, rec_end_date.day, 23, 59, 59) if rec_end_date else None
+    if rec_end_date:
+        tzinfo = event.start_datetime.tzinfo or timezone.utc
+        rec_end_dt = datetime(
+            rec_end_date.year, rec_end_date.month, rec_end_date.day,
+            23, 59, 59, tzinfo=tzinfo,
+        )
+    else:
+        rec_end_dt = None
 
     duration = event.end_datetime - event.start_datetime
     occurrences: List[CalendarEventResponse] = []
@@ -198,20 +208,24 @@ async def list_calendar_events(
     
     administration = await get_user_administration(current_user.id, db)
     
-    # Determine the query date range for expansion
+    # Determine the query date range for expansion.
+    # NOTE: ZZPCalendarEvent.start_datetime / end_datetime are TIMESTAMPTZ
+    # (timezone-aware) in the database. The bounds we build here MUST also be
+    # timezone-aware, otherwise comparisons in expand_recurring_event() raise
+    # `TypeError: can't compare offset-naive and offset-aware datetimes`.
     range_from: Optional[datetime] = None
     range_to: Optional[datetime] = None
 
     if from_date:
-        range_from = datetime.fromisoformat(f"{from_date}T00:00:00")
+        range_from = datetime.fromisoformat(f"{from_date}T00:00:00").replace(tzinfo=timezone.utc)
     elif year and month:
-        range_from = datetime(year, month, 1, 0, 0, 0)
+        range_from = datetime(year, month, 1, 0, 0, 0, tzinfo=timezone.utc)
 
     if to_date:
-        range_to = datetime.fromisoformat(f"{to_date}T23:59:59")
+        range_to = datetime.fromisoformat(f"{to_date}T23:59:59").replace(tzinfo=timezone.utc)
     elif year and month:
         last_day = cal_module.monthrange(year, month)[1]
-        range_to = datetime(year, month, last_day, 23, 59, 59)
+        range_to = datetime(year, month, last_day, 23, 59, 59, tzinfo=timezone.utc)
 
     # Build query — for recurring events we need to fetch events that could
     # produce occurrences in the target range, so we relax the start_datetime

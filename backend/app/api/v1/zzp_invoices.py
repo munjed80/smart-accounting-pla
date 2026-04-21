@@ -914,7 +914,47 @@ async def send_invoice(
         total_amount = f"€{invoice.total_cents / 100:.2f}"
         seller_name = invoice.seller_company_name or invoice.seller_trading_name or "ZZPers Hub"
 
-        from_address = f"{settings.INVOICE_FROM_NAME} <{settings.INVOICE_FROM_EMAIL}>"
+        # Build a production-safe "From" display name of the form
+        # "[Company Name] via ZZPersHub". The underlying email address
+        # (INVOICE_FROM_EMAIL) is kept unchanged so DKIM/SPF alignment on the
+        # verified sending domain is preserved for deliverability.
+        # The display name is sanitized to avoid breaking the RFC 5322 header
+        # (strip quotes, angle brackets and newlines) and wrapped in double
+        # quotes so names containing commas/periods/non-ASCII remain valid.
+        def _sanitize_display_name(name: str) -> str:
+            cleaned = "".join(
+                ch for ch in (name or "") if ch not in ('"', "<", ">", "\r", "\n")
+            ).strip()
+            # Collapse internal whitespace
+            cleaned = " ".join(cleaned.split())
+            return cleaned
+
+        safe_seller_name = _sanitize_display_name(seller_name) or "ZZPers Hub"
+        display_name = f"{safe_seller_name} via ZZPersHub"
+        from_address = f'"{display_name}" <{settings.INVOICE_FROM_EMAIL}>'
+
+        # Reply-To: prefer the seller's own email when present and plausibly
+        # valid (contains "@" and no whitespace/header-injection chars).
+        # Otherwise fall back to the configured platform reply-to address.
+        # The customer email is NOT used for reply-to (the customer is the
+        # recipient, not the responder).
+        def _looks_like_email(value: Optional[str]) -> bool:
+            if not value:
+                return False
+            v = value.strip()
+            if not v or any(ch in v for ch in (" ", "\r", "\n", ",", ";", "<", ">", '"')):
+                return False
+            if "@" not in v or v.startswith("@") or v.endswith("@"):
+                return False
+            local, _, domain = v.partition("@")
+            return bool(local) and "." in domain
+
+        reply_to_address = (
+            invoice.seller_email.strip()
+            if _looks_like_email(invoice.seller_email)
+            else settings.INVOICE_REPLY_TO
+        )
+
         subject = f"Uw factuur {invoice_number} van {seller_name}"
 
         html_content = f"""<!DOCTYPE html>
@@ -1047,7 +1087,7 @@ info@zzpershub.nl
         result = email_service.client.Emails.send({
             "from": from_address,
             "to": [customer_email],
-            "reply_to": settings.INVOICE_REPLY_TO,
+            "reply_to": reply_to_address,
             "subject": subject,
             "html": html_content,
             "text": text_content,

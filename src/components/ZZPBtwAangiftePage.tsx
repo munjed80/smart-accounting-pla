@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Select,
   SelectContent,
@@ -36,6 +37,9 @@ import {
   DownloadSimple,
   Printer,
   FileXls,
+  CaretRight,
+  ArrowsClockwise,
+  Sparkle,
 } from '@phosphor-icons/react'
 import { zzpBtwApi, logApiError } from '@/lib/api'
 import type { BTWAangifteResponse, BTWQuarterOverview } from '@/lib/api'
@@ -145,9 +149,23 @@ const HeroCard = ({ overview, quarterMonths }: { overview: BTWQuarterOverview; q
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg font-semibold">{overview.quarter}</h2>
               <span className="text-sm text-muted-foreground">({quarterMonths})</span>
-              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-700">
-                Voorlopig
-              </Badge>
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      variant="outline"
+                      className="text-xs bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-700 cursor-help"
+                    >
+                      Voorlopig · {overview.basis === 'kasstelsel' ? 'kasstelsel' : overview.basis}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-xs">
+                    Berekend op {overview.basis === 'kasstelsel' ? 'kasstelsel (cash basis)' : overview.basis}: alleen
+                    betaalde facturen tellen mee voor de af te dragen BTW. Het bedrag is voorlopig totdat je de
+                    aangifte indient bij de Belastingdienst.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className={`text-4xl sm:text-5xl font-bold tracking-tight ${isPayable ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
@@ -166,6 +184,267 @@ const HeroCard = ({ overview, quarterMonths }: { overview: BTWQuarterOverview; q
               {isPayable ? 'Te betalen' : 'Terug te vragen'}: {formatCurrencyAbs(overview.net_vat_cents)}
             </p>
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Banner that explains *why* the headline number looks the way it does
+ * when the quarter has only partial data (e.g. only drafts, only unpaid
+ * invoices, no expenses…).  Visible above the metric cards so the user
+ * understands the connection to the rest of their data.
+ */
+const PartialStateBanner = ({ overview }: { overview: BTWQuarterOverview }) => {
+  if (overview.data_status === 'COMPLETE' || overview.data_status === 'NO_DATA') {
+    return null
+  }
+
+  const linkFor = (
+    label: string,
+    route: string,
+  ) => (
+    <Button
+      variant="link"
+      size="sm"
+      className="h-auto p-0 text-xs"
+      onClick={() => navigateTo(route)}
+    >
+      {label} <CaretRight size={12} className="ml-0.5" />
+    </Button>
+  )
+
+  let cta: React.ReactNode = null
+  switch (overview.data_status) {
+    case 'ONLY_DRAFTS':
+      cta = linkFor('Naar conceptfacturen', '/zzp/invoices?status=draft')
+      break
+    case 'ONLY_UNPAID':
+      cta = linkFor('Naar openstaande facturen', '/zzp/invoices?status=sent')
+      break
+    case 'ONLY_INVOICES':
+      cta = linkFor('Voeg uitgaven toe', '/zzp/expenses')
+      break
+    case 'ONLY_EXPENSES':
+      cta = linkFor('Naar facturen', '/zzp/invoices')
+      break
+  }
+
+  return (
+    <Alert className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-900">
+      <Info size={18} weight="fill" className="text-amber-500" />
+      <AlertTitle className="text-sm font-medium">Onvolledige BTW-basis</AlertTitle>
+      <AlertDescription className="text-xs space-y-1">
+        <p>{overview.data_status_reason}</p>
+        {overview.unpaid_vat_cents > 0 && overview.data_status !== 'ONLY_INVOICES' && (
+          <p>
+            Op verstuurde, nog niet betaalde facturen staat <span className="font-medium">{formatCurrency(overview.unpaid_vat_cents)}</span>{' '}
+            aan BTW open – dit telt op kasstelsel pas mee zodra de betaling binnenkomt.
+          </p>
+        )}
+        {cta}
+      </AlertDescription>
+    </Alert>
+  )
+}
+
+/**
+ * Dedicated empty state for quarters that genuinely contain nothing.
+ * Replaces the misleading "€ 0,00 BTW af te dragen" hero with a clear
+ * explanation and direct CTAs into the data-entry flows.
+ */
+const EmptyQuarterCard = ({
+  overview,
+  quarterMonths,
+}: {
+  overview: BTWQuarterOverview
+  quarterMonths: string
+}) => (
+  <Card className="border-dashed">
+    <CardContent className="p-6 sm:p-8 text-center space-y-4">
+      <div className="flex items-center justify-center gap-2 flex-wrap">
+        <h2 className="text-lg font-semibold">{overview.quarter}</h2>
+        <span className="text-sm text-muted-foreground">({quarterMonths})</span>
+        <Badge variant="outline" className="text-xs">Nog niets te declareren</Badge>
+      </div>
+      <Calculator size={40} weight="duotone" className="text-muted-foreground mx-auto" />
+      <div className="space-y-1 max-w-md mx-auto">
+        <p className="text-sm font-medium">Geen facturen of uitgaven in dit kwartaal</p>
+        <p className="text-xs text-muted-foreground">
+          {overview.data_status_reason} Voeg facturen of zakelijke uitgaven toe om de BTW-berekening te starten.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2 justify-center pt-2">
+        <Button size="sm" onClick={() => navigateTo('/zzp/invoices')}>
+          <FileText size={16} className="mr-1" />
+          Maak een factuur
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => navigateTo('/zzp/expenses')}>
+          <Receipt size={16} className="mr-1" />
+          Voeg uitgave toe
+        </Button>
+      </div>
+    </CardContent>
+  </Card>
+)
+
+/**
+ * Lists the concrete data sources behind the BTW numbers, with deep links.
+ * Makes the page feel connected to the rest of the product instead of an
+ * isolated card with totals.
+ */
+const SourcesPanel = ({ overview }: { overview: BTWQuarterOverview }) => {
+  const items: Array<{
+    icon: React.ReactNode
+    title: string
+    detail: string
+    route: string
+    cta: string
+  }> = [
+    {
+      icon: <FileText size={16} weight="duotone" />,
+      title: 'Betaalde facturen',
+      detail:
+        overview.invoice_summary.paid_count > 0
+          ? `${overview.invoice_summary.paid_count} factuur${overview.invoice_summary.paid_count !== 1 ? 'en' : ''} · ${formatCurrency(overview.invoice_summary.total_omzet_cents)} omzet`
+          : 'Geen betaalde facturen in dit kwartaal',
+      route: '/zzp/invoices?status=paid',
+      cta: 'Bekijk facturen',
+    },
+    {
+      icon: <Receipt size={16} weight="duotone" />,
+      title: 'Zakelijke uitgaven',
+      detail:
+        overview.expense_summary.total_count > 0
+          ? `${overview.expense_summary.total_count} uitgave${overview.expense_summary.total_count !== 1 ? 'n' : ''} · ${formatCurrency(overview.expense_summary.total_vat_deductible_cents)} aftrekbare BTW`
+          : 'Geen geregistreerde uitgaven in dit kwartaal',
+      route: '/zzp/expenses',
+      cta: 'Bekijk uitgaven',
+    },
+  ]
+
+  if (overview.invoice_summary.sent_count > 0) {
+    items.push({
+      icon: <CurrencyEur size={16} weight="duotone" />,
+      title: 'Openstaande facturen',
+      detail: `${overview.invoice_summary.sent_count} factuur${overview.invoice_summary.sent_count !== 1 ? 'en' : ''} · ${formatCurrency(overview.unpaid_vat_cents)} BTW (telt nog niet mee op kasstelsel)`,
+      route: '/zzp/invoices?status=sent',
+      cta: 'Bekijk openstaand',
+    })
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Sparkle size={16} weight="duotone" />
+          Bronnen in dit overzicht
+        </CardTitle>
+        <CardDescription className="text-xs">
+          De BTW-berekening komt rechtstreeks uit deze onderdelen van je administratie.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {items.map((item) => (
+          <div
+            key={item.title}
+            className="flex items-start justify-between gap-3 py-2 border-b last:border-b-0"
+          >
+            <div className="flex items-start gap-2 min-w-0">
+              <span className="mt-0.5 text-muted-foreground flex-shrink-0">{item.icon}</span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{item.title}</p>
+                <p className="text-xs text-muted-foreground">{item.detail}</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto py-1 px-2 text-xs flex-shrink-0"
+              onClick={() => navigateTo(item.route)}
+            >
+              {item.cta}
+              <CaretRight size={12} className="ml-0.5" />
+            </Button>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Compact comparison strip with the most recent previous quarters.
+ * Clicking a quarter switches the page to that period.  This grounds the
+ * current number in historical context and stops the page from feeling
+ * like a single isolated card.
+ */
+const PreviousQuartersStrip = ({
+  quarters,
+  onSelect,
+}: {
+  quarters: BTWQuarterOverview[]
+  onSelect: (year: number, quarter: number) => void
+}) => {
+  if (!quarters.length) return null
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <ArrowsClockwise size={16} weight="duotone" />
+          Eerdere kwartalen
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Klik om een kwartaal te openen.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {quarters.map((q) => {
+            const match = q.quarter.match(/Q(\d)\s+(\d{4})/)
+            const qNum = match ? Number(match[1]) : null
+            const yNum = match ? Number(match[2]) : null
+            const isPayable = q.net_vat_cents >= 0
+            const isEmpty = q.data_status === 'NO_DATA'
+            return (
+              <button
+                key={q.quarter}
+                type="button"
+                onClick={() => qNum && yNum && onSelect(yNum, qNum)}
+                className="text-left rounded-lg border p-3 hover:bg-muted/40 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">{q.quarter}</p>
+                  {isEmpty ? (
+                    <Badge variant="outline" className="text-[10px]">leeg</Badge>
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] ${isPayable ? 'text-red-600 border-red-200' : 'text-green-600 border-green-200'}`}
+                    >
+                      {isPayable ? 'af te dragen' : 'terug'}
+                    </Badge>
+                  )}
+                </div>
+                <p
+                  className={`text-base font-semibold mt-1 ${
+                    isEmpty
+                      ? 'text-muted-foreground'
+                      : isPayable
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-green-600 dark:text-green-400'
+                  }`}
+                >
+                  {isEmpty ? '—' : formatCurrencyAbs(q.net_vat_cents)}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {q.invoice_summary.paid_count} betaald · {q.expense_summary.total_count} uitgaven
+                </p>
+              </button>
+            )
+          })}
         </div>
       </CardContent>
     </Card>
@@ -572,13 +851,30 @@ export const ZZPBtwAangiftePage = () => {
       {/* Main content */}
       {!loading && !error && activeOverview && (
         <>
-          <HeroCard overview={activeOverview} quarterMonths={quarterMonths} />
-          <QuarterDetail
-            overview={activeOverview}
-            showExplanations
-            selectedYear={selectedYear}
-            selectedQuarter={selectedQuarter}
-          />
+          {activeOverview.data_status === 'NO_DATA' ? (
+            <EmptyQuarterCard overview={activeOverview} quarterMonths={quarterMonths} />
+          ) : (
+            <>
+              <HeroCard overview={activeOverview} quarterMonths={quarterMonths} />
+              <PartialStateBanner overview={activeOverview} />
+              <QuarterDetail
+                overview={activeOverview}
+                showExplanations
+                selectedYear={selectedYear}
+                selectedQuarter={selectedQuarter}
+              />
+            </>
+          )}
+          <SourcesPanel overview={activeOverview} />
+          {data?.previous_quarters && data.previous_quarters.length > 0 && (
+            <PreviousQuartersStrip
+              quarters={data.previous_quarters}
+              onSelect={(y, q) => {
+                setSelectedYear(y)
+                setSelectedQuarter(q)
+              }}
+            />
+          )}
         </>
       )}
 

@@ -40,10 +40,24 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Legacy favicon: required for browsers, Google and Facebook crawlers
+         that probe /favicon.ico directly. Without a real file the SPA fallback
+         in nginx returns index.html (HTML), which breaks the favicon and trust
+         signals on social previews. -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="mask-icon" href="/icon.svg" color="#0F172A" />
     <link rel="apple-touch-icon" href="/icon-192x192.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512x512.png" />
+
+    <!-- Facebook domain verification: paste the value Meta gives you in
+         Business Manager → Brand Safety → Domains, then redeploy. Without
+         this tag Facebook cannot associate https://zzpershub.nl with an
+         official Page, which surfaces as "page not found for domain".
+         Provide the value via the FACEBOOK_DOMAIN_VERIFY env (or paste the
+         literal token here) when you have it. -->
+    <!-- <meta name="facebook-domain-verification" content="REPLACE_WITH_TOKEN" /> -->
 
     <!-- Structured Data: Organization -->
     <script type="application/ld+json">

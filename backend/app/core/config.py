@@ -45,8 +45,12 @@ class Settings(BaseSettings):
     
     # Email (Resend)
     RESEND_API_KEY: Optional[str] = None
-    RESEND_FROM_EMAIL: str = "no-reply@example.com"
-    SUPPORT_EMAIL: str = "support@example.com"
+    # Production-safe defaults aligned with the public brand domain. The
+    # sending domain MUST be verified in the Resend dashboard (DKIM/SPF/DMARC
+    # records); otherwise Resend rejects the send. Override per-environment
+    # via env vars.
+    RESEND_FROM_EMAIL: str = "no-reply@zzpershub.nl"
+    SUPPORT_EMAIL: str = "info@zzpershub.nl"
 
     # Invoice-specific email settings (ZZPers Hub)
     # Used for outbound invoice emails to improve deliverability and trust

@@ -7,12 +7,22 @@ Features:
 - Professional, clear email templates
 - Configurable via environment variables
 """
+import html
 import logging
 from typing import Optional
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_brand(value: str) -> str:
+    """Return a brand string safe to interpolate into HTML and plain-text
+    email bodies. Strips control characters and HTML-escapes special chars
+    so a misconfigured APP_NAME cannot break the template or inject markup.
+    """
+    cleaned = "".join(ch for ch in (value or "") if ch.isprintable() and ch not in ("\r", "\n"))
+    return html.escape(cleaned.strip(), quote=True) or "ZZPers Hub"
 
 
 class EmailService:
@@ -72,6 +82,8 @@ class EmailService:
         
         verify_url = self._build_verify_url(token)
         greeting = f"Hi {user_name}," if user_name else "Hi,"
+        brand_html = _safe_brand(settings.APP_NAME)
+        brand_text = " ".join((settings.APP_NAME or "ZZPers Hub").split())
         
         html_content = f"""
         <!DOCTYPE html>
@@ -82,11 +94,11 @@ class EmailService:
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-                <h1 style="color: white; margin: 0; font-size: 24px;">Smart Accounting Platform</h1>
+                <h1 style="color: white; margin: 0; font-size: 24px;">{brand_html}</h1>
             </div>
             <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
                 <p style="margin-top: 0;">{greeting}</p>
-                <p>Thank you for registering with Smart Accounting Platform. Please verify your email address to complete your registration.</p>
+                <p>Thank you for registering with {brand_html}. Please verify your email address to complete your registration.</p>
                 <div style="text-align: center; margin: 30px 0;">
                     <a href="{verify_url}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Verify Email Address</a>
                 </div>
@@ -104,7 +116,7 @@ class EmailService:
         text_content = f"""
 {greeting}
 
-Thank you for registering with Smart Accounting Platform. Please verify your email address to complete your registration.
+Thank you for registering with {brand_text}. Please verify your email address to complete your registration.
 
 Click this link to verify your email:
 {verify_url}
@@ -120,7 +132,7 @@ Need help? Contact us at {settings.SUPPORT_EMAIL}
             self.client.Emails.send({
                 "from": settings.RESEND_FROM_EMAIL,
                 "to": [to_email],
-                "subject": "Verify your email - Smart Accounting Platform",
+                "subject": f"Verify your email - {brand_text}",
                 "html": html_content,
                 "text": text_content,
             })
@@ -175,6 +187,8 @@ Need help? Contact us at {settings.SUPPORT_EMAIL}
         
         reset_url = self._build_reset_url(token)
         greeting = f"Hi {user_name}," if user_name else "Hi,"
+        brand_html = _safe_brand(settings.APP_NAME)
+        brand_text = " ".join((settings.APP_NAME or "ZZPers Hub").split())
         
         html_content = f"""
         <!DOCTYPE html>
@@ -185,7 +199,7 @@ Need help? Contact us at {settings.SUPPORT_EMAIL}
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-                <h1 style="color: white; margin: 0; font-size: 24px;">Smart Accounting Platform</h1>
+                <h1 style="color: white; margin: 0; font-size: 24px;">{brand_html}</h1>
             </div>
             <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
                 <p style="margin-top: 0;">{greeting}</p>
@@ -222,7 +236,7 @@ Need help? Contact us at {settings.SUPPORT_EMAIL}
             self.client.Emails.send({
                 "from": settings.RESEND_FROM_EMAIL,
                 "to": [to_email],
-                "subject": "Reset your password - Smart Accounting Platform",
+                "subject": f"Reset your password - {brand_text}",
                 "html": html_content,
                 "text": text_content,
             })

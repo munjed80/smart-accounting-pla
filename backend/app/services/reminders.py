@@ -27,6 +27,7 @@ from app.models.accountant_dashboard import (
     ReminderStatus,
 )
 from app.models.work_queue import DashboardAuditLog, DashboardAuditActionType
+from app.core.config import settings
 
 
 class ReminderServiceError(Exception):
@@ -60,8 +61,13 @@ class ReminderService:
     def __init__(self, db: AsyncSession, accountant_id: uuid.UUID):
         self.db = db
         self.accountant_id = accountant_id
-        self.resend_api_key = os.environ.get("RESEND_API_KEY")
-        self.from_email = os.environ.get("RESEND_FROM_EMAIL", "noreply@zzphub.nl")
+        # Read sender identity from the central settings object so the
+        # value matches the rest of the platform (config.py / .env). The
+        # previous direct os.environ read used a typo'd fallback
+        # ("noreply@zzphub.nl" — note the missing "ers") which produced
+        # an unverified sender domain and silent Resend rejections.
+        self.resend_api_key = settings.RESEND_API_KEY
+        self.from_email = settings.RESEND_FROM_EMAIL
     
     @property
     def email_enabled(self) -> bool:

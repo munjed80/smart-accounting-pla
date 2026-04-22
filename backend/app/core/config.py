@@ -51,7 +51,12 @@ class Settings(BaseSettings):
     # Invoice-specific email settings (ZZPers Hub)
     # Used for outbound invoice emails to improve deliverability and trust
     INVOICE_FROM_EMAIL: str = "facturen@zzpershub.nl"
-    INVOICE_FROM_NAME: str = "ZZPers Hub Facturen"
+    # Neutral, non-branded fallback display name used for the invoice
+    # "From" header only when the seller (the ZZP'er) has not configured a
+    # company_name or trading_name on their business profile. Avoid using
+    # platform branding here, because the email is sent on behalf of the
+    # seller, not the platform.
+    INVOICE_FROM_NAME: str = "Facturatie"
     INVOICE_REPLY_TO: str = "info@zzpershub.nl"
     
     @property

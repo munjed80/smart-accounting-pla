@@ -912,7 +912,11 @@ async def send_invoice(
         # Prepare email content
         invoice_number = invoice.invoice_number
         total_amount = f"€{invoice.total_cents / 100:.2f}"
-        seller_name = invoice.seller_company_name or invoice.seller_trading_name or "ZZPers Hub"
+        seller_name = (
+            invoice.seller_company_name
+            or invoice.seller_trading_name
+            or settings.INVOICE_FROM_NAME
+        )
 
         # Build a production-safe "From" display name of the form
         # "[Company Name] via ZZPersHub". The underlying email address
@@ -929,7 +933,11 @@ async def send_invoice(
             cleaned = " ".join(cleaned.split())
             return cleaned
 
-        safe_seller_name = _sanitize_display_name(seller_name) or "ZZPers Hub"
+        safe_seller_name = (
+            _sanitize_display_name(seller_name)
+            or _sanitize_display_name(settings.INVOICE_FROM_NAME)
+            or "Facturatie"
+        )
         display_name = f"{safe_seller_name} via ZZPersHub"
         from_address = f'"{display_name}" <{settings.INVOICE_FROM_EMAIL}>'
 

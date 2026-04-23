@@ -2,22 +2,44 @@
 
 This guide covers deploying the Smart Accounting Platform using Coolify.
 
+> **Source of truth in production:** Coolify (or the orchestrator) injects all
+> environment variables at runtime. The backend deliberately skips loading any
+> bundled `.env` file when `ENV=production`, so a stale `.env` in the image
+> cannot shadow the runtime configuration.
+>
+> At startup the backend runs `validate_production_environment()` (called from
+> both `backend/startup.sh` pre-flight and the FastAPI `lifespan`) and refuses
+> to start if any required value is missing, contains a placeholder
+> (`change_me`, `change-me`, `secret`, …), points at `localhost`/`127.0.0.1`,
+> or if `MOLLIE_API_KEY` is set without `MOLLIE_WEBHOOK_SECRET` and a public
+> `APP_PUBLIC_URL`/`APP_URL`.
+
 ## Required Environment Variables
 
 ### Backend (API Server)
 
 | Variable | Required | Description | Example |
 |----------|----------|-------------|---------|
-| `DATABASE_URL` | ✅ | PostgreSQL connection string | `postgresql+asyncpg://user:pass@host:5432/db` |
+| `ENV` | ✅ | Environment name (case-insensitive) | `production` |
+| `DATABASE_URL` | ✅ | Async PostgreSQL connection string | `postgresql+asyncpg://user:pass@host:5432/db` |
 | `DATABASE_URL_SYNC` | ✅ | Sync PostgreSQL URL for Alembic | `postgresql://user:pass@host:5432/db` |
 | `SECRET_KEY` | ✅ | JWT signing key (32+ chars) | `openssl rand -hex 32` |
-| `ENV` | ⚠️ | Environment name | `production` |
-| `CORS_ORIGINS` | ⚠️ | Allowed CORS origins | `https://zzpershub.nl,https://www.zzpershub.nl` |
-| `FRONTEND_URL` | ⚠️ | Frontend URL for email links | `https://zzpershub.nl` |
-| `REDIS_URL` | ❌ | Redis connection (optional) | `redis://redis:6379/0` |
+| `APP_URL` | ✅ | Public backend URL (no `localhost` in prod) | `https://api.zzpershub.nl` |
+| `FRONTEND_URL` | ✅ | Public frontend URL (used in emails) | `https://zzpershub.nl` |
+| `CORS_ORIGINS` | ✅ | Allowed CORS origins (must include a public origin) | `https://zzpershub.nl,https://www.zzpershub.nl` |
+| `APP_PUBLIC_URL` | ⚠️ | Public webhook URL; required when Mollie is enabled | `https://api.zzpershub.nl` |
+| `MOLLIE_API_KEY` | ⚠️ | Mollie API key (`test_*` / `live_*`); enables subscriptions | `live_xxx` |
+| `MOLLIE_WEBHOOK_SECRET` | ⚠️ | Required when `MOLLIE_API_KEY` is set | `openssl rand -hex 32` |
+| `REDIS_URL` | ❌ | Redis connection (optional, enables Redis-backed features) | `redis://redis:6379/0` |
 | `RESEND_API_KEY` | ❌ | Resend email API key | `re_xxxxx` |
-| `GIT_SHA` | ❌ | Git commit SHA for versioning | `abc123def` |
-| `BUILD_TIME` | ❌ | ISO 8601 build timestamp | `2024-01-15T10:30:00Z` |
+| `GOCARDLESS_SECRET_ID` | ❌ | PSD2 bank-data secret id | `…` |
+| `GOCARDLESS_SECRET_KEY` | ❌ | PSD2 bank-data secret key | `…` |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | ❌ | Web Push (only if `VITE_PWA_PUSH=true`) | – |
+| `FORWARDED_ALLOW_IPS` | ⚠️ | Trusted reverse-proxy CIDR for `X-Forwarded-*` headers | `172.16.0.0/12` |
+| `BILLING_FORCE_PAYWALL` | ❌ | Force all ZZP users without ACTIVE subscription to pay | `false` |
+| `BILLING_TRIAL_OVERRIDE_DAYS` | ❌ | Shorten all trials to N days (test mode) | `0` |
+| `GIT_SHA` | ❌ | Git commit SHA for versioning (build arg) | `abc123def` |
+| `BUILD_TIME` | ❌ | ISO 8601 build timestamp (build arg) | `2024-01-15T10:30:00Z` |
 
 ### Frontend (Web UI)
 

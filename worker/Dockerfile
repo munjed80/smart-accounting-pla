@@ -20,9 +20,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Environment variables
-ENV DATABASE_URL="postgresql://accounting_user:change_me@db:5432/accounting_db"
-ENV REDIS_URL="redis://redis:6379/0"
+# DO NOT bake DATABASE_URL / REDIS_URL into the image. They MUST be injected
+# at runtime by Coolify (or docker-compose), so a built image cannot
+# accidentally connect to a placeholder database. The worker fails fast in
+# main() if these variables are missing.
 
 # Run the worker
 CMD ["python", "processor.py"]

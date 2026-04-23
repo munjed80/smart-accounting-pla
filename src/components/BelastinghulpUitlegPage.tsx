@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { PageContainer, PageHeader } from '@/components/ui/page'
 import {
   Accordion,
   AccordionContent,
@@ -29,9 +30,16 @@ import {
   ArrowRight,
   CalendarCheck,
   Folder,
-  ShieldWarning,
+  Question,
 } from '@phosphor-icons/react'
 import { navigateTo } from '@/lib/navigation'
+import { cn } from '@/lib/utils'
+import {
+  SoftNote,
+  IconChip,
+  Disclaimer,
+  sectionCardClass,
+} from '@/components/belastinghulp/shared'
 
 /* ------------------------------------------------------------------ */
 /*  Step card component                                                */
@@ -48,10 +56,10 @@ interface StepCardProps {
 const StepCard = ({ stepNumber, title, description, isLast, children }: StepCardProps) => (
   <div className="flex gap-4">
     <div className="flex flex-col items-center">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary text-sm font-semibold ring-1 ring-primary/20">
         {stepNumber}
       </div>
-      {!isLast && <div className="mt-2 w-px flex-1 bg-border" />}
+      {!isLast && <div className="mt-2 w-px flex-1 bg-border/50" />}
     </div>
     <div className={`flex-1 min-w-0 ${isLast ? '' : 'pb-8'}`}>
       <h3 className="font-semibold leading-none">{title}</h3>
@@ -72,12 +80,23 @@ interface ChecklistItemProps {
 
 const ChecklistItem = ({ label, hint }: ChecklistItemProps) => (
   <li className="flex items-start gap-2">
-    <CheckCircle size={18} weight="duotone" className="text-green-600 mt-0.5 shrink-0" />
+    <CheckCircle size={18} weight="duotone" className="text-emerald-500 dark:text-emerald-300 mt-0.5 shrink-0" />
     <div>
       <span className="text-sm">{label}</span>
       {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
     </div>
   </li>
+)
+
+/**
+ * Numbered step pill used in the kwartaal/jaar checklists.  Replaces a
+ * plain `border` circle with a subtle Agenda-style chip that reads as
+ * part of the section instead of as a stray outline.
+ */
+const NumberPill = ({ n }: { n: number }) => (
+  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold ring-1 ring-primary/20">
+    {n}
+  </span>
 )
 
 /* ------------------------------------------------------------------ */
@@ -115,54 +134,49 @@ export const BelastinghulpUitlegPage = () => {
   const [activeSection, setActiveSection] = useState<SectionId>('btw')
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Uitleg &amp; Hulp</h1>
-        <p className="text-muted-foreground mt-1">
-          Stap-voor-stap uitleg over belastingzaken voor ZZP&apos;ers. Kies een onderwerp om te beginnen.
-        </p>
-      </div>
+    <PageContainer width="wide">
+      <div className="space-y-6">
+        <PageHeader
+          icon={<Question size={32} weight="duotone" />}
+          title="Uitleg & Hulp"
+          description="Stap-voor-stap uitleg over belastingzaken voor ZZP'ers. Kies een onderwerp om te beginnen."
+        />
 
-      {/* Quick-tip card */}
-      <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <Lightbulb size={24} weight="duotone" className="text-blue-600 dark:text-blue-400 shrink-0" />
-            <div>
-              <CardTitle className="text-blue-900 dark:text-blue-200">Tip</CardTitle>
-              <CardDescription className="text-blue-700 dark:text-blue-300">
-                Houd je boekhouding bij gedurende het hele jaar. Zo voorkom je stress bij de aangifte en mis je geen aftrekposten.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
+        {/* Quick-tip card */}
+        <SoftNote
+          tone="tip"
+          icon={<Lightbulb size={16} weight="duotone" />}
+          title="Tip"
+          description="Houd je boekhouding bij gedurende het hele jaar. Zo voorkom je stress bij de aangifte en mis je geen aftrekposten."
+        />
 
-      {/* Section navigator */}
-      <div className="flex flex-wrap gap-2">
-        {sections.map((s) => (
-          <Button
-            key={s.id}
-            variant={activeSection === s.id ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveSection(s.id)}
-            className="gap-1.5"
-          >
-            {s.icon}
-            {s.label}
-          </Button>
-        ))}
-      </div>
+        {/* Section navigator */}
+        <div className="flex flex-wrap gap-2">
+          {sections.map((s) => (
+            <Button
+              key={s.id}
+              variant={activeSection === s.id ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveSection(s.id)}
+              className={cn(
+                'gap-1.5',
+                activeSection !== s.id && 'bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/30',
+              )}
+            >
+              {s.icon}
+              {s.label}
+            </Button>
+          ))}
+        </div>
 
       {/* ============================================================ */}
       {/*  1. BTW Aangifte                                              */}
       {/* ============================================================ */}
       {activeSection === 'btw' && (
-        <Card>
+        <Card className={cn(sectionCardClass)}>
           <CardHeader>
             <div className="flex items-center gap-3">
-              <Receipt size={24} weight="duotone" className="text-primary" />
+              <IconChip icon={<Receipt size={18} weight="duotone" />} tone="tip" />
               <div>
                 <CardTitle>BTW Aangifte – stap voor stap</CardTitle>
                 <CardDescription>
@@ -238,10 +252,10 @@ export const BelastinghulpUitlegPage = () => {
       {/*  2. Inkomstenbelasting jaaraangifte                           */}
       {/* ============================================================ */}
       {activeSection === 'inkomstenbelasting' && (
-        <Card>
+        <Card className={cn(sectionCardClass)}>
           <CardHeader>
             <div className="flex items-center gap-3">
-              <CurrencyEur size={24} weight="duotone" className="text-primary" />
+              <IconChip icon={<CurrencyEur size={18} weight="duotone" />} tone="tip" />
               <div>
                 <CardTitle>Inkomstenbelasting – jaaraangifte</CardTitle>
                 <CardDescription>
@@ -320,10 +334,10 @@ export const BelastinghulpUitlegPage = () => {
       {/*  3. Documenten voorbereiden                                   */}
       {/* ============================================================ */}
       {activeSection === 'documenten' && (
-        <Card>
+        <Card className={cn(sectionCardClass)}>
           <CardHeader>
             <div className="flex items-center gap-3">
-              <Folder size={24} weight="duotone" className="text-primary" />
+              <IconChip icon={<Folder size={18} weight="duotone" />} tone="tip" />
               <div>
                 <CardTitle>Welke documenten heb je nodig?</CardTitle>
                 <CardDescription>
@@ -377,10 +391,10 @@ export const BelastinghulpUitlegPage = () => {
       {/*  4. Veelgemaakte fouten                                       */}
       {/* ============================================================ */}
       {activeSection === 'fouten' && (
-        <Card>
+        <Card className={cn(sectionCardClass)}>
           <CardHeader>
             <div className="flex items-center gap-3">
-              <WarningCircle size={24} weight="duotone" className="text-orange-600" />
+              <IconChip icon={<WarningCircle size={18} weight="duotone" />} tone="warning" />
               <div>
                 <CardTitle>Veelgemaakte fouten</CardTitle>
                 <CardDescription>
@@ -394,7 +408,7 @@ export const BelastinghulpUitlegPage = () => {
               <AccordionItem value="m1">
                 <AccordionTrigger>
                   <span className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-orange-600 border-orange-300">1</Badge>
+                    <Badge variant="outline" className="text-amber-600 dark:text-amber-300 border-amber-500/30 bg-amber-500/10">1</Badge>
                     BTW niet op tijd aangeven
                   </span>
                 </AccordionTrigger>
@@ -409,7 +423,7 @@ export const BelastinghulpUitlegPage = () => {
               <AccordionItem value="m2">
                 <AccordionTrigger>
                   <span className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-orange-600 border-orange-300">2</Badge>
+                    <Badge variant="outline" className="text-amber-600 dark:text-amber-300 border-amber-500/30 bg-amber-500/10">2</Badge>
                     Privé- en zakelijke kosten door elkaar
                   </span>
                 </AccordionTrigger>
@@ -424,7 +438,7 @@ export const BelastinghulpUitlegPage = () => {
               <AccordionItem value="m3">
                 <AccordionTrigger>
                   <span className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-orange-600 border-orange-300">3</Badge>
+                    <Badge variant="outline" className="text-amber-600 dark:text-amber-300 border-amber-500/30 bg-amber-500/10">3</Badge>
                     Bonnetjes niet bewaren
                   </span>
                 </AccordionTrigger>
@@ -439,7 +453,7 @@ export const BelastinghulpUitlegPage = () => {
               <AccordionItem value="m4">
                 <AccordionTrigger>
                   <span className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-orange-600 border-orange-300">4</Badge>
+                    <Badge variant="outline" className="text-amber-600 dark:text-amber-300 border-amber-500/30 bg-amber-500/10">4</Badge>
                     Uren niet bijhouden
                   </span>
                 </AccordionTrigger>
@@ -454,7 +468,7 @@ export const BelastinghulpUitlegPage = () => {
               <AccordionItem value="m5">
                 <AccordionTrigger>
                   <span className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-orange-600 border-orange-300">5</Badge>
+                    <Badge variant="outline" className="text-amber-600 dark:text-amber-300 border-amber-500/30 bg-amber-500/10">5</Badge>
                     Aftrekposten vergeten
                   </span>
                 </AccordionTrigger>
@@ -475,10 +489,10 @@ export const BelastinghulpUitlegPage = () => {
       {/*  5. Einde-kwartaal checklist                                  */}
       {/* ============================================================ */}
       {activeSection === 'kwartaal' && (
-        <Card>
+        <Card className={cn(sectionCardClass)}>
           <CardHeader>
             <div className="flex items-center gap-3">
-              <CalendarCheck size={24} weight="duotone" className="text-primary" />
+              <IconChip icon={<CalendarCheck size={18} weight="duotone" />} tone="tip" />
               <div>
                 <CardTitle>Einde-kwartaal checklist</CardTitle>
                 <CardDescription>
@@ -490,7 +504,7 @@ export const BelastinghulpUitlegPage = () => {
           <CardContent>
             <ol className="space-y-4">
               <li className="flex gap-4">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">1</span>
+                <NumberPill n={1} />
                 <div>
                   <p className="text-sm font-medium">Controleer of alle facturen zijn ingevoerd</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -499,7 +513,7 @@ export const BelastinghulpUitlegPage = () => {
                 </div>
               </li>
               <li className="flex gap-4">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">2</span>
+                <NumberPill n={2} />
                 <div>
                   <p className="text-sm font-medium">Verwerk alle bonnetjes en uitgaven</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -508,7 +522,7 @@ export const BelastinghulpUitlegPage = () => {
                 </div>
               </li>
               <li className="flex gap-4">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">3</span>
+                <NumberPill n={3} />
                 <div>
                   <p className="text-sm font-medium">Controleer je bankafschriften</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -517,7 +531,7 @@ export const BelastinghulpUitlegPage = () => {
                 </div>
               </li>
               <li className="flex gap-4">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">4</span>
+                <NumberPill n={4} />
                 <div>
                   <p className="text-sm font-medium">Bekijk je BTW-overzicht</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -526,7 +540,7 @@ export const BelastinghulpUitlegPage = () => {
                 </div>
               </li>
               <li className="flex gap-4">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">5</span>
+                <NumberPill n={5} />
                 <div>
                   <p className="text-sm font-medium">Dien je BTW-aangifte in</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -535,7 +549,7 @@ export const BelastinghulpUitlegPage = () => {
                 </div>
               </li>
               <li className="flex gap-4">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">6</span>
+                <NumberPill n={6} />
                 <div>
                   <p className="text-sm font-medium">Controleer openstaande debiteuren</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -566,10 +580,10 @@ export const BelastinghulpUitlegPage = () => {
       {/*  6. Einde-jaar checklist                                      */}
       {/* ============================================================ */}
       {activeSection === 'jaar' && (
-        <Card>
+        <Card className={cn(sectionCardClass)}>
           <CardHeader>
             <div className="flex items-center gap-3">
-              <ListChecks size={24} weight="duotone" className="text-primary" />
+              <IconChip icon={<ListChecks size={18} weight="duotone" />} tone="tip" />
               <div>
                 <CardTitle>Einde-jaar checklist</CardTitle>
                 <CardDescription>
@@ -581,7 +595,7 @@ export const BelastinghulpUitlegPage = () => {
           <CardContent>
             <ol className="space-y-4">
               <li className="flex gap-4">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">1</span>
+                <NumberPill n={1} />
                 <div>
                   <p className="text-sm font-medium">Rond alle kwartaalchecklists af</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -590,7 +604,7 @@ export const BelastinghulpUitlegPage = () => {
                 </div>
               </li>
               <li className="flex gap-4">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">2</span>
+                <NumberPill n={2} />
                 <div>
                   <p className="text-sm font-medium">Controleer je urenregistratie</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -599,7 +613,7 @@ export const BelastinghulpUitlegPage = () => {
                 </div>
               </li>
               <li className="flex gap-4">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">3</span>
+                <NumberPill n={3} />
                 <div>
                   <p className="text-sm font-medium">Maak een overzicht van investeringen</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -608,7 +622,7 @@ export const BelastinghulpUitlegPage = () => {
                 </div>
               </li>
               <li className="flex gap-4">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">4</span>
+                <NumberPill n={4} />
                 <div>
                   <p className="text-sm font-medium">Bereken je winst en verlies</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -617,7 +631,7 @@ export const BelastinghulpUitlegPage = () => {
                 </div>
               </li>
               <li className="flex gap-4">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">5</span>
+                <NumberPill n={5} />
                 <div>
                   <p className="text-sm font-medium">Controleer privégebruik zakelijke goederen</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -626,7 +640,7 @@ export const BelastinghulpUitlegPage = () => {
                 </div>
               </li>
               <li className="flex gap-4">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">6</span>
+                <NumberPill n={6} />
                 <div>
                   <p className="text-sm font-medium">Bereid je inkomstenbelasting-aangifte voor</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -635,7 +649,7 @@ export const BelastinghulpUitlegPage = () => {
                 </div>
               </li>
               <li className="flex gap-4">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">7</span>
+                <NumberPill n={7} />
                 <div>
                   <p className="text-sm font-medium">Archiveer je administratie</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -660,10 +674,10 @@ export const BelastinghulpUitlegPage = () => {
       )}
 
       {/* More help */}
-      <Card>
+      <Card className={cn(sectionCardClass)}>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <Info size={24} weight="duotone" className="text-primary" />
+            <IconChip icon={<Info size={18} weight="duotone" />} tone="tip" />
             <div>
               <CardTitle>Meer informatie nodig?</CardTitle>
               <CardDescription>
@@ -675,15 +689,13 @@ export const BelastinghulpUitlegPage = () => {
       </Card>
 
       {/* Disclaimer */}
-      <div className="flex items-start gap-2 rounded-lg border border-muted bg-muted/30 px-4 py-3">
-        <ShieldWarning size={18} weight="duotone" className="text-muted-foreground mt-0.5 shrink-0" />
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          <span className="font-medium">Disclaimer:</span> De informatie op deze pagina is
-          bedoeld als algemene toelichting en vormt geen fiscaal, juridisch of financieel advies.
-          Raadpleeg altijd een gekwalificeerde belastingadviseur of boekhouder voor advies dat
-          past bij jouw specifieke situatie. Aan deze informatie kunnen geen rechten worden ontleend.
-        </p>
+      <Disclaimer>
+        <span className="font-medium text-foreground">Disclaimer:</span> De informatie op deze pagina is
+        bedoeld als algemene toelichting en vormt geen fiscaal, juridisch of financieel advies.
+        Raadpleeg altijd een gekwalificeerde belastingadviseur of boekhouder voor advies dat
+        past bij jouw specifieke situatie. Aan deze informatie kunnen geen rechten worden ontleend.
+      </Disclaimer>
       </div>
-    </div>
+    </PageContainer>
   )
 }

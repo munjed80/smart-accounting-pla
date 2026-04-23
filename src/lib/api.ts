@@ -6209,16 +6209,20 @@ export interface BTWQuarterOverview {
   quarter_end: string
   deadline: string
   days_until_deadline: number
+  basis: string
   omzet_cents: number
   output_vat_cents: number
   input_vat_cents: number
   net_vat_cents: number
+  unpaid_vat_cents: number
   vat_rate_breakdown: BTWVatRateBreakdown[]
   invoice_summary: BTWInvoiceSummary
   expense_summary: BTWExpenseSummary
   warnings: BTWWarning[]
   is_ready: boolean
   readiness_notes: string[]
+  data_status: 'NO_DATA' | 'ONLY_DRAFTS' | 'ONLY_UNPAID' | 'ONLY_INVOICES' | 'ONLY_EXPENSES' | 'COMPLETE'
+  data_status_reason: string
   generated_at: string
 }
 

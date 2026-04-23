@@ -85,11 +85,27 @@ class BTWQuarterOverview(BaseModel):
     deadline: str = Field(..., description="Filing deadline ISO")
     days_until_deadline: int = Field(0, description="Days remaining")
 
+    # Calculation basis (always cash basis / kasstelsel for ZZP self-service).
+    # Exposed so the UI can label numbers correctly and explain the
+    # "Voorlopig" state to the user.
+    basis: str = Field(
+        "kasstelsel",
+        description="Calculation basis: 'kasstelsel' = cash basis, only paid invoices count.",
+    )
+
     # Key totals
     omzet_cents: int = Field(0, description="Total revenue (ex. BTW)")
     output_vat_cents: int = Field(0, description="Total output VAT (BTW afgedragen)")
     input_vat_cents: int = Field(0, description="Total deductible input VAT (voorbelasting)")
     net_vat_cents: int = Field(0, description="Net VAT: output - input. Positive = pay, Negative = reclaim")
+
+    # VAT held in invoices that have been sent but are not yet paid.
+    # On kasstelsel this VAT is *not* included in output_vat_cents – exposing
+    # it lets the UI explain why the headline number looks low compared to
+    # what the user sees on the Facturen page.
+    unpaid_vat_cents: int = Field(
+        0, description="Output VAT on sent/overdue invoices not yet collected."
+    )
 
     # Breakdowns
     vat_rate_breakdown: List[BTWVatRateBreakdown] = Field(default_factory=list)
@@ -102,6 +118,31 @@ class BTWQuarterOverview(BaseModel):
     # Readiness
     is_ready: bool = Field(False, description="Whether data looks complete enough to file")
     readiness_notes: List[str] = Field(default_factory=list)
+
+    # Coarse classification of the quarter so the frontend can pick the
+    # right empty/partial/full state instead of conflating everything as
+    # a generic zero result.
+    #
+    # Values:
+    #   NO_DATA         – no invoices and no expenses exist for the quarter
+    #   ONLY_DRAFTS     – invoices exist but only as drafts (not counted)
+    #   ONLY_UNPAID     – invoices exist & are sent but none are paid yet
+    #                     (kasstelsel ⇒ no output VAT counted)
+    #   ONLY_INVOICES   – paid invoices exist but no expenses recorded
+    #                     (no deductible input VAT)
+    #   ONLY_EXPENSES   – expenses exist but no paid invoices
+    #   COMPLETE        – both paid invoices and expenses are present
+    data_status: str = Field(
+        "NO_DATA",
+        description=(
+            "Quarter completeness: NO_DATA | ONLY_DRAFTS | ONLY_UNPAID | "
+            "ONLY_INVOICES | ONLY_EXPENSES | COMPLETE"
+        ),
+    )
+    data_status_reason: str = Field(
+        "",
+        description="Short Dutch human-readable explanation of data_status.",
+    )
 
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -207,6 +248,11 @@ async def build_quarter_overview(
 
     total_omzet = sum(i.subtotal_cents or 0 for i in paid_invoices)
     total_output_vat = sum(i.vat_total_cents or 0 for i in paid_invoices)
+    # VAT held in invoices that have been sent but are not yet paid.  On
+    # the cash basis (kasstelsel) this is *not* part of total_output_vat,
+    # but exposing it lets the UI explain why the headline number is lower
+    # than the totals shown on the Facturen page.
+    unpaid_vat = sum(i.vat_total_cents or 0 for i in sent_invoices)
 
     invoice_summary = BTWInvoiceSummary(
         total_count=len(quarter_invoices),
@@ -395,22 +441,71 @@ async def build_quarter_overview(
 
     days_until_deadline = max(0, (btw_deadline - today).days)
 
+    # ------------------------------------------------------------------
+    # 8. Coarse data-status classification
+    # ------------------------------------------------------------------
+    # Drives distinct empty/partial/full states in the UI.  Order matters:
+    # the most informative classification wins.
+    has_paid = len(paid_invoices) > 0
+    has_expenses = len(quarter_expenses) > 0
+    has_unpaid = len(sent_invoices) > 0
+    has_drafts = len(draft_invoices) > 0
+
+    if has_paid and has_expenses:
+        data_status = "COMPLETE"
+        data_status_reason = (
+            "Zowel betaalde facturen als uitgaven zijn aanwezig in dit kwartaal."
+        )
+    elif has_paid and not has_expenses:
+        data_status = "ONLY_INVOICES"
+        data_status_reason = (
+            "Wel omzet, maar geen geregistreerde uitgaven in dit kwartaal — "
+            "voorbelasting is daarom € 0."
+        )
+    elif not has_paid and has_expenses:
+        data_status = "ONLY_EXPENSES"
+        data_status_reason = (
+            "Wel uitgaven, maar nog geen betaalde facturen — er is daarom geen "
+            "af te dragen BTW (kasstelsel)."
+        )
+    elif not has_paid and has_unpaid:
+        data_status = "ONLY_UNPAID"
+        data_status_reason = (
+            "Er zijn verstuurde facturen, maar nog geen betaling ontvangen. "
+            "Op kasstelsel telt BTW pas mee zodra de factuur betaald is."
+        )
+    elif not has_paid and has_drafts:
+        data_status = "ONLY_DRAFTS"
+        data_status_reason = (
+            "Alle facturen in dit kwartaal staan nog op concept en tellen "
+            "niet mee voor de BTW. Verstuur ze eerst."
+        )
+    else:
+        data_status = "NO_DATA"
+        data_status_reason = (
+            "Nog geen facturen of uitgaven in dit kwartaal."
+        )
+
     return BTWQuarterOverview(
         quarter=quarter_label,
         quarter_start=quarter_start.isoformat(),
         quarter_end=quarter_end.isoformat(),
         deadline=btw_deadline.isoformat(),
         days_until_deadline=days_until_deadline,
+        basis="kasstelsel",
         omzet_cents=total_omzet,
         output_vat_cents=total_output_vat,
         input_vat_cents=total_input_vat,
         net_vat_cents=net_vat,
+        unpaid_vat_cents=unpaid_vat,
         vat_rate_breakdown=vat_rate_breakdown,
         invoice_summary=invoice_summary,
         expense_summary=expense_summary,
         warnings=warnings,
         is_ready=is_ready,
         readiness_notes=readiness_notes,
+        data_status=data_status,
+        data_status_reason=data_status_reason,
     )
 
 

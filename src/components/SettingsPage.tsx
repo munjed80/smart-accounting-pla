@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PageContainer, PageHeader } from '@/components/ui/page'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -633,20 +634,13 @@ export const SettingsPage = () => {
   }
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-background via-secondary to-background">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))] pointer-events-none" />
-      
-      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in duration-500">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
-            <Gear size={32} weight="duotone" className="text-primary" />
-            {t('settings.title')}
-          </h1>
-          <p className="text-muted-foreground">
-            {t('settings.subtitle')}
-          </p>
-        </div>
+    <PageContainer width="narrow" padding="compact">
+      <div className="animate-in fade-in duration-500">
+        <PageHeader
+          icon={<Gear size={32} weight="duotone" />}
+          title={t('settings.title')}
+          description={t('settings.subtitle')}
+        />
 
         {/* Display load error if present */}
         {loadError && (
@@ -1372,7 +1366,7 @@ export const SettingsPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageContainer>
   )
 }
 

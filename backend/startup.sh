@@ -17,8 +17,26 @@ echo "======================================"
 echo "Smart Accounting Platform - Startup"
 echo "======================================"
 
-echo "Running database migrations..."
 cd /app
+
+# Pre-flight: validate environment configuration before touching the database.
+# This surfaces missing/insecure SECRET_KEY, DATABASE_URL placeholders, missing
+# public URLs, missing Mollie webhook secret, etc., with a single readable error.
+# In non-production, problems are logged as warnings and startup continues.
+echo "Validating environment configuration..."
+python -c "from app.core.config import settings; settings.validate_production_environment()"
+PREFLIGHT_EXIT_CODE=$?
+if [ $PREFLIGHT_EXIT_CODE -ne 0 ]; then
+    echo "======================================="
+    echo "ERROR: Environment configuration is invalid!"
+    echo "======================================="
+    echo "Fix the reported issues (typically via Coolify environment variables)"
+    echo "and redeploy. Startup aborted to prevent running with unsafe defaults."
+    exit 1
+fi
+echo "Environment configuration OK."
+
+echo "Running database migrations..."
 
 # Attempt migrations with proper error handling
 # Do NOT use 'set -e' here - we need to handle failures gracefully

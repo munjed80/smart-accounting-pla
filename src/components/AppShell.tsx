@@ -936,7 +936,11 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
       </main>
 
       {isZZP && mobileBottomNavItems.length > 0 && (
-        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-sm lg:hidden" aria-label="Mobiele navigatie">
+        <nav
+          className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-sm lg:hidden"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+          aria-label="Mobiele navigatie"
+        >
           <ul className="grid grid-cols-5">
             {mobileBottomNavItems.map((item) => {
               const isActive = activeTab === item.tabValue
@@ -945,8 +949,19 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
                   <button
                     onClick={() => handleMenuClick(item)}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`flex w-full flex-col items-center justify-center gap-1 py-2 text-[11px] ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
+                    className={`relative flex w-full flex-col items-center justify-center gap-1 py-2 text-[11px] transition-colors ${
+                      isActive
+                        ? 'text-primary'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
                   >
+                    {/* Active indicator bar */}
+                    <span
+                      aria-hidden
+                      className={`absolute top-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-primary transition-opacity ${
+                        isActive ? 'opacity-100' : 'opacity-0'
+                      }`}
+                    />
                     {item.icon}
                     <span className="truncate max-w-[72px]">{item.label}</span>
                   </button>

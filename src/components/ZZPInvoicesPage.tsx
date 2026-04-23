@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
@@ -2130,23 +2131,16 @@ const ZZPInvoicesPageContent = () => {
                   </CardDescription>
                 </div>
                 <div className="flex gap-1.5">
-                  {(['this_month', 'last_6_months', 'this_year'] as MonthlyInvoicePeriod[]).map(p => (
-                    <button
-                      key={p}
-                      onClick={() => setMonthlyPeriod(p)}
-                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                        monthlyPeriod === p
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'border-border/50 text-muted-foreground hover:border-muted-foreground/50'
-                      }`}
-                    >
-                      {p === 'this_month'
-                        ? t('zzpInvoices.monthlyPeriodThisMonth')
-                        : p === 'last_6_months'
-                        ? t('zzpInvoices.monthlyPeriodLast6Months')
-                        : t('zzpInvoices.monthlyPeriodThisYear')}
-                    </button>
-                  ))}
+                  <SegmentedControl<MonthlyInvoicePeriod>
+                    value={monthlyPeriod}
+                    onChange={setMonthlyPeriod}
+                    ariaLabel={t('zzpInvoices.monthlyOverviewTitle')}
+                    options={[
+                      { value: 'this_month', label: t('zzpInvoices.monthlyPeriodThisMonth') },
+                      { value: 'last_6_months', label: t('zzpInvoices.monthlyPeriodLast6Months') },
+                      { value: 'this_year', label: t('zzpInvoices.monthlyPeriodThisYear') },
+                    ]}
+                  />
                 </div>
               </div>
             </CardHeader>

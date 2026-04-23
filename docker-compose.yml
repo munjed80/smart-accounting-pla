@@ -1,5 +1,15 @@
 version: '3.8'
 
+# Smart Accounting Platform – local & Coolify-compatible compose file.
+#
+# In production (Coolify), each service receives its environment variables
+# directly from the orchestrator. The `${VAR:?...}` syntax below makes the
+# required production secrets explicit – `docker compose up` fails fast with
+# a readable message if any of them is missing, instead of silently using an
+# insecure placeholder.
+#
+# For local development, copy `.env.example` to `.env` and fill in values.
+
 services:
   # PostgreSQL Database
   db:
@@ -8,7 +18,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-accounting_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required – set it in .env or your orchestrator}
       POSTGRES_DB: ${POSTGRES_DB:-accounting_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -39,15 +49,45 @@ services:
     container_name: smart-accounting-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-accounting_user}:${POSTGRES_PASSWORD:-change_me}@db:5432/${POSTGRES_DB:-accounting_db}
-      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-accounting_user}:${POSTGRES_PASSWORD:-change_me}@db:5432/${POSTGRES_DB:-accounting_db}
-      REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-use-openssl-rand-hex-32}
-      UPLOAD_DIR: /data/uploads
+      # Core
+      ENV: ${ENV:-production}
       DEBUG: ${DEBUG:-false}
-      # CORS: Allow frontend origins (comma-separated)
-      # For local dev: http://localhost:3000 (container nginx) + http://localhost:5173 (vite dev server)
+      PORT: ${PORT:-8000}
+      # Database (composed from POSTGRES_* so compose & backend stay in sync)
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-accounting_user}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:-accounting_db}
+      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-accounting_user}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:-accounting_db}
+      REDIS_URL: redis://redis:6379/0
+      # Security – must be a 32+ char value (e.g. `openssl rand -hex 32`)
+      SECRET_KEY: "${SECRET_KEY:?SECRET_KEY is required – generate one with: openssl rand -hex 32}"
+      UPLOAD_DIR: /data/uploads
+      # CORS / public URLs (Coolify injects production values; defaults are dev-only)
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173}
+      APP_URL: ${APP_URL:-http://localhost:8000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-172.16.0.0/12}
+      # Email (Resend) – optional
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-no-reply@zzpershub.nl}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:-info@zzpershub.nl}
+      INVOICE_FROM_EMAIL: ${INVOICE_FROM_EMAIL:-no-reply@zzpershub.nl}
+      INVOICE_FROM_NAME: ${INVOICE_FROM_NAME:-Facturatie}
+      INVOICE_REPLY_TO: ${INVOICE_REPLY_TO:-info@zzpershub.nl}
+      # Mollie – optional, enables paywall + webhooks
+      MOLLIE_API_KEY: ${MOLLIE_API_KEY:-}
+      MOLLIE_WEBHOOK_SECRET: ${MOLLIE_WEBHOOK_SECRET:-}
+      MOLLIE_LOCALE: ${MOLLIE_LOCALE:-nl_NL}
+      # GoCardless (PSD2) – optional
+      GOCARDLESS_SECRET_ID: ${GOCARDLESS_SECRET_ID:-}
+      GOCARDLESS_SECRET_KEY: ${GOCARDLESS_SECRET_KEY:-}
+      # Web Push – optional
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      # Billing test toggles – optional
+      BILLING_FORCE_PAYWALL: ${BILLING_FORCE_PAYWALL:-false}
+      BILLING_TRIAL_OVERRIDE_DAYS: ${BILLING_TRIAL_OVERRIDE_DAYS:-}
+      # Admin whitelist – optional
+      ADMIN_WHITELIST: ${ADMIN_WHITELIST:-}
     volumes:
       - uploads_data:/data/uploads
     ports:
@@ -74,7 +114,7 @@ services:
     container_name: smart-accounting-worker
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-accounting_user}:${POSTGRES_PASSWORD:-change_me}@db:5432/${POSTGRES_DB:-accounting_db}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-accounting_user}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:-accounting_db}
       REDIS_URL: redis://redis:6379/0
     volumes:
       - uploads_data:/data/uploads

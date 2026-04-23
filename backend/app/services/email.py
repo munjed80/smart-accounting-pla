@@ -75,7 +75,7 @@ class EmailService:
                 f"Verification email for {to_email} not sent."
             )
             # In development, log the verification URL
-            if settings.ENV == "development":
+            if settings.is_development:
                 verify_url = self._build_verify_url(token)
                 logger.info(f"DEV: Verification URL: {verify_url}")
             return False
@@ -180,7 +180,7 @@ Need help? Contact us at {settings.SUPPORT_EMAIL}
                 f"Password reset email for {to_email} not sent."
             )
             # In development, log the reset URL
-            if settings.ENV == "development":
+            if settings.is_development:
                 reset_url = self._build_reset_url(token)
                 logger.info(f"DEV: Password reset URL: {reset_url}")
             return False

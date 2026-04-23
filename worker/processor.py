@@ -708,16 +708,32 @@ class Worker:
 
 
 def main():
-    """Entry point"""
-    db_url = os.environ.get(
-        "DATABASE_URL",
-        "postgresql://accounting_user:change_me@db:5432/accounting_db"
-    )
-    redis_url = os.environ.get(
-        "REDIS_URL",
-        "redis://redis:6379/0"
-    )
-    
+    """Entry point.
+
+    DATABASE_URL and REDIS_URL must be injected at runtime (via Coolify or
+    docker-compose). We refuse to start with placeholder credentials because
+    that would silently connect the worker to a developer-default database in
+    production.
+    """
+    db_url = os.environ.get("DATABASE_URL", "").strip()
+    redis_url = os.environ.get("REDIS_URL", "").strip()
+
+    if not db_url:
+        raise SystemExit(
+            "FATAL: DATABASE_URL is not set. The worker requires the "
+            "production database URL to be injected via the environment."
+        )
+    if not redis_url:
+        raise SystemExit(
+            "FATAL: REDIS_URL is not set. The worker requires Redis to "
+            "consume document jobs; inject REDIS_URL via the environment."
+        )
+    if "change_me" in db_url or "change-me" in db_url:
+        raise SystemExit(
+            "FATAL: DATABASE_URL contains placeholder credentials "
+            "('change_me'). Inject the real DATABASE_URL via the environment."
+        )
+
     worker = Worker(db_url, redis_url)
     worker.run()
 

@@ -1,16 +1,59 @@
 import logging
-from pydantic_settings import BaseSettings
+import os
 from functools import lru_cache
 from typing import Optional
 
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 logger = logging.getLogger(__name__)
 
+# Tokens that indicate an obviously-unsafe SECRET_KEY (defaults / placeholders).
+# Comparison is done after .strip().lower() on the SECRET_KEY value.
 _UNSAFE_SECRET_KEYS: frozenset[str] = frozenset({
     "change-me-in-production-use-openssl-rand-hex-32",
+    "change-me-use-openssl-rand-hex-32-for-production",
     "change-me",
+    "changeme",
     "secret",
     "",
 })
+
+# Substrings that indicate a placeholder DATABASE_URL was not overridden.
+_UNSAFE_DB_TOKENS: tuple[str, ...] = ("change_me", "change-me")
+
+# Hostnames/URLs that must NOT be used in production for user-facing URLs.
+_NON_PRODUCTION_URL_HOSTS: tuple[str, ...] = (
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "::1",
+)
+
+
+def _is_unsafe_secret(value: str) -> bool:
+    """Return True if the given SECRET_KEY value is obviously unsafe."""
+    if not value:
+        return True
+    normalized = value.strip().lower()
+    if normalized in _UNSAFE_SECRET_KEYS:
+        return True
+    if len(value.strip()) < 32:
+        return True
+    return False
+
+
+def _url_is_local(url: Optional[str]) -> bool:
+    """Return True if the given URL points at a non-production host."""
+    if not url:
+        return False
+    lowered = url.lower()
+    return any(host in lowered for host in _NON_PRODUCTION_URL_HOSTS)
+
+
+def _running_in_production() -> bool:
+    """Best-effort check for production env, used before Settings is constructed."""
+    return os.environ.get("ENV", "").strip().lower() == "production"
 
 
 class Settings(BaseSettings):
@@ -97,22 +140,41 @@ class Settings(BaseSettings):
         return [email.strip().lower() for email in self.ADMIN_WHITELIST.split(",") if email.strip()]
     
     # Digipoort tax submission connector (optional)
-    DIGIPOORT_ENABLED: Optional[str] = None  # Set to "true" to enable Digipoort mode
-    DIGIPOORT_SANDBOX_MODE: Optional[str] = "true"  # Set to "false" for production mode
+    # Booleans accept the strings "true"/"false" (case-insensitive) for backward compatibility.
+    DIGIPOORT_ENABLED: bool = False  # Set to True (or "true"/"1"/"yes"/"on") to enable Digipoort mode
+    DIGIPOORT_SANDBOX_MODE: bool = True  # Set to False (or "false"/"0") for production mode
     DIGIPOORT_ENDPOINT: Optional[str] = None  # Digipoort API endpoint URL
     DIGIPOORT_CLIENT_ID: Optional[str] = None  # Client ID for Digipoort authentication
     DIGIPOORT_CLIENT_SECRET: Optional[str] = None  # Client secret for Digipoort
     DIGIPOORT_CERT_PATH: Optional[str] = None  # Path to client certificate (if required)
-    
+
+    @field_validator("DIGIPOORT_ENABLED", "DIGIPOORT_SANDBOX_MODE", mode="before")
+    @classmethod
+    def _coerce_optional_bool(cls, value):
+        """Accept legacy "true"/"false" strings (and None/"") for boolean flags.
+
+        - None or empty string -> False (treated as "unset" → disabled / non-sandbox-overridden)
+        - bool -> returned as-is
+        - str  -> True for {"1","true","yes","on"} (case-insensitive), else False
+        - other -> bool(value)
+        """
+        if value is None or value == "":
+            return False
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in ("1", "true", "yes", "on")
+        return bool(value)
+
     @property
     def digipoort_enabled(self) -> bool:
         """Check if Digipoort submission is enabled."""
-        return bool(self.DIGIPOORT_ENABLED and str(self.DIGIPOORT_ENABLED).lower() == 'true')
-    
+        return bool(self.DIGIPOORT_ENABLED)
+
     @property
     def digipoort_sandbox_mode(self) -> bool:
         """Check if Digipoort is in sandbox mode (no real network calls)."""
-        return str(self.DIGIPOORT_SANDBOX_MODE).lower() != 'false'
+        return bool(self.DIGIPOORT_SANDBOX_MODE)
     
     # Mollie payment integration (optional)
     MOLLIE_API_KEY: Optional[str] = None  # Mollie API key (test_xxx or live_xxx)
@@ -169,49 +231,140 @@ class Settings(BaseSettings):
         """Return trial override days if set, else None."""
         return self.BILLING_TRIAL_OVERRIDE_DAYS
 
-    def validate_production_secrets(self) -> None:
-        """
-        Fail fast if SECRET_KEY is unsafe in production.
+    # ----- Environment helpers -----
+    @property
+    def is_production(self) -> bool:
+        """True when ENV is 'production' (case-insensitive, whitespace-tolerant)."""
+        return (self.ENV or "").strip().lower() == "production"
 
-        In non-production environments a warning is logged but startup continues,
-        so local development with the default key still works.
+    @property
+    def is_development(self) -> bool:
+        """True when ENV is 'development' (case-insensitive)."""
+        return (self.ENV or "").strip().lower() in ("development", "dev", "local")
+
+    @property
+    def public_url(self) -> str:
         """
-        if self.ENV.lower() == "production":
-            if self.SECRET_KEY in _UNSAFE_SECRET_KEYS or len(self.SECRET_KEY) < 32:
-                raise ValueError(
-                    "FATAL: SECRET_KEY is not configured for production. "
-                    "Set a strong SECRET_KEY (min 32 chars) via environment variable. "
-                    "Generate one with: openssl rand -hex 32"
+        Resolve the canonical public URL of the backend.
+
+        Prefers APP_PUBLIC_URL (used for webhooks behind reverse proxies/Coolify),
+        falling back to APP_URL. Always returns a string.
+        """
+        return (self.APP_PUBLIC_URL or self.APP_URL or "").rstrip("/")
+
+    # ----- Production fail-fast validation -----
+    def _collect_production_issues(self) -> list[str]:
+        """
+        Build a list of fatal configuration issues for production deployment.
+
+        This is the single source of truth for production readiness. Returns
+        an empty list when the configuration looks safe.
+        """
+        issues: list[str] = []
+
+        # SECRET_KEY must be strong
+        if _is_unsafe_secret(self.SECRET_KEY):
+            issues.append(
+                "SECRET_KEY is unset, too short (<32 chars) or a known placeholder. "
+                "Generate one with: openssl rand -hex 32 and inject it via Coolify."
+            )
+
+        # DATABASE_URL must not contain placeholder credentials
+        if any(token in (self.DATABASE_URL or "") for token in _UNSAFE_DB_TOKENS):
+            issues.append(
+                "DATABASE_URL contains placeholder credentials (e.g. 'change_me'). "
+                "Set the production database URL via Coolify env."
+            )
+        if any(token in (self.DATABASE_URL_SYNC or "") for token in _UNSAFE_DB_TOKENS):
+            issues.append(
+                "DATABASE_URL_SYNC contains placeholder credentials (e.g. 'change_me'). "
+                "Set the production sync database URL via Coolify env."
+            )
+
+        # User-facing URLs must not point at localhost
+        if _url_is_local(self.APP_URL):
+            issues.append(
+                f"APP_URL='{self.APP_URL}' points at a non-production host. "
+                "Set it to the public backend URL (e.g. https://api.zzpershub.nl)."
+            )
+        if _url_is_local(self.FRONTEND_URL):
+            issues.append(
+                f"FRONTEND_URL='{self.FRONTEND_URL}' points at a non-production host. "
+                "Set it to the public frontend URL (e.g. https://zzpershub.nl). "
+                "This URL is embedded in verification/reset emails."
+            )
+
+        # CORS must include at least one explicit, non-localhost origin
+        explicit_origins = [
+            o for o in self.cors_origins_list
+            if not _url_is_local(o) and o != "*"
+        ]
+        if not explicit_origins:
+            issues.append(
+                "CORS_ORIGINS does not contain any production origin. "
+                "Add the public frontend origin (e.g. https://zzpershub.nl)."
+            )
+
+        # When Mollie is enabled, webhook secret + public URL are required for safety.
+        if self.mollie_enabled:
+            if not self.MOLLIE_WEBHOOK_SECRET:
+                issues.append(
+                    "MOLLIE_API_KEY is set but MOLLIE_WEBHOOK_SECRET is not. "
+                    "Webhooks would be rejected; configure the webhook secret."
                 )
-        else:
-            if self.SECRET_KEY in _UNSAFE_SECRET_KEYS or len(self.SECRET_KEY) < 32:
-                logger.warning(
-                    "SECRET_KEY is using an insecure default. "
-                    "Set a strong SECRET_KEY before deploying to production."
+            if not self.public_url or _url_is_local(self.public_url):
+                issues.append(
+                    "MOLLIE_API_KEY is set but APP_PUBLIC_URL/APP_URL is not a public URL. "
+                    "Mollie webhooks require a publicly reachable URL."
                 )
+
+        return issues
+
+    def validate_production_environment(self) -> None:
+        """
+        Single fail-fast entry point used at application startup.
+
+        - In production: raises ValueError listing every configuration problem.
+        - Outside production: logs each problem as a warning but allows startup,
+          so local development with the bundled .env keeps working.
+        """
+        issues = self._collect_production_issues()
+        if not issues:
+            return
+
+        if self.is_production:
+            joined = "\n  - ".join(issues)
+            raise ValueError(
+                "FATAL: production environment validation failed:\n  - "
+                f"{joined}"
+            )
+
+        for issue in issues:
+            logger.warning("Config check (non-prod): %s", issue)
+
+    # ----- Backward-compatible shims -----
+    def validate_production_secrets(self) -> None:
+        """Deprecated: use validate_production_environment(). Kept for compat."""
+        self.validate_production_environment()
 
     def validate_production_database(self) -> None:
-        """
-        Fail fast if DATABASE_URL contains default/placeholder credentials in production.
+        """Deprecated: use validate_production_environment(). Kept for compat."""
+        # Implementation is intentionally a no-op when called after
+        # validate_production_environment() — running the full validator twice
+        # is safe (idempotent) but unnecessary.
+        self.validate_production_environment()
 
-        In non-production environments a warning is logged but startup continues.
-        """
-        if self.ENV.lower() == "production":
-            if "change_me" in self.DATABASE_URL:
-                raise ValueError(
-                    "FATAL: DATABASE_URL contains default credentials ('change_me'). "
-                    "Set proper database credentials via environment variables for production."
-                )
-        else:
-            if "change_me" in self.DATABASE_URL:
-                logger.warning(
-                    "DATABASE_URL contains default credentials ('change_me'). "
-                    "Set proper database credentials before deploying to production."
-                )
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    # ----- Pydantic-settings v2 config -----
+    # In production, Coolify (or the orchestrator) is the source of truth for
+    # environment variables. We deliberately disable .env loading in that case
+    # so a stale .env file shipped in an image cannot silently shadow the
+    # injected runtime configuration.
+    model_config = SettingsConfigDict(
+        env_file=None if _running_in_production() else ".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
 
 @lru_cache()

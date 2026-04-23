@@ -39,10 +39,14 @@ export const EmptyState = ({
     <Card className="bg-card/80 backdrop-blur-sm border-2 border-dashed border-primary/20 max-w-xl mx-auto">
       <CardHeader className="text-center pb-2">
         <div className="flex justify-center mb-4">
-          {icon || <FolderOpen size={64} weight="duotone" className="text-muted-foreground" />}
+          {icon ?? (
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/20">
+              <FolderOpen size={32} weight="duotone" className="text-primary" />
+            </div>
+          )}
         </div>
-        <CardTitle className="text-xl">{title}</CardTitle>
-        <CardDescription className="text-base">{description}</CardDescription>
+        <CardTitle className="text-lg sm:text-xl">{title}</CardTitle>
+        <CardDescription className="text-sm sm:text-base">{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Tips section */}
@@ -52,11 +56,11 @@ export const EmptyState = ({
               <Sparkle size={16} className="text-primary" />
               {t('emptyStates.gettingStarted')}
             </h4>
-            <ul className="text-sm text-muted-foreground space-y-1">
+            <ul className="text-sm text-muted-foreground space-y-1.5">
               {tips.map((tip, index) => (
                 <li key={index} className="flex items-start gap-2">
-                  <span className="text-primary">•</span>
-                  {tip}
+                  <span className="text-primary leading-5">•</span>
+                  <span className="leading-5">{tip}</span>
                 </li>
               ))}
             </ul>
@@ -66,13 +70,13 @@ export const EmptyState = ({
         {/* Action buttons */}
         <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
           {actionLabel && onAction && (
-            <Button onClick={onAction} className="gap-2">
+            <Button onClick={onAction} className="gap-2 h-10 sm:h-auto">
               <Plus size={18} />
               {actionLabel}
             </Button>
           )}
           {secondaryActionLabel && onSecondaryAction && (
-            <Button variant="outline" onClick={onSecondaryAction} className="gap-2">
+            <Button variant="outline" onClick={onSecondaryAction} className="gap-2 h-10 sm:h-auto">
               {secondaryActionLabel}
               <ArrowRight size={18} />
             </Button>

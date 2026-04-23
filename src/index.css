@@ -46,6 +46,52 @@
   nav[aria-label="Main navigation"]::-webkit-scrollbar-thumb:hover {
     background: oklch(0.42 0.02 265); /* Even lighter on hover for feedback */
   }
+
+  /* ── Polish: monetary tables ──────────────────────────────────────── */
+  /*
+   * Apply tabular figures to all <table> by default so monetary columns
+   * line up. Components that need proportional figures can override with
+   * `font-variant-numeric: normal` on the relevant cell.
+   */
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Polish: smooth focus rings everywhere ────────────────────────── */
+  /*
+   * Slightly softer outline behaviour for focusable elements that don't
+   * already have a focus-visible style coming from a UI primitive.
+   * Existing primitives use `focus-visible:ring-*` and are unaffected.
+   */
+  :focus-visible {
+    outline-offset: 2px;
+  }
+}
+
+/* ── Polish: horizontal scroll fade hint for tables / overflow rows ── */
+/*
+ * Adds a subtle right-edge fade to any element marked as scrollable,
+ * so users on touch devices see there's more content to swipe to.
+ * Opt-in via `data-scroll-shadow` to avoid applying to unrelated overflow
+ * containers.
+ */
+[data-scroll-shadow] {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black calc(100% - 24px),
+    transparent
+  );
+  mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+}
+
+/* ── Polish: subtle elevation for sticky page headers ─────────────── */
+/*
+ * The AppShell header is sticky with a backdrop blur. Add a hairline
+ * bottom shadow so it visually lifts off the content underneath when
+ * the page is scrolled, without changing layout.
+ */
+header.sticky {
+  box-shadow: 0 1px 0 0 oklch(1 0 0 / 0.04), 0 6px 18px -10px oklch(0 0 0 / 0.45);
 }
 
 :root {

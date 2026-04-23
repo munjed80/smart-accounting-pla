@@ -213,10 +213,10 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Application startup initiated")
 
-    # Fail fast if production secrets are not properly configured
+    # Fail fast if production env is not properly configured (SECRET_KEY,
+    # DATABASE_URL, public URLs, CORS origins, Mollie webhook secret, ...).
     from app.core.config import settings as _settings
-    _settings.validate_production_secrets()
-    _settings.validate_production_database()
+    _settings.validate_production_environment()
 
     try:
         verify_orm_mappings()

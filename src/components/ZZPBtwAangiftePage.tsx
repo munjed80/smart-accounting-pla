@@ -253,6 +253,10 @@ const PartialStateBanner = ({ overview }: { overview: BTWQuarterOverview }) => {
  * Dedicated empty state for quarters that genuinely contain nothing.
  * Replaces the misleading "€ 0,00 BTW af te dragen" hero with a clear
  * explanation and direct CTAs into the data-entry flows.
+ *
+ * Also surfaces any backend warnings (notably ERROR-severity warnings
+ * coming from the route fallback) so a server-side failure isn't
+ * silently displayed as "no data".
  */
 const EmptyQuarterCard = ({
   overview,
@@ -260,34 +264,64 @@ const EmptyQuarterCard = ({
 }: {
   overview: BTWQuarterOverview
   quarterMonths: string
-}) => (
-  <Card className="border-dashed">
-    <CardContent className="p-6 sm:p-8 text-center space-y-4">
-      <div className="flex items-center justify-center gap-2 flex-wrap">
-        <h2 className="text-lg font-semibold">{overview.quarter}</h2>
-        <span className="text-sm text-muted-foreground">({quarterMonths})</span>
-        <Badge variant="outline" className="text-xs">Nog niets te declareren</Badge>
-      </div>
-      <Calculator size={40} weight="duotone" className="text-muted-foreground mx-auto" />
-      <div className="space-y-1 max-w-md mx-auto">
-        <p className="text-sm font-medium">Geen facturen of uitgaven in dit kwartaal</p>
-        <p className="text-xs text-muted-foreground">
-          {overview.data_status_reason} Voeg facturen of zakelijke uitgaven toe om de BTW-berekening te starten.
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2 justify-center pt-2">
-        <Button size="sm" onClick={() => navigateTo('/zzp/invoices')}>
-          <FileText size={16} className="mr-1" />
-          Maak een factuur
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => navigateTo('/zzp/expenses')}>
-          <Receipt size={16} className="mr-1" />
-          Voeg uitgave toe
-        </Button>
-      </div>
-    </CardContent>
-  </Card>
-)
+}) => {
+  const isError = overview.data_status === 'ERROR'
+  const errorWarnings = overview.warnings.filter((w) => w.severity === 'error')
+  return (
+    <Card className={`border-dashed ${isError ? 'border-red-300 dark:border-red-900' : ''}`}>
+      <CardContent className="p-6 sm:p-8 text-center space-y-4">
+        <div className="flex items-center justify-center gap-2 flex-wrap">
+          <h2 className="text-lg font-semibold">{overview.quarter}</h2>
+          <span className="text-sm text-muted-foreground">({quarterMonths})</span>
+          <Badge
+            variant="outline"
+            className={`text-xs ${isError ? 'border-red-300 text-red-700 dark:text-red-300' : ''}`}
+          >
+            {isError ? 'Fout bij berekenen' : 'Nog niets te declareren'}
+          </Badge>
+        </div>
+        {isError ? (
+          <WarningCircle size={40} weight="duotone" className="text-red-400 mx-auto" />
+        ) : (
+          <Calculator size={40} weight="duotone" className="text-muted-foreground mx-auto" />
+        )}
+        <div className="space-y-1 max-w-md mx-auto">
+          <p className="text-sm font-medium">
+            {isError
+              ? 'Het BTW-overzicht kon niet worden berekend'
+              : 'Geen facturen of uitgaven in dit kwartaal'}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {overview.data_status_reason ||
+              'Voeg facturen of zakelijke uitgaven toe om de BTW-berekening te starten.'}
+            {!isError && ' Voeg facturen of zakelijke uitgaven toe om de BTW-berekening te starten.'}
+          </p>
+        </div>
+
+        {errorWarnings.length > 0 && (
+          <div className="space-y-2 max-w-md mx-auto text-left">
+            {errorWarnings.map((w) => (
+              <TaxWarningItem key={w.id} warning={w} />
+            ))}
+          </div>
+        )}
+
+        {!isError && (
+          <div className="flex flex-wrap gap-2 justify-center pt-2">
+            <Button size="sm" onClick={() => navigateTo('/zzp/invoices')}>
+              <FileText size={16} className="mr-1" />
+              Maak een factuur
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigateTo('/zzp/expenses')}>
+              <Receipt size={16} className="mr-1" />
+              Voeg uitgave toe
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
 /**
  * Lists the concrete data sources behind the BTW numbers, with deep links.
@@ -495,7 +529,11 @@ const QuarterDetail = ({
         <StatCard
           label="Af te dragen BTW"
           value={formatCurrency(overview.output_vat_cents)}
-          subtitle="BTW die je hebt gefactureerd"
+          subtitle={
+            overview.unpaid_vat_cents > 0
+              ? `BTW gefactureerd · nog ${formatCurrency(overview.unpaid_vat_cents)} open op verstuurde facturen`
+              : 'BTW die je hebt gefactureerd'
+          }
           icon={<ArrowUp size={18} weight="bold" className="text-red-500" />}
           variant="negative"
           explainTitle={showExplanations ? 'Wat is dit?' : undefined}
@@ -851,7 +889,7 @@ export const ZZPBtwAangiftePage = () => {
       {/* Main content */}
       {!loading && !error && activeOverview && (
         <>
-          {activeOverview.data_status === 'NO_DATA' ? (
+          {activeOverview.data_status === 'NO_DATA' || activeOverview.data_status === 'ERROR' ? (
             <EmptyQuarterCard overview={activeOverview} quarterMonths={quarterMonths} />
           ) : (
             <>

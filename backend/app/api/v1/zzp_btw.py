@@ -12,6 +12,7 @@ Metrics provided per quarter:
 - Net VAT to pay or reclaim
 - Validation warnings for missing or suspicious data
 """
+import logging
 import xml.etree.ElementTree as ET
 from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
@@ -34,6 +35,8 @@ from app.models.zzp import (
 )
 from app.models.administration import Administration, AdministrationMember
 from app.api.v1.deps import CurrentUser, require_zzp
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -132,11 +135,14 @@ class BTWQuarterOverview(BaseModel):
     #                     (no deductible input VAT)
     #   ONLY_EXPENSES   – expenses exist but no paid invoices
     #   COMPLETE        – both paid invoices and expenses are present
+    #   ERROR           – overview could not be built (set by the route
+    #                     fallback handler so the UI can show a real
+    #                     error instead of an empty-state placeholder)
     data_status: str = Field(
         "NO_DATA",
         description=(
             "Quarter completeness: NO_DATA | ONLY_DRAFTS | ONLY_UNPAID | "
-            "ONLY_INVOICES | ONLY_EXPENSES | COMPLETE"
+            "ONLY_INVOICES | ONLY_EXPENSES | COMPLETE | ERROR"
         ),
     )
     data_status_reason: str = Field(
@@ -235,11 +241,30 @@ async def build_quarter_overview(
     )
     all_invoices = invoice_result.scalars().all()
 
-    # Filter invoices by quarter - use invoice_date for revenue recognition
+    # Filter invoices by the appropriate date for the quarter.
+    #
+    # The ZZP self-service overview is calculated on **kasstelsel** (cash
+    # basis), so for paid invoices the relevant moment is the *payment*
+    # date (`paid_at`), not the issue date.  For invoices that are not yet
+    # paid (draft / sent / overdue) we use the `issue_date` so the page
+    # can still show counts and warnings for invoices that were created in
+    # the quarter but have no payment yet.
+    #
+    # NOTE: A previous version of this code referenced `inv.invoice_date`,
+    # which is **not** a column on `ZZPInvoice` (the real fields are
+    # `issue_date` and `paid_at`).  In production this raised
+    # `AttributeError`, was swallowed by the broad `except Exception` in
+    # `get_zzp_btw_aangifte`, and caused the BTW Overzicht page to render
+    # an empty "Geen facturen of uitgaven in dit kwartaal" state even
+    # when invoices and expenses existed.
     quarter_invoices = []
     for inv in all_invoices:
-        inv_date = inv.invoice_date or (inv.created_at.date() if inv.created_at else None)
-        if inv_date and quarter_start <= inv_date <= quarter_end:
+        if inv.status == InvoiceStatus.PAID.value:
+            paid_date = inv.paid_at.date() if inv.paid_at else None
+            relevant_date = paid_date or inv.issue_date
+        else:
+            relevant_date = inv.issue_date
+        if relevant_date and quarter_start <= relevant_date <= quarter_end:
             quarter_invoices.append(inv)
 
     paid_invoices = [i for i in quarter_invoices if i.status == InvoiceStatus.PAID.value]
@@ -564,18 +589,35 @@ async def get_zzp_btw_aangifte(
             admin_id, quarter_start, quarter_end, quarter_label, btw_deadline, today, db
         )
     except Exception:
-        # Graceful fallback on any data inconsistency
+        # Graceful fallback on any data inconsistency.  We log the full
+        # traceback so production failures are diagnosable instead of
+        # silently rendering as "empty quarter".  We also mark the
+        # quarter with an explicit ERROR data_status so the frontend can
+        # show a real error instead of the empty-state placeholder.
+        logger.exception(
+            "Failed to build BTW quarter overview for admin %s (%s)",
+            admin_id, quarter_label,
+        )
         current_overview = BTWQuarterOverview(
             quarter=quarter_label,
             quarter_start=quarter_start.isoformat(),
             quarter_end=quarter_end.isoformat(),
             deadline=btw_deadline.isoformat(),
             days_until_deadline=max(0, (btw_deadline - today).days),
+            data_status="ERROR",
+            data_status_reason=(
+                "Er ging iets mis bij het berekenen van dit kwartaal. "
+                "De gegevens hieronder zijn mogelijk onvolledig."
+            ),
             warnings=[BTWWarning(
                 id="W_ERR",
                 severity="error",
                 title="Fout bij berekenen",
-                description="Er is een probleem opgetreden bij het berekenen van je BTW-overzicht. Probeer het later opnieuw.",
+                description=(
+                    "Er is een probleem opgetreden bij het berekenen van je "
+                    "BTW-overzicht. Probeer het later opnieuw of neem contact "
+                    "op met support als het probleem aanhoudt."
+                ),
             )],
         )
 
@@ -598,8 +640,13 @@ async def get_zzp_btw_aangifte(
             )
             previous_quarters.append(prev_overview)
         except Exception:
-            # Skip quarters that fail gracefully
-            pass
+            # Skip quarters that fail gracefully, but log so issues
+            # are diagnosable rather than silently hidden.
+            logger.exception(
+                "Failed to build previous BTW quarter overview "
+                "for admin %s (%s)",
+                admin_id, p_label,
+            )
 
     # Get business profile for BTW number
     profile_result = await db.execute(

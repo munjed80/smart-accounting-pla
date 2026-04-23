@@ -74,7 +74,6 @@ async def test_btw_aangifte_with_paid_invoice(
     invoice.customer_id = test_customer.id
     invoice.invoice_number = "INV-BTW-001"
     invoice.status = InvoiceStatus.PAID.value
-    invoice.invoice_date = q_start
     invoice.issue_date = q_start
     invoice.subtotal_cents = 10000  # €100
     invoice.vat_total_cents = 2100  # €21
@@ -167,7 +166,6 @@ async def test_btw_aangifte_net_vat_calculation(
     invoice.customer_id = test_customer.id
     invoice.invoice_number = "INV-BTW-NET-001"
     invoice.status = InvoiceStatus.PAID.value
-    invoice.invoice_date = q_start
     invoice.issue_date = q_start
     invoice.subtotal_cents = 10000
     invoice.vat_total_cents = 2100
@@ -273,7 +271,6 @@ async def test_btw_aangifte_excludes_draft_invoices(
     draft_invoice.customer_id = test_customer.id
     draft_invoice.invoice_number = "INV-DRAFT-001"
     draft_invoice.status = InvoiceStatus.DRAFT.value
-    draft_invoice.invoice_date = q_start
     draft_invoice.issue_date = q_start
     draft_invoice.subtotal_cents = 20000
     draft_invoice.vat_total_cents = 4200
@@ -319,3 +316,122 @@ async def test_btw_aangifte_previous_quarters(
     # Should include up to 3 previous quarters
     assert isinstance(data["previous_quarters"], list)
     assert len(data["previous_quarters"]) <= 3
+
+
+@pytest.mark.asyncio
+async def test_btw_aangifte_paid_invoice_after_session_expire(
+    async_client: AsyncClient,
+    auth_headers: dict,
+    db_session: AsyncSession,
+    test_administration,
+    test_customer,
+):
+    """Regression test for the BTW Overzicht "feels dead" bug.
+
+    A previous version of ``zzp_btw.py`` filtered invoices by an
+    ``inv.invoice_date`` attribute that does not exist on
+    ``ZZPInvoice`` (the real columns are ``issue_date`` / ``paid_at``).
+    Other tests masked this because they relied on SQLAlchemy's
+    identity map returning the same Python instance the test had set
+    arbitrary attributes on.  In production a fresh request loads a
+    fresh ORM instance without that attribute, raising ``AttributeError``
+    which the broad ``except`` swallowed -> empty page.
+
+    This test forces a fresh load with ``expire_all()`` so the endpoint
+    must rely on real model columns only.  If the regression returns,
+    omzet/output_vat will be 0 and the assertions below will fail.
+    """
+    today = date.today()
+    q_start = date(today.year, ((today.month - 1) // 3) * 3 + 1, 1)
+
+    invoice = ZZPInvoice(
+        administration_id=test_administration.id,
+        customer_id=test_customer.id,
+        invoice_number="INV-BTW-FRESH-001",
+        status=InvoiceStatus.PAID.value,
+        issue_date=q_start,
+        paid_at=datetime.combine(q_start, datetime.min.time(), tzinfo=timezone.utc),
+        subtotal_cents=15000,
+        vat_total_cents=3150,
+        total_cents=18150,
+        seller_company_name="Test Co",
+        customer_name="Client",
+    )
+    db_session.add(invoice)
+    await db_session.flush()
+
+    line = ZZPInvoiceLine(
+        invoice_id=invoice.id,
+        description="Consulting",
+        quantity=Decimal("1"),
+        unit_price_cents=15000,
+        vat_rate=Decimal("21.00"),
+        line_total_cents=15000,
+        vat_amount_cents=3150,
+    )
+    db_session.add(line)
+    await db_session.commit()
+
+    # Drop all instance state so the next query has to load fresh
+    # ORM rows from the DB (mirrors a real production request).
+    db_session.expire_all()
+
+    response = await async_client.get(
+        "/api/v1/zzp/btw-aangifte",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    cq = response.json()["current_quarter"]
+
+    assert cq["data_status"] != "ERROR", cq
+    assert cq["omzet_cents"] == 15000
+    assert cq["output_vat_cents"] == 3150
+    assert cq["invoice_summary"]["paid_count"] == 1
+    # Both invoice and no expense -> ONLY_INVOICES, never NO_DATA
+    assert cq["data_status"] == "ONLY_INVOICES"
+
+
+@pytest.mark.asyncio
+async def test_btw_aangifte_kasstelsel_uses_paid_at(
+    async_client: AsyncClient,
+    auth_headers: dict,
+    db_session: AsyncSession,
+    test_administration,
+    test_customer,
+):
+    """An invoice issued in a previous quarter but *paid* in the current
+    quarter should count toward the current quarter's omzet/output VAT
+    on the cash basis (kasstelsel)."""
+    today = date.today()
+    q_start = date(today.year, ((today.month - 1) // 3) * 3 + 1, 1)
+    # Pick an issue_date safely in a previous quarter (well before q_start).
+    issue_date = q_start - timedelta(days=120)
+
+    invoice = ZZPInvoice(
+        administration_id=test_administration.id,
+        customer_id=test_customer.id,
+        invoice_number="INV-BTW-KAS-001",
+        status=InvoiceStatus.PAID.value,
+        issue_date=issue_date,
+        paid_at=datetime.combine(q_start, datetime.min.time(), tzinfo=timezone.utc),
+        subtotal_cents=20000,
+        vat_total_cents=4200,
+        total_cents=24200,
+        seller_company_name="Test Co",
+        customer_name="Client",
+    )
+    db_session.add(invoice)
+    await db_session.commit()
+    db_session.expire_all()
+
+    response = await async_client.get(
+        "/api/v1/zzp/btw-aangifte",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    cq = response.json()["current_quarter"]
+
+    # Counted in the current quarter because it was *paid* there.
+    assert cq["omzet_cents"] == 20000
+    assert cq["output_vat_cents"] == 4200
+    assert cq["invoice_summary"]["paid_count"] == 1

@@ -55,7 +55,7 @@ export interface BTWQuarterOverview {
   warnings: BTWWarning[]
   is_ready: boolean
   readiness_notes: string[]
-  data_status: 'NO_DATA' | 'ONLY_DRAFTS' | 'ONLY_UNPAID' | 'ONLY_INVOICES' | 'ONLY_EXPENSES' | 'COMPLETE'
+  data_status: 'NO_DATA' | 'ONLY_DRAFTS' | 'ONLY_UNPAID' | 'ONLY_INVOICES' | 'ONLY_EXPENSES' | 'COMPLETE' | 'ERROR'
   data_status_reason: string
   generated_at: string
 }

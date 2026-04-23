@@ -13,8 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
+import { PageContainer, PageHeader } from '@/components/ui/page'
 import {
   Select,
   SelectContent,
@@ -26,7 +26,6 @@ import {
   CurrencyEur,
   CheckCircle,
   WarningCircle,
-  Info,
   FileText,
   Receipt,
   CalendarBlank,
@@ -45,13 +44,25 @@ import type {
   IncomeTaxChecklistItem,
 } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
-import { formatCurrency, TaxWarningItem } from '@/components/belastinghulp/shared'
+import { cn } from '@/lib/utils'
+import {
+  formatCurrency,
+  TaxWarningItem,
+  SoftNote,
+  IconChip,
+  Disclaimer,
+  sectionCardClass,
+} from '@/components/belastinghulp/shared'
 
 // ============================================================================
 // Sub-components
 // ============================================================================
 
-/** Explanation block — calm blue info card */
+/**
+ * Explanation block — thin wrapper over the shared `SoftNote` so we keep
+ * the existing call sites tidy.  Visually identical to the Agenda-style
+ * soft info note used across all Belastinghulp pages.
+ */
 const ExplainBlock = ({
   title,
   description,
@@ -61,23 +72,13 @@ const ExplainBlock = ({
   description: string
   items?: string[]
 }) => (
-  <div className="rounded-lg border border-blue-200 bg-blue-50/60 dark:bg-blue-950/20 dark:border-blue-900 p-3 text-xs space-y-1">
-    <p className="font-semibold text-blue-900 dark:text-blue-200 flex items-center gap-1">
-      <Info size={14} weight="fill" className="text-blue-500 flex-shrink-0" />
-      {title}
-    </p>
-    <p className="text-blue-800 dark:text-blue-300">{description}</p>
-    {items && items.length > 0 && (
-      <ul className="text-blue-700 dark:text-blue-300 space-y-0.5 mt-1">
-        {items.map((item, i) => (
-          <li key={i} className="flex items-start gap-1">
-            <span className="mt-0.5">•</span>
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-    )}
-  </div>
+  <SoftNote
+    tone="info"
+    size="sm"
+    title={title}
+    description={description}
+    items={items}
+  />
 )
 
 /** Big number stat card */
@@ -102,10 +103,10 @@ const StatCard = ({
   }
 
   return (
-    <Card className="relative overflow-hidden">
+    <Card className={cn(sectionCardClass, 'relative overflow-hidden transition-colors hover:border-primary/30')}>
       <CardContent className="p-4 space-y-2">
         <div className="flex items-center gap-2 text-muted-foreground text-sm">
-          {icon}
+          <IconChip icon={icon} tone="tip" size="sm" />
           <span>{label}</span>
         </div>
         <p className={`text-2xl font-bold ${colorMap[variant]}`}>{value}</p>
@@ -124,7 +125,7 @@ const ChecklistRow = ({ item }: { item: IncomeTaxChecklistItem }) => (
       size={20}
       weight={item.done ? 'fill' : 'regular'}
       className={`mt-0.5 flex-shrink-0 ${
-        item.done ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'
+        item.done ? 'text-emerald-500 dark:text-emerald-300' : 'text-muted-foreground/60'
       }`}
     />
     <div className="flex-1 min-w-0">
@@ -142,16 +143,16 @@ const ChecklistRow = ({ item }: { item: IncomeTaxChecklistItem }) => (
 const HoursIndicator = ({ indicator }: { indicator: IncomeTaxYearOverview['hours_indicator'] }) => {
   const pctClamped = Math.min(indicator.percentage, 100)
   const barColor = indicator.percentage >= 100
-    ? 'bg-green-500'
+    ? 'bg-emerald-500/80'
     : indicator.percentage >= 50
-      ? 'bg-amber-500'
-      : 'bg-red-400'
+      ? 'bg-amber-500/80'
+      : 'bg-red-400/80'
 
   return (
-    <Card>
+    <Card className={cn(sectionCardClass)}>
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
-          <Clock size={18} weight="duotone" />
+          <IconChip icon={<Clock size={16} weight="duotone" />} tone="tip" size="sm" />
           Urencriterium (indicatie)
         </CardTitle>
         <CardDescription>
@@ -169,12 +170,12 @@ const HoursIndicator = ({ indicator }: { indicator: IncomeTaxYearOverview['hours
                 </p>
               </div>
               {indicator.percentage >= 100 && (
-                <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800">
+                <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
                   Waarschijnlijk voldaan
                 </Badge>
               )}
             </div>
-            <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
+            <div className="w-full bg-muted/60 rounded-full h-2.5 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${barColor}`}
                 style={{ width: `${pctClamped}%` }}
@@ -182,8 +183,10 @@ const HoursIndicator = ({ indicator }: { indicator: IncomeTaxYearOverview['hours
             </div>
           </>
         ) : (
-          <div className="rounded-lg border border-dashed p-4 text-center">
-            <Clock size={24} weight="duotone" className="text-muted-foreground mx-auto mb-2" />
+          <div className="rounded-lg border-2 border-dashed border-primary/20 bg-card/40 p-4 text-center">
+            <div className="flex justify-center mb-2">
+              <IconChip icon={<Clock size={20} weight="duotone" />} tone="neutral" size="sm" />
+            </div>
             <p className="text-sm text-muted-foreground">Geen uren geregistreerd</p>
             <Button
               variant="link"
@@ -302,26 +305,26 @@ const YearDetail = ({ overview }: { overview: IncomeTaxYearOverview }) => {
 
       {/* Cost breakdown */}
       {overview.cost_breakdown.length > 0 && (
-        <Card>
+        <Card className={cn(sectionCardClass)}>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Receipt size={18} weight="duotone" />
+              <IconChip icon={<Receipt size={16} weight="duotone" />} tone="tip" size="sm" />
               Kosten per categorie
             </CardTitle>
             <CardDescription>Verdeling van je zakelijke uitgaven</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {overview.cost_breakdown.map((cat) => (
-                <div key={cat.category} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                <div key={cat.category} className="flex items-center justify-between py-2 border-b border-border/40 last:border-b-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm">{cat.label}</span>
-                    <Badge variant="outline" className="text-xs">{cat.count}×</Badge>
+                    <Badge variant="outline" className="text-xs border-border/50">{cat.count}×</Badge>
                   </div>
                   <span className="text-sm font-medium">{formatCurrency(cat.amount_cents)}</span>
                 </div>
               ))}
-              <Separator className="my-2" />
+              <Separator className="my-2 bg-border/40" />
               <div className="flex items-center justify-between font-medium">
                 <span className="text-sm">Totaal kosten</span>
                 <span className="text-sm">{formatCurrency(overview.kosten_cents)}</span>
@@ -333,10 +336,10 @@ const YearDetail = ({ overview }: { overview: IncomeTaxYearOverview }) => {
 
       {/* Invoice & expense summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Card>
+        <Card className={cn(sectionCardClass)}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <FileText size={16} weight="duotone" />
+              <IconChip icon={<FileText size={16} weight="duotone" />} tone="tip" size="sm" />
               Facturen
             </CardTitle>
           </CardHeader>
@@ -353,7 +356,7 @@ const YearDetail = ({ overview }: { overview: IncomeTaxYearOverview }) => {
               <span className="text-muted-foreground">Concept</span>
               <span>{overview.draft_invoice_count}</span>
             </div>
-            <Separator className="my-2" />
+            <Separator className="my-2 bg-border/40" />
             <div className="flex justify-between font-medium">
               <span>Totaal omzet</span>
               <span>{formatCurrency(overview.omzet_cents)}</span>
@@ -361,10 +364,10 @@ const YearDetail = ({ overview }: { overview: IncomeTaxYearOverview }) => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={cn(sectionCardClass)}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Receipt size={16} weight="duotone" />
+              <IconChip icon={<Receipt size={16} weight="duotone" />} tone="tip" size="sm" />
               Uitgaven
             </CardTitle>
           </CardHeader>
@@ -373,7 +376,7 @@ const YearDetail = ({ overview }: { overview: IncomeTaxYearOverview }) => {
               <span className="text-muted-foreground">Aantal</span>
               <span className="font-medium">{overview.expense_count}</span>
             </div>
-            <Separator className="my-2" />
+            <Separator className="my-2 bg-border/40" />
             <div className="flex justify-between font-medium">
               <span>Totaal kosten</span>
               <span>{formatCurrency(overview.kosten_cents)}</span>
@@ -387,16 +390,16 @@ const YearDetail = ({ overview }: { overview: IncomeTaxYearOverview }) => {
 
       {/* Warnings */}
       {overview.warnings.length > 0 && (
-        <Card>
+        <Card className={cn(sectionCardClass)}>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <WarningCircle size={18} weight="duotone" />
+              <IconChip icon={<WarningCircle size={16} weight="duotone" />} tone="warning" size="sm" />
               Aandachtspunten
             </CardTitle>
             <CardDescription>Controleer deze punten voordat je je aangifte indient</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {overview.warnings.map((warning) => (
+            {overview.warnings.map((warning: IncomeTaxWarning) => (
               <TaxWarningItem key={warning.id} warning={warning} />
             ))}
           </CardContent>
@@ -404,10 +407,10 @@ const YearDetail = ({ overview }: { overview: IncomeTaxYearOverview }) => {
       )}
 
       {/* Preparation checklist */}
-      <Card>
+      <Card className={cn(sectionCardClass)}>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <ListChecks size={18} weight="duotone" />
+            <IconChip icon={<ListChecks size={16} weight="duotone" />} tone="tip" size="sm" />
             Voorbereidingschecklist
           </CardTitle>
           <CardDescription>
@@ -415,7 +418,7 @@ const YearDetail = ({ overview }: { overview: IncomeTaxYearOverview }) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ul className="divide-y">
+          <ul className="divide-y divide-border/40">
             {overview.checklist.map((item) => (
               <ChecklistRow key={item.id} item={item} />
             ))}
@@ -424,7 +427,7 @@ const YearDetail = ({ overview }: { overview: IncomeTaxYearOverview }) => {
       </Card>
 
       {/* Pre-filing review explanation */}
-      <Card>
+      <Card className={cn(sectionCardClass)}>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Wat moet je controleren voor je aangifte?</CardTitle>
         </CardHeader>
@@ -455,15 +458,26 @@ const YearDetail = ({ overview }: { overview: IncomeTaxYearOverview }) => {
       </Card>
 
       {/* Readiness & export section */}
-      <Card className={overview.is_complete ? 'border-green-200 dark:border-green-900' : 'border-amber-200 dark:border-amber-900'}>
+      <Card
+        className={cn(
+          sectionCardClass,
+          'border-l-4',
+          overview.is_complete
+            ? 'border-l-emerald-500/70 dark:border-l-emerald-400/60'
+            : 'border-l-amber-500/70 dark:border-l-amber-400/60',
+        )}
+      >
         <CardContent className="p-6">
           <div className="flex items-start gap-4">
-            <div className={`rounded-full p-3 ${overview.is_complete ? 'bg-green-100 dark:bg-green-900/30' : 'bg-amber-100 dark:bg-amber-900/30'}`}>
-              {overview.is_complete
-                ? <CheckCircle size={28} weight="fill" className="text-green-600 dark:text-green-400" />
-                : <WarningCircle size={28} weight="fill" className="text-amber-600 dark:text-amber-400" />
+            <IconChip
+              icon={
+                overview.is_complete
+                  ? <CheckCircle size={24} weight="duotone" />
+                  : <WarningCircle size={24} weight="duotone" />
               }
-            </div>
+              tone={overview.is_complete ? 'success' : 'warning'}
+              size="lg"
+            />
             <div className="flex-1 space-y-2">
               <h3 className="text-lg font-semibold">
                 {overview.is_complete ? 'Gegevens compleet' : 'Nog niet compleet'}
@@ -509,15 +523,13 @@ const YearDetail = ({ overview }: { overview: IncomeTaxYearOverview }) => {
       </Card>
 
       {/* Disclaimer */}
-      <div className="rounded-lg border border-muted p-4 text-xs text-muted-foreground space-y-1">
-        <p className="font-medium">Disclaimer</p>
-        <p>
-          Dit overzicht is bedoeld ter voorbereiding en is geen vervanging voor professioneel
-          fiscaal advies. De berekeningen zijn gebaseerd op de gegevens die je hebt ingevoerd.
-          Aftrekposten, toeslagen en persoonlijke omstandigheden zijn niet meegenomen. Raadpleeg
-          een belastingadviseur als je twijfelt.
-        </p>
-      </div>
+      <Disclaimer>
+        <span className="font-medium text-foreground">Disclaimer:</span>{' '}
+        Dit overzicht is bedoeld ter voorbereiding en is geen vervanging voor professioneel
+        fiscaal advies. De berekeningen zijn gebaseerd op de gegevens die je hebt ingevoerd.
+        Aftrekposten, toeslagen en persoonlijke omstandigheden zijn niet meegenomen. Raadpleeg
+        een belastingadviseur als je twijfelt.
+      </Disclaimer>
     </div>
   )
 }
@@ -589,37 +601,34 @@ export const BelastinghulpInkomstenbelastingPage = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto" data-testid="zzp-inkomstenbelasting-page">
-      {/* Page Header */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Inkomstenbelasting</h1>
-            <p className="text-muted-foreground text-sm">
-              Bereid je jaarlijkse aangifte inkomstenbelasting voor — overzichtelijk en stap voor stap.
-            </p>
-          </div>
-
-          {data && (
-            <div className="flex items-center gap-3">
-              {data.kvk_number && (
-                <Badge variant="outline" className="text-xs">
-                  KVK: {data.kvk_number}
-                </Badge>
-              )}
-              <Select value={selectedYear} onValueChange={handleYearChange}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder="Jaar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {data.available_years.map((yr) => (
-                    <SelectItem key={yr} value={String(yr)}>{yr}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </div>
+    <PageContainer width="wide">
+      <div className="space-y-6" data-testid="zzp-inkomstenbelasting-page">
+        <PageHeader
+          icon={<CurrencyEur size={32} weight="duotone" />}
+          title="Inkomstenbelasting"
+          description="Bereid je jaarlijkse aangifte inkomstenbelasting voor — overzichtelijk en stap voor stap."
+          actions={
+            data ? (
+              <>
+                {data.kvk_number && (
+                  <Badge variant="outline" className="text-xs border-primary/20 bg-primary/5">
+                    KVK: {data.kvk_number}
+                  </Badge>
+                )}
+                <Select value={selectedYear} onValueChange={handleYearChange}>
+                  <SelectTrigger className="w-[120px] bg-card/80 backdrop-blur-sm">
+                    <SelectValue placeholder="Jaar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {data.available_years.map((yr) => (
+                      <SelectItem key={yr} value={String(yr)}>{yr}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            ) : null
+          }
+        />
 
         {/* Deadline banner */}
         {data && data.overview && (() => {
@@ -628,15 +637,12 @@ export const BelastinghulpInkomstenbelastingPage = () => {
           const daysUntil = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
           if (daysUntil > 0 && daysUntil <= 90) {
             return (
-              <Alert className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-900">
-                <CalendarBlank size={18} weight="fill" className="text-amber-500" />
-                <AlertTitle className="text-sm font-medium">
-                  Deadline: {deadline.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </AlertTitle>
-                <AlertDescription className="text-xs">
-                  Nog {daysUntil} dag{daysUntil !== 1 ? 'en' : ''} om je aangifte inkomstenbelasting {data.overview.year} in te dienen.
-                </AlertDescription>
-              </Alert>
+              <SoftNote
+                tone="warning"
+                icon={<CalendarBlank size={16} weight="duotone" />}
+                title={`Deadline: ${deadline.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}`}
+                description={`Nog ${daysUntil} dag${daysUntil !== 1 ? 'en' : ''} om je aangifte inkomstenbelasting ${data.overview.year} in te dienen.`}
+              />
             )
           }
           return null
@@ -644,37 +650,45 @@ export const BelastinghulpInkomstenbelastingPage = () => {
 
         {/* Profile incomplete banner */}
         {data && !data.profile_complete && (
-          <Alert className="border-red-200 bg-red-50/50 dark:bg-red-950/20 dark:border-red-900">
-            <WarningCircle size={18} weight="fill" className="text-red-500" />
-            <AlertTitle className="text-sm font-medium">Bedrijfsprofiel incompleet</AlertTitle>
-            <AlertDescription className="text-xs">
-              Vul je bedrijfsgegevens aan (KVK-nummer, BTW-nummer, IBAN) voor een compleet overzicht.{' '}
-              <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => navigateTo('/settings')}>
-                Naar instellingen
-              </Button>
-            </AlertDescription>
-          </Alert>
+          <SoftNote
+            tone="error"
+            title="Bedrijfsprofiel incompleet"
+            description={
+              <>
+                Vul je bedrijfsgegevens aan (KVK-nummer, BTW-nummer, IBAN) voor een compleet overzicht.{' '}
+                <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => navigateTo('/settings')}>
+                  Naar instellingen
+                </Button>
+              </>
+            }
+          />
+        )}
+
+        {/* Loading state */}
+        {loading && <LoadingSkeleton />}
+
+        {/* Error state */}
+        {error && !loading && (
+          <Card className={cn(sectionCardClass, 'border-l-4 border-l-red-500/70')}>
+            <CardContent className="p-6 text-center space-y-3">
+              <div className="flex justify-center">
+                <IconChip
+                  icon={<WarningCircle size={32} weight="duotone" />}
+                  tone="error"
+                  size="lg"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">{error}</p>
+              <Button variant="outline" size="sm" onClick={() => fetchData()}>Opnieuw proberen</Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Main content */}
+        {!loading && !error && data && (
+          <YearDetail overview={data.overview} />
         )}
       </div>
-
-      {/* Loading state */}
-      {loading && <LoadingSkeleton />}
-
-      {/* Error state */}
-      {error && !loading && (
-        <Card className="border-red-200">
-          <CardContent className="p-6 text-center space-y-3">
-            <WarningCircle size={40} weight="duotone" className="text-red-400 mx-auto" />
-            <p className="text-sm text-muted-foreground">{error}</p>
-            <Button variant="outline" size="sm" onClick={() => fetchData()}>Opnieuw proberen</Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Main content */}
-      {!loading && !error && data && (
-        <YearDetail overview={data.overview} />
-      )}
-    </div>
+    </PageContainer>
   )
 }

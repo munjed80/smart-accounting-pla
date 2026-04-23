@@ -13,9 +13,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { PageContainer, PageHeader } from '@/components/ui/page'
 import {
   Select,
   SelectContent,
@@ -29,7 +29,6 @@ import {
   ArrowUp,
   CheckCircle,
   WarningCircle,
-  Info,
   FileText,
   Receipt,
   CurrencyEur,
@@ -44,7 +43,16 @@ import {
 import { zzpBtwApi, logApiError } from '@/lib/api'
 import type { BTWAangifteResponse, BTWQuarterOverview } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
-import { formatCurrency, formatCurrencyAbs, TaxWarningItem } from '@/components/belastinghulp/shared'
+import { cn } from '@/lib/utils'
+import {
+  formatCurrency,
+  formatCurrencyAbs,
+  TaxWarningItem,
+  SoftNote,
+  IconChip,
+  Disclaimer,
+  sectionCardClass,
+} from '@/components/belastinghulp/shared'
 import { toast } from 'sonner'
 
 // ============================================================================
@@ -62,7 +70,11 @@ const QUARTER_MONTHS: Record<number, string> = {
 // Sub-components
 // ============================================================================
 
-/** Explanation tooltip block */
+/**
+ * Explanation tooltip block (kept as a thin wrapper for back-compat with
+ * the local props used inside this page; visually a soft Agenda-style
+ * note via the shared `SoftNote` primitive).
+ */
 const ExplainBlock = ({
   title,
   description,
@@ -74,15 +86,14 @@ const ExplainBlock = ({
   source?: string
   checkHint?: string
 }) => (
-  <div className="rounded-lg border border-blue-200 bg-blue-50/60 dark:bg-blue-950/20 dark:border-blue-900 p-3 text-xs space-y-1">
-    <p className="font-semibold text-blue-900 dark:text-blue-200 flex items-center gap-1">
-      <Info size={14} weight="fill" className="text-blue-500 flex-shrink-0" />
-      {title}
-    </p>
-    <p className="text-blue-800 dark:text-blue-300">{description}</p>
-    {source && <p className="text-blue-600 dark:text-blue-400 italic">Bron: {source}</p>}
-    {checkHint && <p className="text-blue-700 dark:text-blue-300">✓ Check: {checkHint}</p>}
-  </div>
+  <SoftNote
+    tone="info"
+    size="sm"
+    title={title}
+    description={description}
+    source={source}
+    checkHint={checkHint}
+  />
 )
 
 /** Big number stat card */
@@ -115,10 +126,10 @@ const StatCard = ({
   }
 
   return (
-    <Card className="relative overflow-hidden">
+    <Card className={cn(sectionCardClass, 'relative overflow-hidden transition-colors hover:border-primary/30')}>
       <CardContent className="p-4 space-y-2">
         <div className="flex items-center gap-2 text-muted-foreground text-sm">
-          {icon}
+          <IconChip icon={icon} tone="tip" size="sm" />
           <span>{label}</span>
         </div>
         <p className={`text-2xl font-bold ${colorMap[variant]}`}>{value}</p>
@@ -140,9 +151,21 @@ const StatCard = ({
 const HeroCard = ({ overview, quarterMonths }: { overview: BTWQuarterOverview; quarterMonths: string }) => {
   const isPayable = overview.net_vat_cents >= 0
   const label = isPayable ? 'BTW af te dragen' : 'BTW terug te vragen'
+  const accentText = isPayable
+    ? 'text-red-500 dark:text-red-300'
+    : 'text-emerald-500 dark:text-emerald-300'
+  const accentStripe = isPayable
+    ? 'border-l-red-500/70 dark:border-l-red-400/60'
+    : 'border-l-emerald-500/70 dark:border-l-emerald-400/60'
 
   return (
-    <Card className={`border-2 ${isPayable ? 'border-red-200 dark:border-red-900 bg-red-50/30 dark:bg-red-950/10' : 'border-green-200 dark:border-green-900 bg-green-50/30 dark:bg-green-950/10'}`}>
+    <Card
+      className={cn(
+        sectionCardClass,
+        'overflow-hidden border-l-4 transition-colors hover:border-primary/30',
+        accentStripe,
+      )}
+    >
       <CardContent className="p-6 sm:p-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-1">
@@ -154,7 +177,7 @@ const HeroCard = ({ overview, quarterMonths }: { overview: BTWQuarterOverview; q
                   <TooltipTrigger asChild>
                     <Badge
                       variant="outline"
-                      className="text-xs bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-700 cursor-help"
+                      className="text-xs border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 cursor-help"
                     >
                       Voorlopig · {overview.basis === 'kasstelsel' ? 'kasstelsel' : overview.basis}
                     </Badge>
@@ -168,7 +191,7 @@ const HeroCard = ({ overview, quarterMonths }: { overview: BTWQuarterOverview; q
               </TooltipProvider>
             </div>
             <p className="text-sm text-muted-foreground">{label}</p>
-            <p className={`text-4xl sm:text-5xl font-bold tracking-tight ${isPayable ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+            <p className={cn('text-4xl sm:text-5xl font-bold tracking-tight', accentText)}>
               {formatCurrencyAbs(overview.net_vat_cents)}
             </p>
           </div>
@@ -177,9 +200,9 @@ const HeroCard = ({ overview, quarterMonths }: { overview: BTWQuarterOverview; q
               BTW ontvangen: <span className="font-medium text-foreground">{formatCurrency(overview.output_vat_cents)}</span>
             </p>
             <p>
-              Voorbelasting: <span className="font-medium text-green-600 dark:text-green-400">−{formatCurrencyAbs(overview.input_vat_cents)}</span>
+              Voorbelasting: <span className="font-medium text-emerald-600 dark:text-emerald-300">−{formatCurrencyAbs(overview.input_vat_cents)}</span>
             </p>
-            <Separator className="my-2" />
+            <Separator className="my-2 bg-border/40" />
             <p className="font-medium text-foreground">
               {isPayable ? 'Te betalen' : 'Terug te vragen'}: {formatCurrencyAbs(overview.net_vat_cents)}
             </p>
@@ -232,20 +255,19 @@ const PartialStateBanner = ({ overview }: { overview: BTWQuarterOverview }) => {
   }
 
   return (
-    <Alert className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-900">
-      <Info size={18} weight="fill" className="text-amber-500" />
-      <AlertTitle className="text-sm font-medium">Onvolledige BTW-basis</AlertTitle>
-      <AlertDescription className="text-xs space-y-1">
-        <p>{overview.data_status_reason}</p>
-        {overview.unpaid_vat_cents > 0 && overview.data_status !== 'ONLY_INVOICES' && (
-          <p>
-            Op verstuurde, nog niet betaalde facturen staat <span className="font-medium">{formatCurrency(overview.unpaid_vat_cents)}</span>{' '}
-            aan BTW open – dit telt op kasstelsel pas mee zodra de betaling binnenkomt.
-          </p>
-        )}
-        {cta}
-      </AlertDescription>
-    </Alert>
+    <SoftNote
+      tone="warning"
+      title="Onvolledige BTW-basis"
+      description={overview.data_status_reason}
+    >
+      {overview.unpaid_vat_cents > 0 && overview.data_status !== 'ONLY_INVOICES' && (
+        <p className="text-xs text-muted-foreground">
+          Op verstuurde, nog niet betaalde facturen staat <span className="font-medium text-foreground">{formatCurrency(overview.unpaid_vat_cents)}</span>{' '}
+          aan BTW open – dit telt op kasstelsel pas mee zodra de betaling binnenkomt.
+        </p>
+      )}
+      {cta}
+    </SoftNote>
   )
 }
 
@@ -253,6 +275,10 @@ const PartialStateBanner = ({ overview }: { overview: BTWQuarterOverview }) => {
  * Dedicated empty state for quarters that genuinely contain nothing.
  * Replaces the misleading "€ 0,00 BTW af te dragen" hero with a clear
  * explanation and direct CTAs into the data-entry flows.
+ *
+ * Also surfaces any backend warnings (notably ERROR-severity warnings
+ * coming from the route fallback) so a server-side failure isn't
+ * silently displayed as "no data".
  */
 const EmptyQuarterCard = ({
   overview,
@@ -260,34 +286,81 @@ const EmptyQuarterCard = ({
 }: {
   overview: BTWQuarterOverview
   quarterMonths: string
-}) => (
-  <Card className="border-dashed">
-    <CardContent className="p-6 sm:p-8 text-center space-y-4">
-      <div className="flex items-center justify-center gap-2 flex-wrap">
-        <h2 className="text-lg font-semibold">{overview.quarter}</h2>
-        <span className="text-sm text-muted-foreground">({quarterMonths})</span>
-        <Badge variant="outline" className="text-xs">Nog niets te declareren</Badge>
-      </div>
-      <Calculator size={40} weight="duotone" className="text-muted-foreground mx-auto" />
-      <div className="space-y-1 max-w-md mx-auto">
-        <p className="text-sm font-medium">Geen facturen of uitgaven in dit kwartaal</p>
-        <p className="text-xs text-muted-foreground">
-          {overview.data_status_reason} Voeg facturen of zakelijke uitgaven toe om de BTW-berekening te starten.
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2 justify-center pt-2">
-        <Button size="sm" onClick={() => navigateTo('/zzp/invoices')}>
-          <FileText size={16} className="mr-1" />
-          Maak een factuur
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => navigateTo('/zzp/expenses')}>
-          <Receipt size={16} className="mr-1" />
-          Voeg uitgave toe
-        </Button>
-      </div>
-    </CardContent>
-  </Card>
-)
+}) => {
+  const isError = overview.data_status === 'ERROR'
+  const errorWarnings = overview.warnings.filter((w) => w.severity === 'error')
+  return (
+    <Card
+      className={cn(
+        'bg-card/80 backdrop-blur-sm border-2 border-dashed transition-colors',
+        isError ? 'border-red-500/30' : 'border-primary/20',
+      )}
+    >
+      <CardContent className="p-6 sm:p-8 text-center space-y-4">
+        <div className="flex items-center justify-center gap-2 flex-wrap">
+          <h2 className="text-lg font-semibold">{overview.quarter}</h2>
+          <span className="text-sm text-muted-foreground">({quarterMonths})</span>
+          <Badge
+            variant="outline"
+            className={cn(
+              'text-xs',
+              isError && 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300',
+            )}
+          >
+            {isError ? 'Fout bij berekenen' : 'Nog niets te declareren'}
+          </Badge>
+        </div>
+        <div className="flex justify-center">
+          <IconChip
+            icon={
+              isError ? (
+                <WarningCircle size={32} weight="duotone" />
+              ) : (
+                <Calculator size={32} weight="duotone" />
+              )
+            }
+            tone={isError ? 'error' : 'neutral'}
+            size="lg"
+          />
+        </div>
+        <div className="space-y-1 max-w-md mx-auto">
+          <p className="text-sm font-medium">
+            {isError
+              ? 'Het BTW-overzicht kon niet worden berekend'
+              : 'Geen facturen of uitgaven in dit kwartaal'}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {overview.data_status_reason ||
+              (isError
+                ? 'Probeer het later opnieuw of neem contact op met support.'
+                : 'Voeg facturen of zakelijke uitgaven toe om de BTW-berekening te starten.')}
+          </p>
+        </div>
+
+        {errorWarnings.length > 0 && (
+          <div className="space-y-2 max-w-md mx-auto text-left">
+            {errorWarnings.map((w) => (
+              <TaxWarningItem key={w.id} warning={w} />
+            ))}
+          </div>
+        )}
+
+        {!isError && (
+          <div className="flex flex-wrap gap-2 justify-center pt-2">
+            <Button size="sm" onClick={() => navigateTo('/zzp/invoices')}>
+              <FileText size={16} className="mr-1" />
+              Maak een factuur
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigateTo('/zzp/expenses')}>
+              <Receipt size={16} className="mr-1" />
+              Voeg uitgave toe
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
 /**
  * Lists the concrete data sources behind the BTW numbers, with deep links.
@@ -335,24 +408,24 @@ const SourcesPanel = ({ overview }: { overview: BTWQuarterOverview }) => {
   }
 
   return (
-    <Card>
+    <Card className={cn(sectionCardClass)}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
-          <Sparkle size={16} weight="duotone" />
+          <IconChip icon={<Sparkle size={16} weight="duotone" />} tone="tip" size="sm" />
           Bronnen in dit overzicht
         </CardTitle>
         <CardDescription className="text-xs">
           De BTW-berekening komt rechtstreeks uit deze onderdelen van je administratie.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-1">
         {items.map((item) => (
           <div
             key={item.title}
-            className="flex items-start justify-between gap-3 py-2 border-b last:border-b-0"
+            className="flex items-start justify-between gap-3 py-2 border-b border-border/40 last:border-b-0"
           >
-            <div className="flex items-start gap-2 min-w-0">
-              <span className="mt-0.5 text-muted-foreground flex-shrink-0">{item.icon}</span>
+            <div className="flex items-start gap-3 min-w-0">
+              <IconChip icon={item.icon} tone="tip" size="sm" />
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{item.title}</p>
                 <p className="text-xs text-muted-foreground">{item.detail}</p>
@@ -361,7 +434,7 @@ const SourcesPanel = ({ overview }: { overview: BTWQuarterOverview }) => {
             <Button
               variant="ghost"
               size="sm"
-              className="h-auto py-1 px-2 text-xs flex-shrink-0"
+              className="h-auto py-1 px-2 text-xs flex-shrink-0 text-primary hover:text-primary"
               onClick={() => navigateTo(item.route)}
             >
               {item.cta}
@@ -390,10 +463,10 @@ const PreviousQuartersStrip = ({
   if (!quarters.length) return null
 
   return (
-    <Card>
+    <Card className={cn(sectionCardClass)}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
-          <ArrowsClockwise size={16} weight="duotone" />
+          <IconChip icon={<ArrowsClockwise size={16} weight="duotone" />} tone="tip" size="sm" />
           Eerdere kwartalen
         </CardTitle>
         <CardDescription className="text-xs">
@@ -413,29 +486,35 @@ const PreviousQuartersStrip = ({
                 key={q.quarter}
                 type="button"
                 onClick={() => qNum && yNum && onSelect(yNum, qNum)}
-                className="text-left rounded-lg border p-3 hover:bg-muted/40 transition-colors"
+                className="text-left rounded-lg border border-border/50 bg-card/60 p-3 hover:border-primary/30 hover:bg-card/80 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium">{q.quarter}</p>
                   {isEmpty ? (
-                    <Badge variant="outline" className="text-[10px]">leeg</Badge>
+                    <Badge variant="outline" className="text-[10px] border-border/50">leeg</Badge>
                   ) : (
                     <Badge
                       variant="outline"
-                      className={`text-[10px] ${isPayable ? 'text-red-600 border-red-200' : 'text-green-600 border-green-200'}`}
+                      className={cn(
+                        'text-[10px]',
+                        isPayable
+                          ? 'text-red-600 dark:text-red-300 border-red-500/30 bg-red-500/5'
+                          : 'text-emerald-600 dark:text-emerald-300 border-emerald-500/30 bg-emerald-500/5',
+                      )}
                     >
                       {isPayable ? 'af te dragen' : 'terug'}
                     </Badge>
                   )}
                 </div>
                 <p
-                  className={`text-base font-semibold mt-1 ${
+                  className={cn(
+                    'text-base font-semibold mt-1',
                     isEmpty
                       ? 'text-muted-foreground'
                       : isPayable
-                        ? 'text-red-600 dark:text-red-400'
-                        : 'text-green-600 dark:text-green-400'
-                  }`}
+                        ? 'text-red-500 dark:text-red-300'
+                        : 'text-emerald-500 dark:text-emerald-300',
+                  )}
                 >
                   {isEmpty ? '—' : formatCurrencyAbs(q.net_vat_cents)}
                 </p>
@@ -495,7 +574,11 @@ const QuarterDetail = ({
         <StatCard
           label="Af te dragen BTW"
           value={formatCurrency(overview.output_vat_cents)}
-          subtitle="BTW die je hebt gefactureerd"
+          subtitle={
+            overview.unpaid_vat_cents > 0
+              ? `BTW gefactureerd · nog ${formatCurrency(overview.unpaid_vat_cents)} open op verstuurde facturen`
+              : 'BTW die je hebt gefactureerd'
+          }
           icon={<ArrowUp size={18} weight="bold" className="text-red-500" />}
           variant="negative"
           explainTitle={showExplanations ? 'Wat is dit?' : undefined}
@@ -518,17 +601,20 @@ const QuarterDetail = ({
 
       {/* VAT rate breakdown */}
       {overview.vat_rate_breakdown.length > 0 && (
-        <Card>
+        <Card className={cn(sectionCardClass)}>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">BTW-tarief verdeling</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              <IconChip icon={<Calculator size={16} weight="duotone" />} tone="tip" size="sm" />
+              BTW-tarief verdeling
+            </CardTitle>
             <CardDescription>Uitsplitsing per BTW-tarief</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {overview.vat_rate_breakdown.map((item) => (
-                <div key={item.vat_rate} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                <div key={item.vat_rate} className="flex items-center justify-between py-2 border-b border-border/40 last:border-b-0">
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="min-w-[60px] justify-center">{item.vat_rate}%</Badge>
+                    <Badge variant="outline" className="min-w-[60px] justify-center bg-primary/5 border-primary/20">{item.vat_rate}%</Badge>
                     <span className="text-sm text-muted-foreground">{item.transaction_count} transacties</span>
                   </div>
                   <div className="text-right">
@@ -544,10 +630,10 @@ const QuarterDetail = ({
 
       {/* Data sources summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Card>
+        <Card className={cn(sectionCardClass)}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <FileText size={16} weight="duotone" />
+              <IconChip icon={<FileText size={16} weight="duotone" />} tone="tip" size="sm" />
               Facturen
             </CardTitle>
           </CardHeader>
@@ -564,7 +650,7 @@ const QuarterDetail = ({
               <span className="text-muted-foreground">Concept</span>
               <span>{overview.invoice_summary.draft_count}</span>
             </div>
-            <Separator className="my-2" />
+            <Separator className="my-2 bg-border/40" />
             <div className="flex justify-between font-medium">
               <span>Totaal omzet</span>
               <span>{formatCurrency(overview.invoice_summary.total_omzet_cents)}</span>
@@ -572,10 +658,10 @@ const QuarterDetail = ({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={cn(sectionCardClass)}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Receipt size={16} weight="duotone" />
+              <IconChip icon={<Receipt size={16} weight="duotone" />} tone="tip" size="sm" />
               Uitgaven
             </CardTitle>
           </CardHeader>
@@ -588,10 +674,10 @@ const QuarterDetail = ({
               <span className="text-muted-foreground">Totaal bedrag</span>
               <span>{formatCurrency(overview.expense_summary.total_amount_cents)}</span>
             </div>
-            <Separator className="my-2" />
+            <Separator className="my-2 bg-border/40" />
             <div className="flex justify-between font-medium">
               <span>Aftrekbare BTW</span>
-              <span className="text-green-600 dark:text-green-400">{formatCurrency(overview.expense_summary.total_vat_deductible_cents)}</span>
+              <span className="text-emerald-600 dark:text-emerald-300">{formatCurrency(overview.expense_summary.total_vat_deductible_cents)}</span>
             </div>
           </CardContent>
         </Card>
@@ -599,10 +685,10 @@ const QuarterDetail = ({
 
       {/* Warnings */}
       {overview.warnings.length > 0 && (
-        <Card>
+        <Card className={cn(sectionCardClass)}>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <WarningCircle size={18} weight="duotone" />
+              <IconChip icon={<WarningCircle size={16} weight="duotone" />} tone="warning" size="sm" />
               Aandachtspunten
             </CardTitle>
             <CardDescription>Controleer deze punten voor je aangifte</CardDescription>
@@ -616,15 +702,26 @@ const QuarterDetail = ({
       )}
 
       {/* Ready to submit card */}
-      <Card className={overview.is_ready ? 'border-green-200 dark:border-green-900' : 'border-amber-200 dark:border-amber-900'}>
+      <Card
+        className={cn(
+          sectionCardClass,
+          'border-l-4',
+          overview.is_ready
+            ? 'border-l-emerald-500/70 dark:border-l-emerald-400/60'
+            : 'border-l-amber-500/70 dark:border-l-amber-400/60',
+        )}
+      >
         <CardContent className="p-6">
           <div className="flex items-start gap-4">
-            <div className={`rounded-full p-3 ${overview.is_ready ? 'bg-green-100 dark:bg-green-900/30' : 'bg-amber-100 dark:bg-amber-900/30'}`}>
-              {overview.is_ready
-                ? <CheckCircle size={28} weight="fill" className="text-green-600 dark:text-green-400" />
-                : <WarningCircle size={28} weight="fill" className="text-amber-600 dark:text-amber-400" />
+            <IconChip
+              icon={
+                overview.is_ready
+                  ? <CheckCircle size={24} weight="duotone" />
+                  : <WarningCircle size={24} weight="duotone" />
               }
-            </div>
+              tone={overview.is_ready ? 'success' : 'warning'}
+              size="lg"
+            />
             <div className="flex-1 space-y-2">
               <h3 className="text-lg font-semibold">
                 {overview.is_ready ? 'Klaar om in te dienen' : 'Nog niet compleet'}
@@ -765,128 +862,138 @@ export const ZZPBtwAangiftePage = () => {
   const quarterMonths = QUARTER_MONTHS[selectedQuarter] || ''
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto" data-testid="zzp-btw-aangifte-page">
-      {/* Page Header */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">BTW Overzicht</h1>
-            <p className="text-muted-foreground text-sm">
-              Bereid je kwartaalaangifte voor — overzichtelijk en stap voor stap.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            {data?.btw_number && (
-              <Badge variant="outline" className="text-xs">
-                BTW: {data.btw_number}
-              </Badge>
-            )}
-            <Select value={String(selectedQuarter)} onValueChange={(v) => setSelectedQuarter(Number(v))}>
-              <SelectTrigger className="w-[100px]">
-                <SelectValue placeholder="Kwartaal" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">Q1</SelectItem>
-                <SelectItem value="2">Q2</SelectItem>
-                <SelectItem value="3">Q3</SelectItem>
-                <SelectItem value="4">Q4</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
-              <SelectTrigger className="w-[100px]">
-                <SelectValue placeholder="Jaar" />
-              </SelectTrigger>
-              <SelectContent>
-                {yearOptions.map((y) => (
-                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+    <PageContainer width="wide">
+      <div className="space-y-6" data-testid="zzp-btw-aangifte-page">
+        <PageHeader
+          icon={<Calculator size={32} weight="duotone" />}
+          title="BTW Overzicht"
+          description="Bereid je kwartaalaangifte voor — overzichtelijk en stap voor stap."
+          actions={
+            <>
+              {data?.btw_number && (
+                <Badge variant="outline" className="text-xs border-primary/20 bg-primary/5">
+                  BTW: {data.btw_number}
+                </Badge>
+              )}
+              <Select value={String(selectedQuarter)} onValueChange={(v) => setSelectedQuarter(Number(v))}>
+                <SelectTrigger className="w-[100px] bg-card/80 backdrop-blur-sm">
+                  <SelectValue placeholder="Kwartaal" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Q1</SelectItem>
+                  <SelectItem value="2">Q2</SelectItem>
+                  <SelectItem value="3">Q3</SelectItem>
+                  <SelectItem value="4">Q4</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+                <SelectTrigger className="w-[100px] bg-card/80 backdrop-blur-sm">
+                  <SelectValue placeholder="Jaar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          }
+        />
 
         {/* Deadline banner */}
         {activeOverview && activeOverview.days_until_deadline > 0 && activeOverview.days_until_deadline <= 30 && (
-          <Alert className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-900">
-            <CalendarBlank size={18} weight="fill" className="text-amber-500" />
-            <AlertTitle className="text-sm font-medium">
-              Deadline: {new Date(activeOverview.deadline).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}
-            </AlertTitle>
-            <AlertDescription className="text-xs">
-              Nog {activeOverview.days_until_deadline} dag{activeOverview.days_until_deadline !== 1 ? 'en' : ''} om je BTW-aangifte in te dienen voor {activeOverview.quarter}.
-            </AlertDescription>
-          </Alert>
+          <SoftNote
+            tone="warning"
+            icon={<CalendarBlank size={16} weight="duotone" />}
+            title={`Deadline: ${new Date(activeOverview.deadline).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}`}
+            description={`Nog ${activeOverview.days_until_deadline} dag${activeOverview.days_until_deadline !== 1 ? 'en' : ''} om je BTW-aangifte in te dienen voor ${activeOverview.quarter}.`}
+          />
         )}
 
         {/* Profile incomplete banner */}
         {data && !data.profile_complete && (
-          <Alert className="border-red-200 bg-red-50/50 dark:bg-red-950/20 dark:border-red-900">
-            <WarningCircle size={18} weight="fill" className="text-red-500" />
-            <AlertTitle className="text-sm font-medium">Bedrijfsprofiel incompleet</AlertTitle>
-            <AlertDescription className="text-xs">
-              Vul je bedrijfsgegevens aan (BTW-nummer, KVK, IBAN) voor een complete aangifte.{' '}
-              <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => navigateTo('/settings')}>
-                Naar instellingen
-              </Button>
-            </AlertDescription>
-          </Alert>
+          <SoftNote
+            tone="error"
+            title="Bedrijfsprofiel incompleet"
+            description={
+              <>
+                Vul je bedrijfsgegevens aan (BTW-nummer, KVK, IBAN) voor een complete aangifte.{' '}
+                <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => navigateTo('/settings')}>
+                  Naar instellingen
+                </Button>
+              </>
+            }
+          />
         )}
-      </div>
 
-      {/* Loading state */}
-      {loading && <LoadingSkeleton />}
+        {/* Loading state */}
+        {loading && <LoadingSkeleton />}
 
-      {/* Error state */}
-      {error && !loading && (
-        <Card className="border-red-200">
-          <CardContent className="p-6 text-center space-y-3">
-            <WarningCircle size={40} weight="duotone" className="text-red-400 mx-auto" />
-            <p className="text-sm text-muted-foreground">{error}</p>
-            <Button variant="outline" size="sm" onClick={() => fetchData(selectedYear, selectedQuarter)}>Opnieuw proberen</Button>
-          </CardContent>
-        </Card>
-      )}
+        {/* Error state */}
+        {error && !loading && (
+          <Card className={cn(sectionCardClass, 'border-l-4 border-l-red-500/70')}>
+            <CardContent className="p-6 text-center space-y-3">
+              <div className="flex justify-center">
+                <IconChip
+                  icon={<WarningCircle size={32} weight="duotone" />}
+                  tone="error"
+                  size="lg"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">{error}</p>
+              <Button variant="outline" size="sm" onClick={() => fetchData(selectedYear, selectedQuarter)}>Opnieuw proberen</Button>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Main content */}
-      {!loading && !error && activeOverview && (
-        <>
-          {activeOverview.data_status === 'NO_DATA' ? (
-            <EmptyQuarterCard overview={activeOverview} quarterMonths={quarterMonths} />
-          ) : (
-            <>
-              <HeroCard overview={activeOverview} quarterMonths={quarterMonths} />
-              <PartialStateBanner overview={activeOverview} />
-              <QuarterDetail
-                overview={activeOverview}
-                showExplanations
-                selectedYear={selectedYear}
-                selectedQuarter={selectedQuarter}
+        {/* Main content */}
+        {!loading && !error && activeOverview && (
+          <>
+            {activeOverview.data_status === 'NO_DATA' || activeOverview.data_status === 'ERROR' ? (
+              <EmptyQuarterCard overview={activeOverview} quarterMonths={quarterMonths} />
+            ) : (
+              <>
+                <HeroCard overview={activeOverview} quarterMonths={quarterMonths} />
+                <PartialStateBanner overview={activeOverview} />
+                <QuarterDetail
+                  overview={activeOverview}
+                  showExplanations
+                  selectedYear={selectedYear}
+                  selectedQuarter={selectedQuarter}
+                />
+              </>
+            )}
+            <SourcesPanel overview={activeOverview} />
+            {data?.previous_quarters && data.previous_quarters.length > 0 && (
+              <PreviousQuartersStrip
+                quarters={data.previous_quarters}
+                onSelect={(y, q) => {
+                  setSelectedYear(y)
+                  setSelectedQuarter(q)
+                }}
               />
-            </>
-          )}
-          <SourcesPanel overview={activeOverview} />
-          {data?.previous_quarters && data.previous_quarters.length > 0 && (
-            <PreviousQuartersStrip
-              quarters={data.previous_quarters}
-              onSelect={(y, q) => {
-                setSelectedYear(y)
-                setSelectedQuarter(q)
-              }}
-            />
-          )}
-        </>
-      )}
+            )}
+          </>
+        )}
 
-      {/* No data state */}
-      {!loading && !error && !activeOverview && data && (
-        <Card>
-          <CardContent className="p-6 text-center space-y-3">
-            <Calculator size={40} weight="duotone" className="text-muted-foreground mx-auto" />
-            <p className="text-sm text-muted-foreground">Geen data beschikbaar voor het geselecteerde kwartaal.</p>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+        {/* No data state */}
+        {!loading && !error && !activeOverview && data && (
+          <Card className={cn(sectionCardClass, 'border-2 border-dashed border-primary/20')}>
+            <CardContent className="p-6 text-center space-y-3">
+              <div className="flex justify-center">
+                <IconChip icon={<Calculator size={32} weight="duotone" />} tone="neutral" size="lg" />
+              </div>
+              <p className="text-sm text-muted-foreground">Geen data beschikbaar voor het geselecteerde kwartaal.</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Disclaimer */}
+        <Disclaimer>
+          <span className="font-medium text-foreground">Disclaimer:</span>{' '}
+          Dit overzicht is bedoeld ter voorbereiding en vervangt geen officiële BTW-aangifte. De berekening is gebaseerd op de gegevens die je hebt ingevoerd. Raadpleeg een belastingadviseur als je twijfelt.
+        </Disclaimer>
+      </div>
+    </PageContainer>
   )
 }

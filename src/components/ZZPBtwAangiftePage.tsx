@@ -293,8 +293,9 @@ const EmptyQuarterCard = ({
           </p>
           <p className="text-xs text-muted-foreground">
             {overview.data_status_reason ||
-              'Voeg facturen of zakelijke uitgaven toe om de BTW-berekening te starten.'}
-            {!isError && ' Voeg facturen of zakelijke uitgaven toe om de BTW-berekening te starten.'}
+              (isError
+                ? 'Probeer het later opnieuw of neem contact op met support.'
+                : 'Voeg facturen of zakelijke uitgaven toe om de BTW-berekening te starten.')}
           </p>
         </div>
 

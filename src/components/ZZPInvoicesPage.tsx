@@ -1203,16 +1203,22 @@ const InvoiceCard = ({
         </div>
       </div>
       <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/50">
-        {invoice.status === 'draft' ? (
+        {invoice.status === 'draft' || invoice.status === 'cancelled' ? (
           <StatusBadge status={invoice.status} size="sm" />
         ) : (
-          <Select 
-            value={invoice.status} 
+          <Select
+            value={invoice.status}
             onValueChange={(value) => onStatusChange(value as 'sent' | 'paid' | 'cancelled')}
-            disabled={isUpdatingStatus || invoice.status === 'cancelled'}
+            disabled={isUpdatingStatus}
           >
-            <SelectTrigger className="w-auto border-0 p-0 h-auto focus:ring-0">
+            <SelectTrigger
+              aria-label={t('zzpInvoices.changeStatus')}
+              className="group flex items-center gap-2 h-11 sm:h-9 w-auto pl-1.5 pr-2.5 rounded-full border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/40 transition-all shadow-sm [&>svg:last-child]:opacity-100 [&>svg:last-child]:text-primary"
+            >
               <StatusBadge status={invoice.status} size="sm" />
+              <span className="text-xs font-semibold text-primary whitespace-nowrap">
+                {t('zzpInvoices.changeStatus')}
+              </span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="sent">{t('zzpInvoices.statusSent')}</SelectItem>
@@ -2361,16 +2367,22 @@ const ZZPInvoicesPageContent = () => {
                               {formatAmountEUR(invoice.total_cents)}
                             </TableCell>
                             <TableCell>
-                              {invoice.status === 'draft' ? (
+                              {invoice.status === 'draft' || invoice.status === 'cancelled' ? (
                                 <StatusBadge status={invoice.status} />
                               ) : (
-                                <Select 
-                                  value={invoice.status} 
+                                <Select
+                                  value={invoice.status}
                                   onValueChange={(value) => handleStatusChange(invoice, value as 'sent' | 'paid' | 'cancelled')}
-                                  disabled={updatingStatusInvoiceId === invoice.id || invoice.status === 'cancelled'}
+                                  disabled={updatingStatusInvoiceId === invoice.id}
                                 >
-                                  <SelectTrigger className="w-auto border-0 p-0 h-auto focus:ring-0">
-                                    <StatusBadge status={invoice.status} />
+                                  <SelectTrigger
+                                    aria-label={t('zzpInvoices.changeStatus')}
+                                    className="group flex items-center gap-2 h-9 w-auto pl-1.5 pr-2.5 rounded-full border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/40 transition-all shadow-sm [&>svg:last-child]:opacity-100 [&>svg:last-child]:text-primary"
+                                  >
+                                    <StatusBadge status={invoice.status} size="sm" />
+                                    <span className="text-xs font-semibold text-primary whitespace-nowrap hidden xl:inline">
+                                      {t('zzpInvoices.changeStatus')}
+                                    </span>
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="sent">{t('zzpInvoices.statusSent')}</SelectItem>

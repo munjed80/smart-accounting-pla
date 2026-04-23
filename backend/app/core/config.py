@@ -141,8 +141,8 @@ class Settings(BaseSettings):
     
     # Digipoort tax submission connector (optional)
     # Booleans accept the strings "true"/"false" (case-insensitive) for backward compatibility.
-    DIGIPOORT_ENABLED: bool = False  # Set to "true" to enable Digipoort mode
-    DIGIPOORT_SANDBOX_MODE: bool = True  # Set to "false" for production mode
+    DIGIPOORT_ENABLED: bool = False  # Set to True (or "true"/"1"/"yes"/"on") to enable Digipoort mode
+    DIGIPOORT_SANDBOX_MODE: bool = True  # Set to False (or "false"/"0") for production mode
     DIGIPOORT_ENDPOINT: Optional[str] = None  # Digipoort API endpoint URL
     DIGIPOORT_CLIENT_ID: Optional[str] = None  # Client ID for Digipoort authentication
     DIGIPOORT_CLIENT_SECRET: Optional[str] = None  # Client secret for Digipoort

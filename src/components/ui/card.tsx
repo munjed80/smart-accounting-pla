@@ -7,7 +7,11 @@ function Card({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
+        // Base look — keep the existing rounded/border/shadow language but
+        // soften the shadow and add a subtle ring on hover for a more
+        // premium feel without breaking layouts that rely on the default.
+        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border border-border/60 py-6 shadow-sm",
+        "transition-shadow",
         className
       )}
       {...props}

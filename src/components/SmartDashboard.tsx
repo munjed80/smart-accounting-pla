@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PageContainer, PageHeader } from '@/components/ui/page'
 import { useAuth } from '@/lib/AuthContext'
 import { zzpApi, ZZPDashboardResponse, MonthlyInvoiceSummary, administrationApi, Administration, getErrorMessage } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
@@ -108,118 +109,106 @@ export const SmartDashboard = () => {
   // Show loading state only on initial load (not on background refetches)
   if (isInitialLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 opacity-100">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
-                <House size={40} weight="duotone" className="text-primary" />
-                {t('dashboard.overzichtTitle')}
-              </h1>
-              <p className="text-muted-foreground">
-                {t('dashboard.welcomeBack')}, <span className="font-semibold">{user?.full_name}</span>
-              </p>
-            </div>
-          </div>
-          
-          {/* Loading skeleton for stats cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {[1, 2, 3, 4].map((i) => (
-              <Card key={i} className="bg-card/80 backdrop-blur-sm border-2 border-primary/20">
-                <CardHeader className="pb-3">
-                  <Skeleton className="h-4 w-24" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-8 w-16 mb-2" />
-                  <Skeleton className="h-3 w-32" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          
-          {/* Loading skeleton for content cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {[1, 2].map((i) => (
-              <Card key={i} className="bg-card/80 backdrop-blur-sm">
-                <CardHeader>
-                  <Skeleton className="h-6 w-40 mb-2" />
-                  <Skeleton className="h-4 w-56" />
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      <PageContainer>
+        <PageHeader
+          icon={<House size={32} weight="duotone" />}
+          title={t('dashboard.overzichtTitle')}
+          description={
+            <>
+              {t('dashboard.welcomeBack')},{' '}
+              <span className="font-semibold">{user?.full_name}</span>
+            </>
+          }
+        />
+
+        {/* Loading skeleton for stats cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="bg-card/80 backdrop-blur-sm border-2 border-primary/20">
+              <CardHeader className="pb-3">
+                <Skeleton className="h-4 w-24" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16 mb-2" />
+                <Skeleton className="h-3 w-32" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
-      </div>
+
+        {/* Loading skeleton for content cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[1, 2].map((i) => (
+            <Card key={i} className="bg-card/80 backdrop-blur-sm">
+              <CardHeader>
+                <Skeleton className="h-6 w-40 mb-2" />
+                <Skeleton className="h-4 w-56" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </PageContainer>
     )
   }
   
   // Show error state if fetching failed
   if (fetchError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
-                <House size={40} weight="duotone" className="text-primary" />
-                {t('dashboard.overzichtTitle')}
-              </h1>
-              <p className="text-muted-foreground">
-                {t('dashboard.welcomeBack')}, <span className="font-semibold">{user?.full_name}</span>
-              </p>
-            </div>
-          </div>
-          
-          <Alert variant="destructive">
-            <WarningCircle size={18} />
-            <AlertDescription className="ml-2 flex items-center justify-between">
-              <span>{getErrorMessage(fetchError)}</span>
-              <Button variant="outline" size="sm" onClick={handleRefresh} className="ml-4">
-                <ArrowsClockwise size={16} className="mr-2" />
-                {t('common.retry')}
-              </Button>
-            </AlertDescription>
-          </Alert>
-        </div>
-      </div>
+      <PageContainer>
+        <PageHeader
+          icon={<House size={32} weight="duotone" />}
+          title={t('dashboard.overzichtTitle')}
+          description={
+            <>
+              {t('dashboard.welcomeBack')},{' '}
+              <span className="font-semibold">{user?.full_name}</span>
+            </>
+          }
+        />
+
+        <Alert variant="destructive">
+          <WarningCircle size={18} />
+          <AlertDescription className="ml-2 flex items-center justify-between">
+            <span>{getErrorMessage(fetchError)}</span>
+            <Button variant="outline" size="sm" onClick={handleRefresh} className="ml-4">
+              <ArrowsClockwise size={16} className="mr-2" />
+              {t('common.retry')}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </PageContainer>
     )
   }
-  
+
   // Show empty state if user has no administrations
   if (administrations.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
-                <House size={40} weight="duotone" className="text-primary" />
-                {t('dashboard.overzichtTitle')}
-              </h1>
-              <p className="text-muted-foreground">
-                {t('dashboard.welcomeBack')}, <span className="font-semibold">{user?.full_name}</span>
-              </p>
-            </div>
-          </div>
-          
-          <div className="mt-12">
-            <NoAdministrationsEmptyState
-              userRole={user?.role as 'zzp' | 'accountant' | 'admin'}
-              onCreateAdministration={() => navigateTo('/onboarding')}
-            />
-          </div>
+      <PageContainer>
+        <PageHeader
+          icon={<House size={32} weight="duotone" />}
+          title={t('dashboard.overzichtTitle')}
+          description={
+            <>
+              {t('dashboard.welcomeBack')},{' '}
+              <span className="font-semibold">{user?.full_name}</span>
+            </>
+          }
+        />
+
+        <div className="mt-12">
+          <NoAdministrationsEmptyState
+            userRole={user?.role as 'zzp' | 'accountant' | 'admin'}
+            onCreateAdministration={() => navigateTo('/onboarding')}
+          />
         </div>
-      </div>
+      </PageContainer>
     )
   }
 
@@ -248,30 +237,26 @@ export const SmartDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
-      
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 opacity-100">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
-              <House size={40} weight="duotone" className="text-primary" />
-              {t('dashboard.overzichtTitle')}
-            </h1>
-            <p className="text-muted-foreground">
-              {t('dashboard.welcomeBack')}, <span className="font-semibold">{user?.full_name}</span>
-            </p>
-          </div>
-          <div className="text-right">
-            <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isFetching}>
-              <ArrowsClockwise size={18} className={`mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-              {t('common.refresh')}
-            </Button>
-          </div>
-        </div>
+    <PageContainer>
+      <PageHeader
+        icon={<House size={32} weight="duotone" />}
+        title={t('dashboard.overzichtTitle')}
+        description={
+          <>
+            {t('dashboard.welcomeBack')},{' '}
+            <span className="font-semibold">{user?.full_name}</span>
+          </>
+        }
+        actions={
+          <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isFetching}>
+            <ArrowsClockwise size={18} className={`mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            {t('common.refresh')}
+          </Button>
+        }
+      />
 
-        {/* Main KPI Cards - ZZP focused metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* Main KPI Cards - ZZP focused metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Open Invoices Card */}
           <Card 
             className="bg-card/80 backdrop-blur-sm border-2 border-primary/20 cursor-pointer hover:border-primary/40 transition-colors"
@@ -578,7 +563,6 @@ export const SmartDashboard = () => {
             </Card>
           </div>
         </div>
-      </div>
-    </div>
+    </PageContainer>
   )
 }

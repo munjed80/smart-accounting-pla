@@ -100,66 +100,22 @@ import { toast } from 'sonner'
 import { useDebounce } from '@/hooks/useDebounce'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { ApiHttpError, NetworkError, ServerError, UnauthorizedError } from '@/lib/errors'
+import {
+  formatAmountEUR,
+  formatDate,
+  getStatusCodeFromError,
+  normalizeListResponse,
+  extractDatePart,
+  parseAmountToCents,
+} from '@/components/shared/page-formatting'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatAmountEUR(amountCents: number): string {
-  const safeAmount = Number(amountCents)
-  const normalizedAmount = Number.isFinite(safeAmount) ? safeAmount : 0
-  return new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(normalizedAmount / 100)
-}
-
-function formatDate(isoDate: string | null | undefined): string {
-  if (!isoDate) return '—'
-  const parsedDate = new Date(isoDate)
-  if (Number.isNaN(parsedDate.getTime())) return '—'
-  return new Intl.DateTimeFormat('nl-NL', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  }).format(parsedDate)
-}
 
 /** Default number of days a quote remains valid after its issue date. */
 const DEFAULT_QUOTE_VALIDITY_DAYS = 30
 
-const getStatusCodeFromError = (error: unknown): number | null => {
-  if (error instanceof ApiHttpError && error.statusCode) return error.statusCode
-  if (typeof error === 'object' && error !== null) {
-    const maybeStatus = (error as { statusCode?: unknown }).statusCode
-    if (typeof maybeStatus === 'number') return maybeStatus
-    const responseStatus = (error as { response?: { status?: unknown } }).response?.status
-    if (typeof responseStatus === 'number') return responseStatus
-  }
-  return null
-}
-
-function normalizeListResponse<T>(response: unknown, primaryKey?: string): T[] {
-  if (Array.isArray(response)) return response as T[]
-  if (response !== null && typeof response === 'object') {
-    const obj = response as Record<string, unknown>
-    if (primaryKey && Array.isArray(obj[primaryKey])) return obj[primaryKey] as T[]
-    for (const key of ['data', 'items', 'results']) {
-      if (Array.isArray(obj[key])) return obj[key] as T[]
-    }
-  }
-  return []
-}
-
-const extractDatePart = (isoString: string | undefined): string => {
-  if (!isoString) return ''
-  return isoString.split('T')[0]
-}
-
-const parseAmountToCents = (value: string): number | null => {
-  const normalized = value.replace(',', '.')
-  const parsed = parseFloat(normalized)
-  if (isNaN(parsed) || parsed < 0) return null
-  return Math.round(parsed * 100)
-}
+// (formatAmountEUR, formatDate, getStatusCodeFromError, normalizeListResponse,
+//  extractDatePart, parseAmountToCents are now imported from '@/components/shared/page-formatting')
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 

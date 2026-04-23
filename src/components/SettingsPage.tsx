@@ -68,6 +68,9 @@ import { parseApiError } from '@/lib/utils'
 import { t } from '@/i18n'
 import { getBuildDate, PACKAGE_VERSION_ONLY } from '@/lib/version'
 import { usePushNotifications, isPushEnabled } from '@/hooks/usePushNotifications'
+import { AboutVersionCard } from '@/components/settings/AboutVersionCard'
+import { DataExportCard } from '@/components/settings/DataExportCard'
+import { PasswordChangeCard } from '@/components/settings/PasswordChangeCard'
 
 export const SettingsPage = () => {
   const { user } = useAuth()
@@ -1333,157 +1336,21 @@ export const SettingsPage = () => {
           )}
 
           {/* Password Change Section */}
-          <Card className="bg-card/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Gear size={20} weight="duotone" />
-                Wachtwoord wijzigen
-              </CardTitle>
-              <CardDescription>
-                Wijzig je accountwachtwoord voor extra beveiliging
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Huidig wachtwoord</Label>
-                  <Input 
-                    id="currentPassword" 
-                    type="password"
-                    placeholder="Voer huidig wachtwoord in"
-                    value={passwordForm.currentPassword}
-                    onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
-                    disabled={isChangingPassword}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">Nieuw wachtwoord</Label>
-                  <Input 
-                    id="newPassword" 
-                    type="password"
-                    placeholder="Voer nieuw wachtwoord in"
-                    value={passwordForm.newPassword}
-                    onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
-                    disabled={isChangingPassword}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Bevestig nieuw wachtwoord</Label>
-                  <Input 
-                    id="confirmPassword" 
-                    type="password"
-                    placeholder="Bevestig nieuw wachtwoord"
-                    value={passwordForm.confirmPassword}
-                    onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                    disabled={isChangingPassword}
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end pt-4">
-                <Button onClick={handleChangePassword} disabled={isChangingPassword}>
-                  {isChangingPassword && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                  Wachtwoord wijzigen
-                </Button>
-              </div>
-              <Alert>
-                <Info size={16} />
-                <AlertDescription>
-                  Je wachtwoord moet minimaal 10 tekens bevatten en minimaal één letter en één cijfer bevatten
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
+          <PasswordChangeCard
+            passwordForm={passwordForm}
+            setPasswordForm={setPasswordForm}
+            isChangingPassword={isChangingPassword}
+            onChangePassword={handleChangePassword}
+          />
 
           {/* Data Export/Backup Section */}
-          <Card className="bg-card/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FloppyDisk size={20} weight="duotone" />
-                Data export & backup
-              </CardTitle>
-              <CardDescription>
-                Exporteer je bedrijfsgegevens als backup of voor externe verwerking
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Download een complete export van je bedrijfsgegevens inclusief:
-                </p>
-                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 ml-4">
-                  <li>Bedrijfsprofiel en contactgegevens</li>
-                  <li>Klanten</li>
-                  <li>Facturen en betalingen</li>
-                  <li>Uitgaven en bonnetjes</li>
-                  <li>Uren registratie</li>
-                  <li>Afspraken</li>
-                </ul>
-              </div>
-              <div className="flex gap-3 pt-4">
-                <Button variant="outline" className="flex-1" onClick={handleExportJSON}>
-                  <FloppyDisk size={18} className="mr-2" />
-                  Exporteer als JSON
-                </Button>
-                <Button variant="outline" className="flex-1" onClick={handleExportCSV}>
-                  <FloppyDisk size={18} className="mr-2" />
-                  Exporteer als CSV
-                </Button>
-              </div>
-              <Alert>
-                <Info size={16} />
-                <AlertDescription>
-                  De export bevat alle gegevens in je huidige administratie. Bewaar de export veilig.
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
+          <DataExportCard
+            onExportJSON={handleExportJSON}
+            onExportCSV={handleExportCSV}
+          />
 
           {/* About & Version Info */}
-          <Card className="bg-card/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Info size={20} weight="duotone" />
-                Over deze applicatie
-              </CardTitle>
-              <CardDescription>
-                Versie-informatie en systeemdetails
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-sm text-muted-foreground">Versie</span>
-                  <Badge variant="secondary" className="font-mono text-xs">
-                    {PACKAGE_VERSION_ONLY}
-                  </Badge>
-                </div>
-
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-sm text-muted-foreground">Volledige versie</span>
-                  <Badge variant="outline" className="font-mono text-xs">
-                    {PACKAGE_VERSION_ONLY}
-                  </Badge>
-                </div>
-
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-sm text-muted-foreground">Laatste build</span>
-                  <span className="text-sm font-medium">
-                    {getBuildDate()}
-                  </span>
-                </div>
-              </div>
-
-              <Separator />
-
-              <Alert>
-                <Info size={16} />
-                <AlertDescription className="text-xs">
-                  <strong>Smart Accounting Platform</strong> — Professioneel boekhoudplatform voor ZZP'ers en accountants.
-                  {' '}Versie: <code className="text-xs bg-muted px-1 py-0.5 rounded">{PACKAGE_VERSION_ONLY}</code>
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
+          <AboutVersionCard />
 
         </div>
       </div>

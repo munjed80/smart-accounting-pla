@@ -118,54 +118,18 @@ import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useQueryFilters } from '@/hooks/useQueryFilters'
 import { filterInvoices, InvoiceFilters } from '@/lib/filtering'
 import { ApiHttpError, NetworkError, ServerError, UnauthorizedError } from '@/lib/errors'
+import {
+  formatAmountEUR,
+  formatDate,
+  getStatusCodeFromError,
+  normalizeListResponse,
+  extractDatePart,
+  parseAmountToCents,
+} from '@/components/shared/page-formatting'
 
 // Format amount in cents to EUR currency string
-function formatAmountEUR(amountCents: number): string {
-  const safeAmount = Number(amountCents)
-  const normalizedAmount = Number.isFinite(safeAmount) ? safeAmount : 0
-  return new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(normalizedAmount / 100)
-}
-
-// Format date string for display (Dutch locale)
-function formatDate(isoDate: string | null | undefined): string {
-  if (!isoDate) return '—'
-  const parsedDate = new Date(isoDate)
-  if (Number.isNaN(parsedDate.getTime())) return '—'
-
-  return new Intl.DateTimeFormat('nl-NL', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  }).format(parsedDate)
-}
-
-const getStatusCodeFromError = (error: unknown): number | null => {
-  if (error instanceof ApiHttpError && error.statusCode) return error.statusCode
-  if (typeof error === 'object' && error !== null) {
-    const maybeStatus = (error as { statusCode?: unknown }).statusCode
-    if (typeof maybeStatus === 'number') return maybeStatus
-    const responseStatus = (error as { response?: { status?: unknown } }).response?.status
-    if (typeof responseStatus === 'number') return responseStatus
-  }
-  return null
-}
-
-// Normalize any API list response shape into a typed array.
-// Handles: [], {invoices:[]}, {data:[]}, {items:[]}, null, {}, {items:null}
-function normalizeListResponse<T>(response: unknown, primaryKey?: string): T[] {
-  if (Array.isArray(response)) return response as T[]
-  if (response !== null && typeof response === 'object') {
-    const obj = response as Record<string, unknown>
-    if (primaryKey && Array.isArray(obj[primaryKey])) return obj[primaryKey] as T[]
-    for (const key of ['data', 'items', 'results']) {
-      if (Array.isArray(obj[key])) return obj[key] as T[]
-    }
-  }
-  return []
-}
+// (formatAmountEUR, formatDate, getStatusCodeFromError, normalizeListResponse,
+//  extractDatePart, parseAmountToCents are now imported from '@/components/shared/page-formatting')
 
 // Invoice status types (matches backend)
 type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
@@ -189,12 +153,6 @@ const defaultInvoiceFilters: InvoiceFilters = {
   customer_id: '',
 }
 
-
-// Helper function to extract date part from ISO string
-const extractDatePart = (isoString: string | undefined): string => {
-  if (!isoString) return ''
-  return isoString.split('T')[0]
-}
 
 // Status badge component
 const StatusBadge = ({ status, size = 'default' }: { status: InvoiceStatus; size?: 'default' | 'sm' }) => {
@@ -344,15 +302,6 @@ const createEmptyLine = (): InvoiceLineFormData => ({
   unitPrice: '',
   vatRate: '21',
 })
-
-// Parse amount string to cents
-const parseAmountToCents = (value: string): number | null => {
-  const normalized = value.replace(',', '.')
-  const parsed = parseFloat(normalized)
-  if (isNaN(parsed) || parsed < 0) return null
-  return Math.round(parsed * 100)
-}
-
 // Invoice form dialog - now supports invoice lines
 const InvoiceFormDialog = ({
   open,

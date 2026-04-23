@@ -72,6 +72,9 @@ interface ToneStyle {
   chipBg: string
   /** Icon foreground colour. */
   iconText: string
+  /** Background colour for small accents (e.g. list bullets) — slightly */
+  /** stronger than `chipBg` so it remains visible on dark surfaces.     */
+  accentBg: string
 }
 
 const toneStyles: Record<Tone, ToneStyle> = {
@@ -81,6 +84,7 @@ const toneStyles: Record<Tone, ToneStyle> = {
     stripe: 'border-l-blue-500/70 dark:border-l-blue-400/70',
     chipBg: 'bg-blue-500/10 dark:bg-blue-400/10',
     iconText: 'text-blue-600 dark:text-blue-300',
+    accentBg: 'bg-blue-500/60 dark:bg-blue-400/60',
   },
   tip: {
     surface: 'bg-primary/[0.04]',
@@ -88,6 +92,7 @@ const toneStyles: Record<Tone, ToneStyle> = {
     stripe: 'border-l-primary/70',
     chipBg: 'bg-primary/10',
     iconText: 'text-primary',
+    accentBg: 'bg-primary/60',
   },
   warning: {
     surface: 'bg-amber-500/[0.05] dark:bg-amber-400/[0.05]',
@@ -95,6 +100,7 @@ const toneStyles: Record<Tone, ToneStyle> = {
     stripe: 'border-l-amber-500/70 dark:border-l-amber-400/70',
     chipBg: 'bg-amber-500/10 dark:bg-amber-400/10',
     iconText: 'text-amber-600 dark:text-amber-300',
+    accentBg: 'bg-amber-500/60 dark:bg-amber-400/60',
   },
   error: {
     surface: 'bg-red-500/[0.05] dark:bg-red-400/[0.05]',
@@ -102,6 +108,7 @@ const toneStyles: Record<Tone, ToneStyle> = {
     stripe: 'border-l-red-500/70 dark:border-l-red-400/70',
     chipBg: 'bg-red-500/10 dark:bg-red-400/10',
     iconText: 'text-red-600 dark:text-red-300',
+    accentBg: 'bg-red-500/60 dark:bg-red-400/60',
   },
   success: {
     surface: 'bg-emerald-500/[0.05] dark:bg-emerald-400/[0.05]',
@@ -109,6 +116,7 @@ const toneStyles: Record<Tone, ToneStyle> = {
     stripe: 'border-l-emerald-500/70 dark:border-l-emerald-400/70',
     chipBg: 'bg-emerald-500/10 dark:bg-emerald-400/10',
     iconText: 'text-emerald-600 dark:text-emerald-300',
+    accentBg: 'bg-emerald-500/60 dark:bg-emerald-400/60',
   },
   neutral: {
     surface: 'bg-muted/30',
@@ -116,6 +124,7 @@ const toneStyles: Record<Tone, ToneStyle> = {
     stripe: 'border-l-border',
     chipBg: 'bg-muted',
     iconText: 'text-muted-foreground',
+    accentBg: 'bg-muted-foreground/40',
   },
 }
 
@@ -255,7 +264,10 @@ export const SoftNote = ({
             <ul className={cn('space-y-0.5 pt-1', isCompact ? 'text-xs' : 'text-sm')}>
               {items.map((item, i) => (
                 <li key={i} className="flex items-start gap-1.5 text-muted-foreground">
-                  <span className={cn('mt-1 h-1 w-1 shrink-0 rounded-full', style.iconText, 'bg-current opacity-70')} />
+                  <span
+                    aria-hidden
+                    className={cn('mt-1.5 h-1 w-1 shrink-0 rounded-full', style.accentBg)}
+                  />
                   <span>{item}</span>
                 </li>
               ))}

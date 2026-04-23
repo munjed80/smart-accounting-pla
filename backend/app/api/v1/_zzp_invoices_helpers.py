@@ -17,7 +17,6 @@ from app.core.database import get_db
 from app.core.security import decode_token
 from app.models.administration import Administration, AdministrationMember
 from app.models.zzp import (
-    InvoiceStatus,  # noqa: F401  (re-exported for parity with original module)
     ZZPInvoice,
     ZZPInvoiceCounter,
 )

@@ -6,7 +6,7 @@ import { api } from '../api'
 
 // ============ Work Queue Summary Types ============
 
-export interface DocumentReviewItem {
+export interface WorkQueueDocumentReviewItem {
   id: string
   date: string | null
   type: string
@@ -18,7 +18,7 @@ export interface DocumentReviewItem {
 
 export interface DocumentReviewSection {
   count: number
-  top_items: DocumentReviewItem[]
+  top_items: WorkQueueDocumentReviewItem[]
 }
 
 export interface BankTransactionItem {

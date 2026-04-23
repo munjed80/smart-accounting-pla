@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { ApiHttpError, NotFoundError, NetworkError, UnauthorizedError, ValidationError, ServerError, PaymentRequiredError } from './errors'
+import type { ScopeMissingError } from './api/accountant'
 
 /**
  * ==== DATA MAP: Accountant Screens → Endpoints ====

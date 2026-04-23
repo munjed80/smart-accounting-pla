@@ -29,7 +29,6 @@ def generate_mapping_reason(
     Returns:
         A short explanation string (e.g., "Binnenlandse omzet 21% → rubriek 1a")
     """
-    box_mapping = vat_code.box_mapping or {}  # noqa: F841 - kept for parity with original
     rate = float(vat_code.rate)
     category = vat_code.category.value if hasattr(vat_code.category, 'value') else str(vat_code.category)
 

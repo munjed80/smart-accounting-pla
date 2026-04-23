@@ -7,6 +7,11 @@
 // ============================================================================
 
 import { api } from '../api'
+import type {
+  ComprehensiveAuditLogFilters,
+  ComprehensiveAuditLogListResponse,
+} from './ledger'
+import type { WorkQueueSummaryResponse } from './work-queue'
 
 // ============ Accountant Master Dashboard Types ============
 

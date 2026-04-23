@@ -8,6 +8,12 @@
 // ============================================================================
 
 import { api } from '../api'
+import type {
+  AccountantCommitmentsResponse,
+  ZZPExpenseListResponse,
+  ZZPInvoiceListResponse,
+  ZZPTimeEntryListResponse,
+} from './zzp'
 
 // Core Ledger API Types
 export type LedgerIssueSeverity = 'RED' | 'YELLOW'
@@ -254,7 +260,7 @@ export type AuditLogAction =
   | 'START_REVIEW' 
   | 'FINALIZE_PERIOD'
 
-export interface AuditLogEntry {
+export interface LedgerAuditLogEntry {
   id: string
   administration_id: string
   actor_id: string | null
@@ -268,7 +274,7 @@ export interface AuditLogEntry {
 }
 
 export interface AuditLogListResponse {
-  entries: AuditLogEntry[]
+  entries: LedgerAuditLogEntry[]
   total_count: number
 }
 

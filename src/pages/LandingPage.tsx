@@ -138,8 +138,8 @@ export const LandingPage = () => {
       <section className="relative overflow-hidden border-b border-primary/10">
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/15 via-background to-accent/10" />
         <div className="hero-glow-bg absolute inset-0 -z-10" />
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
-          <div className="flex flex-col items-center gap-12 lg:flex-row lg:items-center lg:gap-16">
+        <div className="mx-auto max-w-[88rem] px-4 py-16 sm:px-6 sm:py-24 lg:px-10 lg:py-32 xl:px-12">
+          <div className="flex flex-col items-center gap-12 lg:flex-row lg:items-center lg:gap-20 xl:gap-24">
             {/* Left — text content */}
             <div className="flex-1 text-center lg:text-left">
               {/* Premium badge */}
@@ -153,7 +153,7 @@ export const LandingPage = () => {
                 <span className="hero-gradient-text block">simpel en duidelijk</span>
               </h1>
               {/* Subtitle */}
-              <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg lg:mx-0 lg:mt-6 lg:max-w-lg lg:text-xl lg:leading-[1.7]">
+              <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg lg:mx-0 lg:mt-6 lg:max-w-xl lg:text-xl lg:leading-[1.7]">
                 Facturen, uitgaven, BTW-overzicht en jaaroverzicht — alles op één plek. Speciaal voor zzp'ers, zonder boekhoudkennis.
               </p>
               {/* ZZP feature highlights */}
@@ -195,7 +195,7 @@ export const LandingPage = () => {
             </div>
 
             {/* Right — product visual */}
-            <div className="w-full flex-shrink-0 px-4 sm:px-8 lg:w-[52%] lg:px-0">
+            <div className="w-full flex-shrink-0 px-4 sm:px-8 lg:w-[55%] lg:px-0 xl:w-[58%]">
               <HeroProductMockup />
             </div>
           </div>
@@ -207,11 +207,11 @@ export const LandingPage = () => {
 
       {/* For Accountants — secondary, brief mention */}
       <section id="voor-accountants" className="bg-muted/40 py-14 sm:py-20 lg:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-8">
+        <div className="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10 xl:px-12">
+          <div className="mb-8 max-w-3xl">
             <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-2">Samenwerken met boekhouder</p>
             <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Nodig je boekhouder uit</h2>
-            <p className="mt-3 text-muted-foreground max-w-2xl lg:text-lg lg:leading-relaxed">
+            <p className="mt-3 text-muted-foreground lg:text-lg lg:leading-relaxed">
               Wil je je administratie delen met een boekhouder of accountant? Dat kan met één klik. Zij krijgen leestoegang tot jouw dossier — jij behoudt altijd de controle.
             </p>
           </div>
@@ -225,10 +225,12 @@ export const LandingPage = () => {
 
       {/* Trust section — factual statements, no fake testimonials */}
       <section className="py-14 sm:py-20 lg:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl mb-3">Gebouwd voor de Nederlandse markt</h2>
-          <p className="text-muted-foreground max-w-2xl mb-10 lg:text-lg">Vertrouwd, transparant en volledig conform Nederlandse regelgeving.</p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10 xl:px-12">
+          <div className="max-w-3xl mb-10">
+            <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl mb-3">Gebouwd voor de Nederlandse markt</h2>
+            <p className="text-muted-foreground lg:text-lg">Vertrouwd, transparant en volledig conform Nederlandse regelgeving.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
             {[
               { icon: CheckCircle, text: 'Nederlandse BTW-tarieven en rubrieken ingebouwd' },
               { icon: CheckCircle, text: 'Voldoet aan Nederlandse boekhoudregels' },
@@ -237,7 +239,7 @@ export const LandingPage = () => {
             ].map((item) => {
               const Icon = item.icon
               return (
-                <div key={item.text} className="flex items-start gap-3 rounded-lg border border-border/80 bg-background p-4">
+                <div key={item.text} className="flex items-start gap-3 rounded-xl border border-border/80 bg-gradient-to-br from-background to-muted/30 p-5 shadow-sm transition-all hover:border-accent/40 hover:shadow-md">
                   <Icon className="h-5 w-5 text-accent shrink-0 mt-0.5" />
                   <p className="text-sm font-medium lg:text-base">{item.text}</p>
                 </div>
@@ -249,16 +251,18 @@ export const LandingPage = () => {
 
       {/* Why this platform */}
       <section id="waarom" className="py-14 sm:py-20 lg:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Waarom ZZPers Hub?</h2>
-          <p className="mt-3 text-muted-foreground max-w-2xl lg:text-lg">Gemaakt voor zzp'ers die snel willen werken zonder gedoe.</p>
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10 xl:px-12">
+          <div className="max-w-3xl">
+            <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Waarom ZZPers Hub?</h2>
+            <p className="mt-3 text-muted-foreground lg:text-lg">Gemaakt voor zzp'ers die snel willen werken zonder gedoe.</p>
+          </div>
+          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
             {usps.map((usp) => {
               const Icon = usp.icon
               return (
-                <Card key={usp.title} className="border-border/80">
+                <Card key={usp.title} className="border-border/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-lg">
                   <CardHeader>
-                    <div className="mb-2 text-accent">
+                    <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent/12 ring-1 ring-accent/25 text-accent">
                       <Icon className="h-5 w-5" />
                     </div>
                     <CardTitle className="text-lg lg:text-xl">{usp.title}</CardTitle>
@@ -273,10 +277,10 @@ export const LandingPage = () => {
 
       {/* Pricing */}
       <section id="prijzen" className="bg-gradient-to-b from-primary/5 to-muted/30 py-14 sm:py-20 lg:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10 xl:px-12">
           <h2 className="text-2xl font-bold sm:text-center sm:text-4xl lg:text-5xl mb-2">Prijzen</h2>
           <p className="text-muted-foreground sm:text-center mb-10 lg:text-lg">Eenvoudig en transparant — geen verborgen kosten.</p>
-          <div className="mx-auto mt-8 grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="mx-auto mt-8 grid max-w-6xl grid-cols-1 gap-6 md:grid-cols-3">
             {/* Free */}
             <Card className="border-border/80">
               <CardHeader>
@@ -368,7 +372,7 @@ export const LandingPage = () => {
           </div>
 
           {/* Accountant card below */}
-          <div className="mx-auto mt-6 max-w-5xl">
+          <div className="mx-auto mt-6 max-w-6xl">
             <Card className="border-border/80">
               <CardHeader>
                 <CardTitle className="text-2xl">Accountant</CardTitle>

@@ -8,18 +8,17 @@ import { CheckCircle, FileText, Users, Clock, Receipt, TrendingUp } from 'lucide
 export function HeroProductMockup() {
   return (
     <div className="hero-mockup-wrapper relative flex items-center justify-center">
-      {/* Ambient glow behind the laptop */}
+      {/* Ambient glow behind the laptop — sharp soft-light radial, no filter blur */}
       <div
         className="absolute inset-0 -z-10 pointer-events-none"
         style={{
           background:
-            'radial-gradient(ellipse 70% 60% at 50% 60%, oklch(0.65 0.25 265 / 0.18) 0%, oklch(0.72 0.20 200 / 0.10) 45%, transparent 75%)',
-          filter: 'blur(8px)',
+            'radial-gradient(ellipse 75% 65% at 50% 55%, oklch(0.65 0.25 265 / 0.22) 0%, oklch(0.72 0.20 200 / 0.12) 45%, transparent 78%)',
         }}
       />
 
       {/* Laptop frame */}
-      <div className="relative w-full max-w-[520px] select-none">
+      <div className="relative w-full max-w-[640px] select-none">
         {/* Screen bezel */}
         <div
           className="relative rounded-t-xl overflow-hidden"
@@ -48,7 +47,7 @@ export function HeroProductMockup() {
             style={{
               background: 'oklch(0.10 0.01 260)',
               border: '1px solid oklch(0.22 0.03 260)',
-              minHeight: 280,
+              minHeight: 340,
             }}
           >
             {/* App top bar */}
@@ -64,15 +63,15 @@ export function HeroProductMockup() {
                 <div
                   className="flex items-center justify-center rounded-md"
                   style={{
-                    width: 20,
-                    height: 20,
+                    width: 22,
+                    height: 22,
                     background: 'linear-gradient(135deg, oklch(0.65 0.25 265), oklch(0.75 0.22 150))',
                   }}
                 >
-                  <FileText style={{ width: 11, height: 11, color: 'white' }} />
+                  <FileText style={{ width: 12, height: 12, color: 'white' }} />
                 </div>
                 <span
-                  className="text-xs font-bold tracking-tight"
+                  className="text-[13px] font-bold tracking-tight"
                   style={{
                     background: 'linear-gradient(100deg, oklch(0.65 0.25 265), oklch(0.75 0.22 150))',
                     backgroundClip: 'text',
@@ -96,12 +95,12 @@ export function HeroProductMockup() {
             </div>
 
             {/* Main layout: sidebar + content */}
-            <div className="flex" style={{ minHeight: 240 }}>
+            <div className="flex" style={{ minHeight: 300 }}>
               {/* Sidebar */}
               <div
                 className="flex flex-col gap-0.5 py-3 px-2"
                 style={{
-                  width: 110,
+                  width: 130,
                   background: 'oklch(0.11 0.015 260)',
                   borderRight: '1px solid oklch(0.20 0.03 260)',
                   flexShrink: 0,
@@ -116,7 +115,7 @@ export function HeroProductMockup() {
                 ].map(({ label, icon: Icon, active }) => (
                   <div
                     key={label}
-                    className="flex items-center gap-1.5 rounded px-2 py-1.5 text-[10px] font-medium"
+                    className="flex items-center gap-2 rounded px-2 py-2 text-[11px] font-medium"
                     style={{
                       background: active
                         ? 'linear-gradient(90deg, oklch(0.65 0.25 265 / 0.18), oklch(0.72 0.20 200 / 0.10))'
@@ -125,7 +124,7 @@ export function HeroProductMockup() {
                       borderLeft: active ? '2px solid oklch(0.65 0.25 265)' : '2px solid transparent',
                     }}
                   >
-                    <Icon style={{ width: 10, height: 10, flexShrink: 0 }} />
+                    <Icon style={{ width: 12, height: 12, flexShrink: 0 }} />
                     {label}
                   </div>
                 ))}
@@ -135,14 +134,14 @@ export function HeroProductMockup() {
               <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Content header */}
                 <div
-                  className="flex items-center justify-between px-3 py-2"
+                  className="flex items-center justify-between px-3 py-2.5"
                   style={{ borderBottom: '1px solid oklch(0.18 0.02 260)' }}
                 >
-                  <span className="text-[10px] font-semibold" style={{ color: 'oklch(0.78 0.02 260)' }}>
+                  <span className="text-[11px] font-semibold" style={{ color: 'oklch(0.78 0.02 260)' }}>
                     Facturen
                   </span>
                   <div
-                    className="rounded px-2 py-0.5 text-[9px] font-semibold"
+                    className="rounded px-2 py-0.5 text-[10px] font-semibold"
                     style={{
                       background: 'linear-gradient(135deg, oklch(0.65 0.25 265), oklch(0.72 0.20 200))',
                       color: 'white',
@@ -153,7 +152,7 @@ export function HeroProductMockup() {
                 </div>
 
                 {/* Invoice rows */}
-                <div className="flex-1 px-2 py-1.5 space-y-1 overflow-hidden">
+                <div className="flex-1 px-2 py-2 space-y-1.5 overflow-hidden">
                   {[
                     { num: '#2026-047', client: 'De Vries B.V.', amount: '€ 1.250,00', status: 'Betaald', paid: true },
                     { num: '#2026-046', client: 'Bakker & Zn', amount: '€ 875,50', status: 'Verzonden', paid: false },
@@ -162,15 +161,15 @@ export function HeroProductMockup() {
                   ].map((inv) => (
                     <div
                       key={inv.num}
-                      className="flex items-center justify-between rounded px-2 py-1.5"
+                      className="flex items-center justify-between rounded px-2.5 py-2"
                       style={{ background: 'oklch(0.14 0.015 260)' }}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <div
                           className="rounded"
                           style={{
-                            width: 4,
-                            height: 4,
+                            width: 5,
+                            height: 5,
                             background: inv.paid
                               ? 'oklch(0.72 0.18 150)'
                               : inv.status === 'Verzonden'
@@ -180,23 +179,23 @@ export function HeroProductMockup() {
                           }}
                         />
                         <div className="min-w-0">
-                          <p className="text-[9px] font-semibold truncate" style={{ color: 'oklch(0.78 0.02 260)' }}>
+                          <p className="text-[10px] font-semibold truncate" style={{ color: 'oklch(0.80 0.02 260)' }}>
                             {inv.client}
                           </p>
-                          <p className="text-[8px]" style={{ color: 'oklch(0.45 0.01 260)' }}>
+                          <p className="text-[9px]" style={{ color: 'oklch(0.45 0.01 260)' }}>
                             {inv.num}
                           </p>
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0 ml-2">
                         <p
-                          className="text-[9px] font-bold"
+                          className="text-[10px] font-bold"
                           style={{ color: inv.paid ? 'oklch(0.72 0.18 150)' : 'oklch(0.65 0.02 260)' }}
                         >
                           {inv.amount}
                         </p>
                         <p
-                          className="text-[8px]"
+                          className="text-[9px]"
                           style={{
                             color: inv.paid
                               ? 'oklch(0.62 0.14 150)'
@@ -214,37 +213,37 @@ export function HeroProductMockup() {
 
                 {/* Mini stats bar */}
                 <div
-                  className="flex items-center justify-around px-2 py-2 text-[9px]"
+                  className="flex items-center justify-around px-2 py-2.5 text-[10px]"
                   style={{
                     borderTop: '1px solid oklch(0.18 0.02 260)',
                     background: 'oklch(0.11 0.01 260)',
                   }}
                 >
                   <div className="text-center">
-                    <p className="font-bold" style={{ color: 'oklch(0.72 0.18 150)' }}>
+                    <p className="font-bold text-[11px]" style={{ color: 'oklch(0.72 0.18 150)' }}>
                       €4.715
                     </p>
-                    <p style={{ color: 'oklch(0.45 0.01 260)' }}>ontvangen</p>
+                    <p className="text-[9px]" style={{ color: 'oklch(0.45 0.01 260)' }}>ontvangen</p>
                   </div>
                   <div
                     className="rounded-full"
-                    style={{ width: 1, height: 24, background: 'oklch(0.22 0.02 260)' }}
+                    style={{ width: 1, height: 26, background: 'oklch(0.22 0.02 260)' }}
                   />
                   <div className="text-center">
-                    <p className="font-bold" style={{ color: 'oklch(0.65 0.25 265)' }}>
+                    <p className="font-bold text-[11px]" style={{ color: 'oklch(0.65 0.25 265)' }}>
                       3 open
                     </p>
-                    <p style={{ color: 'oklch(0.45 0.01 260)' }}>facturen</p>
+                    <p className="text-[9px]" style={{ color: 'oklch(0.45 0.01 260)' }}>facturen</p>
                   </div>
                   <div
                     className="rounded-full"
-                    style={{ width: 1, height: 24, background: 'oklch(0.22 0.02 260)' }}
+                    style={{ width: 1, height: 26, background: 'oklch(0.22 0.02 260)' }}
                   />
                   <div className="text-center">
-                    <p className="font-bold" style={{ color: 'oklch(0.72 0.20 200)' }}>
+                    <p className="font-bold text-[11px]" style={{ color: 'oklch(0.72 0.20 200)' }}>
                       Q4 2024
                     </p>
-                    <p style={{ color: 'oklch(0.45 0.01 260)' }}>BTW-kwartaal</p>
+                    <p className="text-[9px]" style={{ color: 'oklch(0.45 0.01 260)' }}>BTW-kwartaal</p>
                   </div>
                 </div>
               </div>

@@ -396,9 +396,9 @@ export function ProductShowcaseSection() {
       className="py-16 sm:py-20 lg:py-28 border-t border-border/60"
       aria-labelledby="showcase-heading"
     >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10 xl:px-12">
         {/* Section header */}
-        <div className="mx-auto max-w-2xl text-center mb-14 sm:mb-20">
+        <div className="mx-auto max-w-3xl text-center mb-14 sm:mb-20">
           <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'oklch(0.65 0.25 265)' }}>
             Product in de praktijk
           </p>
@@ -437,7 +437,7 @@ export function ProductShowcaseSection() {
                 </div>
 
                 {/* Text column */}
-                <div className="flex-1 lg:max-w-md">
+                <div className="flex-1 lg:max-w-lg">
                   <div
                     className="inline-flex items-center justify-center rounded-xl mb-4"
                     style={{

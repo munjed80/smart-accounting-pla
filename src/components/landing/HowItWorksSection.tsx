@@ -23,14 +23,14 @@ const stages = [
 
 export const HowItWorksSection = () => {
   return (
-    <section id="hoe-werkt-het" className="py-16 md:py-24 border-b border-border/60">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16 lg:items-center">
+    <section id="hoe-werkt-het" className="py-16 md:py-24 lg:py-28 border-b border-border/60">
+      <div className="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10 xl:px-12">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-16 lg:items-center">
 
           {/* Left: Copy */}
-          <div>
+          <div className="lg:col-span-4">
             <p className="text-xs font-semibold uppercase tracking-widest text-accent mb-3">WERKWIJZE</p>
-            <h2 className="text-2xl font-bold sm:text-3xl lg:text-4xl mb-4">Hoe werkt het?</h2>
+            <h2 className="text-2xl font-bold sm:text-3xl lg:text-4xl xl:text-5xl mb-4">Hoe werkt het?</h2>
             <p className="text-muted-foreground text-sm sm:text-base lg:text-lg max-w-sm lg:max-w-md">
               Van eerste factuur tot btw-overzicht — in drie eenvoudige stappen.
             </p>
@@ -40,7 +40,7 @@ export const HowItWorksSection = () => {
           </div>
 
           {/* Right: Workflow cards */}
-          <div className="flex flex-col gap-3 lg:flex-row lg:gap-0 lg:items-stretch">
+          <div className="flex flex-col gap-3 lg:col-span-8 lg:flex-row lg:gap-0 lg:items-stretch">
             {stages.map((stage, index) => {
               const Icon = stage.icon
               const isLast = index === stages.length - 1

@@ -9,10 +9,12 @@ import {
   CheckCircle,
   ClipboardList,
   FileText,
+  Receipt,
   ShieldCheck,
+  ShoppingBag,
   Smartphone,
+  Sparkles,
   Star,
-  UserCheck,
   Users,
   Wallet,
   X,
@@ -208,7 +210,7 @@ export const LandingPage = () => {
                   className="pointer-events-none absolute -left-6 -top-6 hidden w-[38%] max-w-[260px] opacity-70 mix-blend-luminosity lg:block xl:-left-10 xl:-top-10 xl:w-[34%]"
                 >
                   <LandingHumanImage
-                    src="/images/landing/zzpershub-mobile-dashboard.webp"
+                    src="/images/landing/hero-section.png"
                     alt=""
                     aspect="aspect-[4/5]"
                     width={520}
@@ -236,16 +238,13 @@ export const LandingPage = () => {
             {/* Image — accountant at desk reviewing a dossier */}
             <div className="order-2 lg:order-1 lg:col-span-5">
               <LandingHumanImage
-                src="/images/landing/zzpershub-mobile-agenda.webp"
-                alt="ZZPers Hub mobiele app: agenda en afsprakenoverzicht"
+                src="/images/landing/nodig-je-boekhouder-uit.png"
+                alt="Nodig je boekhouder uit en deel je administratie met één klik"
                 aspect="aspect-[4/5] sm:aspect-[5/4] lg:aspect-[4/5]"
-                width={720}
-                height={900}
+                width={1200}
+                height={1500}
                 overlay="medium"
                 objectPosition="center 30%"
-                placeholderIcon={UserCheck}
-                placeholderLabel="Samenwerken met je boekhouder"
-                placeholderCaption="Eén dossier, één bron van waarheid"
                 className="mx-auto max-w-md lg:max-w-none"
               />
             </div>
@@ -260,6 +259,195 @@ export const LandingPage = () => {
               <div className="mt-8">
                 <Button size="lg" variant="outline" onClick={() => navigateTo('/contact')}>
                   Contact opnemen
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* E-commerce — connect webshops to ZZPers Hub */}
+      <section id="webshops" className="py-14 sm:py-20 lg:py-28">
+        <div className="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10 xl:px-12">
+          <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
+            {/* Copy */}
+            <div className="order-2 max-w-3xl lg:order-1 lg:col-span-7">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-primary">Webshop & e-commerce</p>
+              <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Koppel je webshop, alles boekt zichzelf</h2>
+              <p className="mt-3 text-muted-foreground lg:text-lg lg:leading-relaxed">
+                Verbind je Shopify- of WooCommerce-webshop met ZZPers Hub en synchroniseer automatisch je bestellingen, klanten, retouren en restbetalingen naar je administratie. Geen handmatig overtypen meer — alles staat netjes in je boekhouding.
+              </p>
+              <ul className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {[
+                  'Shopify & WooCommerce ondersteund',
+                  'Bestellingen & klanten direct geboekt',
+                  'Retouren en restbetalingen afgehandeld',
+                  'Altijd actueel zicht op je omzet',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-sm lg:text-base">
+                    <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8">
+                <Button size="lg" variant="outline" onClick={() => navigateTo('/register')}>
+                  Probeer het gratis
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Image */}
+            <div className="order-1 lg:order-2 lg:col-span-5">
+              <LandingHumanImage
+                src="/images/landing/e-commerce.png"
+                alt="Webshop koppelen aan ZZPers Hub: bestellingen, klanten en retouren synchroniseren"
+                aspect="aspect-[4/5] sm:aspect-[5/4] lg:aspect-[4/5]"
+                width={1200}
+                height={1500}
+                overlay="medium"
+                objectPosition="center 30%"
+                placeholderIcon={ShoppingBag}
+                placeholderLabel="Webshop koppelen"
+                placeholderCaption="Synchroniseer orders, klanten en retouren"
+                className="mx-auto max-w-md lg:max-w-none"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Belastinghulp — structured tax preparation */}
+      <section id="belastinghulp" className="bg-muted/40 py-14 sm:py-20 lg:py-28">
+        <div className="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10 xl:px-12">
+          <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
+            {/* Image */}
+            <div className="order-2 lg:order-1 lg:col-span-5">
+              <LandingHumanImage
+                src="/images/landing/belasting-hulp.png"
+                alt="Belastinghulp: BTW- en inkomstenbelasting overzichtelijk voorbereiden"
+                aspect="aspect-[4/5] sm:aspect-[5/4] lg:aspect-[4/5]"
+                width={1200}
+                height={1500}
+                overlay="medium"
+                objectPosition="center 30%"
+                placeholderIcon={Receipt}
+                placeholderLabel="Belastinghulp"
+                placeholderCaption="BTW & inkomstenbelasting begrijpelijk gemaakt"
+                className="mx-auto max-w-md lg:max-w-none"
+              />
+            </div>
+
+            {/* Copy */}
+            <div className="order-1 max-w-3xl lg:order-2 lg:col-span-7">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-primary">Belastinghulp</p>
+              <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Belasting begrijpen, niet vrezen</h2>
+              <p className="mt-3 text-muted-foreground lg:text-lg lg:leading-relaxed">
+                Bereid je BTW-aangifte en inkomstenbelasting voor op een gestructureerde, begrijpelijke manier. ZZPers Hub leidt je stap voor stap door je administratie, controleert ontbrekende bonnen en laat precies zien welke bedragen waar horen — zonder fiscaal jargon.
+              </p>
+              <ul className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {[
+                  'BTW per kwartaal helder onderbouwd',
+                  'Voorbereiding inkomstenbelasting',
+                  'Controle op ontbrekende of dubbele boekingen',
+                  'Uitleg in normale taal — geen jargon',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-sm lg:text-base">
+                    <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8">
+                <Button size="lg" variant="outline" onClick={() => navigateTo('/register')}>
+                  Start met Belastinghulp
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Klantenbeheer — customers and history in one place */}
+      <section id="klantenbeheer" className="py-14 sm:py-20 lg:py-28">
+        <div className="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10 xl:px-12">
+          <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
+            {/* Copy */}
+            <div className="order-2 max-w-3xl lg:order-1 lg:col-span-7">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-primary">Klantenbeheer</p>
+              <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Al je klanten op één plek</h2>
+              <p className="mt-3 text-muted-foreground lg:text-lg lg:leading-relaxed">
+                Beheer je klanten, contactgegevens en facturatiegeschiedenis in één rustig overzicht. Maak in een paar klikken een nieuwe factuur op basis van eerdere opdrachten en houd grip op wie nog moet betalen.
+              </p>
+              <ul className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {[
+                  'Volledig klantdossier per relatie',
+                  'Direct factureren vanuit een klant',
+                  'Inzicht in openstaande bedragen',
+                  'Eenvoudig zoeken en filteren',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-sm lg:text-base">
+                    <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Image */}
+            <div className="order-1 lg:order-2 lg:col-span-5">
+              <LandingHumanImage
+                src="/images/landing/klantenbeheer.png"
+                alt="Klantenbeheer in ZZPers Hub: klantdossier en factuurgeschiedenis op één plek"
+                aspect="aspect-[4/5] sm:aspect-[5/4] lg:aspect-[4/5]"
+                width={1200}
+                height={1500}
+                overlay="medium"
+                objectPosition="center 30%"
+                placeholderIcon={Users}
+                placeholderLabel="Klantenbeheer"
+                placeholderCaption="Eén overzicht voor al je klanten"
+                className="mx-auto max-w-md lg:max-w-none"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Product in de praktijk — see it in action */}
+      <section id="in-de-praktijk" className="bg-muted/40 py-14 sm:py-20 lg:py-28">
+        <div className="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10 xl:px-12">
+          <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
+            {/* Image */}
+            <div className="order-2 lg:order-1 lg:col-span-5">
+              <LandingHumanImage
+                src="/images/landing/product-in-de-praktijk.png"
+                alt="ZZPers Hub in de praktijk: dashboard, facturen en uren in één omgeving"
+                aspect="aspect-[4/5] sm:aspect-[5/4] lg:aspect-[4/5]"
+                width={1200}
+                height={1500}
+                overlay="medium"
+                objectPosition="center 30%"
+                placeholderIcon={Sparkles}
+                placeholderLabel="Product in de praktijk"
+                placeholderCaption="Zo werkt ZZPers Hub elke dag"
+                className="mx-auto max-w-md lg:max-w-none"
+              />
+            </div>
+
+            {/* Copy */}
+            <div className="order-1 max-w-3xl lg:order-2 lg:col-span-7">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-primary">In de praktijk</p>
+              <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Zo ziet jouw werkdag eruit</h2>
+              <p className="mt-3 text-muted-foreground lg:text-lg lg:leading-relaxed">
+                Van het versturen van een factuur tot het bijwerken van je uren en het controleren van je BTW — alles loopt soepel in één omgeving. Geen losse tools, geen export-import-gedoe. Gewoon doorwerken.
+              </p>
+              <div className="mt-8">
+                <Button size="lg" onClick={() => navigateTo('/register')}>
+                  Probeer het zelf
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -305,11 +493,11 @@ export const LandingPage = () => {
             <div className="lg:col-span-4 lg:row-span-2">
               <div className="relative h-full">
                 <LandingHumanImage
-                  src="/images/landing/zzpershub-hero-product.webp"
-                  alt="ZZPers Hub op laptop en mobiel: dashboard met facturen, omzet en uren"
+                  src="/images/landing/waarom-zzpers-hub.png"
+                  alt="Waarom zzp'ers kiezen voor ZZPers Hub: alles op één plek"
                   aspect="aspect-[16/10] lg:aspect-auto"
-                  width={1200}
-                  height={750}
+                  width={1600}
+                  height={1000}
                   overlay="medium"
                   objectPosition="center center"
                   placeholderIcon={Briefcase}

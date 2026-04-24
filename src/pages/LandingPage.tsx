@@ -21,6 +21,7 @@ import { CookieBanner } from '@/components/marketing/CookieBanner'
 import { HowItWorksSection } from '@/components/landing/HowItWorksSection'
 import { HeroProductMockup } from '@/components/landing/HeroProductMockup'
 import { ProductShowcaseSection } from '@/components/landing/ProductShowcaseSection'
+import { LandingHumanImage } from '@/components/landing/LandingHumanImage'
 
 
 
@@ -194,9 +195,29 @@ export const LandingPage = () => {
               </div>
             </div>
 
-            {/* Right — product visual */}
+            {/* Right — product visual (with subtle human portrait behind it) */}
             <div className="w-full flex-shrink-0 px-4 sm:px-8 lg:w-[55%] lg:px-0 xl:w-[58%]">
-              <HeroProductMockup />
+              <div className="relative">
+                {/* Subtle portrait offset behind the product mockup. Hidden on small
+                    screens so the product UI stays the unambiguous hero. Hides itself
+                    automatically if the asset is missing. */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -left-6 -top-6 hidden w-[38%] max-w-[260px] opacity-70 mix-blend-luminosity lg:block xl:-left-10 xl:-top-10 xl:w-[34%]"
+                >
+                  <LandingHumanImage
+                    src="/images/landing/hero-zzper-portrait.webp"
+                    alt=""
+                    aspect="aspect-[4/5]"
+                    width={520}
+                    height={650}
+                    overlay="strong"
+                  />
+                </div>
+                <div className="relative">
+                  <HeroProductMockup />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -208,17 +229,33 @@ export const LandingPage = () => {
       {/* For Accountants — secondary, brief mention */}
       <section id="voor-accountants" className="bg-muted/40 py-14 sm:py-20 lg:py-28">
         <div className="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10 xl:px-12">
-          <div className="mb-8 max-w-3xl">
-            <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-2">Samenwerken met boekhouder</p>
-            <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Nodig je boekhouder uit</h2>
-            <p className="mt-3 text-muted-foreground lg:text-lg lg:leading-relaxed">
-              Wil je je administratie delen met een boekhouder of accountant? Dat kan met één klik. Zij krijgen leestoegang tot jouw dossier — jij behoudt altijd de controle.
-            </p>
-          </div>
-          <div className="mt-8">
-            <Button size="lg" variant="outline" onClick={() => navigateTo('/contact')}>
-              Contact opnemen
-            </Button>
+          <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
+            {/* Image — accountant at desk reviewing a dossier */}
+            <div className="order-2 lg:order-1 lg:col-span-5">
+              <LandingHumanImage
+                src="/images/landing/accountant-at-desk.webp"
+                alt="Boekhouder die een klantdossier doorneemt op een laptop"
+                aspect="aspect-[4/5] sm:aspect-[5/4] lg:aspect-[4/5]"
+                width={720}
+                height={900}
+                overlay="medium"
+                className="mx-auto max-w-md lg:max-w-none"
+              />
+            </div>
+
+            {/* Copy + CTA */}
+            <div className="order-1 max-w-3xl lg:order-2 lg:col-span-7">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-primary">Samenwerken met boekhouder</p>
+              <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Nodig je boekhouder uit</h2>
+              <p className="mt-3 text-muted-foreground lg:text-lg lg:leading-relaxed">
+                Wil je je administratie delen met een boekhouder of accountant? Dat kan met één klik. Zij krijgen leestoegang tot jouw dossier — jij behoudt altijd de controle.
+              </p>
+              <div className="mt-8">
+                <Button size="lg" variant="outline" onClick={() => navigateTo('/contact')}>
+                  Contact opnemen
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -256,21 +293,45 @@ export const LandingPage = () => {
             <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Waarom ZZPers Hub?</h2>
             <p className="mt-3 text-muted-foreground lg:text-lg">Gemaakt voor zzp'ers die snel willen werken zonder gedoe.</p>
           </div>
-          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
-            {usps.map((usp) => {
-              const Icon = usp.icon
-              return (
-                <Card key={usp.title} className="border-border/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-lg">
-                  <CardHeader>
-                    <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent/12 ring-1 ring-accent/25 text-accent">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <CardTitle className="text-lg lg:text-xl">{usp.title}</CardTitle>
-                    <CardDescription>{usp.description}</CardDescription>
-                  </CardHeader>
-                </Card>
-              )
-            })}
+          <div className="mt-10 grid grid-cols-1 gap-5 lg:grid-cols-12 lg:gap-6">
+            {/* Anchor visual — one freelancer portrait used as a "face" for the value props */}
+            <div className="lg:col-span-4 lg:row-span-2">
+              <div className="relative h-full">
+                <LandingHumanImage
+                  src="/images/landing/freelancer-at-work.webp"
+                  alt="Zzp'er werkt geconcentreerd in een kleine studio"
+                  aspect="aspect-[4/5] lg:aspect-auto"
+                  width={720}
+                  height={900}
+                  overlay="medium"
+                  className="h-full min-h-[320px]"
+                />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-6">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-accent/90">Voor zzp'ers</p>
+                  <p className="mt-1 text-base font-semibold text-foreground sm:text-lg">
+                    Gebouwd voor hoe jij werkt.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* USP grid — preserved 6 cards */}
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:col-span-8 lg:gap-6">
+              {usps.map((usp) => {
+                const Icon = usp.icon
+                return (
+                  <Card key={usp.title} className="border-border/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-lg">
+                    <CardHeader>
+                      <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent/12 ring-1 ring-accent/25 text-accent">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <CardTitle className="text-lg lg:text-xl">{usp.title}</CardTitle>
+                      <CardDescription>{usp.description}</CardDescription>
+                    </CardHeader>
+                  </Card>
+                )
+              })}
+            </div>
           </div>
         </div>
       </section>

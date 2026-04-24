@@ -1,7 +1,21 @@
-# Landing page human imagery — asset brief
+# Landing page imagery — asset brief
 
-This directory holds the human/photographic assets used by the marketing
-landing page (`src/pages/LandingPage.tsx`).
+> **Current state (as of 2026-04):** The three `<LandingHumanImage>` slots now
+> use **real ZZPers Hub product screenshots** instead of human portraits.
+> The three active files are:
+>
+> | File | Slot | Description |
+> | --- | --- | --- |
+> | `zzpershub-mobile-dashboard.webp` | Hero (decorative) | Mobile "Start gratis met ZZPersHub" — portrait phone with Overzicht KPI cards |
+> | `zzpershub-mobile-agenda.webp` | "Voor accountants" section | Mobile "Jouw agenda, altijd op orde" — two stacked phones with Agenda view |
+> | `zzpershub-hero-product.webp` | "Waarom ZZPers Hub?" anchor visual | Wide "Alles voor de moderne zzp'er" — laptop + phone hero, landscape ~16:10 |
+>
+> The legacy human-portrait filenames (`hero-zzper-portrait.webp`,
+> `accountant-at-desk.webp`, `freelancer-at-work.webp`) are no longer referenced
+> in the codebase and do not need to be added.
+
+This directory holds the photographic/product screenshot assets used by the
+marketing landing page (`src/pages/LandingPage.tsx`).
 
 The page references each file via `<LandingHumanImage>`
 (`src/components/landing/LandingHumanImage.tsx`). The component is robust to
@@ -61,7 +75,7 @@ Visual matching to the site:
 
 ---
 
-## 1. `hero-zzper-portrait.webp`
+### (Legacy) `hero-zzper-portrait.webp`
 
 | Field | Spec |
 | --- | --- |
@@ -79,7 +93,7 @@ Visual matching to the site:
 
 ---
 
-## 2. `accountant-at-desk.webp`
+### (Legacy) `accountant-at-desk.webp`
 
 | Field | Spec |
 | --- | --- |
@@ -97,7 +111,7 @@ Visual matching to the site:
 
 ---
 
-## 3. `freelancer-at-work.webp`
+### (Legacy) `freelancer-at-work.webp`
 
 | Field | Spec |
 | --- | --- |
@@ -125,4 +139,52 @@ Visual matching to the site:
 - [ ] No model-release-sensitive faces (use generated or properly licensed
       photography only).
 - [ ] Background is dark and softly out of focus.
-- [ ] Visually consistent with the other two images in the set.
+- [ ] Visually consistent with the other images in the set.
+
+---
+
+## Current product screenshots (active files)
+
+### `zzpershub-mobile-dashboard.webp`
+
+| Field | Spec |
+| --- | --- |
+| **Used in** | Hero section — sits **behind** the product mockup on `lg:` and up. Hidden on mobile. Decorative — absent if missing. |
+| **Visual purpose** | Add a quiet product "presence" behind the hero mockup so it reinforces ZZPers Hub branding. |
+| **Content** | Portrait phone render showing the `Overzicht` dashboard with KPI cards (Openstaande facturen, Te laat, Deze maand omzet, Uitgaven, Te betalen btw, Geregistreerde uren) and "Recente facturen" list. Feature bullets around the phone. |
+| **Aspect** | ≈ 4 : 5 portrait |
+| **Rendered size** | 520 × 650 px (decorative slot, 38 % of hero column width) |
+| **Overlay** | `strong` — heavily blended with `mix-blend-luminosity` and 70 % opacity |
+
+### `zzpershub-mobile-agenda.webp`
+
+| Field | Spec |
+| --- | --- |
+| **Used in** | "Samenwerken met boekhouder" section, left column. Anchors the message *"Nodig je boekhouder uit"*. |
+| **Visual purpose** | Show the product's scheduling/agenda capability as a visually clear real-product screenshot. |
+| **Content** | Two stacked portrait phones: `Agenda` calendar view (April 2026) and "Afspraken in April" appointment cards. Feature bullets: Overzichtelijk, Snel plannen, Nooit meer vergeten, Altijd gesynchroniseerd. |
+| **Aspect** | ≈ 4 : 5 portrait (5 : 4 on tablet) |
+| **Rendered size** | 720 × 900 px |
+| **Overlay** | `medium` |
+
+### `zzpershub-hero-product.webp`
+
+| Field | Spec |
+| --- | --- |
+| **Used in** | "Waarom ZZPers Hub?" section, tall anchor visual (`lg:row-span-2`) next to 6 USP cards. Overlay caption ("Voor zzp'ers / Gebouwd voor hoe jij werkt.") at the bottom. |
+| **Visual purpose** | Show the full product platform — desktop + mobile — as a wide marketing hero shot. |
+| **Content** | Laptop showing `ZZPers Hub` Overzicht dashboard (KPI cards, Omzet overzicht chart, Recente facturen, Agenda, Taken) with a phone showing `Open uren` and time entries. Feature row at bottom: Facturatie, Urenregistratie, Klantenbeheer, Inzicht & groei. |
+| **Aspect** | ≈ 16 : 10 landscape (`aspect-[16/10] lg:aspect-auto`) |
+| **Rendered size** | 1200 × 750 px |
+| **Overlay** | `medium`, `objectPosition: center center` |
+
+---
+
+## Legacy asset briefs (for historical context)
+
+The sections below document the original **human portrait** brief that was
+written before the product screenshots shipped. These filenames are **no longer
+referenced** in the codebase, but the visual guidelines remain useful context
+for future photography if the product screenshots are ever replaced.
+
+### (Legacy) `hero-zzper-portrait.webp`

@@ -208,7 +208,7 @@ export const LandingPage = () => {
                   className="pointer-events-none absolute -left-6 -top-6 hidden w-[38%] max-w-[260px] opacity-70 mix-blend-luminosity lg:block xl:-left-10 xl:-top-10 xl:w-[34%]"
                 >
                   <LandingHumanImage
-                    src="/images/landing/hero-zzper-portrait.webp"
+                    src="/images/landing/zzpershub-mobile-dashboard.webp"
                     alt=""
                     aspect="aspect-[4/5]"
                     width={520}
@@ -236,13 +236,13 @@ export const LandingPage = () => {
             {/* Image — accountant at desk reviewing a dossier */}
             <div className="order-2 lg:order-1 lg:col-span-5">
               <LandingHumanImage
-                src="/images/landing/accountant-at-desk.webp"
-                alt="Boekhouder die een klantdossier doorneemt op een laptop"
+                src="/images/landing/zzpershub-mobile-agenda.webp"
+                alt="ZZPers Hub mobiele app: agenda en afsprakenoverzicht"
                 aspect="aspect-[4/5] sm:aspect-[5/4] lg:aspect-[4/5]"
                 width={720}
                 height={900}
                 overlay="medium"
-                objectPosition="center 28%"
+                objectPosition="center 30%"
                 placeholderIcon={UserCheck}
                 placeholderLabel="Samenwerken met je boekhouder"
                 placeholderCaption="Eén dossier, één bron van waarheid"
@@ -305,13 +305,13 @@ export const LandingPage = () => {
             <div className="lg:col-span-4 lg:row-span-2">
               <div className="relative h-full">
                 <LandingHumanImage
-                  src="/images/landing/freelancer-at-work.webp"
-                  alt="Zzp'er werkt geconcentreerd in een kleine studio"
-                  aspect="aspect-[4/5] lg:aspect-auto"
-                  width={720}
-                  height={900}
+                  src="/images/landing/zzpershub-hero-product.webp"
+                  alt="ZZPers Hub op laptop en mobiel: dashboard met facturen, omzet en uren"
+                  aspect="aspect-[16/10] lg:aspect-auto"
+                  width={1200}
+                  height={750}
                   overlay="medium"
-                  objectPosition="center 30%"
+                  objectPosition="center center"
                   placeholderIcon={Briefcase}
                   className="h-full min-h-[320px]"
                 />

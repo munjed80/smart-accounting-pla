@@ -249,11 +249,11 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/nodig-je-boekhouder-uit.png"
                 alt="Nodig je boekhouder uit en deel je administratie met één klik"
-                aspect="aspect-[5/4] sm:aspect-[16/10]"
+                aspect="aspect-video sm:aspect-[16/10]"
                 width={1672}
                 height={941}
                 variant="product"
-                objectPositionClass="object-[center_top] sm:object-center"
+                objectPositionClass="object-center"
                 className="mx-auto w-full max-w-2xl lg:max-w-none"
               />
             </div>
@@ -312,11 +312,11 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/e-commerce.png"
                 alt="Webshop koppelen aan ZZPers Hub: bestellingen, klanten en retouren synchroniseren"
-                aspect="aspect-[5/4] sm:aspect-[16/10]"
+                aspect="aspect-video sm:aspect-[16/10]"
                 width={1672}
                 height={941}
                 variant="product"
-                objectPositionClass="object-[center_top] sm:object-center"
+                objectPositionClass="object-center"
                 placeholderIcon={ShoppingBag}
                 placeholderLabel="Webshop koppelen"
                 placeholderCaption="Synchroniseer orders, klanten en retouren"
@@ -336,11 +336,11 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/belasting-hulp.png"
                 alt="Belastinghulp: BTW- en inkomstenbelasting overzichtelijk voorbereiden"
-                aspect="aspect-[5/4] sm:aspect-[16/10]"
+                aspect="aspect-video sm:aspect-[16/10]"
                 width={1672}
                 height={941}
                 variant="product"
-                objectPositionClass="object-[center_top] sm:object-center"
+                objectPositionClass="object-center"
                 placeholderIcon={Receipt}
                 placeholderLabel="Belastinghulp"
                 placeholderCaption="BTW & inkomstenbelasting begrijpelijk gemaakt"
@@ -410,11 +410,11 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/klantenbeheer.png"
                 alt="Klantenbeheer in ZZPers Hub: klantdossier en factuurgeschiedenis op één plek"
-                aspect="aspect-[5/4] sm:aspect-[16/10]"
+                aspect="aspect-video sm:aspect-[16/10]"
                 width={1672}
                 height={941}
                 variant="product"
-                objectPositionClass="object-[left_top] sm:object-center"
+                objectPositionClass="object-center"
                 placeholderIcon={Users}
                 placeholderLabel="Klantenbeheer"
                 placeholderCaption="Eén overzicht voor al je klanten"
@@ -434,11 +434,11 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/product-in-de-praktijk.png"
                 alt="ZZPers Hub in de praktijk: dashboard, facturen en uren in één omgeving"
-                aspect="aspect-[5/4] sm:aspect-[16/10]"
+                aspect="aspect-video sm:aspect-[16/10]"
                 width={1672}
                 height={941}
                 variant="product"
-                objectPositionClass="object-[center_top] sm:object-center"
+                objectPositionClass="object-center"
                 placeholderIcon={Sparkles}
                 placeholderLabel="Product in de praktijk"
                 placeholderCaption="Zo werkt ZZPers Hub elke dag"
@@ -504,11 +504,11 @@ export const LandingPage = () => {
                 <LandingHumanImage
                   src="/images/landing/waarom-zzpers-hub.png"
                   alt="Waarom zzp'ers kiezen voor ZZPers Hub: alles op één plek"
-                  aspect="aspect-[5/4] sm:aspect-[16/10]"
+                  aspect="aspect-video sm:aspect-[16/10]"
                   width={1672}
                   height={941}
                   variant="product"
-                  objectPositionClass="object-[center_top] sm:object-center"
+                  objectPositionClass="object-center"
                   placeholderIcon={Briefcase}
                   className="w-full"
                 />

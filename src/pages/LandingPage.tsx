@@ -5,12 +5,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   ArrowRight,
+  Briefcase,
   CheckCircle,
   ClipboardList,
   FileText,
   ShieldCheck,
   Smartphone,
   Star,
+  UserCheck,
   Users,
   Wallet,
   X,
@@ -212,6 +214,7 @@ export const LandingPage = () => {
                     width={520}
                     height={650}
                     overlay="strong"
+                    decorative
                   />
                 </div>
                 <div className="relative">
@@ -239,6 +242,10 @@ export const LandingPage = () => {
                 width={720}
                 height={900}
                 overlay="medium"
+                objectPosition="center 28%"
+                placeholderIcon={UserCheck}
+                placeholderLabel="Samenwerken met je boekhouder"
+                placeholderCaption="Eén dossier, één bron van waarheid"
                 className="mx-auto max-w-md lg:max-w-none"
               />
             </div>
@@ -304,6 +311,8 @@ export const LandingPage = () => {
                   width={720}
                   height={900}
                   overlay="medium"
+                  objectPosition="center 30%"
+                  placeholderIcon={Briefcase}
                   className="h-full min-h-[320px]"
                 />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-6">

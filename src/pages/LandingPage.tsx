@@ -203,7 +203,13 @@ export const LandingPage = () => {
               across breakpoints, and blends into the dark theme via a soft
               bottom gradient instead of a bordered card. */}
           <div className="relative mt-12 w-full sm:mt-16 lg:mt-20">
-            <div className="relative w-full overflow-hidden aspect-[16/10] sm:aspect-[16/9] lg:aspect-[21/9]">
+            {/* Mobile gets a taller crop (4/3) so the dashboard screenshot
+                renders as an intentional, focused composition instead of a
+                tiny shrunken full screenshot. Tablet/desktop keep the wide
+                cinematic banner. `object-[center_30%]` favors the top-third
+                of the dashboard (KPIs / hero panel) on mobile, then recenters
+                from `sm` upward where the full width can breathe. */}
+            <div className="relative w-full overflow-hidden aspect-[4/3] sm:aspect-[16/9] lg:aspect-[21/9]">
               <img
                 src="/images/landing/hero-section.png"
                 alt="ZZPers Hub: rustig overzicht voor zzp'ers"
@@ -213,7 +219,7 @@ export const LandingPage = () => {
                 fetchPriority="high"
                 decoding="async"
                 sizes="100vw"
-                className="absolute inset-0 h-full w-full object-cover object-center"
+                className="absolute inset-0 h-full w-full object-cover object-[center_30%] sm:object-center"
               />
               {/* Soft bottom gradient so the banner melts into the dark theme
                   without reading as a bordered card. */}
@@ -243,11 +249,11 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/nodig-je-boekhouder-uit.png"
                 alt="Nodig je boekhouder uit en deel je administratie met één klik"
-                aspect="aspect-[16/10]"
-                width={1200}
-                height={1500}
-                overlay="medium"
-                objectPosition="center center"
+                aspect="aspect-[5/4] sm:aspect-[16/10]"
+                width={1672}
+                height={941}
+                variant="product"
+                objectPositionClass="object-[center_top] sm:object-center"
                 className="mx-auto w-full max-w-2xl lg:max-w-none"
               />
             </div>
@@ -306,11 +312,11 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/e-commerce.png"
                 alt="Webshop koppelen aan ZZPers Hub: bestellingen, klanten en retouren synchroniseren"
-                aspect="aspect-[16/10]"
-                width={1200}
-                height={1500}
-                overlay="medium"
-                objectPosition="center center"
+                aspect="aspect-[5/4] sm:aspect-[16/10]"
+                width={1672}
+                height={941}
+                variant="product"
+                objectPositionClass="object-[center_top] sm:object-center"
                 placeholderIcon={ShoppingBag}
                 placeholderLabel="Webshop koppelen"
                 placeholderCaption="Synchroniseer orders, klanten en retouren"
@@ -330,11 +336,11 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/belasting-hulp.png"
                 alt="Belastinghulp: BTW- en inkomstenbelasting overzichtelijk voorbereiden"
-                aspect="aspect-[16/10]"
-                width={1200}
-                height={1500}
-                overlay="medium"
-                objectPosition="center center"
+                aspect="aspect-[5/4] sm:aspect-[16/10]"
+                width={1672}
+                height={941}
+                variant="product"
+                objectPositionClass="object-[center_top] sm:object-center"
                 placeholderIcon={Receipt}
                 placeholderLabel="Belastinghulp"
                 placeholderCaption="BTW & inkomstenbelasting begrijpelijk gemaakt"
@@ -404,11 +410,11 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/klantenbeheer.png"
                 alt="Klantenbeheer in ZZPers Hub: klantdossier en factuurgeschiedenis op één plek"
-                aspect="aspect-[16/10]"
-                width={1200}
-                height={1500}
-                overlay="medium"
-                objectPosition="center center"
+                aspect="aspect-[5/4] sm:aspect-[16/10]"
+                width={1672}
+                height={941}
+                variant="product"
+                objectPositionClass="object-[left_top] sm:object-center"
                 placeholderIcon={Users}
                 placeholderLabel="Klantenbeheer"
                 placeholderCaption="Eén overzicht voor al je klanten"
@@ -428,11 +434,11 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/product-in-de-praktijk.png"
                 alt="ZZPers Hub in de praktijk: dashboard, facturen en uren in één omgeving"
-                aspect="aspect-[16/10]"
-                width={1200}
-                height={1500}
-                overlay="medium"
-                objectPosition="center center"
+                aspect="aspect-[5/4] sm:aspect-[16/10]"
+                width={1672}
+                height={941}
+                variant="product"
+                objectPositionClass="object-[center_top] sm:object-center"
                 placeholderIcon={Sparkles}
                 placeholderLabel="Product in de praktijk"
                 placeholderCaption="Zo werkt ZZPers Hub elke dag"
@@ -498,11 +504,11 @@ export const LandingPage = () => {
                 <LandingHumanImage
                   src="/images/landing/waarom-zzpers-hub.png"
                   alt="Waarom zzp'ers kiezen voor ZZPers Hub: alles op één plek"
-                  aspect="aspect-[16/10]"
+                  aspect="aspect-[5/4] sm:aspect-[16/10]"
                   width={1672}
                   height={941}
-                  overlay="medium"
-                  objectPosition="center center"
+                  variant="product"
+                  objectPositionClass="object-[center_top] sm:object-center"
                   placeholderIcon={Briefcase}
                   className="w-full"
                 />

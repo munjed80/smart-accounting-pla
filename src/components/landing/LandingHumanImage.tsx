@@ -39,8 +39,30 @@ interface LandingHumanImageProps {
    *
    * Defaults to `center 30%` which keeps a subject's face inside the frame for
    * 4/5 portraits.
+   *
+   * Prefer {@link objectPositionClass} for product/UI screenshots that need a
+   * different focal point on mobile vs. desktop.
    */
   objectPosition?: string
+  /**
+   * Responsive `object-position` Tailwind class string, e.g.
+   * `'object-[center_top] sm:object-center'`. When supplied, this overrides
+   * the inline `objectPosition` style and lets each section pick a strong
+   * mobile crop while keeping a centered desktop composition.
+   */
+  objectPositionClass?: string
+  /**
+   * Visual treatment for the asset:
+   *  - `'portrait'` (default): legacy treatment for human portraits — gentle
+   *    desaturation, micro contrast/brightness tweak and a multi-stop dark
+   *    gradient that blends a person photo into the dark theme.
+   *  - `'product'`: treatment tuned for UI screenshots / product mockups —
+   *    no desaturation or brightness shift (so the UI stays vivid and
+   *    readable) and only a thin bottom edge fade so dashboard pixels are
+   *    not buried under a heavy overlay. Use this for every landing-page
+   *    section that anchors on a product visual.
+   */
+  variant?: 'portrait' | 'product'
   /**
    * Decorative slots (e.g. the hero accent behind the product mockup) should
    * pass `decorative`. When the asset is missing the component will return
@@ -87,6 +109,8 @@ export const LandingHumanImage = ({
   className,
   overlay = 'medium',
   objectPosition = 'center 30%',
+  objectPositionClass,
+  variant = 'portrait',
   decorative = false,
   placeholderIcon: PlaceholderIcon,
   placeholderLabel,
@@ -189,14 +213,40 @@ export const LandingHumanImage = ({
         loading="lazy"
         decoding="async"
         onError={() => setFailed(true)}
-        className="h-full w-full object-cover saturate-[0.85] transition-transform duration-700 ease-out group-hover:scale-[1.02]"
-        style={{ filter: PORTRAIT_FILTER, objectPosition }}
+        className={cn(
+          'h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]',
+          // Portraits get a gentle desaturation so stock photography blends into
+          // the dark brand palette. Product/UI screenshots stay fully vivid so
+          // every dashboard pixel keeps its intended color.
+          variant === 'portrait' && 'saturate-[0.85]',
+          objectPositionClass,
+        )}
+        style={{
+          // Portrait filter only applies to human imagery — UI screenshots must
+          // stay punchy and readable, especially on mobile where they're already
+          // heavily downscaled.
+          ...(variant === 'portrait' ? { filter: PORTRAIT_FILTER } : null),
+          // The Tailwind `objectPositionClass` (responsive) takes precedence;
+          // fall back to the inline string for legacy callers.
+          ...(objectPositionClass ? null : { objectPosition }),
+        }}
       />
-      {/* Dark gradient blend so the portrait melts into the page's dark background */}
-      <div
-        aria-hidden="true"
-        className={cn('pointer-events-none absolute inset-0 bg-gradient-to-t', overlayClass)}
-      />
+      {variant === 'product' ? (
+        // Product visuals only get a thin bottom edge fade so the UI screenshot
+        // melts into the section background without burying the dashboard
+        // chrome under a heavy gradient.
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-background/70 via-background/10 to-transparent"
+        />
+      ) : (
+        // Human portraits use the original full-frame dark gradient blend so
+        // faces sit naturally inside the dark theme.
+        <div
+          aria-hidden="true"
+          className={cn('pointer-events-none absolute inset-0 bg-gradient-to-t', overlayClass)}
+        />
+      )}
       {/* Subtle accent rim light along the top edge */}
       <div
         aria-hidden="true"

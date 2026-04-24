@@ -13,7 +13,7 @@ across the page.
 
 | File | Slot on the landing page | Notes |
 | --- | --- | --- |
-| `hero-section.png` | Hero — decorative accent behind the product mockup (hidden below the `lg` breakpoint). | `decorative` slot, renders nothing if missing. |
+| `hero-section.png` | Hero — main visual to the right of the hero copy. | Rendered through `LandingHumanImage` as a landscape (`aspect-[16/10] sm:aspect-[16/9]`) image with a soft overlay. |
 | `nodig-je-boekhouder-uit.png` | "Nodig je boekhouder uit" — accountant collaboration section. | Anchors the *Samenwerken met boekhouder* message. |
 | `e-commerce.png` | "Koppel je webshop, alles boekt zichzelf" — webshop / e-commerce section. | Anchors the Shopify + WooCommerce sync story. |
 | `belasting-hulp.png` | "Belasting begrijpen, niet vrezen" — Belastinghulp section. | Anchors the BTW + inkomstenbelasting voorbereiding story. |
@@ -44,6 +44,9 @@ overlays or burnt-in text — the component will do the blending.
 ## Image guidelines
 
 - Premium **dark style** — calm, low-key, slightly cinematic lighting.
+- **Landscape composition** (≈ 16:9 / 16:10). All slots are rendered as
+  landscape cards with `object-cover; object-position: center center`, so
+  keep the subject roughly centered with a little headroom.
 - Believable Dutch zzp / MKB context.
 - WebP or PNG, sRGB, 8-bit. Optimise for the smallest reasonable file size
   while staying visually crisp at the rendered dimensions.

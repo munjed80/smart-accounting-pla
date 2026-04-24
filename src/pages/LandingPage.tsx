@@ -23,9 +23,8 @@ import {
 import { MarketingFooter } from '@/components/marketing/Footer'
 import { CookieBanner } from '@/components/marketing/CookieBanner'
 import { HowItWorksSection } from '@/components/landing/HowItWorksSection'
-import { HeroProductMockup } from '@/components/landing/HeroProductMockup'
-import { ProductShowcaseSection } from '@/components/landing/ProductShowcaseSection'
 import { LandingHumanImage } from '@/components/landing/LandingHumanImage'
+import { ProductShowcaseSection } from '@/components/landing/ProductShowcaseSection'
 
 
 
@@ -199,30 +198,18 @@ export const LandingPage = () => {
               </div>
             </div>
 
-            {/* Right — product visual (with subtle human portrait behind it) */}
+            {/* Right — hero visual */}
             <div className="w-full flex-shrink-0 px-4 sm:px-8 lg:w-[55%] lg:px-0 xl:w-[58%]">
-              <div className="relative">
-                {/* Subtle portrait offset behind the product mockup. Hidden on small
-                    screens so the product UI stays the unambiguous hero. Hides itself
-                    automatically if the asset is missing. */}
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute -left-6 -top-6 hidden w-[38%] max-w-[260px] opacity-70 mix-blend-luminosity lg:block xl:-left-10 xl:-top-10 xl:w-[34%]"
-                >
-                  <LandingHumanImage
-                    src="/images/landing/hero-section.png"
-                    alt=""
-                    aspect="aspect-[4/5]"
-                    width={520}
-                    height={650}
-                    overlay="strong"
-                    decorative
-                  />
-                </div>
-                <div className="relative">
-                  <HeroProductMockup />
-                </div>
-              </div>
+              <LandingHumanImage
+                src="/images/landing/hero-section.png"
+                alt="ZZPers Hub: rustig overzicht voor zzp'ers"
+                aspect="aspect-[16/10] sm:aspect-[16/9]"
+                width={1672}
+                height={941}
+                overlay="soft"
+                objectPosition="center center"
+                className="mx-auto w-full max-w-2xl lg:max-w-none"
+              />
             </div>
           </div>
         </div>
@@ -240,12 +227,12 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/nodig-je-boekhouder-uit.png"
                 alt="Nodig je boekhouder uit en deel je administratie met één klik"
-                aspect="aspect-[4/5] sm:aspect-[5/4] lg:aspect-[4/5]"
+                aspect="aspect-[16/10]"
                 width={1200}
                 height={1500}
                 overlay="medium"
-                objectPosition="center 30%"
-                className="mx-auto max-w-md lg:max-w-none"
+                objectPosition="center center"
+                className="mx-auto w-full max-w-2xl lg:max-w-none"
               />
             </div>
 
@@ -303,15 +290,15 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/e-commerce.png"
                 alt="Webshop koppelen aan ZZPers Hub: bestellingen, klanten en retouren synchroniseren"
-                aspect="aspect-[4/5] sm:aspect-[5/4] lg:aspect-[4/5]"
+                aspect="aspect-[16/10]"
                 width={1200}
                 height={1500}
                 overlay="medium"
-                objectPosition="center 30%"
+                objectPosition="center center"
                 placeholderIcon={ShoppingBag}
                 placeholderLabel="Webshop koppelen"
                 placeholderCaption="Synchroniseer orders, klanten en retouren"
-                className="mx-auto max-w-md lg:max-w-none"
+                className="mx-auto w-full max-w-2xl lg:max-w-none"
               />
             </div>
           </div>
@@ -327,15 +314,15 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/belasting-hulp.png"
                 alt="Belastinghulp: BTW- en inkomstenbelasting overzichtelijk voorbereiden"
-                aspect="aspect-[4/5] sm:aspect-[5/4] lg:aspect-[4/5]"
+                aspect="aspect-[16/10]"
                 width={1200}
                 height={1500}
                 overlay="medium"
-                objectPosition="center 30%"
+                objectPosition="center center"
                 placeholderIcon={Receipt}
                 placeholderLabel="Belastinghulp"
                 placeholderCaption="BTW & inkomstenbelasting begrijpelijk gemaakt"
-                className="mx-auto max-w-md lg:max-w-none"
+                className="mx-auto w-full max-w-2xl lg:max-w-none"
               />
             </div>
 
@@ -401,15 +388,15 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/klantenbeheer.png"
                 alt="Klantenbeheer in ZZPers Hub: klantdossier en factuurgeschiedenis op één plek"
-                aspect="aspect-[4/5] sm:aspect-[5/4] lg:aspect-[4/5]"
+                aspect="aspect-[16/10]"
                 width={1200}
                 height={1500}
                 overlay="medium"
-                objectPosition="center 30%"
+                objectPosition="center center"
                 placeholderIcon={Users}
                 placeholderLabel="Klantenbeheer"
                 placeholderCaption="Eén overzicht voor al je klanten"
-                className="mx-auto max-w-md lg:max-w-none"
+                className="mx-auto w-full max-w-2xl lg:max-w-none"
               />
             </div>
           </div>
@@ -425,15 +412,15 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/product-in-de-praktijk.png"
                 alt="ZZPers Hub in de praktijk: dashboard, facturen en uren in één omgeving"
-                aspect="aspect-[4/5] sm:aspect-[5/4] lg:aspect-[4/5]"
+                aspect="aspect-[16/10]"
                 width={1200}
                 height={1500}
                 overlay="medium"
-                objectPosition="center 30%"
+                objectPosition="center center"
                 placeholderIcon={Sparkles}
                 placeholderLabel="Product in de praktijk"
                 placeholderCaption="Zo werkt ZZPers Hub elke dag"
-                className="mx-auto max-w-md lg:max-w-none"
+                className="mx-auto w-full max-w-2xl lg:max-w-none"
               />
             </div>
 
@@ -489,19 +476,19 @@ export const LandingPage = () => {
             <p className="mt-3 text-muted-foreground lg:text-lg">Gemaakt voor zzp'ers die snel willen werken zonder gedoe.</p>
           </div>
           <div className="mt-10 grid grid-cols-1 gap-5 lg:grid-cols-12 lg:gap-6">
-            {/* Anchor visual — one freelancer portrait used as a "face" for the value props */}
+            {/* Anchor visual — landscape image used as a "face" for the value props */}
             <div className="lg:col-span-4 lg:row-span-2">
-              <div className="relative h-full">
+              <div className="relative lg:sticky lg:top-24">
                 <LandingHumanImage
                   src="/images/landing/waarom-zzpers-hub.png"
                   alt="Waarom zzp'ers kiezen voor ZZPers Hub: alles op één plek"
-                  aspect="aspect-[16/10] lg:aspect-auto"
-                  width={1600}
-                  height={1000}
+                  aspect="aspect-[16/10]"
+                  width={1672}
+                  height={941}
                   overlay="medium"
                   objectPosition="center center"
                   placeholderIcon={Briefcase}
-                  className="h-full min-h-[320px]"
+                  className="w-full"
                 />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-6">
                   <p className="text-xs font-semibold uppercase tracking-widest text-accent/90">Voor zzp'ers</p>

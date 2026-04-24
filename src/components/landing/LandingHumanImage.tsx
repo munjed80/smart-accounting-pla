@@ -145,7 +145,10 @@ export const LandingHumanImage = ({
           {placeholderContent ?? (
             <div className="flex flex-col items-center text-center">
               {PlaceholderIcon ? (
-                <span className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-accent shadow-[inset_0_1px_0_oklch(1_0_0/0.08)] ring-1 ring-inset ring-white/10 backdrop-blur">
+                <span
+                  aria-hidden="true"
+                  className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-accent shadow-[inset_0_1px_0_oklch(1_0_0/0.08)] ring-1 ring-inset ring-white/10 backdrop-blur"
+                >
                   <PlaceholderIcon className="h-6 w-6" />
                 </span>
               ) : null}

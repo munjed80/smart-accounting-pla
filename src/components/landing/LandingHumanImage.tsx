@@ -18,7 +18,7 @@ const OVERLAY_CLASSES = {
 const PORTRAIT_FILTER = 'contrast(1.02) brightness(0.92)'
 
 interface LandingHumanImageProps {
-  /** Path to the image file under /public, e.g. "/images/landing/hero-portrait.webp" */
+  /** Path to the image file under /public, e.g. "/images/landing/hero-section.png" */
   src: string
   /** Meaningful alt text in Dutch describing the person and context */
   alt: string

@@ -1202,7 +1202,7 @@ const InvoiceCard = ({
           <p className="text-xs text-muted-foreground">{formatDate(invoice.issue_date)}</p>
         </div>
       </div>
-      <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/50">
+      <div className="flex items-center justify-between gap-2 pt-3 border-t border-border/50">
         {invoice.status === 'draft' || invoice.status === 'cancelled' ? (
           <StatusBadge status={invoice.status} size="sm" />
         ) : (
@@ -1211,12 +1211,20 @@ const InvoiceCard = ({
             onValueChange={(value) => onStatusChange(value as 'sent' | 'paid' | 'cancelled')}
             disabled={isUpdatingStatus}
           >
+            {/*
+              Mobile: compact pill (status badge + chevron only) so the actions stay
+              visible. The dashed primary border + tinted background still signal
+              that this control is interactive. From sm: up the explicit
+              "Status wijzigen" label is shown for extra discoverability on larger
+              screens where there is room.
+            */}
             <SelectTrigger
               aria-label={t('zzpInvoices.changeStatus')}
-              className="group flex items-center gap-2 h-11 sm:h-9 w-auto pl-1.5 pr-2.5 rounded-full border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/40 transition-all shadow-sm [&>svg:last-child]:opacity-100 [&>svg:last-child]:text-primary"
+              title={t('zzpInvoices.changeStatus')}
+              className="group flex items-center gap-1.5 sm:gap-2 h-11 sm:h-9 w-auto pl-1.5 pr-1.5 sm:pr-2.5 rounded-full border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/40 transition-all shadow-sm [&>svg:last-child]:opacity-100 [&>svg:last-child]:text-primary"
             >
               <StatusBadge status={invoice.status} size="sm" />
-              <span className="text-xs font-semibold text-primary whitespace-nowrap">
+              <span className="hidden sm:inline text-xs font-semibold text-primary whitespace-nowrap">
                 {t('zzpInvoices.changeStatus')}
               </span>
             </SelectTrigger>
@@ -1227,15 +1235,22 @@ const InvoiceCard = ({
             </SelectContent>
           </Select>
         )}
-        <div className="flex gap-2">
+        <div className="flex gap-1 sm:gap-2 flex-shrink-0">
+          {/*
+            Edit/View: icon-only on mobile (square 36px touch target), icon + label
+            from sm: up. This guarantees the dropdown trigger to its right always
+            stays visible even when the status pill is shown.
+          */}
           <Button
             variant="ghost"
             size="sm"
             onClick={canEdit ? onEdit : onView}
-            className="h-9 px-3 gap-2"
+            aria-label={canEdit ? t('common.edit') : t('common.view')}
+            title={canEdit ? t('common.edit') : t('common.view')}
+            className="h-9 w-9 sm:w-auto p-0 sm:px-3 sm:gap-2"
           >
             {canEdit ? <PencilSimple size={16} /> : <Eye size={16} />}
-            {canEdit ? t('common.edit') : t('common.view')}
+            <span className="hidden sm:inline">{canEdit ? t('common.edit') : t('common.view')}</span>
           </Button>
           {(invoice.status === 'draft' || invoice.status === 'cancelled') && (
             <Button

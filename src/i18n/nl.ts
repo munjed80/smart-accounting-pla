@@ -120,7 +120,12 @@ export const nl = {
     tryAgain: "Opnieuw proberen",
     noAccount: "Nog geen account?",
     createAccountCta: "Maak er nu één aan",
+    haveAccount: "Al een account?",
+    loginCta: "Log hier in",
     trialInfo: "3 maanden gratis. Daarna vanaf €4,99/maand.",
+    showPassword: "Wachtwoord tonen",
+    hidePassword: "Wachtwoord verbergen",
+    secureLogin: "Beveiligde verbinding",
   },
 
   // Roles

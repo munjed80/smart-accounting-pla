@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Database, Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning, CircleNotch, Clock } from '@phosphor-icons/react'
+import { Database, Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning, CircleNotch, Clock, Eye, EyeSlash, ShieldCheck } from '@phosphor-icons/react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason, getErrorMessage, getValidationErrors } from '@/lib/api'
 import { AxiosError } from 'axios'
@@ -63,6 +63,10 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   const [resendCooldown, setResendCooldown] = useState(0)
   const [isResending, setIsResending] = useState(false)
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // State for password visibility toggles (login + register)
+  const [showLoginPassword, setShowLoginPassword] = useState(false)
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false)
 
   // Cleanup cooldown timer on unmount
   useEffect(() => {
@@ -242,9 +246,13 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
-      
+    <div className="relative min-h-screen overflow-hidden bg-[#0b0d12] text-foreground flex items-center justify-center px-4 py-10 sm:py-16">
+      {/* Premium ambient backdrop */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#0b0d12] via-[#0d1018] to-[#0b0d12]" />
+      <div className="pointer-events-none absolute -top-32 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(120,119,198,0.22),rgba(11,13,18,0))] blur-2xl" />
+      <div className="pointer-events-none absolute bottom-[-15%] right-[-10%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.16),rgba(11,13,18,0))] blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.035] [background-image:linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] [background-size:48px_48px]" />
+
       {/* API Misconfiguration Warning Banner */}
       {isMisconfigured && (
         <div className="fixed top-0 left-0 right-0 bg-red-600 text-white px-4 py-3 text-center z-50">
@@ -260,31 +268,45 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
           )}
         </div>
       )}
-      
-      <div className={`relative w-full max-w-md ${isMisconfigured ? 'mt-24' : ''}`}>
-        <div className="text-center mb-6">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Database size={36} weight="duotone" className="text-primary" />
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+
+      <div className={`relative w-full max-w-[440px] ${isMisconfigured ? 'mt-24' : ''}`}>
+        {/* Header / brand */}
+        <div className="text-center mb-8 sm:mb-10">
+          <div className="inline-flex items-center justify-center gap-2.5 mb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/30 to-accent/20 ring-1 ring-white/10 shadow-[0_8px_24px_-8px_rgba(120,119,198,0.45)]">
+              <Database size={22} weight="duotone" className="text-primary" />
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight bg-gradient-to-r from-white via-white to-white/70 bg-clip-text text-transparent">
               {t('brand.name')}
             </h1>
           </div>
-          <p className="text-sm text-muted-foreground">{t('brand.tagline')}</p>
+          <p className="text-sm text-white/55">{t('brand.tagline')}</p>
         </div>
 
+        {/* Tab switcher — segmented pill */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'register')} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="login">{t('auth.login')}</TabsTrigger>
-            <TabsTrigger value="register">{t('auth.register')}</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 h-11 p-1 bg-white/[0.04] border border-white/10 rounded-xl backdrop-blur-md mb-5">
+            <TabsTrigger
+              value="login"
+              className="h-full rounded-lg text-sm font-medium text-white/60 data-[state=active]:bg-white/[0.08] data-[state=active]:text-white data-[state=active]:shadow-[0_1px_0_0_rgba(255,255,255,0.06)_inset] dark:data-[state=active]:bg-white/[0.08] dark:data-[state=active]:border-transparent transition-colors"
+            >
+              {t('auth.login')}
+            </TabsTrigger>
+            <TabsTrigger
+              value="register"
+              className="h-full rounded-lg text-sm font-medium text-white/60 data-[state=active]:bg-white/[0.08] data-[state=active]:text-white data-[state=active]:shadow-[0_1px_0_0_rgba(255,255,255,0.06)_inset] dark:data-[state=active]:bg-white/[0.08] dark:data-[state=active]:border-transparent transition-colors"
+            >
+              {t('auth.register')}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="login">
-            <Card className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
-              <CardHeader className="pb-4">
-                <CardTitle>{t('auth.welcomeBack')}</CardTitle>
-                <CardDescription>{t('auth.loginDescription')}</CardDescription>
+            <Card className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_30px_80px_-30px_rgba(0,0,0,0.6)]">
+              <CardHeader className="pb-3 sm:pb-4 px-6 pt-6 sm:px-7 sm:pt-7">
+                <CardTitle className="text-xl font-semibold tracking-tight text-white">{t('auth.welcomeBack')}</CardTitle>
+                <CardDescription className="text-white/55">{t('auth.loginDescription')}</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-6 pb-6 sm:px-7 sm:pb-7">
                 {/* Email Not Verified Warning */}
                 {showEmailNotVerified && (
                   <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
@@ -325,14 +347,14 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
 
                 {/* Login Error Message - shown even if toast fails */}
                 {loginError && (
-                  <div role="alert" aria-live="polite" className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                  <div role="alert" aria-live="polite" className="mb-4 p-4 bg-red-500/10 rounded-lg border border-red-500/30">
                     <div className="flex items-start gap-3">
-                      <Warning size={20} className="text-red-600 dark:text-red-400 mt-0.5" weight="fill" aria-hidden="true" />
+                      <Warning size={20} className="text-red-400 mt-0.5" weight="fill" aria-hidden="true" />
                       <div className="flex-1">
-                        <p className="text-red-700 dark:text-red-400 font-medium text-sm">
+                        <p className="text-red-300 font-medium text-sm">
                           {t('auth.loginFailed')}
                         </p>
-                        <p className="text-red-600 dark:text-red-500 text-sm mt-1">
+                        <p className="text-red-300/80 text-sm mt-1">
                           {loginError}
                         </p>
                       </div>
@@ -340,18 +362,20 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                   </div>
                 )}
 
-                <form onSubmit={handleLogin} className="space-y-4">
+                <form onSubmit={handleLogin} className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">{t('auth.email')}</Label>
+                    <Label htmlFor="login-email" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                      {t('auth.email')}
+                    </Label>
                     <div className="relative">
-                      <Envelope className="absolute left-3 top-3 text-muted-foreground" size={18} />
+                      <Envelope className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} aria-hidden="true" />
                       <Input
                         id="login-email"
                         type="email"
-                        placeholder="uw@email.nl"
+                        autoComplete="email"
                         value={loginForm.username}
                         onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-                        className="pl-10"
+                        className="h-11 pl-10 bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 hover:border-white/20 focus-visible:border-primary/60 focus-visible:ring-primary/30"
                         required
                       />
                     </div>
@@ -359,11 +383,13 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
 
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <Label htmlFor="login-password">{t('auth.password')}</Label>
+                      <Label htmlFor="login-password" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                        {t('auth.password')}
+                      </Label>
                       {onForgotPassword && (
                         <button
                           type="button"
-                          className="text-xs text-muted-foreground underline-offset-4 hover:underline hover:text-foreground focus:underline focus:outline-none transition-colors"
+                          className="text-xs text-white/55 hover:text-white focus:text-white focus:outline-none transition-colors"
                           onClick={onForgotPassword}
                         >
                           {t('auth.forgotPassword')}
@@ -371,58 +397,77 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                       )}
                     </div>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-3 text-muted-foreground" size={18} />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} aria-hidden="true" />
                       <Input
                         id="login-password"
-                        type="password"
-                        placeholder="••••••••"
+                        type={showLoginPassword ? 'text' : 'password'}
+                        autoComplete="current-password"
                         value={loginForm.password}
                         onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                        className="pl-10"
+                        className="h-11 pl-10 pr-11 bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 hover:border-white/20 focus-visible:border-primary/60 focus-visible:ring-primary/30"
                         required
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword((v) => !v)}
+                        aria-label={showLoginPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+                        aria-pressed={showLoginPassword}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-md text-white/50 hover:text-white hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
+                      >
+                        {showLoginPassword ? <EyeSlash size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                      </button>
                     </div>
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? t('auth.loggingIn') : t('auth.login')}
+                  <Button
+                    type="submit"
+                    className="w-full h-11 text-sm font-semibold rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_8px_24px_-8px_rgba(120,119,198,0.55)] transition-all"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <CircleNotch size={16} className="mr-2 animate-spin" />
+                        {t('auth.loggingIn')}
+                      </>
+                    ) : (
+                      t('auth.login')
+                    )}
                   </Button>
                 </form>
 
-                <div className="mt-5 text-center space-y-1">
-                  <p className="text-sm text-muted-foreground">
+                <div className="mt-6 text-center">
+                  <p className="text-sm text-white/55">
                     {t('auth.noAccount')}{' '}
                     <button
                       type="button"
-                      className="text-primary underline-offset-4 hover:underline focus:underline focus:outline-none font-medium transition-colors"
+                      className="text-white font-medium hover:text-primary focus:text-primary focus:outline-none transition-colors"
                       onClick={() => setActiveTab('register')}
                     >
                       {t('auth.createAccountCta')}
                     </button>
                   </p>
-                  <p className="text-xs text-muted-foreground/60">{t('auth.trialInfo')}</p>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="register">
-            <Card className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
-              <CardHeader className="pb-4">
-                <CardTitle>{t('auth.createAccount')}</CardTitle>
-                <CardDescription>{t('auth.registerDescription')}</CardDescription>
+            <Card className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_30px_80px_-30px_rgba(0,0,0,0.6)]">
+              <CardHeader className="pb-3 sm:pb-4 px-6 pt-6 sm:px-7 sm:pt-7">
+                <CardTitle className="text-xl font-semibold tracking-tight text-white">{t('auth.createAccount')}</CardTitle>
+                <CardDescription className="text-white/55">{t('auth.registerDescription')}</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-6 pb-6 sm:px-7 sm:pb-7">
                 {/* Register Error Message - shown even if toast fails */}
                 {registerError && (
-                  <div role="alert" aria-live="polite" className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                  <div role="alert" aria-live="polite" className="mb-4 p-4 bg-red-500/10 rounded-lg border border-red-500/30">
                     <div className="flex items-start gap-3">
-                      <Warning size={20} className="text-red-600 dark:text-red-400 mt-0.5" weight="fill" aria-hidden="true" />
+                      <Warning size={20} className="text-red-400 mt-0.5" weight="fill" aria-hidden="true" />
                       <div className="flex-1">
-                        <p className="text-red-700 dark:text-red-400 font-medium text-sm">
+                        <p className="text-red-300 font-medium text-sm">
                           {t('auth.registrationFailed')}
                         </p>
-                        <p className="text-red-600 dark:text-red-500 text-sm mt-1">
+                        <p className="text-red-300/80 text-sm mt-1">
                           {registerError}
                         </p>
                       </div>
@@ -430,82 +475,103 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                   </div>
                 )}
 
-                <form onSubmit={handleRegister} className="space-y-4">
+                <form onSubmit={handleRegister} className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="register-name">{t('auth.fullName')}</Label>
+                    <Label htmlFor="register-name" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                      {t('auth.fullName')}
+                    </Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-3 text-muted-foreground" size={18} />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} aria-hidden="true" />
                       <Input
                         id="register-name"
                         type="text"
-                        placeholder="Jan de Vries"
+                        autoComplete="name"
                         value={registerForm.full_name}
                         onChange={(e) => setRegisterForm({ ...registerForm, full_name: e.target.value })}
-                        className={`pl-10 ${registerFieldErrors.full_name ? 'border-red-500' : ''}`}
+                        className={`h-11 pl-10 bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 hover:border-white/20 focus-visible:border-primary/60 focus-visible:ring-primary/30 ${registerFieldErrors.full_name ? 'border-red-500/60 focus-visible:border-red-500/60' : ''}`}
                         aria-invalid={!!registerFieldErrors.full_name}
                         aria-describedby={registerFieldErrors.full_name ? 'register-name-error' : undefined}
                         required
                       />
                     </div>
                     {registerFieldErrors.full_name && (
-                      <p id="register-name-error" className="text-xs text-red-500" role="alert">{registerFieldErrors.full_name}</p>
+                      <p id="register-name-error" className="text-xs text-red-400" role="alert">{registerFieldErrors.full_name}</p>
                     )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-email">{t('auth.email')}</Label>
+                    <Label htmlFor="register-email" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                      {t('auth.email')}
+                    </Label>
                     <div className="relative">
-                      <Envelope className="absolute left-3 top-3 text-muted-foreground" size={18} />
+                      <Envelope className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} aria-hidden="true" />
                       <Input
                         id="register-email"
                         type="email"
-                        placeholder="uw@email.nl"
+                        autoComplete="email"
                         value={registerForm.email}
                         onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                        className={`pl-10 ${registerFieldErrors.email ? 'border-red-500' : ''}`}
+                        className={`h-11 pl-10 bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 hover:border-white/20 focus-visible:border-primary/60 focus-visible:ring-primary/30 ${registerFieldErrors.email ? 'border-red-500/60 focus-visible:border-red-500/60' : ''}`}
                         aria-invalid={!!registerFieldErrors.email}
                         aria-describedby={registerFieldErrors.email ? 'register-email-error' : undefined}
                         required
                       />
                     </div>
                     {registerFieldErrors.email && (
-                      <p id="register-email-error" className="text-xs text-red-500" role="alert">{registerFieldErrors.email}</p>
+                      <p id="register-email-error" className="text-xs text-red-400" role="alert">{registerFieldErrors.email}</p>
                     )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-password">{t('auth.password')}</Label>
+                    <Label htmlFor="register-password" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                      {t('auth.password')}
+                    </Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-3 text-muted-foreground" size={18} />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} aria-hidden="true" />
                       <Input
                         id="register-password"
-                        type="password"
-                        placeholder="••••••••"
+                        type={showRegisterPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
                         value={registerForm.password}
                         onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                        className={`pl-10 ${registerFieldErrors.password ? 'border-red-500' : ''}`}
+                        className={`h-11 pl-10 pr-11 bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 hover:border-white/20 focus-visible:border-primary/60 focus-visible:ring-primary/30 ${registerFieldErrors.password ? 'border-red-500/60 focus-visible:border-red-500/60' : ''}`}
                         aria-invalid={!!registerFieldErrors.password}
                         aria-describedby={registerFieldErrors.password ? 'register-password-error' : 'register-password-hint'}
                         required
                         minLength={8}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegisterPassword((v) => !v)}
+                        aria-label={showRegisterPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+                        aria-pressed={showRegisterPassword}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-md text-white/50 hover:text-white hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
+                      >
+                        {showRegisterPassword ? <EyeSlash size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                      </button>
                     </div>
                     {registerFieldErrors.password ? (
-                      <p id="register-password-error" className="text-xs text-red-500" role="alert">{registerFieldErrors.password}</p>
+                      <p id="register-password-error" className="text-xs text-red-400" role="alert">{registerFieldErrors.password}</p>
                     ) : (
-                      <p id="register-password-hint" className="text-xs text-muted-foreground">{t('auth.passwordHint')}</p>
+                      <p id="register-password-hint" className="text-xs text-white/45">{t('auth.passwordHint')}</p>
                     )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-role">{t('auth.role')}</Label>
+                    <Label htmlFor="register-role" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                      {t('auth.role')}
+                    </Label>
                     <Select
                       value={registerForm.role}
-                      onValueChange={(value: 'zzp' | 'accountant') => 
+                      onValueChange={(value: 'zzp' | 'accountant') =>
                         setRegisterForm({ ...registerForm, role: value })
                       }
                     >
-                      <SelectTrigger id="register-role" aria-describedby={registerFieldErrors.role ? 'register-role-error' : undefined}>
+                      <SelectTrigger
+                        id="register-role"
+                        className="h-11 bg-white/[0.04] border-white/10 text-white hover:border-white/20 focus-visible:border-primary/60 focus-visible:ring-primary/30"
+                        aria-describedby={registerFieldErrors.role ? 'register-role-error' : undefined}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -516,18 +582,50 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                       </SelectContent>
                     </Select>
                     {registerFieldErrors.role && (
-                      <p id="register-role-error" className="text-xs text-red-500" role="alert">{registerFieldErrors.role}</p>
+                      <p id="register-role-error" className="text-xs text-red-400" role="alert">{registerFieldErrors.role}</p>
                     )}
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? t('auth.creatingAccount') : t('auth.createAccount')}
+                  <Button
+                    type="submit"
+                    className="w-full h-11 text-sm font-semibold rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_8px_24px_-8px_rgba(120,119,198,0.55)] transition-all"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <CircleNotch size={16} className="mr-2 animate-spin" />
+                        {t('auth.creatingAccount')}
+                      </>
+                    ) : (
+                      t('auth.createAccount')
+                    )}
                   </Button>
+
+                  <p className="text-xs text-white/45 text-center leading-relaxed">{t('auth.trialInfo')}</p>
                 </form>
+
+                <div className="mt-6 text-center">
+                  <p className="text-sm text-white/55">
+                    {t('auth.haveAccount')}{' '}
+                    <button
+                      type="button"
+                      className="text-white font-medium hover:text-primary focus:text-primary focus:outline-none transition-colors"
+                      onClick={() => setActiveTab('login')}
+                    >
+                      {t('auth.loginCta')}
+                    </button>
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Trust footer */}
+        <div className="mt-6 flex items-center justify-center gap-1.5 text-xs text-white/40">
+          <ShieldCheck size={14} weight="duotone" aria-hidden="true" />
+          <span>{t('auth.secureLogin')}</span>
+        </div>
       </div>
     </div>
   )

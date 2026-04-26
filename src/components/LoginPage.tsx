@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Database, Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning, CircleNotch, Clock, Eye, EyeSlash, ShieldCheck } from '@phosphor-icons/react'
+import { Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning, CircleNotch, Clock, Eye, EyeSlash, ShieldCheck } from '@phosphor-icons/react'
+import { BrandLockup } from '@/components/BrandLockup'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason, getErrorMessage, getValidationErrors } from '@/lib/api'
 import { AxiosError } from 'axios'
@@ -182,11 +183,8 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
         
         <div className="relative w-full max-w-md">
           <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <Database size={48} weight="duotone" className="text-primary" />
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-                {t('brand.name')}
-              </h1>
+            <div className="flex items-center justify-center mb-4">
+              <BrandLockup size="lg" />
             </div>
           </div>
 
@@ -272,14 +270,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
       <div className={`relative w-full max-w-[440px] ${isMisconfigured ? 'mt-24' : ''}`}>
         {/* Header / brand */}
         <div className="text-center mb-8 sm:mb-10">
-          <div className="inline-flex items-center justify-center gap-2.5 mb-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/30 to-accent/20 ring-1 ring-white/10 shadow-[0_8px_24px_-8px_rgba(120,119,198,0.45)]">
-              <Database size={22} weight="duotone" className="text-primary" />
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight bg-gradient-to-r from-white via-white to-white/70 bg-clip-text text-transparent">
-              {t('brand.name')}
-            </h1>
-          </div>
+          <BrandLockup size="lg" className="mb-4" />
           <p className="text-sm text-white/55">{t('brand.tagline')}</p>
         </div>
 

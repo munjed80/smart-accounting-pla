@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Database, Lock, CheckCircle, XCircle, Warning } from '@phosphor-icons/react'
+import { Lock, CheckCircle, XCircle, Warning } from '@phosphor-icons/react'
+import { BrandLockup } from '@/components/BrandLockup'
 
 interface ResetPasswordPageProps {
   token: string
@@ -72,11 +73,8 @@ export const ResetPasswordPage = ({ token, onNavigateToLogin }: ResetPasswordPag
         
         <div className="relative w-full max-w-md">
           <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <Database size={48} weight="duotone" className="text-primary" />
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-                Smart Accounting
-              </h1>
+            <div className="flex items-center justify-center mb-4">
+              <BrandLockup size="lg" />
             </div>
           </div>
 
@@ -107,11 +105,8 @@ export const ResetPasswordPage = ({ token, onNavigateToLogin }: ResetPasswordPag
       
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Database size={48} weight="duotone" className="text-primary" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-              Smart Accounting
-            </h1>
+          <div className="flex items-center justify-center mb-4">
+            <BrandLockup size="lg" />
           </div>
         </div>
 

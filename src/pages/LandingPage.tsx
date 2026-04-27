@@ -202,36 +202,34 @@ export const LandingPage = () => {
               full hero container width, uses a wide aspect ratio that adapts
               across breakpoints, and blends into the dark theme via a soft
               bottom gradient instead of a bordered card. */}
-          <div className="relative mt-12 w-full sm:mt-16 lg:mt-20">
-            {/* Mobile gets a taller crop (4/3) so the dashboard screenshot
-                renders as an intentional, focused composition instead of a
-                tiny shrunken full screenshot. Tablet/desktop keep the wide
-                cinematic banner. `object-[center_30%]` favors the top-third
-                of the dashboard (KPIs / hero panel) on mobile, then recenters
-                from `sm` upward where the full width can breathe. */}
-            <div className="relative w-full overflow-hidden aspect-[4/3] sm:aspect-[16/9] lg:aspect-[21/9]">
-              <img
-                src="/images/landing/hero-section.png"
-                alt="ZZPers Hub: rustig overzicht voor zzp'ers"
-                width={1672}
-                height={941}
-                loading="eager"
-                fetchPriority="high"
-                decoding="async"
-                sizes="100vw"
-                className="absolute inset-0 h-full w-full object-cover object-[center_30%] sm:object-center"
-              />
-              {/* Soft bottom gradient so the banner melts into the dark theme
-                  without reading as a bordered card. */}
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-background via-background/40 to-transparent"
-              />
-              {/* Subtle top accent rim, consistent with other landing visuals */}
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent"
-              />
+          <div className="relative mt-12 sm:mt-16 lg:mt-20">
+            <div className="relative left-1/2 w-screen -translate-x-1/2">
+              <div className="relative mx-auto w-full max-w-[120rem] overflow-hidden border-y border-white/10 bg-gradient-to-br from-background/95 via-background/75 to-primary/10 shadow-[0_20px_80px_-30px_oklch(0_0_0/0.8)]">
+                <div className="relative h-[56vw] min-h-[16rem] max-h-[44rem] w-full sm:h-[50vw] lg:h-[44vw]">
+                  <img
+                    src="/images/landing/hero-section.png"
+                    alt="ZZPers Hub: rustig overzicht voor zzp'ers"
+                    width={1672}
+                    height={941}
+                    loading="eager"
+                    fetchPriority="high"
+                    decoding="async"
+                    sizes="100vw"
+                    className="absolute inset-0 h-full w-full object-contain object-center sm:object-cover"
+                  />
+                  {/* Soft bottom gradient so the banner melts into the dark theme
+                      without reading as a bordered card. */}
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-background via-background/40 to-transparent"
+                  />
+                  {/* Subtle top accent rim, consistent with other landing visuals */}
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -249,11 +247,13 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/nodig-je-boekhouder-uit.png"
                 alt="Nodig je boekhouder uit en deel je administratie met één klik"
-                aspect="aspect-video sm:aspect-[16/10]"
+                aspect="aspect-[5/4] sm:aspect-[16/10] lg:aspect-video"
                 width={1672}
                 height={941}
                 variant="product"
                 objectPositionClass="object-center"
+                mobileImageFit="contain"
+                imageFit="contain"
                 className="mx-auto w-full max-w-2xl lg:max-w-none"
               />
             </div>
@@ -312,11 +312,13 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/e-commerce.png"
                 alt="Webshop koppelen aan ZZPers Hub: bestellingen, klanten en retouren synchroniseren"
-                aspect="aspect-video sm:aspect-[16/10]"
+                aspect="aspect-[5/4] sm:aspect-[16/10] lg:aspect-video"
                 width={1672}
                 height={941}
                 variant="product"
                 objectPositionClass="object-center"
+                mobileImageFit="contain"
+                imageFit="contain"
                 placeholderIcon={ShoppingBag}
                 placeholderLabel="Webshop koppelen"
                 placeholderCaption="Synchroniseer orders, klanten en retouren"
@@ -336,11 +338,13 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/belasting-hulp.png"
                 alt="Belastinghulp: BTW- en inkomstenbelasting overzichtelijk voorbereiden"
-                aspect="aspect-video sm:aspect-[16/10]"
+                aspect="aspect-[5/4] sm:aspect-[16/10] lg:aspect-video"
                 width={1672}
                 height={941}
                 variant="product"
                 objectPositionClass="object-center"
+                mobileImageFit="contain"
+                imageFit="contain"
                 placeholderIcon={Receipt}
                 placeholderLabel="Belastinghulp"
                 placeholderCaption="BTW & inkomstenbelasting begrijpelijk gemaakt"
@@ -410,11 +414,13 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/klantenbeheer.png"
                 alt="Klantenbeheer in ZZPers Hub: klantdossier en factuurgeschiedenis op één plek"
-                aspect="aspect-video sm:aspect-[16/10]"
+                aspect="aspect-[5/4] sm:aspect-[16/10] lg:aspect-video"
                 width={1672}
                 height={941}
                 variant="product"
                 objectPositionClass="object-center"
+                mobileImageFit="contain"
+                imageFit="contain"
                 placeholderIcon={Users}
                 placeholderLabel="Klantenbeheer"
                 placeholderCaption="Eén overzicht voor al je klanten"
@@ -434,11 +440,13 @@ export const LandingPage = () => {
               <LandingHumanImage
                 src="/images/landing/product-in-de-praktijk.png"
                 alt="ZZPers Hub in de praktijk: dashboard, facturen en uren in één omgeving"
-                aspect="aspect-video sm:aspect-[16/10]"
+                aspect="aspect-[5/4] sm:aspect-[16/10] lg:aspect-video"
                 width={1672}
                 height={941}
                 variant="product"
                 objectPositionClass="object-center"
+                mobileImageFit="contain"
+                imageFit="contain"
                 placeholderIcon={Sparkles}
                 placeholderLabel="Product in de praktijk"
                 placeholderCaption="Zo werkt ZZPers Hub elke dag"
@@ -504,11 +512,13 @@ export const LandingPage = () => {
                 <LandingHumanImage
                   src="/images/landing/waarom-zzpers-hub.png"
                   alt="Waarom zzp'ers kiezen voor ZZPers Hub: alles op één plek"
-                  aspect="aspect-video sm:aspect-[16/10]"
+                  aspect="aspect-[5/4] sm:aspect-[16/10] lg:aspect-video"
                   width={1672}
                   height={941}
                   variant="product"
                   objectPositionClass="object-center"
+                  mobileImageFit="contain"
+                  imageFit="contain"
                   placeholderIcon={Briefcase}
                   className="w-full"
                 />

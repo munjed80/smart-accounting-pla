@@ -30,6 +30,10 @@ interface LandingHumanImageProps {
   height: number
   /** Extra classes for the outer wrapper. */
   className?: string
+  /** Object-fit behavior on tablet/desktop (`sm` and up). */
+  imageFit?: 'cover' | 'contain'
+  /** Optional object-fit override for mobile (< `sm`). */
+  mobileImageFit?: 'cover' | 'contain'
   /** Strength of the dark gradient overlay used to blend into the dark theme. */
   overlay?: keyof typeof OVERLAY_CLASSES
   /**
@@ -107,6 +111,8 @@ export const LandingHumanImage = ({
   width,
   height,
   className,
+  imageFit,
+  mobileImageFit,
   overlay = 'medium',
   objectPosition = 'center 30%',
   objectPositionClass,
@@ -126,6 +132,8 @@ export const LandingHumanImage = ({
   }
 
   const overlayClass = OVERLAY_CLASSES[overlay]
+  const desktopFit = imageFit ?? (variant === 'product' ? 'contain' : 'cover')
+  const mobileFit = mobileImageFit ?? desktopFit
 
   const wrapperClasses = cn(
     'group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_10px_40px_-15px_oklch(0_0_0/0.6)] ring-1 ring-inset ring-white/5 backdrop-blur',
@@ -205,6 +213,12 @@ export const LandingHumanImage = ({
 
   return (
     <div className={wrapperClasses}>
+      {variant === 'product' ? (
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-gradient-to-br from-background/95 via-background/75 to-primary/10"
+        />
+      ) : null}
       <img
         src={src}
         alt={alt}
@@ -214,7 +228,10 @@ export const LandingHumanImage = ({
         decoding="async"
         onError={() => setFailed(true)}
         className={cn(
-          'h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]',
+          'h-full w-full transition-transform duration-700 ease-out group-hover:scale-[1.02]',
+          mobileFit === 'contain' ? 'object-contain' : 'object-cover',
+          mobileImageFit ? (desktopFit === 'contain' ? 'sm:object-contain' : 'sm:object-cover') : null,
+          variant === 'product' && (mobileFit === 'contain' || desktopFit === 'contain') && 'p-2 sm:p-3',
           // Portraits get a gentle desaturation so stock photography blends into
           // the dark brand palette. Product/UI screenshots stay fully vivid so
           // every dashboard pixel keeps its intended color.

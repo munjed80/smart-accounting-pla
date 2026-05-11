@@ -214,9 +214,14 @@ export const LandingHumanImage = ({
   return (
     <div className={wrapperClasses}>
       {variant === 'product' ? (
+        // Soft brand-tinted glow that frames the product visual without darkening
+        // it. Previously this layer used `from-background/95 via-background/75`,
+        // which made the padded letterbox area read as a black void and made the
+        // image itself feel sunken/dim. We now keep just enough tint for depth
+        // while letting the screenshot breathe.
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-br from-background/95 via-background/75 to-primary/10"
+          className="absolute inset-0 bg-gradient-to-br from-background/40 via-background/10 to-primary/5"
         />
       ) : null}
       <img
@@ -249,12 +254,15 @@ export const LandingHumanImage = ({
         }}
       />
       {variant === 'product' ? (
-        // Product visuals only get a thin bottom edge fade so the UI screenshot
-        // melts into the section background without burying the dashboard
-        // chrome under a heavy gradient.
+        // Product visuals only get a thin, gentle bottom edge fade so the UI
+        // screenshot melts into the section background. Previously this used
+        // `h-1/4 ... from-background/70`, which masked the bottom quarter of
+        // every screenshot and made dashboards look hidden. Reduced to a much
+        // shorter, lighter kiss of darkness that preserves the elegant blend
+        // without burying the image.
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-background/70 via-background/10 to-transparent"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[15%] bg-gradient-to-t from-background/35 via-background/5 to-transparent"
         />
       ) : (
         // Human portraits use the original full-frame dark gradient blend so

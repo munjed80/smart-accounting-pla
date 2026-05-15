@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from '@/lib/AuthContext'
 import { NetworkError, ServerError } from '@/lib/errors'
 import { ActiveClientProvider } from '@/lib/ActiveClientContext'
+import { isPublicRoutePath } from '@/lib/publicRoutes'
 import { LoginPage } from '@/components/LoginPage'
 import { VerifyEmailPage } from '@/components/VerifyEmailPage'
 import { ForgotPasswordPage } from '@/components/ForgotPasswordPage'
@@ -491,6 +492,43 @@ const AppContent = () => {
     return () => window.clearTimeout(timer)
   }, [isAuthenticated, isLoading, isCheckingOnboarding, needsOnboarding, needsAccountantOnboarding])
 
+  // Auth-aware URL guard.
+  //
+  // 1. Unauthenticated visitors who directly open a protected app route
+  //    (e.g. /dashboard, /zzp/invoices, /accountant, /settings, …) must be
+  //    redirected to /login so that the address bar reflects the actual
+  //    page being shown — not just the LoginPage rendered in-place.
+  //
+  // 2. Authenticated users who land on /login or /register should be
+  //    bounced to their role-appropriate dashboard. They are NOT bounced
+  //    away from "/" — the public landing page must remain reachable
+  //    even when logged in (req. 1 & 6).
+  useEffect(() => {
+    if (isLoading) return
+
+    const path = window.location.pathname
+
+    if (!isAuthenticated) {
+      if (!isPublicRoutePath(path)) {
+        navigateTo('/login')
+      }
+      return
+    }
+
+    // Authenticated: redirect away from the auth pages only. The router
+    // collapses /login, /auth and /register into route.type === 'login'
+    // (see getRouteFromURL), so this branch covers all three.
+    if (route.type === 'login') {
+      const userIsAccountant = user?.role === 'accountant' || user?.role === 'admin'
+      const landingPath = user?.role === 'super_admin'
+        ? '/admin'
+        : userIsAccountant
+          ? '/accountant'
+          : '/dashboard'
+      navigateTo(landingPath)
+    }
+  }, [isAuthenticated, isLoading, route, user])
+
   // Handle special auth routes first (before checking authentication)
   if (route.type === 'verify-email') {
     return (
@@ -546,6 +584,15 @@ const AppContent = () => {
     return <BedanktPage />
   }
 
+  // "/" is the public landing page. It must render for ALL visitors
+  // (authenticated and unauthenticated) so that the marketing entry point
+  // is never silently swapped for the login page or the dashboard. This
+  // is checked before any auth/loading gates so that a slow session check
+  // never produces a "loading then login" flicker on the public root.
+  if (route.type === 'app' && route.path === '/') {
+    return <LandingPage />
+  }
+
   if (bootError && isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center p-4">
@@ -596,13 +643,12 @@ const AppContent = () => {
   }
 
   if (!isAuthenticated) {
-    // Show LandingPage for root path, LoginPage for explicit /login routes
-    if (route.type === 'app' && route.path === '/') {
-      return <LandingPage />
-    }
-    
+    // Public landing ("/") is handled above. Protected routes are
+    // redirected to "/login" by the auth-aware URL guard effect; while
+    // that redirect is in flight, render the LoginPage as a safe
+    // fallback so the user never sees a blank screen.
     return (
-      <LoginPage 
+      <LoginPage
         onSuccess={(loggedInUser) => {
           // Navigate to the role-appropriate landing page - no "/" fallback
           const userIsAccountant = loggedInUser?.role === 'accountant' || loggedInUser?.role === 'admin'

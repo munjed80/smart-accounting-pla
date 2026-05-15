@@ -213,13 +213,159 @@
 
 <body>
     <div id="root">
-      <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #040b1f; color: #e5e7eb; font-family: system-ui, -apple-system, sans-serif; padding: 24px; text-align: center;">
-        <div>
-          <div style="width: 40px; height: 40px; border: 3px solid rgba(148,163,184,0.35); border-top-color: #60a5fa; border-radius: 9999px; margin: 0 auto 16px; animation: root-spin 0.9s linear infinite;"></div>
-          <p style="margin: 0; font-size: 14px; opacity: 0.9;">ZZPers Hub wordt geladen…</p>
-          <p style="margin: 8px 0 0; font-size: 12px; opacity: 0.7;">Blijft dit scherm zichtbaar? Ververs dan de pagina.</p>
+      <!--
+        SEO / no-JS fallback content.
+
+        This block is rendered as the initial HTML of "/" so that:
+          - Search engine crawlers and link-preview bots that do NOT execute
+            JavaScript still see the real Dutch landing page content (H1,
+            sub-headline, USPs, CTAs, FAQ summary, footer links) instead of
+            an empty "ZZPers Hub wordt geladen…" shell.
+          - "View Source" on https://zzpershub.nl/ shows meaningful content,
+            which improves Lighthouse SEO and Google indexing.
+
+        Hydration safety: src/main.tsx uses `createRoot(...).render(...)`
+        (NOT `hydrateRoot`), so React unconditionally replaces these
+        children with the real LandingPage component on first paint. There
+        is no hydration mismatch. The inline styles below are intentionally
+        scoped (`#seo-fallback`) so they vanish along with the markup.
+
+        Keep this content in sync with src/pages/LandingPage.tsx — same
+        H1, USP labels, primary CTAs and FAQ topics.
+      -->
+      <main id="seo-fallback" lang="nl" style="min-height:100vh;background:#040b1f;color:#e5e7eb;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;">
+        <style>
+          #seo-fallback{line-height:1.6}
+          #seo-fallback .seo-wrap{max-width:1100px;margin:0 auto;padding:32px 20px 64px}
+          #seo-fallback header.seo-nav{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-bottom:24px;border-bottom:1px solid rgba(148,163,184,.15)}
+          #seo-fallback header.seo-nav .seo-brand{font-weight:700;font-size:18px;letter-spacing:-.01em}
+          #seo-fallback header.seo-nav nav{display:flex;flex-wrap:wrap;gap:14px;font-size:14px}
+          #seo-fallback header.seo-nav nav a{color:#cbd5e1;text-decoration:none}
+          #seo-fallback header.seo-nav nav a:hover{color:#fff;text-decoration:underline}
+          #seo-fallback .seo-hero{padding:48px 0 32px;text-align:center}
+          #seo-fallback .seo-badge{display:inline-block;font-size:12px;font-weight:600;color:#86efac;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);padding:6px 14px;border-radius:999px;margin-bottom:18px}
+          #seo-fallback h1{font-size:clamp(28px,5vw,48px);line-height:1.15;font-weight:800;margin:0 0 16px;letter-spacing:-.02em}
+          #seo-fallback h1 span.accent{background:linear-gradient(90deg,#60a5fa,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent}
+          #seo-fallback .seo-lead{max-width:680px;margin:0 auto 24px;font-size:clamp(15px,2vw,18px);color:#cbd5e1}
+          #seo-fallback .seo-cta{display:inline-flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:8px}
+          #seo-fallback .seo-cta a{display:inline-block;padding:12px 22px;border-radius:10px;font-weight:600;font-size:15px;text-decoration:none}
+          #seo-fallback .seo-cta a.primary{background:#3b82f6;color:#fff}
+          #seo-fallback .seo-cta a.secondary{border:1px solid rgba(148,163,184,.4);color:#e5e7eb}
+          #seo-fallback .seo-meta{font-size:13px;color:#94a3b8;margin-top:14px}
+          #seo-fallback section{padding:40px 0;border-top:1px solid rgba(148,163,184,.1)}
+          #seo-fallback h2{font-size:clamp(22px,3vw,30px);font-weight:700;margin:0 0 18px;letter-spacing:-.01em}
+          #seo-fallback ul{list-style:none;padding:0;margin:0;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+          #seo-fallback ul li{background:rgba(15,23,42,.55);border:1px solid rgba(148,163,184,.12);padding:16px;border-radius:12px}
+          #seo-fallback ul li strong{display:block;color:#fff;margin-bottom:4px}
+          #seo-fallback ul li span{font-size:14px;color:#cbd5e1}
+          #seo-fallback details{background:rgba(15,23,42,.55);border:1px solid rgba(148,163,184,.12);padding:14px 16px;border-radius:10px;margin-bottom:10px}
+          #seo-fallback details summary{cursor:pointer;font-weight:600;color:#fff}
+          #seo-fallback details p{margin:10px 0 0;color:#cbd5e1;font-size:14px}
+          #seo-fallback footer.seo-footer{padding-top:32px;margin-top:32px;border-top:1px solid rgba(148,163,184,.15);font-size:13px;color:#94a3b8;display:flex;flex-wrap:wrap;gap:18px;justify-content:space-between;align-items:center}
+          #seo-fallback footer.seo-footer nav{display:flex;flex-wrap:wrap;gap:14px}
+          #seo-fallback footer.seo-footer a{color:#cbd5e1;text-decoration:none}
+          #seo-fallback footer.seo-footer a:hover{color:#fff;text-decoration:underline}
+          #seo-fallback .seo-loading{display:flex;align-items:center;justify-content:center;gap:10px;font-size:13px;color:#94a3b8;margin-top:32px}
+          #seo-fallback .seo-loading-dot{width:14px;height:14px;border:2px solid rgba(148,163,184,.35);border-top-color:#60a5fa;border-radius:50%;animation:root-spin .9s linear infinite}
+        </style>
+        <div class="seo-wrap">
+          <header class="seo-nav">
+            <span class="seo-brand">ZZPers Hub</span>
+            <nav aria-label="Hoofdnavigatie">
+              <a href="/prijzen">Pakketten</a>
+              <a href="/faq">FAQ</a>
+              <a href="/help">Help</a>
+              <a href="/contact">Contact</a>
+              <a href="/login">Inloggen</a>
+              <a href="/register">Start gratis</a>
+            </nav>
+          </header>
+
+          <section class="seo-hero" aria-labelledby="seo-h1">
+            <span class="seo-badge">90 dagen gratis uitproberen — geen creditcard vereist</span>
+            <h1 id="seo-h1">Jouw boekhouding, <span class="accent">simpel en duidelijk</span></h1>
+            <p class="seo-lead">
+              Facturen, uitgaven, BTW-overzicht en jaaroverzicht — alles op één plek.
+              Speciaal voor zzp'ers in Nederland, zonder boekhoudkennis. Start binnen 60 seconden.
+            </p>
+            <div class="seo-cta">
+              <a class="primary" href="/register">Start gratis</a>
+              <a class="secondary" href="/login">Inloggen</a>
+            </div>
+            <p class="seo-meta">90 dagen gratis, daarna €4,99 per maand. Geen verplichtingen.</p>
+          </section>
+
+          <section aria-labelledby="seo-features">
+            <h2 id="seo-features">Alles wat een zzp'er nodig heeft</h2>
+            <ul>
+              <li><strong>Professionele facturen in seconden</strong><span>Maak en verstuur facturen met automatische nummering en PDF-export.</span></li>
+              <li><strong>Werkt op mobiel &amp; desktop</strong><span>Gebruik ZZPers Hub overal — als PWA op je telefoon of in de browser op je laptop.</span></li>
+              <li><strong>Transparant BTW-overzicht</strong><span>Altijd inzicht in je BTW-verplichtingen met automatische berekeningen en drilldown.</span></li>
+              <li><strong>Eenvoudige, eerlijke prijs</strong><span>Geen verborgen kosten. Start gratis, daarna vanaf €4,95 per maand.</span></li>
+              <li><strong>Klanten en uren op één plek</strong><span>Beheer klanten, registreer uren en zet ze direct om in facturen.</span></li>
+              <li><strong>Veilig en privacybewust</strong><span>Je gegevens worden veilig opgeslagen in Europa, volledig AVG-conform.</span></li>
+            </ul>
+          </section>
+
+          <section aria-labelledby="seo-howto">
+            <h2 id="seo-howto">Zo werkt het</h2>
+            <ul>
+              <li><strong>1. Maak gratis een account</strong><span>Aanmelden in 60 seconden, geen creditcard vereist.</span></li>
+              <li><strong>2. Voeg klanten en uren toe</strong><span>Registreer klanten, uren en uitgaven in een paar klikken.</span></li>
+              <li><strong>3. Verstuur facturen en hou BTW bij</strong><span>Automatische BTW-berekening, PDF-facturen en jaaroverzicht.</span></li>
+            </ul>
+          </section>
+
+          <section aria-labelledby="seo-faq">
+            <h2 id="seo-faq">Veelgestelde vragen</h2>
+            <details>
+              <summary>Hoe maak ik gratis een factuur?</summary>
+              <p>Maak een gratis account aan op ZZPers Hub — geen creditcard nodig. Ga daarna naar 'Facturen' en klik op '+ Nieuwe factuur'. Vul de klantgegevens in, voeg regelitems toe, kies het btw-tarief en klik op 'Versturen'.</p>
+            </details>
+            <details>
+              <summary>Wat kost ZZPers Hub na de gratis proefperiode?</summary>
+              <p>De eerste 90 dagen zijn volledig gratis — geen creditcard nodig bij aanmelding. Daarna is ZZPers Hub €4,95 per maand. Je kunt op elk moment opzeggen; geen opzegtermijnen of verborgen kosten.</p>
+            </details>
+            <details>
+              <summary>Is ZZPers Hub geschikt voor zzp'ers?</summary>
+              <p>Ja, ZZPers Hub is speciaal gemaakt voor zzp'ers, freelancers en zelfstandige ondernemers in Nederland. Maak professionele facturen, beheer klanten, registreer uren en houd je btw-overzicht bij — zonder boekhoudkennis.</p>
+            </details>
+            <details>
+              <summary>Werkt ZZPers Hub ook op mobiel?</summary>
+              <p>Ja, ZZPers Hub werkt als Progressive Web App (PWA) op zowel mobiel als desktop. Je kunt het installeren op je telefoon en facturen onderweg versturen.</p>
+            </details>
+            <p style="margin-top:14px"><a href="/faq" style="color:#60a5fa">Bekijk alle veelgestelde vragen →</a></p>
+          </section>
+
+          <footer class="seo-footer" aria-label="Footer">
+            <span>© ZZPers Hub — MHM IT, Alkmaar</span>
+            <nav>
+              <a href="/prijzen">Pakketten</a>
+              <a href="/faq">FAQ</a>
+              <a href="/help">Help</a>
+              <a href="/contact">Contact</a>
+              <a href="/privacy">Privacy</a>
+              <a href="/cookies">Cookies</a>
+              <a href="/terms">Voorwaarden</a>
+              <a href="/disclaimer">Disclaimer</a>
+            </nav>
+          </footer>
+
+          <div class="seo-loading" aria-hidden="true">
+            <span class="seo-loading-dot"></span>
+            <span>ZZPers Hub wordt geladen…</span>
+          </div>
         </div>
-      </div>
+      </main>
+
+      <noscript>
+        <p style="padding:24px;text-align:center;color:#e5e7eb;background:#040b1f;font-family:system-ui,sans-serif">
+          ZZPers Hub werkt het beste met JavaScript ingeschakeld. Schakel JavaScript in om de app te gebruiken — of bekijk
+          <a href="/faq" style="color:#60a5fa">de veelgestelde vragen</a>,
+          <a href="/prijzen" style="color:#60a5fa">de pakketten</a> of
+          <a href="/contact" style="color:#60a5fa">neem contact op</a>.
+        </p>
+      </noscript>
     </div>
     <script type="module" src="/src/main.tsx"></script>
     <style>

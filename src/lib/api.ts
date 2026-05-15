@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { ApiHttpError, NotFoundError, NetworkError, UnauthorizedError, ValidationError, ServerError, PaymentRequiredError } from './errors'
 import type { ScopeMissingError } from './api/accountant'
+import { isPublicRoutePath } from './publicRoutes'
 
 /**
  * ==== DATA MAP: Accountant Screens → Endpoints ====
@@ -584,15 +585,26 @@ api.interceptors.response.use(
       }
     }
 
-    // Handle 401 - redirect to login
+    // Handle 401 - clear stale credentials and redirect to login.
+    //
+    // IMPORTANT: do NOT force a redirect when the user is already on a public
+    // route (landing page, login, register, password reset, marketing pages,
+    // etc.). Otherwise a visitor with a stale `access_token` left in
+    // localStorage from a previous session would be kicked off the public
+    // landing page straight to /login on first load — which is exactly the
+    // routing bug we are fixing here. Public-route visitors just get their
+    // stale token cleared and the request rejected; AuthContext handles the
+    // resulting unauthenticated state.
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
 
       localStorage.removeItem('access_token')
       localStorage.removeItem('user')
-      
-      window.location.href = '/login'
-      
+
+      if (typeof window !== 'undefined' && !isPublicRoutePath(window.location.pathname)) {
+        window.location.href = '/login'
+      }
+
       return Promise.reject(typedError)
     }
 

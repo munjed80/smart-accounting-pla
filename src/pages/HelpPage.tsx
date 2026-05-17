@@ -16,7 +16,7 @@ const helpSections: HelpSection[] = [
     title: 'Aan de slag',
     content: (
       <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
-        <p><strong className="text-foreground">Account aanmaken:</strong> Ga naar de startpagina en klik op "Start gratis (30 dagen proefperiode)". Vul uw naam, e-mailadres en wachtwoord in. U ontvangt een bevestigingsmail om uw account te activeren.</p>
+        <p><strong className="text-foreground">Account aanmaken:</strong> Ga naar de startpagina en klik op "Start gratis". Vul uw naam, e-mailadres en wachtwoord in. U ontvangt een bevestigingsmail om uw account te activeren.</p>
         <p><strong className="text-foreground">Administratie inrichten:</strong> Na inloggen wordt u gevraagd uw bedrijfsgegevens in te voeren: handelsnaam, KvK-nummer, BTW-nummer en factuuradres. Vul dit zo compleet mogelijk in — deze gegevens worden gebruikt op uw facturen.</p>
         <p><strong className="text-foreground">Eerste klant toevoegen:</strong> Ga naar "Klanten" en klik op "+ Klant toevoegen". Voer de bedrijfsnaam, e-mailadres en eventuele KvK- of BTW-gegevens in.</p>
         <p><strong className="text-foreground">Als accountant:</strong> Meld u aan als accountant en nodig uw eerste klant uit via "Klanten" → "Klant uitnodigen". De klant ontvangt een machtigingsverzoek en u krijgt toegang tot zijn dossier na acceptatie.</p>
@@ -88,10 +88,10 @@ const helpSections: HelpSection[] = [
     title: 'Abonnement & betaling',
     content: (
       <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
-        <p><strong className="text-foreground">Gratis proefperiode:</strong> U heeft 30 dagen gratis toegang tot alle functies. Geen creditcard vereist bij aanmelding. Na 30 dagen wordt uw account beperkt tot alleen-lezen tenzij u een abonnement activeert.</p>
-        <p><strong className="text-foreground">Abonnement activeren:</strong> Ga naar "Instellingen" → "Abonnement" en klik op "Activeer abonnement". Betaal via iDEAL of creditcard via ons betalingssysteem (Mollie). Het abonnement kost €6,95 per maand (voor ZZP).</p>
+        <p><strong className="text-foreground">Gratis proefperiode:</strong> U heeft tijdens de gratis proefperiode toegang tot de beschikbare functies. Geen creditcard vereist bij aanmelding.</p>
+        <p><strong className="text-foreground">Abonnement activeren:</strong> Ga naar "Instellingen" → "Abonnement" om de actuele abonnementsstatus en eventuele activatie-opties te bekijken.</p>
         <p><strong className="text-foreground">Opzeggen:</strong> U kunt uw abonnement op elk moment opzeggen via "Instellingen" → "Abonnement" → "Abonnement opzeggen". Uw toegang blijft actief tot het einde van de betaalde periode. Geen opzegtermijn of boetes.</p>
-        <p><strong className="text-foreground">Factuur ontvangen:</strong> Na elke betaling ontvangt u een factuur per e-mail van MHM IT.</p>
+        <p><strong className="text-foreground">Factuur ontvangen:</strong> Als betalingen actief zijn, ontvangt u een factuur per e-mail na iedere betaling.</p>
       </div>
     ),
   },
@@ -118,7 +118,7 @@ const helpSections: HelpSection[] = [
         </div>
         <div>
           <p className="font-medium text-foreground mb-1">Nog steeds een probleem?</p>
-          <p>Neem contact op via het <button onClick={() => navigateTo('/contact')} className="underline hover:text-foreground">contactformulier</button>. Wij reageren binnen één werkdag.</p>
+          <p>Bekijk de startgids opnieuw of probeer de actie later nogmaals. Exporteer belangrijke gegevens wanneer u een eigen kopie wilt bewaren.</p>
         </div>
       </div>
     ),
@@ -176,10 +176,10 @@ export const HelpPage = () => {
         <div className="mt-10 rounded-lg border border-accent/20 bg-accent/5 p-5">
           <h2 className="text-base font-semibold mb-2">Meer hulp nodig?</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Staat uw vraag er niet bij? Neem contact op via ons contactformulier en wij helpen u verder.
+            Staat uw vraag er niet bij? Controleer de relevante instellingen in uw account en bewaar belangrijke gegevens met de exportfunctie.
           </p>
-          <Button variant="outline" size="sm" onClick={() => navigateTo('/contact')}>
-            Contact opnemen
+          <Button variant="outline" size="sm" onClick={() => navigateTo('/login')}>
+            Naar mijn account
           </Button>
         </div>
 

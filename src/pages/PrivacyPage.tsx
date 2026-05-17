@@ -24,17 +24,10 @@ export const PrivacyPage = () => {
         <div className="prose prose-sm prose-invert max-w-none space-y-8 text-foreground">
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">1. Verantwoordelijke voor de verwerking</h2>
+            <h2 className="text-xl font-semibold mb-3">1. Verwerking van gegevens</h2>
             <p className="text-muted-foreground leading-relaxed">
-              MHM IT is de verwerkingsverantwoordelijke in de zin van de Algemene Verordening Gegevensbescherming (AVG).
+              Smart Accounting verwerkt persoonsgegevens voor het aanbieden van administratie-, facturatie-, BTW- en samenwerkingsfuncties binnen het platform.
             </p>
-            <address className="not-italic mt-3 text-sm text-muted-foreground leading-relaxed">
-              MHM IT<br />
-              Europaboulevard 371<br />
-              1825RL Alkmaar<br />
-              KvK: 69779716<br />
-              E-mail: <a href="mailto:support@zzpershub.nl" className="underline hover:text-foreground">support@zzpershub.nl</a>
-            </address>
           </section>
 
           <section>
@@ -95,7 +88,7 @@ export const PrivacyPage = () => {
               <li><strong className="text-foreground">Klacht indienen:</strong> U heeft het recht om een klacht in te dienen bij de Autoriteit Persoonsgegevens (autoriteitpersoonsgegevens.nl).</li>
             </ul>
             <p className="text-muted-foreground text-sm leading-relaxed mt-2">
-              Stuur verzoeken naar: <a href="mailto:support@zzpershub.nl" className="underline hover:text-foreground">support@zzpershub.nl</a>. Wij reageren binnen 30 dagen.
+              Dien verzoeken in via de beschikbare account- of supportkanalen. Verzoeken worden binnen de wettelijke termijnen behandeld.
             </p>
           </section>
 

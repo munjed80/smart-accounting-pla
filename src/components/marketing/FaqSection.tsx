@@ -59,7 +59,7 @@ const faqItems: FaqItem[] = [
   {
     question: 'Hoe werkt de gratis proefperiode?',
     answer:
-      'U krijgt 30 dagen gratis toegang tot alle functies, zonder creditcard bij aanmelding. Na 30 dagen wordt uw account automatisch beperkt tot alleen-lezen modus tenzij u een abonnement activeert. Uw gegevens blijven bewaard. U ontvangt een herinnering per e-mail voor het einde van de proefperiode.',
+      'U krijgt een ruime gratis proefperiode met toegang tot de beschikbare functies, zonder creditcard bij aanmelding. Uw gegevens blijven bewaard en u kunt belangrijke gegevens exporteren wanneer u een eigen kopie wilt bewaren.',
   },
   {
     question: 'Hoe activeer of annuleer ik mijn abonnement?',

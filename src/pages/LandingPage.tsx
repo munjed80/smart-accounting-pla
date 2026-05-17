@@ -88,24 +88,18 @@ const accountantFeatures = [
   { icon: Key, title: 'PKI-ondertekening', description: 'Digitale handtekening voor documenten (voorbereid voor toekomstige certificering).', beta: true },
 ]
 
-const testimonials = [
+const productHighlights = [
   {
-    quote: 'Eindelijk inzicht in mijn BTW zonder gedoe. Ik zie precies hoe elke rubriek is opgebouwd.',
-    initials: 'M.V.',
-    author: 'M. Vermeer',
-    role: 'ZZP — Freelance ontwerper',
+    title: 'Inzicht zonder ruis',
+    description: 'Bekijk per BTW-rubriek welke facturen, uitgaven en correcties meetellen.',
   },
   {
-    quote: 'De werkqueue en het audittrail geven ons kantoor echt grip op deadlines en kwaliteit. De drilldown per klant is een uitkomst.',
-    initials: 'R.H.',
-    author: 'R. Hendriks',
-    role: 'Boekhouder — Klein administratiekantoor',
+    title: 'Samenwerken met controle',
+    description: 'Werk met klantdossiers, beoordelingsstappen en een duidelijke audit trail.',
   },
   {
-    quote: 'Eenvoudig, mobiel en professioneel. Ik gebruik het dagelijks op mijn telefoon en verstuur facturen onderweg.',
-    initials: 'S.B.',
-    author: 'S. Bakker',
-    role: 'ZZP — Zelfstandig aannemer',
+    title: 'Mobiel en compleet',
+    description: 'Maak facturen, registreer uren en upload bonnetjes vanaf desktop of telefoon.',
   },
 ]
 
@@ -133,7 +127,7 @@ export const LandingPage = () => {
       }
       tag.setAttribute(
         'content',
-        "Boekhouden en compliance in één slim platform voor ZZP'ers en accountants. Start met 30 dagen gratis, daarna €6,95 per maand voor ZZP.",
+        "Boekhouden en compliance in één slim platform voor ZZP'ers en accountants. Start met een ruime gratis proefperiode en houd uw administratie overzichtelijk in één platform.",
       )
     }
 
@@ -199,7 +193,7 @@ export const LandingPage = () => {
           <div className="mx-auto max-w-4xl text-center">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
               <Star className="h-3 w-3" />
-              30 dagen gratis uitproberen — geen creditcard vereist
+              Ruime gratis proefperiode — geen creditcard vereist
             </div>
             <h1 className="text-3xl font-bold tracking-tight sm:text-5xl lg:text-6xl lg:tracking-[-0.02em]">Boekhouden en compliance in één slim platform</h1>
             <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg lg:text-xl lg:leading-relaxed">
@@ -218,14 +212,14 @@ export const LandingPage = () => {
             </div>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button size="lg" className="w-full max-w-sm sm:w-auto" onClick={() => navigateTo('/login')}>
-                Start gratis (30 dagen proefperiode)
+                Start gratis
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
               <Button size="lg" variant="outline" className="w-full max-w-sm sm:w-auto" onClick={() => navigateTo('/login')}>
                 Inloggen
               </Button>
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">30 dagen gratis, daarna €6,95 per maand. Geen verplichtingen.</p>
+            <p className="mt-3 text-sm text-muted-foreground">Ruime gratis proefperiode. Geen creditcard en geen verplichtingen.</p>
             <p className="mt-2 text-sm font-medium" style={{ color: 'var(--accent2)' }}>Binnen 60 seconden gestart.</p>
           </div>
         </div>
@@ -262,7 +256,7 @@ export const LandingPage = () => {
           </div>
           <div className="mt-8">
             <Button size="lg" onClick={() => navigateTo('/login')}>
-              Start gratis (30 dagen proefperiode)
+              Start gratis
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </div>
@@ -299,36 +293,26 @@ export const LandingPage = () => {
             })}
           </div>
           <div className="mt-8">
-            <Button size="lg" variant="outline" onClick={() => navigateTo('/contact')}>
-              Contact opnemen
+            <Button size="lg" variant="outline" onClick={() => navigateTo('/help')}>
+              Bekijk startgids
             </Button>
           </div>
         </div>
       </section>
 
-      {/* Testimonials */}
+      {/* Product highlights */}
       <section className="bg-muted/40 py-14 sm:py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl mb-10">Wat klanten zeggen</h2>
+          <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl mb-10">Gebouwd voor overzicht en vertrouwen</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {testimonials.map((item) => (
-              <Card key={item.author} className="border-border/80">
+            {productHighlights.map((item) => (
+              <Card key={item.title} className="border-border/80">
                 <CardContent className="pt-6">
-                  <div className="flex gap-0.5 mb-3">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="h-3.5 w-3.5" style={{ color: 'var(--accent2)', fill: 'var(--accent2)' }} />
-                    ))}
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary">
+                    <Star className="h-4 w-4" />
                   </div>
-                  <p className="text-sm text-muted-foreground lg:text-base lg:leading-relaxed">"{item.quote}"</p>
-                  <div className="mt-4 flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary shrink-0">
-                      {item.initials}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold">{item.author}</p>
-                      <p className="text-xs text-muted-foreground">{item.role}</p>
-                    </div>
-                  </div>
+                  <p className="text-base font-semibold">{item.title}</p>
+                  <p className="mt-2 text-sm text-muted-foreground lg:text-base lg:leading-relaxed">{item.description}</p>
                 </CardContent>
               </Card>
             ))}
@@ -370,9 +354,9 @@ export const LandingPage = () => {
                 <CardTitle className="text-2xl">ZZP</CardTitle>
                 <div>
                   <p className="text-3xl font-bold text-primary">Gratis</p>
-                  <p className="text-sm text-muted-foreground">eerste 30 dagen</p>
+                  <p className="text-sm text-muted-foreground">tijdens de proefperiode</p>
                 </div>
-                <p className="text-lg font-semibold">Daarna €6,95 <span className="text-sm font-normal text-muted-foreground">/ maand</span></p>
+                <p className="text-lg font-semibold">Activeer later <span className="text-sm font-normal text-muted-foreground">wanneer u wilt doorgaan</span></p>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm lg:text-base">
@@ -386,7 +370,7 @@ export const LandingPage = () => {
               </CardContent>
               <CardFooter>
                 <Button className="w-full" onClick={() => navigateTo('/login')}>
-                  Start 30 dagen gratis
+                  Start gratis
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </CardFooter>
@@ -396,7 +380,7 @@ export const LandingPage = () => {
               <CardHeader>
                 <CardTitle className="text-2xl">Accountant</CardTitle>
                 <p className="text-xl font-semibold">Op aanvraag</p>
-                <p className="text-sm text-muted-foreground">Prijsafspraken op basis van klantvolume.</p>
+                <p className="text-sm text-muted-foreground">Gebruik de accountantfuncties vanuit het platform wanneer u meerdere klantdossiers beheert.</p>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm lg:text-base">
@@ -409,8 +393,8 @@ export const LandingPage = () => {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button variant="outline" className="w-full" onClick={() => navigateTo('/contact')}>
-                  Contact opnemen
+                <Button variant="outline" className="w-full" onClick={() => navigateTo('/help')}>
+                  Bekijk startgids
                 </Button>
               </CardFooter>
             </Card>
@@ -438,15 +422,15 @@ export const LandingPage = () => {
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
           <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Klaar om te beginnen?</h2>
           <p className="mt-4 text-muted-foreground lg:text-lg lg:leading-relaxed">
-            Start vandaag nog met uw gratis proefperiode van 30 dagen. Geen creditcard, geen verplichtingen.
+            Start vandaag nog met een ruime gratis proefperiode. Geen creditcard, geen verplichtingen.
           </p>
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Button size="lg" onClick={() => navigateTo('/login')}>
-              Start gratis (30 dagen proefperiode)
+              Start gratis
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigateTo('/contact')}>
-              Contact opnemen
+            <Button size="lg" variant="outline" onClick={() => navigateTo('/help')}>
+              Bekijk startgids
             </Button>
           </div>
         </div>

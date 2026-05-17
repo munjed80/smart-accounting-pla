@@ -130,13 +130,6 @@ export const CookiesPage = () => {
             </p>
           </section>
 
-          <section>
-            <h2 className="text-xl font-semibold mb-3">5. Contact</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Vragen over ons cookiebeleid? Stuur een e-mail naar{' '}
-              <a href="mailto:support@zzpershub.nl" className="underline hover:text-foreground">support@zzpershub.nl</a>.
-            </p>
-          </section>
 
         </div>
 

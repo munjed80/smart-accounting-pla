@@ -26,30 +26,23 @@ export const TermsPage = () => {
           <section>
             <h2 className="text-xl font-semibold mb-3">1. Partijen</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Deze voorwaarden zijn van toepassing op de overeenkomst tussen MHM IT (hierna "aanbieder") en u als gebruiker (hierna "gebruiker") van het platform Smart Accounting.
+              Deze voorwaarden beschrijven het gebruik van Smart Accounting door gebruikers van het platform. Smart Accounting is bedoeld als product voor administratie, facturatie, BTW-overzichten en samenwerking met boekhouders.
             </p>
-            <address className="not-italic mt-3 text-sm text-muted-foreground leading-relaxed">
-              MHM IT<br />
-              Europaboulevard 371<br />
-              1825RL Alkmaar<br />
-              KvK: 69779716<br />
-              E-mail: <a href="mailto:support@zzpershub.nl" className="underline hover:text-foreground">support@zzpershub.nl</a>
-            </address>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold mb-3">2. De dienst</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Smart Accounting is een online boekhoudplatform voor ZZP'ers en accountants. De dienst omvat facturatie, urenregistratie, uitgavenbeheer, BTW-overzichten en samenwerkingsfuncties voor accountants. De aanbieder levert de dienst als Software-as-a-Service (SaaS) en is geen belastingadviseur.
+              Smart Accounting is een online boekhoudplatform voor ZZP'ers en accountants. De dienst omvat facturatie, urenregistratie, uitgavenbeheer, BTW-overzichten en samenwerkingsfuncties voor accountants. Het platform levert de dienst als Software-as-a-Service (SaaS) en is geen belastingadviseur.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold mb-3">3. Gratis proefperiode en abonnement</h2>
             <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground leading-relaxed">
-              <li>Nieuwe gebruikers ontvangen een gratis proefperiode van 30 dagen met toegang tot alle functies.</li>
-              <li>Na afloop van de proefperiode is een betaald abonnement vereist voor voortgezet gebruik.</li>
-              <li>Het abonnement voor ZZP-gebruikers bedraagt €6,95 per maand (excl. BTW), maandelijks opzegbaar.</li>
+              <li>Nieuwe gebruikers ontvangen een ruime gratis proefperiode met toegang tot de beschikbare functies.</li>
+              <li>Na afloop van de proefperiode kan voortgezet gebruik worden geactiveerd zodra abonnementen beschikbaar zijn.</li>
+              <li>Eventuele abonnementsvoorwaarden worden duidelijk getoond voordat een gebruiker activeert.</li>
               <li>Accountants/kantoren: prijsafspraken worden individueel vastgesteld.</li>
               <li>Bij niet-betaling wordt de toegang beperkt tot alleen-lezen; gegevens blijven bewaard.</li>
             </ul>
@@ -68,35 +61,35 @@ export const TermsPage = () => {
           <section>
             <h2 className="text-xl font-semibold mb-3">5. Beschikbaarheid en onderhoud</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              De aanbieder streeft naar een hoge beschikbaarheid van het platform maar garandeert geen ononderbroken toegang. Gepland onderhoud wordt indien mogelijk van tevoren aangekondigd. De aanbieder is niet aansprakelijk voor schade als gevolg van tijdelijke onbeschikbaarheid.
+              Het platform streeft naar een hoge beschikbaarheid van het platform maar garandeert geen ononderbroken toegang. Gepland onderhoud wordt indien mogelijk van tevoren aangekondigd. Het platform is niet aansprakelijk voor schade als gevolg van tijdelijke onbeschikbaarheid.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold mb-3">6. Eigendom van gegevens</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Alle door de gebruiker ingevoerde gegevens (facturen, klantgegevens, enz.) blijven eigendom van de gebruiker. De aanbieder verwerkt deze gegevens uitsluitend ten behoeve van de dienstverlening. Bij beëindiging van het account kunnen gegevens worden geëxporteerd via de exportfunctie.
+              Alle door de gebruiker ingevoerde gegevens (facturen, klantgegevens, enz.) blijven eigendom van de gebruiker. Het platform verwerkt deze gegevens uitsluitend ten behoeve van de dienstverlening. Bij beëindiging van het account kunnen gegevens worden geëxporteerd via de exportfunctie.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold mb-3">7. Aansprakelijkheid</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              De aansprakelijkheid van de aanbieder is beperkt tot directe schade en maximaal het bedrag dat de gebruiker in de afgelopen 3 maanden heeft betaald voor de dienst. De aanbieder is niet aansprakelijk voor indirecte schade, gevolgschade of verlies van gegevens als gevolg van gebruiksfouten.
+              De aansprakelijkheid van het platform is beperkt tot directe schade en maximaal het bedrag dat de gebruiker in de afgelopen 3 maanden heeft betaald voor de dienst. Het platform is niet aansprakelijk voor indirecte schade, gevolgschade of verlies van gegevens als gevolg van gebruiksfouten.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold mb-3">8. Intellectueel eigendom</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Het platform, de software en alle bijbehorende documentatie zijn eigendom van MHM IT. De gebruiker krijgt een beperkt, niet-exclusief gebruiksrecht voor de duur van het abonnement. Kopiëren, distribueren of reverse engineering van de software is niet toegestaan.
+              Het platform, de software en alle bijbehorende documentatie blijven beschermd door intellectuele-eigendomsrechten. De gebruiker krijgt een beperkt, niet-exclusief gebruiksrecht voor de duur van het abonnement. Kopiëren, distribueren of reverse engineering van de software is niet toegestaan.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold mb-3">9. Opzegging</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Beide partijen kunnen de overeenkomst op elk moment beëindigen. De gebruiker kan opzeggen via "Instellingen" → "Abonnement". Na opzegging blijft de toegang actief tot het einde van de betaalde periode. De aanbieder kan de overeenkomst per direct beëindigen bij misbruik of niet-betaling.
+              Beide partijen kunnen de overeenkomst op elk moment beëindigen. De gebruiker kan opzeggen via "Instellingen" → "Abonnement". Na opzegging blijft de toegang actief tot het einde van de betaalde periode. Het platform kan de overeenkomst per direct beëindigen bij misbruik of niet-betaling.
             </p>
           </section>
 
@@ -110,7 +103,7 @@ export const TermsPage = () => {
           <section>
             <h2 className="text-xl font-semibold mb-3">11. Wijzigingen</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              De aanbieder kan deze voorwaarden wijzigen. Wezenlijke wijzigingen worden minimaal 30 dagen van tevoren per e-mail aangekondigd. Voortgezet gebruik na de ingangsdatum geldt als acceptatie van de gewijzigde voorwaarden.
+              Het platform kan deze voorwaarden wijzigen. Wezenlijke wijzigingen worden minimaal 30 dagen van tevoren per e-mail aangekondigd. Voortgezet gebruik na de ingangsdatum geldt als acceptatie van de gewijzigde voorwaarden.
             </p>
           </section>
 

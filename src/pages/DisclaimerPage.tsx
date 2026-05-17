@@ -32,31 +32,31 @@ export const DisclaimerPage = () => {
           <section>
             <h2 className="text-xl font-semibold mb-3">2. Juistheid van informatie</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              MHM IT doet er alles aan om de informatie op dit platform correct en actueel te houden. Desondanks kunnen wij de volledigheid, juistheid of actualiteit van de informatie niet garanderen. Gebruik van de informatie is geheel voor eigen risico. MHM IT is niet aansprakelijk voor eventuele schade als gevolg van onjuiste of onvolledige informatie.
+              Het platform is bedoeld om informatie overzichtelijk en actueel weer te geven. Desondanks kan de volledigheid, juistheid of actualiteit van informatie niet worden gegarandeerd. Gebruik van de informatie blijft voor eigen risico.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold mb-3">3. Aansprakelijkheidsbeperking</h2>
             <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground leading-relaxed">
-              <li>MHM IT is niet aansprakelijk voor directe of indirecte schade voortvloeiend uit het gebruik van het platform.</li>
-              <li>MHM IT is niet aansprakelijk voor fouten, verlies van gegevens of schade als gevolg van technische storingen of onderhoud.</li>
-              <li>MHM IT is niet verantwoordelijk voor de inhoud van externe websites waarnaar eventueel wordt verwezen.</li>
-              <li>De maximale aansprakelijkheid van MHM IT is beperkt tot het bedrag dat de gebruiker in de afgelopen drie maanden heeft betaald voor de dienst.</li>
+              <li>Het platform is niet bedoeld als vervanging voor professioneel fiscaal of juridisch advies.</li>
+              <li>Gebruikers blijven verantwoordelijk voor controle van gegevens, aangiften en exports.</li>
+              <li>Externe websites waarnaar eventueel wordt verwezen vallen buiten de inhoud van het platform.</li>
+              <li>Maak regelmatig gebruik van exportmogelijkheden wanneer u een eigen administratiekopie wilt bewaren.</li>
             </ul>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold mb-3">4. Beschikbaarheid</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              MHM IT streeft naar een maximale beschikbaarheid van het platform, maar kan niet garanderen dat het platform altijd en zonder onderbreking beschikbaar is. Geplande en ongeplande onderhoudswerkzaamheden kunnen leiden tot tijdelijke onbeschikbaarheid. MHM IT is niet aansprakelijk voor schade als gevolg van onbeschikbaarheid.
+              Het platform streeft naar goede beschikbaarheid, maar kan niet garanderen dat het altijd en zonder onderbreking beschikbaar is. Gepland of ongepland onderhoud kan leiden tot tijdelijke onbeschikbaarheid.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold mb-3">5. Intellectueel eigendom</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Alle rechten op de inhoud van dit platform, inclusief teksten, afbeeldingen, logo's en software, berusten bij MHM IT of diens licentiegevers. Niets uit dit platform mag worden verveelvoudigd, opgeslagen of openbaar gemaakt zonder voorafgaande schriftelijke toestemming van MHM IT.
+              De inhoud van dit platform, inclusief teksten, afbeeldingen, logo's en software, is beschermd door intellectuele-eigendomsrechten. Gebruik is toegestaan binnen de normale werking van het platform.
             </p>
           </section>
 
@@ -67,13 +67,6 @@ export const DisclaimerPage = () => {
             </p>
           </section>
 
-          <section>
-            <h2 className="text-xl font-semibold mb-3">7. Contact</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Vragen over deze disclaimer? Stuur een e-mail naar{' '}
-              <a href="mailto:support@zzpershub.nl" className="underline hover:text-foreground">support@zzpershub.nl</a>.
-            </p>
-          </section>
 
         </div>
 

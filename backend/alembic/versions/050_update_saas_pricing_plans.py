@@ -5,7 +5,7 @@ Revises: 049_update_zzp_basic_price
 Create Date: 2026-04-09 20:00:00.000000
 
 Updates the plans table to reflect the new pricing structure:
-  - Free: €0.00/month, 30-day trial (updated limits from old free plan)
+  - Free: €0.00/month, 365-day trial (updated limits from old free plan)
   - Starter: €4.95/month (replaces zzp_basic)
   - Pro (zzp_pro): €6.95/month (new plan)
   - Removes obsolete 'trial' plan
@@ -29,7 +29,7 @@ def upgrade() -> None:
         UPDATE plans
         SET name = 'Free',
             price_monthly = 0.00,
-            trial_days = 30,
+            trial_days = 365,
             max_invoices = 999999,
             max_storage_mb = 5120,
             max_users = 1

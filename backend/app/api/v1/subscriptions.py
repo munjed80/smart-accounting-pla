@@ -127,7 +127,7 @@ async def start_trial(
     Start a trial subscription for the current user.
     
     Idempotent: Returns existing subscription if already started.
-    Auto-starts 30-day trial for ZZP Basic plan.
+    Auto-starts the configured free trial for the ZZP free plan (365 days by default).
     """
     # Get user's primary administration (ZZP users have one)
     result = await db.execute(

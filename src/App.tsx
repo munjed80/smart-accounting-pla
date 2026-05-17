@@ -239,7 +239,7 @@ const TrialExpiredScreen = ({ onGoToSubscriptions, onLogout }: { onGoToSubscript
       <div className="space-y-2">
         <h2 className="text-xl font-semibold">Je proefperiode is afgelopen</h2>
         <p className="text-sm text-muted-foreground">
-          Je gratis maand is verlopen of je hebt nog geen actief abonnement.
+          Je gratis jaar is verlopen of je hebt nog geen actief abonnement.
           Kies een abonnement om de app te blijven gebruiken.
         </p>
       </div>

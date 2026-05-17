@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import { pathToTab, tabToPath } from '../lib/routing'
+import { isPublicRoutePath } from '../lib/publicRoutes'
+
+describe('public route guard', () => {
+  it('keeps landing and auth pages public while app routes stay protected', () => {
+    expect(isPublicRoutePath('/')).toBe(true)
+    expect(isPublicRoutePath('/login')).toBe(true)
+    expect(isPublicRoutePath('/register')).toBe(true)
+    expect(isPublicRoutePath('/dashboard')).toBe(false)
+    expect(isPublicRoutePath('/facturen')).toBe(false)
+    expect(isPublicRoutePath('/zzp/invoices')).toBe(false)
+  })
+})
 
 describe('routing mappings for accountant pages', () => {
   it('maps accountant URLs to expected tabs', () => {

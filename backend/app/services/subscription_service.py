@@ -69,7 +69,7 @@ class SubscriptionService:
     """Service for managing subscriptions and computing entitlements"""
     
     ZZP_FREE_PLAN_CODE = "free"
-    DEFAULT_TRIAL_DAYS = 90
+    DEFAULT_TRIAL_DAYS = 365
     
     async def ensure_trial_started(
         self,
@@ -102,7 +102,7 @@ class SubscriptionService:
             )
             return existing_subscription
         
-        # Get Free plan (1-month trial)
+        # Get Free plan (1-year trial)
         plan_result = await db.execute(
             select(Plan).where(Plan.code == self.ZZP_FREE_PLAN_CODE)
         )

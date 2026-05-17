@@ -19,7 +19,7 @@ depends_on = None
 def upgrade() -> None:
     # Add new fields to plans table
     op.add_column('plans', sa.Column('code', sa.String(length=64), nullable=True))
-    op.add_column('plans', sa.Column('trial_days', sa.Integer(), nullable=False, server_default='30'))
+    op.add_column('plans', sa.Column('trial_days', sa.Integer(), nullable=False, server_default='365'))
     
     # Create unique index on code
     op.create_index('ix_plans_code', 'plans', ['code'], unique=True)

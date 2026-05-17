@@ -6,12 +6,12 @@ Create Date: 2026-04-11 10:00:00.000000
 
 One-time data migration: resets the trial window for every subscription on
 the 'free' plan that is currently TRIALING or EXPIRED.  This gives all
-non-paid users a fresh 3-month (90-day) trial starting from the moment
+non-paid users a fresh 1-year (365-day) trial starting from the moment
 this migration runs.
 
 Fields updated (real access-control source of truth):
   - status           → 'TRIALING'  (checked by compute_entitlements)
-  - trial_end_at     → NOW() + 90 days  (deadline used by paywall guard)
+  - trial_end_at     → NOW() + 365 days  (deadline used by paywall guard)
   - trial_start_at   → NOW()  (tracking; entitlement logic does not gate on it)
   - cancel_at_period_end → FALSE  (prevents stale cancellation state)
   - updated_at       → NOW()
@@ -29,14 +29,14 @@ depends_on = None
 
 
 def upgrade() -> None:
-    """Reset trial window to 3 months for all free-plan non-paid users."""
+    """Reset trial window to 1 year for all free-plan non-paid users."""
     # 1. Backfill existing subscription records
     op.execute(
         """
         UPDATE subscriptions
         SET status                = 'TRIALING',
             trial_start_at        = NOW(),
-            trial_end_at          = NOW() + INTERVAL '90 days',
+            trial_end_at          = NOW() + INTERVAL '365 days',
             cancel_at_period_end  = FALSE,
             updated_at            = NOW()
         WHERE plan_code = 'free'
@@ -44,11 +44,11 @@ def upgrade() -> None:
         """
     )
 
-    # 2. Update plans table so NEW signups also get 90-day trials
+    # 2. Update plans table so NEW signups also get 365-day trials
     op.execute(
         """
         UPDATE plans
-        SET trial_days = 90
+        SET trial_days = 365
         WHERE code = 'free'
         """
     )

@@ -3,6 +3,13 @@ Allow: /
 
 # Disallow authenticated app routes — these redirect to login and waste crawl budget
 Disallow: /dashboard
+Disallow: /transactions
+Disallow: /zzp/
+Disallow: /offertes
+Disallow: /instellingen
+Disallow: /klanten
+Disallow: /uren
+Disallow: /facturen
 Disallow: /invoices
 Disallow: /expenses
 Disallow: /hours

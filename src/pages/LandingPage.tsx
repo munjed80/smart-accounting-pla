@@ -43,7 +43,7 @@ export const LandingPage = () => {
 
   useSeoMeta({
     title: "Jouw boekhouding, simpel en duidelijk | ZZPers Hub",
-    description: "Altijd weten wat je moet betalen. Facturen, uitgaven, BTW-overzicht en jaaroverzicht op één plek — speciaal voor zzp'ers. Start 90 dagen gratis, daarna €4,99/maand.",
+    description: "Altijd weten wat je moet betalen. Facturen, uitgaven, BTW-overzicht en jaaroverzicht op één plek — speciaal voor zzp'ers. Start 1 jaar gratis, daarna €4,99/maand.",
     canonical: 'https://zzpershub.nl/',
   })
 
@@ -148,7 +148,7 @@ export const LandingPage = () => {
             {/* Premium badge */}
             <div className="hero-badge-premium mb-6 inline-flex items-center gap-2 rounded-full border border-accent/45 bg-accent/10 px-4 py-1.5 text-xs font-semibold text-accent shadow-[inset_0_1px_0_oklch(1_0_0/0.08),0_1px_8px_oklch(0_0_0/0.25)] backdrop-blur-sm">
               <Star className="h-3.5 w-3.5 shrink-0 fill-current opacity-90" />
-              <span>90 dagen gratis uitproberen — geen creditcard vereist</span>
+              <span>1 jaar gratis uitproberen — geen creditcard vereist</span>
             </div>
             {/* Headline */}
             <h1 className="text-4xl font-extrabold leading-[1.15] tracking-tight sm:text-5xl lg:text-6xl lg:tracking-[-0.03em]">
@@ -189,7 +189,7 @@ export const LandingPage = () => {
             </div>
             {/* Helper text */}
             <div className="mt-5 space-y-1.5">
-              <p className="text-sm text-muted-foreground">90 dagen gratis, daarna €4,99 per maand. Geen verplichtingen.</p>
+              <p className="text-sm text-muted-foreground">1 jaar gratis, daarna €4,99 per maand. Geen verplichtingen.</p>
               <p className="flex items-center justify-center gap-1.5 text-sm font-semibold" style={{ color: 'var(--accent2)' }}>
                 <CheckCircle className="h-3.5 w-3.5 shrink-0" />
                 Binnen 60 seconden gestart.
@@ -564,7 +564,7 @@ export const LandingPage = () => {
                 <CardTitle className="text-2xl">Free</CardTitle>
                 <div>
                   <p className="text-3xl font-bold text-primary">Gratis</p>
-                  <p className="text-sm text-muted-foreground">3 maanden gratis</p>
+                  <p className="text-sm text-muted-foreground">1 jaar gratis</p>
                 </div>
               </CardHeader>
               <CardContent>
@@ -579,7 +579,7 @@ export const LandingPage = () => {
               </CardContent>
               <CardFooter>
                 <Button variant="outline" className="w-full" onClick={() => navigateTo('/register')}>
-                  Start gratis maand
+                  Start gratis jaar
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </CardFooter>
@@ -696,7 +696,7 @@ export const LandingPage = () => {
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
           <h2 className="text-2xl font-bold sm:text-4xl lg:text-5xl">Klaar om te beginnen?</h2>
           <p className="mt-4 text-muted-foreground lg:text-lg lg:leading-relaxed">
-            Start vandaag nog met uw gratis proefperiode van 90 dagen. Geen creditcard, geen verplichtingen.
+            Start vandaag nog met uw gratis proefperiode van 1 jaar. Geen creditcard, geen verplichtingen.
           </p>
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Button size="lg" onClick={() => navigateTo('/register')}>

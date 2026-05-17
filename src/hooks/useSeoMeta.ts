@@ -4,27 +4,42 @@ interface SeoMetaOptions {
   title: string
   description: string
   canonical: string
+  image?: string
+  robots?: string
+  type?: string
+}
+
+const upsertMeta = (selector: string, attributes: Record<string, string>) => {
+  let tag = document.querySelector(selector)
+  if (!tag) {
+    tag = document.createElement('meta')
+    document.head.appendChild(tag)
+  }
+
+  Object.entries(attributes).forEach(([key, value]) => {
+    tag.setAttribute(key, value)
+  })
 }
 
 /**
- * Hook that updates document title, meta description, and canonical link per page.
- * Call this at the top of every public-facing page component.
+ * Hook that updates SEO metadata per public-facing page.
+ * Keeps the rendered SPA document aligned with the initial index.html tags.
  */
-export function useSeoMeta({ title, description, canonical }: SeoMetaOptions) {
+export function useSeoMeta({
+  title,
+  description,
+  canonical,
+  image = 'https://zzpershub.nl/og-image.png',
+  robots = 'index, follow',
+  type = 'website',
+}: SeoMetaOptions) {
   useEffect(() => {
-    // Title
+    document.documentElement.setAttribute('lang', 'nl')
     document.title = title
 
-    // Meta description
-    let descTag = document.querySelector('meta[name="description"]')
-    if (!descTag) {
-      descTag = document.createElement('meta')
-      descTag.setAttribute('name', 'description')
-      document.head.appendChild(descTag)
-    }
-    descTag.setAttribute('content', description)
+    upsertMeta('meta[name="description"]', { name: 'description', content: description })
+    upsertMeta('meta[name="robots"]', { name: 'robots', content: robots })
 
-    // Canonical link
     let canonicalTag = document.querySelector('link[rel="canonical"]')
     if (!canonicalTag) {
       canonicalTag = document.createElement('link')
@@ -32,5 +47,18 @@ export function useSeoMeta({ title, description, canonical }: SeoMetaOptions) {
       document.head.appendChild(canonicalTag)
     }
     canonicalTag.setAttribute('href', canonical)
-  }, [title, description, canonical])
+
+    upsertMeta('meta[property="og:type"]', { property: 'og:type', content: type })
+    upsertMeta('meta[property="og:url"]', { property: 'og:url', content: canonical })
+    upsertMeta('meta[property="og:title"]', { property: 'og:title', content: title })
+    upsertMeta('meta[property="og:description"]', { property: 'og:description', content: description })
+    upsertMeta('meta[property="og:image"]', { property: 'og:image', content: image })
+    upsertMeta('meta[property="og:locale"]', { property: 'og:locale', content: 'nl_NL' })
+    upsertMeta('meta[property="og:site_name"]', { property: 'og:site_name', content: 'ZZPers Hub' })
+
+    upsertMeta('meta[name="twitter:card"]', { name: 'twitter:card', content: 'summary_large_image' })
+    upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: title })
+    upsertMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: description })
+    upsertMeta('meta[name="twitter:image"]', { name: 'twitter:image', content: image })
+  }, [title, description, canonical, image, robots, type])
 }

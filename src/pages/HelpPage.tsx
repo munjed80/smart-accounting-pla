@@ -63,7 +63,7 @@ const helpGroups: HelpGroup[] = [
           'Eventueel meerdere administraties beheren als je voor meer dan één onderneming werkt.',
         ],
         keyActions: [
-          '"Start gratis (90 dagen proefperiode)" op de startpagina',
+          '"Start gratis (1 jaar proefperiode)" op de startpagina',
           '"Bedrijfsgegevens" in Instellingen invullen',
         ],
         whenToUse:
@@ -607,7 +607,7 @@ const helpGroups: HelpGroup[] = [
         title: 'Abonnement & betaling',
         purpose: 'Beheer van je abonnement en facturatie.',
         whatYouCanDo: [
-          '90 dagen gratis proefperiode gebruiken zonder creditcard.',
+          '1 jaar gratis proefperiode gebruiken zonder creditcard.',
           'Een abonnement activeren via Instellingen → Abonnement.',
           'Betalen via iDEAL of creditcard.',
           'Je abonnement op elk moment opzeggen — toegang blijft tot het einde van de betaalde periode.',

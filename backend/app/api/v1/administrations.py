@@ -23,6 +23,7 @@ from app.schemas.administration import (
 )
 from app.schemas.document import DocumentResponse
 from app.api.v1.deps import CurrentUser
+from app.services.subscription_service import subscription_service
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,12 @@ async def create_administration(
         len(CHART_OF_ACCOUNTS_TEMPLATE),
         administration.id,
     )
+
+    # New ZZP administrations should immediately receive the configured free
+    # trial subscription. The subscription service uses the free plan's
+    # trial_days value (365 days by default) for trial_end_at.
+    if current_user.role == "zzp":
+        await subscription_service.ensure_trial_started(db, administration.id)
     
     await db.commit()
     await db.refresh(administration)

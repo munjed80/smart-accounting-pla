@@ -122,7 +122,7 @@ export const nl = {
     createAccountCta: "Maak er nu één aan",
     haveAccount: "Al een account?",
     loginCta: "Log hier in",
-    trialInfo: "3 maanden gratis. Daarna vanaf €4,99/maand.",
+    trialInfo: "1 jaar gratis. Daarna vanaf €4,99/maand.",
     showPassword: "Wachtwoord tonen",
     hidePassword: "Wachtwoord verbergen",
     secureLogin: "Beveiligde verbinding",
@@ -2579,7 +2579,7 @@ export const nl = {
     whyDifferent: "Waarom dit systeem anders is",
     
     // CTAs
-    startZzp: "Start gratis maand",
+    startZzp: "Start gratis jaar",
     contactAccountants: "Contact voor accountants",
     
     // Status badges

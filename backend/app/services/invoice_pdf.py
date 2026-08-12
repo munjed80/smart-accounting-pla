@@ -5,53 +5,17 @@ Generates professional PDF invoices using WeasyPrint.
 Uses HTML/CSS templates for flexible layout control.
 """
 import io
-from datetime import datetime
 from typing import Optional
-from decimal import Decimal
 import logging
 
 from app.models.zzp import ZZPInvoice
+from app.services.invoice_formatting import (
+    format_amount,
+    format_date_nl,
+    format_quantity_nl,
+)
 
 logger = logging.getLogger(__name__)
-
-
-def format_amount(cents: int) -> str:
-    """
-    Format cents as EUR currency string in Dutch format.
-    
-    Dutch format uses period (.) as thousand separator and comma (,) as decimal separator.
-    Example: 1234567 cents -> "€ 12.345,67"
-    """
-    euros = Decimal(cents) / 100
-    # Format with US-style thousand separators first
-    formatted = f"{euros:,.2f}"
-    # Convert to Dutch format: swap , and . using a temporary placeholder
-    # Step 1: , (thousands) -> temp
-    # Step 2: . (decimal) -> ,
-    # Step 3: temp -> . (thousands)
-    dutch_formatted = formatted.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
-    return f"\u20ac {dutch_formatted}"
-
-
-def format_date_nl(date_obj) -> str:
-    """Format date in Dutch format (dd-mm-yyyy)."""
-    if isinstance(date_obj, str):
-        date_obj = datetime.fromisoformat(date_obj.replace("Z", "+00:00")).date()
-    return date_obj.strftime("%d-%m-%Y")
-
-
-def format_quantity_nl(qty) -> str:
-    """
-    Format a quantity value in Dutch decimal notation.
-
-    Whole numbers are shown without decimals; fractional values use a comma as
-    the decimal separator, e.g. 28.75 → "28,75".
-    """
-    val = float(qty)
-    if val == int(val):
-        return str(int(val))
-    return f"{val:.2f}".replace(".", ",")
-
 
 def generate_invoice_html(invoice: ZZPInvoice) -> str:
     """

@@ -663,6 +663,19 @@ async def test_customer(test_administration, db_session):
 
 class TestInvoicePdfContent:
     """Tests for invoice PDF content correctness."""
+
+    def test_shared_invoice_formatting_preserves_dutch_output(self):
+        """Shared invoice formatting helpers preserve exact Dutch formatting."""
+        from app.services.invoice_formatting import (
+            format_amount,
+            format_date_nl,
+            format_quantity_nl,
+        )
+
+        assert format_amount(1234567) == "€ 12.345,67"
+        assert format_date_nl("2026-08-12T00:00:00Z") == "12-08-2026"
+        assert format_quantity_nl(28) == "28"
+        assert format_quantity_nl("28.75") == "28,75"
     
     def test_reportlab_pdf_totals_no_html_tags(self):
         """ReportLab PDF totals should not contain escaped HTML tags."""
@@ -859,4 +872,3 @@ class TestInvoicePdfContent:
         # Verify no escaped or inline HTML in values
         assert "<b>Totaal</b>" not in html, "Should not have inline <b> tags in total label"
         assert "&lt;b&gt;" not in html, "Should not have HTML-encoded tags"
-

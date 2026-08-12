@@ -103,7 +103,11 @@ async def test_commitment_overview_alerts_and_suggestions(async_client, auth_hea
     db_session.add(bank_account)
     await db_session.flush()
 
-    for d in [date(2026, 1, 5), date(2026, 2, 5), date(2026, 3, 5)]:
+    for d in [
+        date.today() - timedelta(days=90),
+        date.today() - timedelta(days=60),
+        date.today() - timedelta(days=30),
+    ]:
         db_session.add(BankTransaction(
             administration_id=test_administration.id,
             bank_account_id=bank_account.id,

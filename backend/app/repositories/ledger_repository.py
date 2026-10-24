@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.accounting import ChartOfAccount
+from app.models.administration import Administration
 from app.models.bank import BankTransaction
 from app.models.ledger import JournalEntry, JournalLine, JournalEntryStatus
 from app.models.zzp import ZZPExpense, ZZPInvoice
@@ -53,6 +54,8 @@ class LedgerRepository:
         return result.scalar_one_or_none()
 
     async def get_next_entry_number(self) -> str:
+        # Serialize numbers for this administration through the surrounding transaction.
+        await self.db.execute(select(Administration.id).where(Administration.id == self.administration_id).with_for_update())
         result = await self.db.execute(
             select(func.count(JournalEntry.id))
             .where(JournalEntry.administration_id == self.administration_id)
@@ -67,9 +70,19 @@ class LedgerRepository:
             .where(JournalEntry.source_type == source_type)
             .where(JournalEntry.source_id == source_id)
             .where(JournalEntry.posted.is_(True))
+            .where(JournalEntry.reversed_by_id.is_(None))
             .limit(1)
         )
         return result.scalar_one_or_none() is not None
+
+    async def active_entries(self, source_type: str, source_id: uuid.UUID) -> list[JournalEntry]:
+        result = await self.db.execute(select(JournalEntry)
+            .options(selectinload(JournalEntry.lines))
+            .where(JournalEntry.administration_id == self.administration_id,
+                   JournalEntry.source_type == source_type, JournalEntry.source_id == source_id,
+                   JournalEntry.posted.is_(True), JournalEntry.reversed_by_id.is_(None))
+            .with_for_update())
+        return list(result.scalars().all())
 
     async def create_journal_entry(
         self,

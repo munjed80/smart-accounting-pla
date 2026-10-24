@@ -1,3 +1,5 @@
+import { useServerPagination } from '@/hooks/useServerPagination'
+import { ServerPagination } from './ServerPagination'
 /**
  * ZZP Expenses Page (Uitgaven)
  * 
@@ -702,6 +704,7 @@ export const ZZPExpensesPage = () => {
   const [filterMonth, setFilterMonth] = useState<string>((currentDate.getMonth() + 1).toString())
   const [filterCategory, setFilterCategory] = useState<string>('all')
   
+  const pagination = useServerPagination(JSON.stringify([user?.id, filterYear, filterMonth, filterCategory]))
   // Totals from API
   const [totalCount, setTotalCount] = useState(0)
   const [totalAmountCents, setTotalAmountCents] = useState(0)
@@ -732,6 +735,7 @@ export const ZZPExpensesPage = () => {
 
   // Load expenses from API
   const loadExpenses = useCallback(async () => {
+    const isCurrent = pagination.beginRequest()
     if (!user?.id) return
     
     setIsLoading(true)
@@ -752,18 +756,21 @@ export const ZZPExpensesPage = () => {
         options.category = filterCategory
       }
       
-      const response = await zzpApi.expenses.list(options)
+      const response = await zzpApi.expenses.list({ ...options, limit: pagination.pageSize, offset: pagination.offset })
+      if (!isCurrent()) return
+      pagination.setTotal(response.total)
       setExpenses(response.expenses)
       setTotalCount(response.total)
       setTotalAmountCents(response.total_amount_cents)
       setTotalVatCents(response.total_vat_cents)
     } catch (error) {
+      if (!isCurrent()) return
       console.error('Failed to load expenses:', error)
       toast.error(parseApiError(error))
     } finally {
-      setIsLoading(false)
+      if (isCurrent()) setIsLoading(false)
     }
-  }, [user?.id, filterYear, filterMonth, filterCategory])
+  }, [user?.id, filterYear, filterMonth, filterCategory, pagination.offset, pagination.pageSize])
 
   useEffect(() => {
     loadCategories()
@@ -878,6 +885,7 @@ export const ZZPExpensesPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
+        <ServerPagination {...pagination} loading={isLoading} />
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>

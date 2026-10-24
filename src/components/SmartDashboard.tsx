@@ -37,10 +37,12 @@ export const SmartDashboard = () => {
   const { 
     data: administrations = [], 
     isLoading: isLoadingAdmins,
-    error: adminError 
+    error: adminError,
+    refetch: refetchAdmins,
   } = useQuery<Administration[], Error>({
-    queryKey: ['administrations'],
+    queryKey: ['administrations', user?.id],
     queryFn: () => administrationApi.list(),
+    enabled: !!user?.id,
     refetchOnWindowFocus: false,
   })
 
@@ -52,19 +54,14 @@ export const SmartDashboard = () => {
     error: dashboardError,
     refetch
   } = useQuery<ZZPDashboardResponse | null, Error>({
-    queryKey: ['zzp-dashboard'],
+    queryKey: ['zzp-dashboard', user?.id],
     queryFn: async () => {
       if (administrations.length === 0) {
         return null
       }
-      try {
-        return await zzpApi.dashboard.get()
-      } catch {
-        // Dashboard data may be unavailable for fresh accounts - this is expected
-        return null
-      }
+      return await zzpApi.dashboard.get()
     },
-    enabled: !isLoadingAdmins && administrations.length > 0,
+    enabled: !!user?.id && !isLoadingAdmins && administrations.length > 0,
     refetchOnWindowFocus: false,
   })
 
@@ -72,27 +69,27 @@ export const SmartDashboard = () => {
   const {
     data: monthlyInvoicesData,
     isLoading: isLoadingMonthly,
+    refetch: refetchMonthly,
+    error: monthlyError,
   } = useQuery({
-    queryKey: ['zzp-monthly-invoices', 'last_6_months'],
+    queryKey: ['zzp-monthly-invoices', user?.id, 'last_6_months'],
     queryFn: async () => {
       if (administrations.length === 0) return null
-      try {
-        return await zzpApi.dashboard.monthlyInvoices('last_6_months')
-      } catch {
-        return null
-      }
+      return await zzpApi.dashboard.monthlyInvoices('last_6_months')
     },
-    enabled: !isLoadingAdmins && administrations.length > 0,
+    enabled: !!user?.id && !isLoadingAdmins && administrations.length > 0,
     refetchOnWindowFocus: false,
   })
 
   // Determine loading states
   // Only show full skeleton on initial load when we have no data yet
   const isInitialLoading = isLoadingAdmins || (isLoadingDashboard && !dashboardData && administrations.length > 0)
-  const fetchError = adminError || dashboardError
+  const fetchError = adminError || dashboardError || monthlyError
 
   const handleRefresh = () => {
+    refetchAdmins()
     refetch()
+    refetchMonthly()
   }
 
   const formatCurrency = (cents: number) => {
@@ -306,7 +303,7 @@ export const SmartDashboard = () => {
           {/* BTW Dit Kwartaal Card */}
           <Card 
             className="bg-card/80 backdrop-blur-sm border-2 border-primary/20 cursor-pointer hover:border-primary/40 transition-colors"
-            onClick={() => navigateTo('/zzp/btw-aangifte')}
+            onClick={() => navigateTo('/zzp/belastinghulp/btw')}
           >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">

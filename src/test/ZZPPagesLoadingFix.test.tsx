@@ -1,11 +1,4 @@
-/**
- * ZZP Pages Tests
- *
- * Tests for ZZPLeaseLoansPage and ZZPSubscriptionsPage after the local-first
- * rebuild.  Both pages now use localStorage exclusively — no backend API calls.
- *
- * Also verifies that SmartDashboard does not render SubscriptionBanner.
- */
+/** Regression coverage for server-backed commitments and dashboard isolation. */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
@@ -22,7 +15,9 @@ vi.mock('../lib/api', () => ({
   zzpApi: {
     dashboard: {
       get: vi.fn(),
+      monthlyInvoices: vi.fn().mockResolvedValue({months:[]}),
     },
+    commitments: { list: vi.fn(), create: vi.fn() },
   },
   administrationApi: {
     list: vi.fn(),
@@ -75,109 +70,28 @@ const withQueryClient = (ui: React.ReactElement) => (
 )
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
-describe('ZZPSubscriptionsPage — local-first', () => {
+describe.each([
+  ['subscriptions', ZZPSubscriptionsPage, 'Abonnementen'],
+  ['leases', ZZPLeaseLoansPage, 'Lease & leningen'],
+] as const)('%s — shared server commitments', (_name, Page, title) => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
     vi.mocked(AuthContext.useAuth).mockReturnValue({ user: defaultUser } as any)
-    localStorage.clear()
+    vi.mocked(api.zzpApi.commitments.list).mockResolvedValue({ commitments: [], total: 0 })
   })
-
-  afterEach(() => {
-    localStorage.clear()
+  it('loads business records from the server', async () => {
+    render(withQueryClient(<Page />))
+    expect(screen.getByRole('heading', { name: title })).toBeInTheDocument()
+    expect(await screen.findByText('Nog geen verplichtingen toegevoegd.')).toBeInTheDocument()
+    expect(api.zzpApi.commitments.list).toHaveBeenCalledOnce()
   })
-
-  it('renders without errors and shows the "Nieuw abonnement" button', () => {
-    render(<ZZPSubscriptionsPage />)
-    // Multiple "Nieuw abonnement" buttons may appear (header + empty state)
-    expect(screen.getAllByText('Nieuw abonnement').length).toBeGreaterThan(0)
-  })
-
-  it('shows the page title', () => {
-    render(<ZZPSubscriptionsPage />)
-    expect(screen.getByText(/Abonnementen & Recurring Kosten/)).toBeInTheDocument()
-  })
-
-  it('shows the empty state when no entries exist', () => {
-    render(<ZZPSubscriptionsPage />)
-    expect(screen.getByText(/Nog geen abonnementen/)).toBeInTheDocument()
-  })
-
-  it('does not make any network calls', () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response())
-    render(<ZZPSubscriptionsPage />)
-    expect(fetchSpy).not.toHaveBeenCalled()
-    fetchSpy.mockRestore()
-  })
-
-  it('persists and shows an entry after it is added via localStorage', () => {
-    // Pre-populate localStorage
-    const entry = {
-      id: 'sub-1',
-      name: 'Adobe Creative Cloud',
-      amount_cents: 5999,
-      interval: 'monthly',
-      start_date: '2024-01-01',
-      vat_rate: 21,
-      auto_renew: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-    localStorage.setItem('zzp_recurring_costs_v1', JSON.stringify([entry]))
-
-    render(<ZZPSubscriptionsPage />)
-    expect(screen.getByText('Adobe Creative Cloud')).toBeInTheDocument()
-  })
-})
-
-describe('ZZPLeaseLoansPage — local-first', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    vi.mocked(AuthContext.useAuth).mockReturnValue({ user: defaultUser } as any)
-    localStorage.clear()
-  })
-
-  afterEach(() => {
-    localStorage.clear()
-  })
-
-  it('renders without errors and shows the "Nieuwe lease/lening" button', () => {
-    render(<ZZPLeaseLoansPage />)
-    expect(screen.getByText('Nieuwe lease/lening')).toBeInTheDocument()
-  })
-
-  it('shows the page title', () => {
-    render(<ZZPLeaseLoansPage />)
-    // Multiple elements may contain "Lease & Leningen" text (h1 + h3 "Module")
-    expect(screen.getAllByText(/Lease & Leningen/).length).toBeGreaterThan(0)
-  })
-
-  it('shows the empty state with description when no entries exist', () => {
-    render(<ZZPLeaseLoansPage />)
-    expect(screen.getByText(/Lease & Leningen Module/)).toBeInTheDocument()
-  })
-
-  it('does not make any network calls', () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response())
-    render(<ZZPLeaseLoansPage />)
-    expect(fetchSpy).not.toHaveBeenCalled()
-    fetchSpy.mockRestore()
-  })
-
-  it('persists and shows an entry after it is added via localStorage', () => {
-    const entry = {
-      id: 'loan-1',
-      type: 'loan',
-      name: 'Auto lening',
-      principal_cents: 1500000,
-      start_date: '2024-01-01',
-      payment_interval: 'monthly',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-    localStorage.setItem('zzp_leases_loans_v1', JSON.stringify([entry]))
-
-    render(<ZZPLeaseLoansPage />)
-    expect(screen.getByText('Auto lening')).toBeInTheDocument()
+  it('does not silently show unowned legacy financial records', async () => {
+    localStorage.setItem('zzp_recurring_costs_v1', JSON.stringify([{ id:'old-1', name:'Other account private expense', amount_cents:1000 }]))
+    render(withQueryClient(<Page />))
+    await screen.findByText('Nog geen verplichtingen toegevoegd.')
+    expect(screen.queryByText('Other account private expense')).not.toBeInTheDocument()
+    expect(screen.getByText('Lokale gegevens beoordelen')).toBeInTheDocument()
   })
 })
 
@@ -217,4 +131,60 @@ describe('SmartDashboard — no SubscriptionBanner', () => {
     // The trial banner text that SubscriptionBanner would render must NOT appear
     expect(screen.queryByText(/Proefperiode actief/)).not.toBeInTheDocument()
   })
+})
+
+
+describe('dashboard tenant isolation and outages', () => {
+  const dashboard = (title: string) => ({ invoices: {}, btw: {}, time: {}, actions: [{ id: title, title, severity: 'info', route: '/settings' }] })
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(AuthContext.useAuth).mockReturnValue({ user: defaultUser } as any)
+    vi.mocked(api.administrationApi.list).mockResolvedValue([{ id: 'admin' }] as any)
+    vi.mocked(api.zzpApi.dashboard.monthlyInvoices).mockResolvedValue({ months: [] } as any)
+  })
+  it('does not reuse another user dashboard while its cache is fresh', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60000 } } })
+    vi.mocked(api.zzpApi.dashboard.get).mockResolvedValueOnce(dashboard('Private account A') as any).mockResolvedValueOnce(dashboard('Account B only') as any)
+    const view = render(<QueryClientProvider client={client}><SmartDashboard /></QueryClientProvider>)
+    await screen.findByText('Private account A')
+    vi.mocked(AuthContext.useAuth).mockReturnValue({ user: { ...defaultUser, id: 'u2' } } as any)
+    view.rerender(<QueryClientProvider client={client}><SmartDashboard /></QueryClientProvider>)
+    expect(screen.queryByText('Private account A')).not.toBeInTheDocument()
+    await screen.findByText('Account B only')
+    expect(api.zzpApi.dashboard.get).toHaveBeenCalledTimes(2)
+  })
+  it('shows a dashboard outage and retries the failed request', async () => {
+    vi.mocked(api.zzpApi.dashboard.get).mockRejectedValueOnce(new Error('Dashboard unavailable')).mockResolvedValueOnce(dashboard('Recovered') as any)
+    render(withQueryClient(<SmartDashboard />))
+    await screen.findByText('Dashboard unavailable')
+    fireEvent.click(screen.getByRole('button', { name: 'common.retry' }))
+    await screen.findByText('Recovered')
+  })
+  it('shows a monthly-summary outage instead of an empty financial summary', async () => {
+    vi.mocked(api.zzpApi.dashboard.get).mockResolvedValue(dashboard('Account A') as any)
+    vi.mocked(api.zzpApi.dashboard.monthlyInvoices).mockRejectedValue(new Error('Monthly summary unavailable'))
+    render(withQueryClient(<SmartDashboard />))
+    await screen.findByText('Monthly summary unavailable')
+  })
+})
+
+
+it('imports local records only after selecting them and confirming ownership', async () => {
+  localStorage.clear()
+  vi.mocked(AuthContext.useAuth).mockReturnValue({ user: defaultUser } as any)
+  vi.mocked(api.zzpApi.commitments.list).mockResolvedValue({ commitments: [], total: 0 })
+  vi.mocked(api.zzpApi.commitments.create).mockResolvedValue({ id: 'imported' } as any)
+  localStorage.setItem('zzp_recurring_costs_v1', JSON.stringify([{ id: 'old-1', name: 'Reviewed record', amount_cents: 1200, interval: 'quarterly', start_date: '2026-01-01' }]))
+  render(withQueryClient(<ZZPSubscriptionsPage />))
+  expect(screen.queryByText(/Reviewed record/)).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Lokale gegevens beoordelen' }))
+  expect(api.zzpApi.commitments.create).not.toHaveBeenCalled()
+  const checks = screen.getAllByRole('checkbox')
+  fireEvent.click(checks[0])
+  const button = screen.getByRole('button', { name: '1 verplichting(en) importeren' })
+  expect(button).toBeDisabled()
+  fireEvent.click(checks[1])
+  fireEvent.click(button)
+  await waitFor(() => expect(api.zzpApi.commitments.create).toHaveBeenCalledWith(expect.objectContaining({ legacy_source_key: 'recurring:old-1', recurring_frequency: 'quarterly' })))
+  expect(localStorage.getItem('zzp_recurring_costs_v1')).toContain('Reviewed record')
 })

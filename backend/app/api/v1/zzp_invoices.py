@@ -12,8 +12,8 @@ from typing import Annotated, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import Response, JSONResponse
-from sqlalchemy import select, func, and_
+from fastapi.responses import Response
+from sqlalchemy import and_, select, func, and_, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -48,8 +48,7 @@ from app.api.v1._zzp_invoices_helpers import (
     get_user_administration,
     invoice_to_response,
 )
-from app.repositories.ledger_repository import LedgerRepository
-from app.services.ledger_service import LedgerPostingService, LedgerPostingError
+from app.services.zzp_integrity import require_open_dates, sync_invoice
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -60,10 +59,15 @@ logger = logging.getLogger(__name__)
 async def list_invoices(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    limit: Optional[int] = Query(None, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    q: Optional[str] = Query(None, max_length=200),
+    min_cents: Optional[int] = Query(None, ge=0),
+    max_cents: Optional[int] = Query(None, ge=0),
     status: Optional[str] = Query(None, pattern=r'^(draft|sent|paid|overdue|cancelled)$'),
     customer_id: Optional[UUID] = Query(None),
-    from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
-    to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    from_date: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
 ):
     """
     List all invoices for the current user's administration.
@@ -79,24 +83,44 @@ async def list_invoices(
         .where(ZZPInvoice.administration_id == administration.id)
     )
     
+    if q:
+        term = f'%{q}%'
+        query = query.where(or_(ZZPInvoice.invoice_number.ilike(term), ZZPInvoice.customer_name.ilike(term), ZZPInvoice.notes.ilike(term), ZZPInvoice.lines.any(ZZPInvoiceLine.description.ilike(term))))
+    if min_cents is not None: query = query.where(ZZPInvoice.total_cents >= min_cents)
+    if max_cents is not None: query = query.where(ZZPInvoice.total_cents <= max_cents)
     # Apply filters
     if status:
-        query = query.where(ZZPInvoice.status == status)
+        query = query.where(or_(ZZPInvoice.status == 'overdue', and_(ZZPInvoice.status == 'sent', ZZPInvoice.due_date < date.today())) if status == 'overdue' else ZZPInvoice.status == status)
     if customer_id:
         query = query.where(ZZPInvoice.customer_id == customer_id)
     if from_date:
-        query = query.where(ZZPInvoice.issue_date >= date.fromisoformat(from_date))
+        query = query.where(ZZPInvoice.issue_date >= from_date)
     if to_date:
-        query = query.where(ZZPInvoice.issue_date <= date.fromisoformat(to_date))
-    
-    query = query.order_by(ZZPInvoice.issue_date.desc(), ZZPInvoice.invoice_number.desc())
-    
+        query = query.where(ZZPInvoice.issue_date <= to_date)
+
+    query = query.order_by(ZZPInvoice.issue_date.desc(), ZZPInvoice.invoice_number.desc(), ZZPInvoice.id)
+
+    rows = query.order_by(None).subquery()
+    stats = dict((await db.execute(select(
+        func.count().label('total'),
+        func.coalesce(func.sum(case((rows.c.status == 'draft', 1), else_=0)), 0).label('draft'),
+        func.coalesce(func.sum(case((rows.c.status == 'sent', 1), else_=0)), 0).label('sent'),
+        func.coalesce(func.sum(case((rows.c.status == 'paid', 1), else_=0)), 0).label('paid'),
+        func.coalesce(func.sum(case((rows.c.status == 'overdue', 1), else_=0)), 0).label('overdue'),
+        func.coalesce(func.sum(case((rows.c.status == 'cancelled', 1), else_=0)), 0).label('cancelled'),
+        func.coalesce(func.sum(rows.c.total_cents), 0).label('totalAmount'),
+        func.coalesce(func.sum(case((rows.c.status == 'paid', rows.c.total_cents), else_=0)), 0).label('paidAmount'),
+        func.coalesce(func.sum(case((rows.c.status.in_(['sent','overdue']), rows.c.total_cents), else_=0)), 0).label('openAmount')
+    ))).mappings().one())
+    total = stats['total']
+    if limit is not None: query = query.limit(limit).offset(offset)
     result = await db.execute(query)
     invoices = result.scalars().all()
     
     return InvoiceListResponse(
         invoices=[invoice_to_response(inv) for inv in invoices],
-        total=len(invoices)
+        stats=stats,
+        total=total
     )
 
 
@@ -209,14 +233,9 @@ async def create_invoice(
     invoice.vat_total_cents = vat_total
     invoice.total_cents = subtotal + vat_total
     
+    await db.flush()
+    await sync_invoice(db, administration.id, invoice)
     await db.commit()
-
-    try:
-        ledger_service = LedgerPostingService(LedgerRepository(db, administration.id))
-        await ledger_service.post_invoice(invoice.id)
-        await db.commit()
-    except LedgerPostingError as e:
-        logger.warning(f"Invoice ledger posting skipped for {invoice.id}: {e}")
     
     # Reload with lines
     result = await db.execute(
@@ -227,6 +246,16 @@ async def create_invoice(
     invoice = result.scalar_one()
     
     return invoice_to_response(invoice)
+
+
+@router.get('/invoice-numbers')
+async def get_invoice_numbers(current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)], ids: List[UUID] = Query(..., max_length=100)):
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
+    rows = (await db.execute(select(ZZPInvoice.id, ZZPInvoice.invoice_number).where(
+        ZZPInvoice.administration_id == administration.id, ZZPInvoice.id.in_(ids),
+    ))).all()
+    return {'numbers': {str(id): number for id, number in rows}}
 
 
 @router.get("/invoices/{invoice_id}", response_model=InvoiceResponse)
@@ -283,7 +312,7 @@ async def update_invoice(
         .where(
             ZZPInvoice.id == invoice_id,
             ZZPInvoice.administration_id == administration.id
-        )
+        ).with_for_update()
     )
     invoice = result.scalar_one_or_none()
     
@@ -299,6 +328,8 @@ async def update_invoice(
             detail={"code": "INVOICE_NOT_EDITABLE", "message": "Alleen concept of geannuleerde facturen kunnen worden bewerkt."}
         )
 
+    await require_open_dates(db, administration.id, invoice.issue_date,
+        date.fromisoformat(invoice_in.issue_date) if invoice_in.issue_date else None)
     # Auto-restore cancelled invoices to draft before applying changes
     if invoice.status == InvoiceStatus.CANCELLED.value:
         invoice.status = InvoiceStatus.DRAFT.value
@@ -390,6 +421,8 @@ async def update_invoice(
         invoice.vat_total_cents = vat_total
         invoice.total_cents = subtotal + vat_total
     
+    await db.flush()
+    await sync_invoice(db, administration.id, invoice)
     await db.commit()
     
     # Reload with lines
@@ -428,7 +461,7 @@ async def update_invoice_status(
         .where(
             ZZPInvoice.id == invoice_id,
             ZZPInvoice.administration_id == administration.id
-        )
+        ).with_for_update()
     )
     invoice = result.scalar_one_or_none()
     
@@ -438,6 +471,9 @@ async def update_invoice_status(
             detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
         )
     
+    await require_open_dates(db, administration.id, invoice.issue_date,
+        invoice.paid_at.date() if invoice.paid_at else None,
+        date.today() if status_in.status == 'paid' else None)
     current_status = invoice.status
     new_status = status_in.status
     
@@ -468,19 +504,15 @@ async def update_invoice_status(
     if new_status == InvoiceStatus.PAID.value:
         # Mark as paid: set paid_at to current time (timezone-aware)
         invoice.paid_at = datetime.now(timezone.utc)
+        invoice.amount_paid_cents = invoice.total_cents
     elif current_status == InvoiceStatus.PAID.value and new_status != InvoiceStatus.PAID.value:
         # Mark as unpaid (transitioning from paid to another status): clear paid_at
         invoice.paid_at = None
+        invoice.amount_paid_cents = 0
     
+    await db.flush()
+    await sync_invoice(db, administration.id, invoice)
     await db.commit()
-
-    if new_status == InvoiceStatus.PAID.value:
-        try:
-            ledger_service = LedgerPostingService(LedgerRepository(db, administration.id))
-            await ledger_service.post_invoice_payment(invoice.id)
-            await db.commit()
-        except LedgerPostingError as e:
-            logger.warning(f"Invoice payment posting skipped for {invoice.id}: {e}")
 
     # Refresh invoice with lines eagerly loaded
     result = await db.execute(
@@ -512,7 +544,7 @@ async def delete_invoice(
         select(ZZPInvoice).where(
             ZZPInvoice.id == invoice_id,
             ZZPInvoice.administration_id == administration.id
-        )
+        ).with_for_update()
     )
     invoice = result.scalar_one_or_none()
     
@@ -528,6 +560,8 @@ async def delete_invoice(
             detail={"code": "INVOICE_NOT_DELETABLE", "message": "Alleen concept- en geannuleerde facturen kunnen worden verwijderd."}
         )
     
+    await require_open_dates(db, administration.id, invoice.issue_date, invoice.paid_at.date() if invoice.paid_at else None)
+    await sync_invoice(db, administration.id, invoice, delete=True)
     await db.delete(invoice)
     await db.commit()
     
@@ -692,7 +726,7 @@ async def send_invoice(
         .where(
             ZZPInvoice.id == invoice_id,
             ZZPInvoice.administration_id == administration.id
-        )
+        ).with_for_update()
     )
     invoice = result.scalar_one_or_none()
     
@@ -711,6 +745,18 @@ async def send_invoice(
                 "message": "Klant heeft geen e-mailadres. Voeg een e-mailadres toe aan de klant om de factuur te verzenden."
             }
         )
+
+    if invoice.status == InvoiceStatus.CANCELLED.value:
+        raise HTTPException(409, detail={'code': 'INVOICE_CANCELLED', 'message': 'Een geannuleerde factuur kan niet worden verzonden.'})
+    if not email_service.client:
+        raise HTTPException(503, detail={'code': 'EMAIL_NOT_CONFIGURED', 'message': 'E-mailservice is niet geconfigureerd. De factuur is niet verzonden.'})
+    # Validate and prepare the posting before contacting the email provider.
+    # Resending a paid/overdue invoice must preserve its financial state.
+    await require_open_dates(db, administration.id, invoice.issue_date)
+    if invoice.status == InvoiceStatus.DRAFT.value:
+        invoice.status = InvoiceStatus.SENT.value
+    await db.flush()
+    await sync_invoice(db, administration.id, invoice)
     
     customer_email = invoice.customer.email
     customer_name = invoice.customer.name
@@ -870,32 +916,6 @@ info@zzpershub.nl
 """
 
         # Send via Resend
-        if not email_service.client:
-            # Graceful degradation: update status without sending email
-            logger.warning(
-                "Email service not configured, updating invoice status without sending email",
-                extra={
-                    "event": "invoice_email_skipped",
-                    "invoice_id": str(invoice_id),
-                    "reason": "RESEND_API_KEY not configured",
-                }
-            )
-            invoice.status = InvoiceStatus.SENT.value
-            await db.commit()
-
-            # Reload invoice with lines eagerly loaded
-            result = await db.execute(
-                select(ZZPInvoice)
-                .options(selectinload(ZZPInvoice.lines))
-                .where(ZZPInvoice.id == invoice.id)
-            )
-            invoice = result.scalar_one()
-
-            resp = invoice_to_response(invoice)
-            resp_dict = resp.model_dump(mode="json")
-            resp_dict["_email_status"] = "not_configured"
-            return JSONResponse(content=resp_dict)
-
         # Encode PDF as base64 for attachment
         pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
 
@@ -969,8 +989,6 @@ info@zzpershub.nl
             }
         )
     
-    # Update invoice status to 'sent'
-    invoice.status = InvoiceStatus.SENT.value
     await db.commit()
     
     # Reload invoice with lines eagerly loaded

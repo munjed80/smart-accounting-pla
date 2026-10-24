@@ -5,12 +5,15 @@ from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
 
 CommitmentTypeLiteral = Literal["lease", "loan", "subscription"]
-RecurringFrequencyLiteral = Literal["monthly", "yearly"]
+RecurringFrequencyLiteral = Literal["monthly", "quarterly", "yearly"]
 EndDateStatusLiteral = Literal["active", "ending_soon", "ended", "unknown"]
 CommitmentStatusLiteral = Literal["active", "paused", "ended"]
 
 
 class CommitmentCreate(BaseModel):
+    legacy_source_key: Optional[str] = Field(None, max_length=150, pattern=r'^(recurring|lease_loan):[a-zA-Z0-9_-]+$')
+    notes: Optional[str] = Field(None, max_length=10000)
+    remaining_balance_override_cents: Optional[int] = Field(None, ge=0)
     type: CommitmentTypeLiteral
     name: str = Field(..., min_length=2, max_length=255)
     amount_cents: int = Field(..., gt=0)
@@ -54,6 +57,8 @@ class CommitmentCreate(BaseModel):
 
 
 class CommitmentUpdate(BaseModel):
+    notes: Optional[str] = Field(None, max_length=10000)
+    remaining_balance_override_cents: Optional[int] = Field(None, ge=0)
     type: Optional[CommitmentTypeLiteral] = None
     name: Optional[str] = Field(None, min_length=2, max_length=255)
     amount_cents: Optional[int] = Field(None, gt=0)
@@ -83,6 +88,9 @@ class CommitmentUpdate(BaseModel):
 
 
 class CommitmentResponse(BaseModel):
+    legacy_source_key: Optional[str] = None
+    notes: Optional[str] = None
+    remaining_balance_override_cents: Optional[int] = None
     id: UUID
     administration_id: UUID
     type: CommitmentTypeLiteral
@@ -151,6 +159,10 @@ class CommitmentAlert(BaseModel):
 
 
 class CommitmentOverviewResponse(BaseModel):
+    average_monthly_receipts_cents: int = 0
+    cashflow_from: Optional[date] = None
+    cashflow_to: Optional[date] = None
+    linked_expense_counts: dict[str, int] = Field(default_factory=dict)
     monthly_total_cents: int
     upcoming_total_cents: int
     warning_count: int

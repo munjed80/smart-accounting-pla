@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Date, DateTime, Enum as SQLEnum, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import Date, DateTime, Enum as SQLEnum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,6 +20,7 @@ class CommitmentType(str, enum.Enum):
 class RecurringFrequency(str, enum.Enum):
     MONTHLY = "monthly"
     YEARLY = "yearly"
+    QUARTERLY = "quarterly"
 
 
 class CommitmentStatus(str, enum.Enum):
@@ -30,12 +31,16 @@ class CommitmentStatus(str, enum.Enum):
 
 class FinancialCommitment(Base):
     __tablename__ = "financial_commitments"
+    __table_args__ = (UniqueConstraint('administration_id', 'legacy_source_key', name='uq_commitment_legacy_source'),)
+    legacy_source_key: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    remaining_balance_override_cents: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     administration_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("administrations.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    type: Mapped[CommitmentType] = mapped_column(SQLEnum(CommitmentType), nullable=False, index=True)
+    type: Mapped[CommitmentType] = mapped_column(SQLEnum(CommitmentType, values_callable=lambda enum: [item.value for item in enum]), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
 
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -53,9 +58,9 @@ class FinancialCommitment(Base):
     auto_renew: Mapped[bool] = mapped_column(nullable=False, default=True, server_default="true")
 
     interest_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 3), nullable=True)
-    recurring_frequency: Mapped[Optional[RecurringFrequency]] = mapped_column(SQLEnum(RecurringFrequency), nullable=True)
+    recurring_frequency: Mapped[Optional[RecurringFrequency]] = mapped_column(SQLEnum(RecurringFrequency, values_callable=lambda enum: [item.value for item in enum]), nullable=True)
     status: Mapped[CommitmentStatus] = mapped_column(
-        SQLEnum(CommitmentStatus), nullable=False, default=CommitmentStatus.ACTIVE, server_default=CommitmentStatus.ACTIVE.value
+        SQLEnum(CommitmentStatus, values_callable=lambda enum: [item.value for item in enum]), nullable=False, default=CommitmentStatus.ACTIVE, server_default=CommitmentStatus.ACTIVE.value
     )
     btw_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
     vat_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)

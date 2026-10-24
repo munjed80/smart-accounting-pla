@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import axios from 'axios'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { zzpApi, ZZPCommitment, ZZPCommitmentOverview, ZZPExpense, ZZPInvoice } from '@/lib/api'
+import { zzpApi, ZZPCommitment } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
 import { navigateTo } from '@/lib/navigation'
 import { toast } from 'sonner'
 import { CommitmentExpenseDialog } from '@/components/CommitmentExpenseDialog'
-import { createDemoCommitments } from '@/lib/commitments'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '@/lib/AuthContext'
 
 const eur = (cents: number) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(cents / 100)
 const todayStr = () => new Date().toISOString().slice(0, 10)
@@ -18,52 +19,31 @@ const isExpired = (item: ZZPCommitment) => item.status === 'ended' || item.end_d
 const isPaused = (item: ZZPCommitment) => item.status === 'paused'
 const errorWithStatus = (error: unknown) => axios.isAxiosError(error) && error.response?.status ? `${error.response.status}: ${parseApiError(error)}` : parseApiError(error)
 
-const toMonthKey = (date: string) => date.slice(0, 7)
-const getThreeMonthsAgo = () => {
-  const date = new Date()
-  date.setMonth(date.getMonth() - 3)
-  return date.toISOString().slice(0, 10)
-}
-
+const monthlyAmount = (item: ZZPCommitment) => Math.round((item.monthly_payment_cents || item.amount_cents) / (item.recurring_frequency === 'yearly' ? 12 : item.recurring_frequency === 'quarterly' ? 3 : 1))
 const paymentFrequency = (item: ZZPCommitment) => item.recurring_frequency || 'monthly'
 const estimateYearlyVatReclaim = (item: ZZPCommitment) => {
   const rate = item.vat_rate ?? item.btw_rate ?? 0
   if (![0, 9, 21].includes(rate) || rate <= 0) return 0
-  const yearlyGross = paymentFrequency(item) === 'yearly' ? item.amount_cents : (item.monthly_payment_cents || item.amount_cents) * 12
+  const yearlyGross = monthlyAmount(item) * 12
   return Math.round(yearlyGross * (rate / 100) / (1 + rate / 100))
 }
 
 export const ZZPCommitmentsOverviewPage = () => {
   const [typeFilter, setTypeFilter] = useState<'all' | 'lease' | 'loan' | 'subscription'>('all')
-  const [frequencyFilter, setFrequencyFilter] = useState<'all' | 'monthly' | 'yearly'>('all')
+  const [frequencyFilter, setFrequencyFilter] = useState<'all' | 'monthly' | 'quarterly' | 'yearly'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused' | 'ended'>('all')
-  const [commitments, setCommitments] = useState<ZZPCommitment[]>([])
-  const [allCommitments, setAllCommitments] = useState<ZZPCommitment[]>([])
-  const [overview, setOverview] = useState<ZZPCommitmentOverview | null>(null)
-  const [paidInvoices, setPaidInvoices] = useState<ZZPInvoice[]>([])
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+  const listQuery = useQuery({ queryKey: ['zzp-commitments', user?.id], queryFn: () => zzpApi.commitments.list(), enabled: !!user?.id })
+  const summaryQuery = useQuery({ queryKey: ['zzp-commitments-overview', user?.id], queryFn: () => zzpApi.commitments.overview(), enabled: !!user?.id })
+  const commitments = listQuery.data?.commitments ?? []
+  const overview = summaryQuery.data
   const [selectedExpenseCommitment, setSelectedExpenseCommitment] = useState<ZZPCommitment | null>(null)
   const [isCreatingExpense, setIsCreatingExpense] = useState(false)
-  const [expenses, setExpenses] = useState<ZZPExpense[]>([])
-
-  const load = async () => {
-    try {
-      const [allListResp, overviewResp, paidInvoiceResp, expenseResp] = await Promise.all([
-        zzpApi.commitments.list(),
-        zzpApi.commitments.overview(),
-        zzpApi.invoices.list({ status: 'paid', from_date: getThreeMonthsAgo() }),
-        zzpApi.expenses.list(),
-      ])
-      setCommitments(allListResp.commitments)
-      setAllCommitments(allListResp.commitments)
-      setOverview(overviewResp)
-      setPaidInvoices(paidInvoiceResp.invoices)
-      setExpenses(expenseResp.expenses)
-    } catch (error) {
-      toast.error(errorWithStatus(error))
-    }
-  }
-
-  useEffect(() => { load() }, [])
+  const load = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['zzp-commitments', user?.id] }),
+    queryClient.invalidateQueries({ queryKey: ['zzp-commitments-overview', user?.id] }),
+  ])
 
   const filteredCommitments = useMemo(() => commitments.filter(item => {
     if (typeFilter !== 'all' && item.type !== typeFilter) return false
@@ -78,41 +58,14 @@ export const ZZPCommitmentsOverviewPage = () => {
   }), [commitments, typeFilter, frequencyFilter, statusFilter])
 
 
-  const expensesByCommitmentId = useMemo(() => expenses.reduce<Record<string, ZZPExpense[]>>((acc, expense) => {
-    if (!expense.commitment_id) return acc
-    acc[expense.commitment_id] = [...(acc[expense.commitment_id] || []), expense]
-    return acc
-  }, {}), [expenses])
-
   const sortedUpcoming = useMemo(() => [...filteredCommitments].sort((a, b) => (a.next_due_date || '9999-12-31').localeCompare(b.next_due_date || '9999-12-31')), [filteredCommitments])
-  const top5Largest = useMemo(
-    () => [...allCommitments]
-      .sort((a, b) => (b.monthly_payment_cents || b.amount_cents) - (a.monthly_payment_cents || a.amount_cents))
-      .slice(0, 5),
-    [allCommitments],
-  )
-
-  const cashflowStress = useMemo(() => {
-    const monthlyObligationsCents = allCommitments.reduce((total, item) => {
-      if (isPaused(item) || isExpired(item)) return total
-      if (item.type === 'subscription' && item.recurring_frequency === 'yearly') return total + Math.round(item.amount_cents / 12)
-      return total + (item.monthly_payment_cents || item.amount_cents)
-    }, 0)
-
-    const revenueByMonth = paidInvoices.reduce<Record<string, number>>((acc, invoice) => {
-      const monthKey = toMonthKey(invoice.paid_at || invoice.issue_date)
-      acc[monthKey] = (acc[monthKey] || 0) + invoice.total_cents
-      return acc
-    }, {})
-
-    const paidMonths = Object.keys(revenueByMonth).sort()
-    const avgMonthlyIncomeCents = paidMonths.length > 0
-      ? Math.round(Object.values(revenueByMonth).reduce((sum, val) => sum + val, 0) / paidMonths.length)
-      : 0
-
-    const ratio = avgMonthlyIncomeCents > 0 ? monthlyObligationsCents / avgMonthlyIncomeCents : null
-    return { avgMonthlyIncomeCents, monthlyObligationsCents, ratio, hasEnoughData: paidMonths.length >= 2 }
-  }, [allCommitments, paidInvoices])
+  const top5Largest = useMemo(() => [...commitments].filter(item => !isPaused(item) && !isExpired(item)).sort((a, b) => monthlyAmount(b) - monthlyAmount(a)).slice(0, 5), [commitments])
+  const cashflowStress = {
+    avgMonthlyIncomeCents: overview?.average_monthly_receipts_cents ?? 0,
+    monthlyObligationsCents: overview?.monthly_total_cents ?? 0,
+    ratio: overview?.average_monthly_receipts_cents ? overview.monthly_total_cents / overview.average_monthly_receipts_cents : null,
+    hasEnoughData: (overview?.average_monthly_receipts_cents ?? 0) > 0,
+  }
 
   const createExpenseFromCommitment = async (payload: { expense_date: string; amount_cents: number; vat_rate: number; description: string; notes?: string }) => {
     if (!selectedExpenseCommitment) return
@@ -135,18 +88,10 @@ export const ZZPCommitmentsOverviewPage = () => {
     }
   }
 
-  const addExamples = async () => {
-    try {
-      await createDemoCommitments(todayStr())
-      toast.success('Voorbeelden toegevoegd')
-      load()
-    } catch (error) {
-      toast.error(errorWithStatus(error))
-    }
-  }
-
   return (
     <div className="space-y-4 pb-4">
+      {(listQuery.isError || summaryQuery.isError) && <Alert variant="destructive"><AlertDescription>Verplichtingen laden mislukt. <Button variant="outline" onClick={() => void load()}>Opnieuw proberen</Button></AlertDescription></Alert>}
+      {(listQuery.isLoading || summaryQuery.isLoading) && <p role="status">Verplichtingen laden…</p>}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl sm:text-2xl font-semibold">Overzicht vaste verplichtingen</h1>
       </div>
@@ -156,9 +101,9 @@ export const ZZPCommitmentsOverviewPage = () => {
           <SelectTrigger><SelectValue placeholder='Type' /></SelectTrigger>
           <SelectContent><SelectItem value='all'>Alle typen</SelectItem><SelectItem value='lease'>Lease</SelectItem><SelectItem value='loan'>Lening</SelectItem><SelectItem value='subscription'>Abonnement</SelectItem></SelectContent>
         </Select>
-        <Select value={frequencyFilter} onValueChange={(v: 'all' | 'monthly' | 'yearly') => setFrequencyFilter(v)}>
+        <Select value={frequencyFilter} onValueChange={(v: 'all' | 'monthly' | 'quarterly' | 'yearly') => setFrequencyFilter(v)}>
           <SelectTrigger><SelectValue placeholder='Frequentie' /></SelectTrigger>
-          <SelectContent><SelectItem value='all'>Alle frequenties</SelectItem><SelectItem value='monthly'>Maandelijks</SelectItem><SelectItem value='yearly'>Jaarlijks</SelectItem></SelectContent>
+          <SelectContent><SelectItem value='all'>Alle frequenties</SelectItem><SelectItem value='monthly'>Maandelijks</SelectItem><SelectItem value='quarterly'>Per kwartaal</SelectItem><SelectItem value='yearly'>Jaarlijks</SelectItem></SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={(v: 'all' | 'active' | 'paused' | 'ended') => setStatusFilter(v)}>
           <SelectTrigger><SelectValue placeholder='Status' /></SelectTrigger>
@@ -193,14 +138,14 @@ export const ZZPCommitmentsOverviewPage = () => {
           <div key={item.id} className='rounded border p-2 text-sm grid grid-cols-1 sm:grid-cols-4 gap-1'>
             <span className='font-medium'>{item.name}</span>
             <span className='text-muted-foreground'>{item.type}</span>
-            <span>{eur(item.monthly_payment_cents || item.amount_cents)}</span>
+            <span>{eur(monthlyAmount(item))} / maand</span>
             <span className='text-muted-foreground'>Volgende: {item.next_due_date || '-'}</span>
           </div>
         ))}
       </CardContent></Card>
 
       <Card><CardHeader><CardTitle>Aankomende verplichtingen</CardTitle></CardHeader>
-        {filteredCommitments.length === 0 && <CardContent><Button variant="outline" onClick={addExamples}>Voeg 3 voorbeelden toe</Button></CardContent>}
+        {filteredCommitments.length === 0 && <CardContent><p>Geen verplichtingen voor deze filters. <Button variant="outline" onClick={() => navigateTo("/zzp/verplichtingen/abonnementen")}>Abonnement toevoegen</Button></p></CardContent>}
         <CardContent className="space-y-2">
           {sortedUpcoming.map(item => (
             <div id={`commitment-${item.id}`} key={item.id} className="rounded-md border p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -211,9 +156,8 @@ export const ZZPCommitmentsOverviewPage = () => {
                   {isPaused(item) ? <Badge variant="secondary">Gepauzeerd</Badge> : isExpired(item) ? <Badge variant="secondary">Beëindigd</Badge> : null}
                 </div>
                 <p className='text-xs text-muted-foreground mt-1'>Laatste boeking: {item.last_booked_date || '-'}</p>
-                <p className='text-xs text-muted-foreground'>Gekoppelde uitgaven: {(expensesByCommitmentId[item.id] || []).length}</p>
+                <p className='text-xs text-muted-foreground'>Gekoppelde uitgaven: {overview?.linked_expense_counts?.[item.id] ?? 0}</p>
                 <p className='text-xs text-muted-foreground'>Geschatte BTW-teruggave: {eur(estimateYearlyVatReclaim(item))}</p>
-                {(expensesByCommitmentId[item.id] || []).slice(0, 2).map(exp => <p key={exp.id} className='text-xs text-muted-foreground'>• {exp.expense_date}: {eur(exp.amount_cents)}</p>) }
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium">{eur(item.monthly_payment_cents || item.amount_cents)}</span>
@@ -225,7 +169,7 @@ export const ZZPCommitmentsOverviewPage = () => {
         </CardContent>
       </Card>
 
-      <Card><CardHeader><CardTitle>Cashflow stress</CardTitle></CardHeader><CardContent className='space-y-2'>
+      <Card><CardHeader><CardTitle>Cashflow stress</CardTitle></CardHeader><CardContent className='space-y-2'><p className='text-xs text-muted-foreground'>Gemiddelde ontvangen factuurbedragen over de drie volledige maanden ({overview?.cashflow_from} – {overview?.cashflow_to}), inclusief maanden zonder ontvangsten. Dit is geen nettowinst.</p>
         {!cashflowStress.hasEnoughData ? <p className='text-sm text-muted-foreground'>Nog niet genoeg betaalde facturen om een betrouwbare stressscore te berekenen.</p> : <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'><div><p className='text-xs text-muted-foreground'>Gem. maandinkomsten</p><p className='font-medium'>{eur(cashflowStress.avgMonthlyIncomeCents)}</p></div><div><p className='text-xs text-muted-foreground'>Maandelijkse verplichtingen</p><p className='font-medium'>{eur(cashflowStress.monthlyObligationsCents)}</p></div><div><p className='text-xs text-muted-foreground'>Ratio</p><p className='font-medium'>{((cashflowStress.ratio || 0) * 100).toFixed(1)}%</p></div></div>}
       </CardContent></Card>
 

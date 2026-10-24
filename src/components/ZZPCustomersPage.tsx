@@ -1,3 +1,5 @@
+import { useServerPagination } from '@/hooks/useServerPagination'
+import { ServerPagination } from './ServerPagination'
 /**
  * ZZP Customers Page
  * 
@@ -1075,21 +1077,28 @@ export const ZZPCustomersPage = () => {
   const [newlyCreatedCustomer, setNewlyCreatedCustomer] = useState<ZZPCustomer | undefined>()
   const [showCreateInvoiceCta, setShowCreateInvoiceCta] = useState(false)
 
+  const pagination = useServerPagination(JSON.stringify([user?.id, statusFilter, debouncedSearch]))
+  const [serverStats, setServerStats] = useState<Awaited<ReturnType<typeof zzpApi.customers.list>>['stats']>()
   // Load customers from API
   const loadCustomers = useCallback(async () => {
+    const isCurrent = pagination.beginRequest()
     if (!user?.id) return
     
     setIsLoading(true)
     try {
-      const response = await zzpApi.customers.list()
+      const response = await zzpApi.customers.list({ limit: pagination.pageSize, offset: pagination.offset, search: debouncedSearch || undefined, status: statusFilter === 'all' ? undefined : statusFilter })
+      if (!isCurrent()) return
+      pagination.setTotal(response.total)
+      setServerStats(response.stats)
       setCustomers(response.customers)
     } catch (error) {
+      if (!isCurrent()) return
       console.error('Failed to load customers:', error)
       toast.error(parseApiError(error))
     } finally {
-      setIsLoading(false)
+      if (isCurrent()) setIsLoading(false)
     }
-  }, [user?.id])
+  }, [user?.id, pagination.offset, pagination.pageSize, debouncedSearch, statusFilter])
 
   useEffect(() => {
     loadCustomers()
@@ -1097,11 +1106,12 @@ export const ZZPCustomersPage = () => {
 
   // Calculate stats
   const stats = useMemo(() => {
+    if (serverStats) return serverStats
     const total = customers.length
     const active = customers.filter(c => c.status === 'active').length
     const inactive = customers.filter(c => c.status === 'inactive').length
     return { total, active, inactive }
-  }, [customers])
+  }, [customers, serverStats])
 
   // Filter customers based on search and status
   const filteredCustomers = useMemo(() => {
@@ -1225,6 +1235,7 @@ export const ZZPCustomersPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
+        <ServerPagination {...pagination} loading={isLoading} />
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>

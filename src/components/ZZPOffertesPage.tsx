@@ -1,3 +1,5 @@
+import { useServerPagination } from '@/hooks/useServerPagination'
+import { ServerPagination } from './ServerPagination'
 /**
  * ZZP Offertes Page
  *
@@ -1022,7 +1024,10 @@ const ZZPOffertesPageContent = () => {
 
   const administrationId = typeof window !== 'undefined' ? localStorage.getItem('administration_id') : null
 
+  const pagination = useServerPagination(JSON.stringify([user?.id, statusFilter, debouncedSearch]))
+  const [serverStats, setServerStats] = useState<Record<string, number> | undefined>()
   const loadData = useCallback(async () => {
+    const isCurrent = pagination.beginRequest()
     if (!user?.id) {
       setIsLoading(false)
       return
@@ -1034,17 +1039,21 @@ const ZZPOffertesPageContent = () => {
 
     try {
       const [quotesResponse, customersResponse] = await Promise.all([
-        zzpApi.quotes.list(),
+        zzpApi.quotes.list({ limit: pagination.pageSize, offset: pagination.offset, status: statusFilter === 'all' ? undefined : statusFilter as ZZPQuote['status'], q: debouncedSearch || undefined }),
         zzpApi.customers.list(),
       ])
 
+      if (!isCurrent()) return
       const normalizedQuotes = normalizeListResponse<ZZPQuote>(quotesResponse, 'quotes')
       const normalizedCustomers = normalizeListResponse<ZZPCustomer>(customersResponse, 'customers')
 
+      pagination.setTotal(quotesResponse?.total ?? normalizedQuotes.length)
+      setServerStats(quotesResponse?.stats ?? undefined)
       setQuotes(normalizedQuotes)
       setCustomers(normalizedCustomers)
       setLoadState('success')
     } catch (err) {
+      if (!isCurrent()) return
       console.error('[Offertes] Failed to load page data', {
         userRole: user.role,
         administration_id: administrationId,
@@ -1072,9 +1081,9 @@ const ZZPOffertesPageContent = () => {
       setQuotes([])
       setCustomers([])
     } finally {
-      setIsLoading(false)
+      if (isCurrent()) setIsLoading(false)
     }
-  }, [administrationId, user?.id, user?.role])
+  }, [administrationId, user?.id, user?.role, pagination.offset, pagination.pageSize, debouncedSearch, statusFilter])
 
   useEffect(() => {
     loadData()
@@ -1088,6 +1097,7 @@ const ZZPOffertesPageContent = () => {
 
   // Stats
   const stats = useMemo(() => {
+    if (serverStats) return { total: serverStats.total, draft: serverStats.draft, sent: serverStats.sent, accepted: serverStats.accepted, converted: serverStats.converted, totalAmount: serverStats.totalAmount, acceptedAmount: serverStats.acceptedAmount }
     const total = quotes.length
     const draft = quotes.filter(q => q.status === 'draft').length
     const sent = quotes.filter(q => q.status === 'sent').length
@@ -1096,7 +1106,7 @@ const ZZPOffertesPageContent = () => {
     const totalAmount = quotes.reduce((sum, q) => sum + q.total_cents, 0)
     const acceptedAmount = quotes.filter(q => q.status === 'accepted').reduce((sum, q) => sum + q.total_cents, 0)
     return { total, draft, sent, accepted, converted, totalAmount, acceptedAmount }
-  }, [quotes])
+  }, [quotes, serverStats])
 
   // Filtered quotes
   const filteredQuotes = useMemo(() => {
@@ -1286,6 +1296,7 @@ const ZZPOffertesPageContent = () => {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
 
+        <ServerPagination {...pagination} loading={isLoading} />
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>

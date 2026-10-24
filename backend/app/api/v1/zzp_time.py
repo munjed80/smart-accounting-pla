@@ -264,6 +264,8 @@ async def list_invoiced_time_entries(
     customer_id: Optional[UUID] = Query(None),
     period_start: Optional[date] = Query(None),
     period_end: Optional[date] = Query(None),
+    limit: Annotated[Optional[int], Query(ge=1, le=100)] = None,
+    offset: int = 0,
 ):
     require_zzp(current_user)
     administration = await get_user_administration(current_user.id, db)
@@ -279,7 +281,10 @@ async def list_invoiced_time_entries(
     if period_end:
         clauses.append(ZZPTimeEntry.entry_date <= period_end)
 
-    result = await db.execute(select(ZZPTimeEntry).where(and_(*clauses)).order_by(ZZPTimeEntry.entry_date.asc()))
+    query = select(ZZPTimeEntry).where(and_(*clauses)).order_by(ZZPTimeEntry.entry_date.desc(), ZZPTimeEntry.id)
+    if limit is not None:
+        query = query.limit(limit).offset(max(0, offset))
+    result = await db.execute(query)
     return [entry_to_response(e) for e in result.scalars().all()]
 
 

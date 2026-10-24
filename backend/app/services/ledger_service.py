@@ -6,9 +6,14 @@ from decimal import Decimal
 from typing import Iterable
 
 from app.repositories.ledger_repository import LedgerRepository
+from app.models.ledger import JournalEntryStatus
 
 
 class LedgerPostingError(Exception):
+    pass
+
+
+class MissingLedgerAccountError(LedgerPostingError):
     pass
 
 
@@ -31,6 +36,8 @@ class LedgerPostingService:
         if not invoice:
             raise LedgerPostingError("Invoice not found")
 
+        if invoice.status in ('draft', 'cancelled'):
+            return
         already_posted = await self.repository.has_posted_entry_for_reference("INVOICE", invoice.id)
         if already_posted:
             return
@@ -68,6 +75,9 @@ class LedgerPostingService:
         if not invoice:
             raise LedgerPostingError("Invoice not found")
 
+        if invoice.status != 'paid':
+            return
+        await self.post_invoice(invoice_id)
         already_posted = await self.repository.has_posted_entry_for_reference("INVOICE_PAYMENT", invoice.id)
         if already_posted:
             return
@@ -170,10 +180,27 @@ class LedgerPostingService:
             lines=[line.__dict__ for line in lines],
         )
 
+    async def reverse_source(self, source_type: str, source_id: uuid.UUID) -> None:
+        from app.services.zzp_integrity import require_open_dates
+        for original in await self.repository.active_entries(source_type, source_id):
+            await require_open_dates(self.repository.db, self.repository.administration_id, original.entry_date)
+            reversal = await self.repository.create_journal_entry(
+                entry_date=original.entry_date,
+                description=f'Correctie van {original.entry_number}',
+                reference=original.reference, source_type='REVERSAL', source_id=original.id,
+                lines=[dict(account_id=line.account_id, debit_amount=line.credit_amount,
+                            credit_amount=line.debit_amount, description=f'Correctie: {line.description or ""}')
+                       for line in original.lines],
+            )
+            reversal.reverses_id = original.id
+            original.reversed_by_id = reversal.id
+            original.status = JournalEntryStatus.REVERSED
+            await self.repository.db.flush()
+
     async def _require_account(self, code: str):
         account = await self.repository.get_account_by_code(code)
         if not account:
-            raise LedgerPostingError(f"Required account {code} is missing or inactive")
+            raise MissingLedgerAccountError(f"Required account {code} is missing or inactive")
         return account
 
     @staticmethod

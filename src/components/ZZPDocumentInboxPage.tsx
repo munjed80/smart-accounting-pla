@@ -6,6 +6,10 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { useServerPagination } from '@/hooks/useServerPagination'
+import { useDebounce } from '@/hooks/useDebounce'
+import { ServerPagination } from './ServerPagination'
+import { useAuth } from '@/lib/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -488,10 +492,15 @@ const DocRow = ({ doc, onClick }: DocRowProps) => (
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export const ZZPDocumentInboxPage = () => {
+  const { user } = useAuth()
+  const [group, setGroup] = useState('inbox')
+  const [counts, setCounts] = useState<Record<string, number>>({})
   const [docs, setDocs] = useState<ZZPDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 300)
+  const pagination = useServerPagination(JSON.stringify([user?.id, group, debouncedSearch]))
   const [uploading, setUploading] = useState(false)
 
   const [selectedDoc, setSelectedDoc] = useState<ZZPDocument | null>(null)
@@ -504,17 +513,22 @@ export const ZZPDocumentInboxPage = () => {
   const [showUploadChooser, setShowUploadChooser] = useState(false)
 
   const loadDocs = useCallback(async () => {
+    const isCurrent = pagination.beginRequest()
     setLoading(true)
     setLoadError(null)
     try {
-      const all = await zzpApi.documents.list()
-      setDocs(all)
+      const result = await zzpApi.documents.page({ group, q: debouncedSearch || undefined, limit: pagination.pageSize, offset: pagination.offset })
+      if (!isCurrent()) return
+      setDocs(result.documents)
+      setCounts(result.counts)
+      pagination.setTotal(result.total)
     } catch (e) {
+      if (!isCurrent()) return
       setLoadError(parseApiError(e))
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [])
+  }, [user?.id, group, debouncedSearch, pagination.offset, pagination.pageSize])
 
   // Load on mount
   useEffect(() => { loadDocs() }, [loadDocs])
@@ -534,7 +548,7 @@ export const ZZPDocumentInboxPage = () => {
     try {
       const result = await zzpApi.documents.upload(Array.from(files))
       toast.success(`${result.documents.length} document(en) geüpload.`)
-      setDocs(prev => [...result.documents, ...prev])
+      await loadDocs()
     } catch (e) {
       toast.error(parseApiError(e))
     } finally {
@@ -554,15 +568,15 @@ export const ZZPDocumentInboxPage = () => {
     setConvertOpen(true)
   }
 
-  const handleDeleted = (id: string) => setDocs(prev => prev.filter(d => d.id !== id))
+  const handleDeleted = (_id: string) => { void loadDocs() }
 
-  const handleMarkedProcessed = (id: string) => {
-    setDocs(prev => prev.map(d => d.id === id ? { ...d, status: 'PROCESSED' as ZZPDocStatus } : d))
+  const handleMarkedProcessed = (_id: string) => {
+    void loadDocs()
   }
 
   const handleConvertSuccess = () => {
     if (convertDoc) {
-      setDocs(prev => prev.map(d => d.id === convertDoc.id ? { ...d, status: 'PROCESSED' as ZZPDocStatus } : d))
+      void loadDocs()
     }
     setConvertDoc(null)
   }
@@ -681,24 +695,25 @@ export const ZZPDocumentInboxPage = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="inbox">
+        <ServerPagination {...pagination} loading={loading} />
+        <Tabs value={group} onValueChange={setGroup}>
           <TabsList className="w-full sm:w-auto">
             <TabsTrigger value="inbox" className="flex-1 sm:flex-none">
               Inbox
-              {inboxDocs.length > 0 && (
-                <Badge variant="secondary" className="ml-2 text-xs">{inboxDocs.length}</Badge>
+              {((counts.NEW ?? 0) + (counts.REVIEW ?? 0)) > 0 && (
+                <Badge variant="secondary" className="ml-2 text-xs">{(counts.NEW ?? 0) + (counts.REVIEW ?? 0)}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="processed" className="flex-1 sm:flex-none">
               Verwerkt
-              {processedDocs.length > 0 && (
-                <Badge variant="outline" className="ml-2 text-xs">{processedDocs.length}</Badge>
+              {(counts.PROCESSED ?? 0) > 0 && (
+                <Badge variant="outline" className="ml-2 text-xs">{counts.PROCESSED}</Badge>
               )}
             </TabsTrigger>
-            {failedDocs.length > 0 && (
+            {(counts.FAILED ?? 0) > 0 && (
               <TabsTrigger value="failed" className="flex-1 sm:flex-none">
                 Mislukt
-                <Badge variant="destructive" className="ml-2 text-xs">{failedDocs.length}</Badge>
+                <Badge variant="destructive" className="ml-2 text-xs">{counts.FAILED}</Badge>
               </TabsTrigger>
             )}
           </TabsList>
@@ -714,7 +729,7 @@ export const ZZPDocumentInboxPage = () => {
             {renderDocList(processedDocs, 'Geen verwerkte documenten.')}
           </TabsContent>
 
-          {failedDocs.length > 0 && (
+          {(counts.FAILED ?? 0) > 0 && (
             <TabsContent value="failed" className="mt-4">
               {renderDocList(failedDocs, 'Geen mislukte documenten.')}
             </TabsContent>

@@ -16,9 +16,8 @@ from app.models.administration import Administration, AdministrationMember
 from app.models.bank import BankTransaction
 from app.models.financial_commitment import CommitmentStatus, CommitmentType, FinancialCommitment, RecurringFrequency
 from app.models.ledger import AccountingPeriod, PeriodStatus
-from app.models.zzp import ZZPExpense
-from app.repositories.ledger_repository import LedgerRepository
-from app.services.ledger_service import LedgerPostingError, LedgerPostingService
+from app.models.zzp import ZZPExpense, ZZPInvoice
+from app.services.zzp_integrity import sync_expense
 from app.schemas.commitments import (
     AmortizationRow,
     CommitmentAlert,
@@ -109,14 +108,14 @@ def compute_next_due_date(item: FinancialCommitment, today: Optional[date] = Non
         if item.recurring_frequency == RecurringFrequency.YEARLY:
             candidate = add_years(item.last_booked_date, 1)
         else:
-            candidate = add_months(item.last_booked_date, 1)
+            candidate = add_months(item.last_booked_date, 3 if item.recurring_frequency == RecurringFrequency.QUARTERLY else 1)
 
         if item.end_date and candidate > item.end_date:
             return None
         if candidate >= today:
             return candidate
 
-    if item.type == CommitmentType.SUBSCRIPTION and item.recurring_frequency == RecurringFrequency.YEARLY:
+    if item.recurring_frequency == RecurringFrequency.YEARLY:
         base = item.renewal_date or item.start_date
         candidate = base
         while candidate < today:
@@ -124,6 +123,12 @@ def compute_next_due_date(item: FinancialCommitment, today: Optional[date] = Non
         if item.end_date and candidate > item.end_date:
             return None
         return candidate
+
+    if item.recurring_frequency == RecurringFrequency.QUARTERLY:
+        candidate = item.start_date
+        while candidate < today:
+            candidate = add_months(candidate, 3)
+        return None if item.end_date and candidate > item.end_date else candidate
 
     candidate = _candidate_for_month(item, today.year, today.month)
     if candidate < today:
@@ -157,10 +162,11 @@ def compute_amortization_rows(item: FinancialCommitment) -> list[AmortizationRow
     if principal <= 0 or payment <= 0:
         return []
 
-    monthly_rate = float(item.interest_rate or 0) / 100 / 12
+    step_months = 12 if item.recurring_frequency == RecurringFrequency.YEARLY else 3 if item.recurring_frequency == RecurringFrequency.QUARTERLY else 1
+    monthly_rate = float(item.interest_rate or 0) / 100 * step_months / 12
     rows: list[AmortizationRow] = []
     remaining = principal
-    horizon = item.contract_term_months or 120
+    horizon = max(1, (item.contract_term_months or 120) // step_months)
     due_date = compute_next_due_date(item, today=item.start_date) or item.start_date
 
     for idx in range(1, horizon + 1):
@@ -180,7 +186,7 @@ def compute_amortization_rows(item: FinancialCommitment) -> list[AmortizationRow
         )
         if remaining == 0:
             break
-        due_date = add_months(due_date, 1)
+        due_date = add_months(due_date, step_months)
 
     return rows
 
@@ -212,7 +218,11 @@ def to_response(item: FinancialCommitment, today: Optional[date] = None) -> Comm
         if not computed_end_date:
             computed_end_date = rows[-1].due_date
 
+    if item.remaining_balance_override_cents is not None:
+        remaining_balance_cents = item.remaining_balance_override_cents
     return CommitmentResponse(
+        notes=item.notes, legacy_source_key=item.legacy_source_key,
+        remaining_balance_override_cents=item.remaining_balance_override_cents,
         id=item.id,
         administration_id=item.administration_id,
         type=item.type.value,
@@ -299,12 +309,10 @@ async def commitment_overview(
         lifecycle_status = _normalize_status(item, today)
 
         if lifecycle_status == CommitmentStatus.ACTIVE:
-            if item.type == CommitmentType.SUBSCRIPTION and item.recurring_frequency == RecurringFrequency.YEARLY:
-                monthly_total += item.amount_cents // 12
-            else:
-                monthly_total += value
+            divisor = 12 if item.recurring_frequency == RecurringFrequency.YEARLY else 3 if item.recurring_frequency == RecurringFrequency.QUARTERLY else 1
+            monthly_total += value // divisor
 
-            by_type[item.type.value] += value
+            by_type[item.type.value] += value // divisor
             if due_date and due_date <= next_30:
                 upcoming.append(item)
 
@@ -319,7 +327,22 @@ async def commitment_overview(
     if monthly_total > threshold_cents:
         alerts.append(CommitmentAlert(code="monthly_threshold", severity="warning", message="Maandelijkse vaste verplichtingen overschrijden de ingestelde drempel."))
 
+    # Three complete calendar months, including months with no receipts.
+    # Filter on payment date: an old invoice may have been paid recently.
+    end = today.replace(day=1)
+    start = add_months(end, -3)
+    receipts = await db.scalar(select(func.coalesce(func.sum(ZZPInvoice.total_cents), 0)).where(
+        ZZPInvoice.administration_id == administration.id,
+        ZZPInvoice.status == 'paid', ZZPInvoice.paid_at >= start,
+        ZZPInvoice.paid_at < end,
+    ))
+    linked_counts = dict((await db.execute(select(ZZPExpense.commitment_id, func.count(ZZPExpense.id)).where(
+        ZZPExpense.administration_id == administration.id, ZZPExpense.commitment_id.is_not(None),
+    ).group_by(ZZPExpense.commitment_id))).all())
     return CommitmentOverviewResponse(
+        average_monthly_receipts_cents=int(receipts or 0) // 3,
+        cashflow_from=start, cashflow_to=end - timedelta(days=1),
+        linked_expense_counts={str(key): count for key, count in linked_counts.items()},
         monthly_total_cents=monthly_total,
         upcoming_total_cents=sum(i.monthly_payment_cents or i.amount_cents for i in upcoming),
         warning_count=len([a for a in alerts if a.severity == "warning"]),
@@ -382,7 +405,17 @@ async def create_commitment(
     require_zzp(current_user)
     administration = await get_user_administration(current_user.id, db)
 
+    if payload.legacy_source_key:
+        await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
+        existing = await db.scalar(select(FinancialCommitment).where(
+            FinancialCommitment.administration_id == administration.id,
+            FinancialCommitment.legacy_source_key == payload.legacy_source_key,
+        ))
+        if existing:
+            return to_response(existing)
     item = FinancialCommitment(
+        notes=payload.notes, legacy_source_key=payload.legacy_source_key,
+        remaining_balance_override_cents=payload.remaining_balance_override_cents,
         administration_id=administration.id,
         type=CommitmentType(payload.type),
         name=payload.name,
@@ -483,7 +516,7 @@ def _compute_next_due_from_booked(item: FinancialCommitment, booked_date: date) 
     if item.recurring_frequency == RecurringFrequency.YEARLY:
         candidate = add_years(booked_date, 1)
     else:
-        candidate = add_months(booked_date, 1)
+        candidate = add_months(booked_date, 3 if item.recurring_frequency == RecurringFrequency.QUARTERLY else 1)
         if item.payment_day:
             candidate = with_day(candidate, item.payment_day)
 
@@ -501,6 +534,8 @@ def _compute_next_due_from_booked(item: FinancialCommitment, booked_date: date) 
 def _period_key(expense_date: date, frequency: Optional[RecurringFrequency]) -> str:
     if frequency == RecurringFrequency.YEARLY:
         return f"{expense_date.year}-Y"
+    if frequency == RecurringFrequency.QUARTERLY:
+        return f'{expense_date.year}-Q{(expense_date.month - 1) // 3 + 1}'
     return expense_date.strftime('%Y-%m')
 
 
@@ -586,7 +621,7 @@ async def create_expense_from_commitment(
     )
     db.add(expense)
 
-    item.last_booked_date = payload.expense_date
+    item.last_booked_date = max(item.last_booked_date or payload.expense_date, payload.expense_date)
     if item.vat_rate is None:
         item.vat_rate = Decimal(str(payload.vat_rate))
     if item.btw_rate is None:
@@ -598,18 +633,13 @@ async def create_expense_from_commitment(
         await db.rollback()
         raise HTTPException(status_code=409, detail={"code": "DUPLICATE_COMMITMENT_EXPENSE", "message": "Er bestaat al een uitgave voor deze periode."}) from exc
 
-    try:
-        ledger_service = LedgerPostingService(LedgerRepository(db, administration.id))
-        await ledger_service.post_expense(expense.id)
-    except LedgerPostingError:
-        # TODO: Add explicit booking fallback once manual journal endpoint is available
-        pass
+    await sync_expense(db, administration.id, expense.id)
 
     await db.commit()
     await db.refresh(expense)
     await db.refresh(item)
 
-    next_due_date = _compute_next_due_from_booked(item, payload.expense_date)
+    next_due_date = _compute_next_due_from_booked(item, item.last_booked_date)
 
     linked_count = await db.scalar(select(func.count(ZZPExpense.id)).where(ZZPExpense.commitment_id == item.id))
 

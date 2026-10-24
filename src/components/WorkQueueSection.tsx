@@ -51,7 +51,8 @@ import {
   Funnel,
 } from '@phosphor-icons/react'
 import { formatDistanceToNow } from 'date-fns'
-import { toast } from 'sonner'
+import { BulkOperationModal } from './BulkOperationModal'
+import type { BulkActionType } from './BulkActionBar'
 import { t } from '@/i18n'
 
 interface WorkQueueSectionProps {
@@ -64,7 +65,8 @@ export const WorkQueueSection = ({ onRefresh }: WorkQueueSectionProps) => {
   const [error, setError] = useState<string | null>(null)
   const [selectedQueue, setSelectedQueue] = useState<'all' | 'red' | 'review' | 'vat_due' | 'stale'>('all')
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
-  const [clientFilter, setClientFilter] = useState<string>('')
+  const [clientFilter, setClientFilter] = useState('all')
+  const [bulkAction, setBulkAction] = useState<BulkActionType | null>(null)
 
   const fetchWorkQueue = useCallback(async () => {
     try {
@@ -95,51 +97,25 @@ export const WorkQueueSection = ({ onRefresh }: WorkQueueSectionProps) => {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      const allIds = new Set((workQueue?.items || []).map(item => item.client_id))
+      const allIds = new Set(filteredItems.map(item => item.client_id))
       setSelectedItems(allIds)
     } else {
       setSelectedItems(new Set())
     }
   }
 
-  const handleBulkMarkReviewed = async () => {
-    if (selectedItems.size === 0) return
-    
-    try {
-      toast.promise(
-        Promise.resolve(), // Placeholder - actual API call would go here
-        {
-          loading: 'Markeren als beoordeeld...',
-          success: `${selectedItems.size} items gemarkeerd als beoordeeld`,
-          error: 'Fout bij markeren',
-        }
-      )
-      setSelectedItems(new Set())
-      await fetchWorkQueue()
-      onRefresh?.()
-    } catch (err) {
-      console.error('Bulk mark reviewed failed:', err)
-    }
-  }
+  useEffect(() => { setSelectedItems(new Set()) }, [selectedQueue, clientFilter])
 
-  const handleBulkRequestInfo = async () => {
-    if (selectedItems.size === 0) return
-    
-    try {
-      toast.promise(
-        Promise.resolve(), // Placeholder - actual API call would go here
-        {
-          loading: 'Informatie aanvragen...',
-          success: `Informatie aangevraagd voor ${selectedItems.size} items`,
-          error: 'Fout bij aanvragen informatie',
-        }
-      )
-      setSelectedItems(new Set())
-      await fetchWorkQueue()
-      onRefresh?.()
-    } catch (err) {
-      console.error('Bulk request info failed:', err)
-    }
+  const selectedClients = Array.from(new Map(
+    (workQueue?.items ?? [])
+      .filter(item => selectedItems.has(item.client_id))
+      .map(item => [item.client_id, { id: item.client_id, name: item.client_name }]),
+  ).values())
+
+  const handleOperationComplete = () => {
+    setSelectedItems(new Set())
+    fetchWorkQueue()
+    onRefresh?.()
   }
 
   const getSeverityBadge = (severity: string | null) => {
@@ -174,7 +150,7 @@ export const WorkQueueSection = ({ onRefresh }: WorkQueueSectionProps) => {
 
   // Filter items by client if filter is set
   const filteredItems = workQueue?.items.filter(item => 
-    !clientFilter || item.client_name.toLowerCase().includes(clientFilter.toLowerCase())
+    clientFilter === 'all' || item.client_id === clientFilter
   ) || []
 
   return (
@@ -263,14 +239,14 @@ export const WorkQueueSection = ({ onRefresh }: WorkQueueSectionProps) => {
       {selectedItems.size > 0 && (
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-center justify-between">
           <span className="text-sm font-medium">
-            {selectedItems.size} item(s) geselecteerd
+            {selectedItems.size} klant(en) geselecteerd
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleBulkMarkReviewed}>
+            <Button variant="outline" size="sm" onClick={() => setBulkAction('recalculate')}>
               <CheckCircle size={16} className="mr-2" />
-              Markeer als Beoordeeld
+              Controleer opnieuw
             </Button>
-            <Button variant="outline" size="sm" onClick={handleBulkRequestInfo}>
+            <Button variant="outline" size="sm" onClick={() => setBulkAction('send_reminders')}>
               <FileText size={16} className="mr-2" />
               Vraag Info Aan
             </Button>
@@ -310,13 +286,11 @@ export const WorkQueueSection = ({ onRefresh }: WorkQueueSectionProps) => {
                   <SelectValue placeholder="Filter op klant..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Alle klanten</SelectItem>
-                  {Array.from(new Set((workQueue?.items || []).map(item => item.client_name)))
-                    .sort()
-                    .map(name => (
-                      <SelectItem key={name} value={name.toLowerCase()}>
-                        {name}
-                      </SelectItem>
+                  <SelectItem value="all">Alle klanten</SelectItem>
+                  {Array.from(new Map((workQueue?.items || []).map(item => [item.client_id, item.client_name])))
+                    .sort((a, b) => a[1].localeCompare(b[1], 'nl'))
+                    .map(([id, name]) => (
+                      <SelectItem key={id} value={id}>{name}</SelectItem>
                     ))}
                 </SelectContent>
               </Select>
@@ -342,7 +316,7 @@ export const WorkQueueSection = ({ onRefresh }: WorkQueueSectionProps) => {
                 <TableRow>
                   <TableHead className="w-[50px]">
                     <Checkbox
-                      checked={selectedItems.size === filteredItems.length && filteredItems.length > 0}
+                      checked={filteredItems.length > 0 && filteredItems.every(item => selectedItems.has(item.client_id))}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
@@ -418,6 +392,13 @@ export const WorkQueueSection = ({ onRefresh }: WorkQueueSectionProps) => {
           )}
         </CardContent>
       </Card>
+      <BulkOperationModal
+        isOpen={bulkAction !== null}
+        onClose={() => setBulkAction(null)}
+        actionType={bulkAction}
+        selectedClients={selectedClients}
+        onOperationComplete={handleOperationComplete}
+      />
     </div>
   )
 }

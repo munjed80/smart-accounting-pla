@@ -7,8 +7,6 @@ import { reportRuntimeError } from './lib/runtimeDiagnostics.ts'
 import { registerServiceWorker } from './serviceWorkerRegistration.ts'
 
 import './main.css'
-import './styles/theme.css'
-import './index.css'
 
 window.addEventListener('error', (event) => {
   void reportRuntimeError({

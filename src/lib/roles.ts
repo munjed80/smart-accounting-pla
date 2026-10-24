@@ -41,6 +41,7 @@ export const VALID_ROLES = new Set<string>([
   UserRole.ZZP,
   UserRole.ACCOUNTANT,
   UserRole.ADMIN,
+  UserRole.SUPER_ADMIN,
 ])
 
 /**
@@ -73,7 +74,7 @@ export function isRegistrationRole(role: string): boolean {
  */
 export function isAccountantRole(role: string | undefined): boolean {
   if (!role) return false
-  return role === UserRole.ACCOUNTANT || role === UserRole.ADMIN
+  return role === UserRole.ACCOUNTANT || role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN
 }
 
 /**
@@ -90,7 +91,7 @@ export function isZzpRole(role: string | undefined): boolean {
  * ZZP users see "ZZPers Hub"; all other roles see "Smart Accounting".
  */
 export const BRAND_NAME_ZZP = 'ZZPers Hub'
-export const BRAND_NAME_DEFAULT = 'Smart Accounting'
+export const BRAND_NAME_DEFAULT = 'ZZPers Hub'
 
 export function getBrandName(role?: string): string {
   return isZzpRole(role) ? BRAND_NAME_ZZP : BRAND_NAME_DEFAULT

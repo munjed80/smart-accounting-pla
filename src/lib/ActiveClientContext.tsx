@@ -1,3 +1,4 @@
+import { isAccountantRole } from '@/lib/roles'
 /**
  * ActiveClientContext - Manages accountant's active client context
  * 
@@ -111,7 +112,7 @@ export const ActiveClientProvider = ({ children }: ActiveClientProviderProps) =>
   const [isLoading, setIsLoading] = useState(false)
 
   // Determine if user is accountant
-  const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
+  const isAccountant = isAccountantRole(user?.role)
 
   // Filter to only ACTIVE links
   const activeClients = useMemo(
@@ -164,7 +165,7 @@ export const ActiveClientProvider = ({ children }: ActiveClientProviderProps) =>
         // Validate current activeClient is still ACTIVE
         if (prevClient) {
           const currentLink = response.links.find(
-            link => link.client_user_id === prevClient.id
+            link => link.administration_id === prevClient.administrationId
           )
           if (!currentLink || currentLink.status !== 'ACTIVE') {
             // Current client is no longer active, clear selection

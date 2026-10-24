@@ -1,3 +1,4 @@
+import { useActiveClient } from '@/lib/ActiveClientContext'
 /**
  * PriorityClientsPanel - "Top prioriteit klanten" Component
  * 
@@ -197,6 +198,7 @@ const ClientRow = ({
 )
 
 export const PriorityClientsPanel = ({ clients, isLoading }: PriorityClientsPanelProps) => {
+  const { allLinks, setActiveClient } = useActiveClient()
   // Filter state
   const [activeFilter, setActiveFilter] = useState<'alle' | RiskLevel>('alle')
   const [searchQuery, setSearchQuery] = useState('')
@@ -242,10 +244,13 @@ export const PriorityClientsPanel = ({ clients, isLoading }: PriorityClientsPane
   
   // Handle select client (store in localStorage for other components)
   const handleSelectClient = (client: ClientWithRisk) => {
-    localStorage.setItem('selectedClientId', client.id)
-    localStorage.setItem('selectedClientName', client.name)
-    // Dispatch storage event for other components
-    window.dispatchEvent(new StorageEvent('storage', { key: 'selectedClientId' }))
+    const link = allLinks.find(link => link.administration_id === client.id && link.status === 'ACTIVE')
+    if (link) {
+      setActiveClient({ id: link.client_user_id, name: link.client_name, email: link.client_email,
+        administrationId: link.administration_id, administrationName: link.administration_name })
+    } else {
+      navigateTo(`/accountant/clients/${client.id}/issues`)
+    }
   }
   
   // Clear filters
@@ -308,7 +313,7 @@ export const PriorityClientsPanel = ({ clients, isLoading }: PriorityClientsPane
           <div className="relative w-full sm:w-48">
             <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder={t('priorityClients.searchPlaceholder')}
+              placeholder="Zoek in top 10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 h-8 text-sm"

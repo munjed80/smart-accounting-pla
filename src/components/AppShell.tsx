@@ -1,4 +1,5 @@
-import { ReactNode, useState, useEffect, useMemo } from 'react'
+import { isAccountantRole } from '@/lib/roles'
+import { ReactNode, useState, useEffect, useMemo, Suspense } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/lib/AuthContext'
 import { useActiveClient } from '@/lib/ActiveClientContext'
@@ -385,7 +386,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isDev = import.meta.env.DEV
 
-  const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
+  const isAccountant = isAccountantRole(user?.role)
   const isSuperAdmin = user?.role === 'super_admin'
   const isZZP = user?.role === 'zzp'
 
@@ -926,13 +927,13 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
 
         {/* Main Content Area with sidebar offset and top padding */}
         <main className="flex-1 ml-64 pt-4">
-          {children}
+          <Suspense fallback={<div role="status" className="p-8 text-center text-muted-foreground">Pagina laden...</div>}>{children}</Suspense>
         </main>
       </div>
 
       {/* Mobile/Tablet Content - No sidebar offset but with top padding */}
       <main className={isZZP ? 'lg:hidden pb-20 pt-4' : 'lg:hidden pt-4'}>
-        {children}
+        <Suspense fallback={<div role="status" className="p-8 text-center text-muted-foreground">Pagina laden...</div>}>{children}</Suspense>
       </main>
 
       {isZZP && mobileBottomNavItems.length > 0 && (

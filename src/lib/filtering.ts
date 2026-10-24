@@ -65,7 +65,7 @@ export const filterInvoices = (invoices: ZZPInvoice[], filters: InvoiceFilters):
         invoice.invoice_number,
         invoice.customer_name,
         invoice.notes,
-        ...lines.map((line) => `${line.description} ${line.reference || ''}`),
+        ...lines.map((line) => line.description),
       ]
         .filter(Boolean)
         .join(' ')

@@ -377,18 +377,18 @@ export const ledgerApi = {
 
 
 export const accountantDossierApi = {
-  getInvoices: async (clientId: string): Promise<ZZPInvoiceListResponse> => {
-    const response = await api.get<ZZPInvoiceListResponse>(`/accountant/clients/${clientId}/invoices`)
+  getInvoices: async (clientId: string, page?: { limit: number; offset: number }): Promise<ZZPInvoiceListResponse> => {
+    const response = await api.get<ZZPInvoiceListResponse>(`/accountant/clients/${clientId}/invoices`, { params: page })
     return response.data
   },
 
-  getExpenses: async (clientId: string, filters?: { commitment_id?: string }): Promise<ZZPExpenseListResponse> => {
+  getExpenses: async (clientId: string, filters?: { commitment_id?: string; limit?: number; offset?: number }): Promise<ZZPExpenseListResponse> => {
     const response = await api.get<ZZPExpenseListResponse>(`/accountant/clients/${clientId}/expenses`, { params: filters })
     return response.data
   },
 
-  getHours: async (clientId: string): Promise<ZZPTimeEntryListResponse> => {
-    const response = await api.get<ZZPTimeEntryListResponse>(`/accountant/clients/${clientId}/hours`)
+  getHours: async (clientId: string, page?: { limit: number; offset: number }): Promise<ZZPTimeEntryListResponse> => {
+    const response = await api.get<ZZPTimeEntryListResponse>(`/accountant/clients/${clientId}/hours`, { params: page })
     return response.data
   },
 

@@ -6,6 +6,7 @@ Service layer for:
 - Bulk operations execution
 - Rate limiting and audit logging
 """
+import calendar
 import logging
 import uuid
 import hashlib
@@ -137,11 +138,12 @@ class AccountantDashboardService:
         
         # Document backlog (NEEDS_REVIEW status)
         try:
-            doc_backlog_result = await self.db.execute(
-                select(func.count(Document.id))
-                .where(Document.administration_id.in_(client_ids))
-                .where(Document.status == DocumentStatus.NEEDS_REVIEW)
-            )
+            async with self.db.begin_nested():
+                doc_backlog_result = await self.db.execute(
+                    select(func.count(Document.id))
+                    .where(Document.administration_id.in_(client_ids))
+                    .where(Document.status == DocumentStatus.NEEDS_REVIEW)
+                )
             document_backlog_total = doc_backlog_result.scalar() or 0
         except Exception as exc:
             # Defensive: if the database enum is missing NEEDS_REVIEW (production mismatch) or any other
@@ -154,15 +156,16 @@ class AccountantDashboardService:
         # Alert counts by severity
         alerts_by_severity = {"critical": 0, "warning": 0, "info": 0}
         try:
-            alerts_result = await self.db.execute(
-                select(Alert.severity, func.count(Alert.id))
-                .where(or_(
-                    Alert.administration_id.in_(client_ids),
-                    Alert.administration_id.is_(None)
-                ))
-                .where(Alert.resolved_at.is_(None))
-                .group_by(Alert.severity)
-            )
+            async with self.db.begin_nested():
+                alerts_result = await self.db.execute(
+                    select(Alert.severity, func.count(Alert.id))
+                    .where(or_(
+                        Alert.administration_id.in_(client_ids),
+                        Alert.administration_id.is_(None)
+                    ))
+                    .where(Alert.resolved_at.is_(None))
+                    .group_by(Alert.severity)
+                )
             for severity, count in alerts_result.all():
                 if severity == AlertSeverity.CRITICAL:
                     alerts_by_severity["critical"] = count
@@ -178,7 +181,8 @@ class AccountantDashboardService:
         # Calculate VAT deadlines
         today = date.today()
         try:
-            vat_deadlines = await self._get_vat_deadlines(client_ids, today)
+            async with self.db.begin_nested():
+                vat_deadlines = await self._get_vat_deadlines(client_ids, today)
         except Exception as exc:
             logger.warning(
                 "Accountant dashboard VAT deadline calculation failed; returning empty list. error=%s",
@@ -262,6 +266,9 @@ class AccountantDashboardService:
         sort_by: str = "readiness_score",
         sort_order: str = "asc",
         filters: Optional[List[str]] = None,
+        search: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: int = 0,
     ) -> Dict[str, Any]:
         """
         Get list of clients with computed status cards.
@@ -284,15 +291,42 @@ class AccountantDashboardService:
         # Build client status cards
         clients = await self._build_client_status_cards(client_ids)
         
+        now = datetime.now(timezone.utc)
+        def inactive_days(card):
+            return (now - datetime.fromisoformat(card['last_activity_at'])).days if card['last_activity_at'] else None
+        def risk(card):
+            return (30 * (card['red_issue_count'] > 0)
+                    + 20 * (card['documents_needing_review_count'] > 0)
+                    + 20 * (card['days_to_vat_deadline'] is not None and card['days_to_vat_deadline'] <= 7)
+                    + 10 * ((card['backlog_age_max_days'] or 0) > 0)
+                    + 5 * (inactive_days(card) is not None and inactive_days(card) > 14))
+        priority_clients = sorted(clients, key=lambda c: (-risk(c), c['id']))[:10]
+        portfolio_counts = {
+            'documents': sum(c['documents_needing_review_count'] for c in clients),
+            'vat_due': sum(c['days_to_vat_deadline'] is not None and c['days_to_vat_deadline'] <= 7 for c in clients),
+            'inactive': sum(inactive_days(c) is None or inactive_days(c) >= 30 for c in clients),
+        }
         # Apply filters
-        filtered_clients = clients
+        filtered_clients = list(clients)
         applied_filters = []
+        if search and search.strip():
+            term = search.strip().casefold()
+            filtered_clients = [c for c in filtered_clients if any(
+                term in str(c.get(field) or '').casefold()
+                for field in ('name', 'kvk_number', 'btw_number')
+            )]
         
         if filters:
             for filter_type in filters:
                 if filter_type == "has_red":
                     filtered_clients = [c for c in filtered_clients if c["red_issue_count"] > 0]
                     applied_filters.append("has_red")
+                elif filter_type == "has_yellow":
+                    filtered_clients = [c for c in filtered_clients if c["yellow_issue_count"] > 0 and c["red_issue_count"] == 0]
+                    applied_filters.append(filter_type)
+                elif filter_type == "ok":
+                    filtered_clients = [c for c in filtered_clients if c["red_issue_count"] == 0 and c["yellow_issue_count"] == 0]
+                    applied_filters.append(filter_type)
                 elif filter_type == "needs_review":
                     filtered_clients = [c for c in filtered_clients if c["documents_needing_review_count"] > 0]
                     applied_filters.append("needs_review")
@@ -303,9 +337,11 @@ class AccountantDashboardService:
                 elif filter_type == "stale_30d":
                     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
                     filtered_clients = [c for c in filtered_clients 
-                                       if c["last_activity_at"] is None or c["last_activity_at"] < thirty_days_ago]
+                                       if c["last_activity_at"] is None or datetime.fromisoformat(c["last_activity_at"]) < thirty_days_ago]
                     applied_filters.append("stale_30d")
         
+        # Stable secondary order prevents page overlap when scores tie.
+        filtered_clients.sort(key=lambda c: c["id"])
         # Apply sorting
         reverse = sort_order.lower() == "desc"
         
@@ -314,22 +350,19 @@ class AccountantDashboardService:
         elif sort_by == "red_issues":
             filtered_clients.sort(key=lambda x: x["red_issue_count"], reverse=reverse)
         elif sort_by == "backlog":
-            filtered_clients.sort(key=lambda x: x["documents_needing_review_count"], reverse=reverse)
-        elif sort_by == "deadline":
-            filtered_clients.sort(
-                key=lambda x: x["days_to_vat_deadline"] if x["days_to_vat_deadline"] is not None else 9999,
-                reverse=reverse
-            )
-        elif sort_by == "last_activity":
-            filtered_clients.sort(
-                key=lambda x: x["last_activity_at"] if x["last_activity_at"] else datetime.min.replace(tzinfo=timezone.utc),
-                reverse=reverse
-            )
+            filtered_clients.sort(key=lambda x: x["backlog_age_max_days"] or 0, reverse=reverse)
+        elif sort_by in ("deadline", "last_activity"):
+            field = "days_to_vat_deadline" if sort_by == "deadline" else "last_activity_at"
+            with_value = [c for c in filtered_clients if c[field] is not None]
+            without_value = [c for c in filtered_clients if c[field] is None]
+            filtered_clients = sorted(with_value, key=lambda c: c[field], reverse=reverse) + without_value
         elif sort_by == "name":
             filtered_clients.sort(key=lambda x: x["name"].lower(), reverse=reverse)
         
         return {
-            "clients": filtered_clients,
+            "priority_clients": priority_clients,
+            "portfolio_counts": portfolio_counts,
+            "clients": filtered_clients[offset:offset + limit] if limit is not None else filtered_clients[offset:],
             "total_count": len(clients),
             "filtered_count": len(filtered_clients),
             "sort_by": sort_by,
@@ -398,23 +431,16 @@ class AccountantDashboardService:
             select(AccountingPeriod)
             .where(AccountingPeriod.administration_id.in_(client_ids))
             .where(AccountingPeriod.status.in_([PeriodStatus.OPEN, PeriodStatus.REVIEW]))
-            .order_by(AccountingPeriod.end_date.desc())
+            .order_by(AccountingPeriod.end_date.asc())
         )
         period_info = {}
         for period in periods_result.scalars().all():
             if period.administration_id not in period_info:
                 # Calculate VAT deadline
-                if period.end_date.month == 12:
-                    deadline = date(period.end_date.year + 1, 1, 31)
-                else:
-                    next_month = period.end_date.month + 1
-                    if next_month == 12:
-                        deadline = date(period.end_date.year, 12, 31)
-                    elif next_month == 2:
-                        deadline = date(period.end_date.year, 2, 28)
-                    else:
-                        deadline = date(period.end_date.year, next_month + 1, 1) - timedelta(days=1)
-                
+                deadline_year = period.end_date.year + (period.end_date.month == 12)
+                deadline_month = period.end_date.month % 12 + 1
+                deadline = date(deadline_year, deadline_month, calendar.monthrange(deadline_year, deadline_month)[1])
+
                 period_info[period.administration_id] = {
                     "status": period.status.value,
                     "name": period.name,

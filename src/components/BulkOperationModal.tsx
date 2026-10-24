@@ -211,7 +211,7 @@ export const BulkOperationModal = ({
   const [error, setError] = useState<string | null>(null)
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set())
   const [pollingOperationId, setPollingOperationId] = useState<string | null>(null)
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   
   // Reminder form state
   const [reminderType, setReminderType] = useState('ACTION_REQUIRED')

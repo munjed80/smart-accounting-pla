@@ -77,6 +77,10 @@ describe('BelastinghulpJaaroverzichtPage', () => {
         output_vat_cents: 21000,
         input_vat_cents: 5000,
         net_vat_cents: 16000,
+        basis: 'invoice',
+        unpaid_vat_cents: 0,
+        data_status: 'COMPLETE',
+        data_status_reason: '',
         vat_rate_breakdown: [],
         invoice_summary: {
           total_count: 1,

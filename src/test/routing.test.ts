@@ -1,3 +1,4 @@
+import { parseClientDossierRoute } from '@/lib/routing'
 import { describe, it, expect } from 'vitest'
 import { pathToTab, tabToPath } from '../lib/routing'
 import { isPublicRoutePath } from '../lib/publicRoutes'
@@ -44,4 +45,11 @@ describe('routing mappings for accountant pages', () => {
     expect(pathToTab('/something-else', false, false)).toBe('dashboard')
     expect(pathToTab('/something-else', false, true)).toBe('admin')
   })
+})
+
+
+it('restores the certificates dossier tab from a direct URL', () => {
+  expect(parseClientDossierRoute('/accountant/clients/client-1/certificates')).toEqual({ clientId: 'client-1', tab: 'certificates' })
+  expect(parseClientDossierRoute('/accountant/clients/client-1')).toEqual({ clientId: 'client-1', tab: 'invoices' })
+  expect(parseClientDossierRoute('/accountant/clients')).toBeNull()
 })

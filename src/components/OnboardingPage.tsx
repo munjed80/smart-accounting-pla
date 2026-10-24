@@ -20,7 +20,6 @@ import { toast } from 'sonner'
 import { t } from '@/i18n'
 
 interface OnboardingPageProps {
-  userRole: 'zzp' | 'accountant' | 'admin'
   userName: string
   onComplete: () => void
 }

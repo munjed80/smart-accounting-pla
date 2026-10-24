@@ -65,6 +65,8 @@ export interface ClientStatusCard {
 
 export interface ClientsListResponse {
   clients: ClientStatusCard[]
+  priority_clients: ClientStatusCard[]
+  portfolio_counts: { documents?: number; vat_due?: number; inactive?: number }
   total_count: number
   filtered_count: number
   sort_by: string
@@ -171,7 +173,7 @@ export const accountantMasterDashboardApi = {
     if (sort) params.sort = sort
     if (order) params.order = order
     if (filters && filters.length > 0) params.filter = filters
-    const response = await api.get<ClientsListResponse>('/accountant/dashboard/clients', { params })
+    const response = await api.get<ClientsListResponse>('/accountant/dashboard/clients', { params, paramsSerializer: { indexes: null } })
     return response.data
   },
 

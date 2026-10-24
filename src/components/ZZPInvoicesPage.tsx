@@ -1805,10 +1805,10 @@ const ZZPInvoicesPageContent = () => {
   const handleSendInvoice = useCallback(async (invoice: ZZPInvoice) => {
     setUpdatingStatusInvoiceId(invoice.id)
     try {
-      toast.info(t('zzpInvoices.sending'))
+      toast.info(t('common.sending'))
       const result = await zzpApi.invoices.sendEmail(invoice.id)
       // Check if email was actually sent or just status updated
-      if ((result as Record<string, unknown>)._email_status === 'not_configured') {
+      if (('_email_status' in result ? result._email_status : undefined) === 'not_configured') {
         toast.success('Status bijgewerkt (e-mail niet geconfigureerd)')
       } else {
         toast.success(t('zzpInvoices.invoiceSent'))

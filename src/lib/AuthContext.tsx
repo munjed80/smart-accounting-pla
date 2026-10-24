@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { authApi, User, LoginRequest, RegisterRequest, getErrorMessage, RegisterResponse } from '@/lib/api'
 import { toast } from 'sonner'
-import { AxiosError } from 'axios'
+import { AxiosError, isAxiosError } from 'axios'
 
 // Custom error type for email not verified
 export interface EmailNotVerifiedError {
@@ -37,7 +37,7 @@ export const useAuth = () => {
 
 // Helper to check if error is EMAIL_NOT_VERIFIED
 export const isEmailNotVerifiedError = (error: unknown): error is AxiosError => {
-  if (error instanceof AxiosError && error.response?.status === 403) {
+  if (isAxiosError<{ detail?: { code?: string } }>(error) && error.response?.status === 403) {
     const detail = error.response?.data?.detail
     if (typeof detail === 'object' && detail?.code === 'EMAIL_NOT_VERIFIED') {
       return true
@@ -47,7 +47,7 @@ export const isEmailNotVerifiedError = (error: unknown): error is AxiosError => 
 }
 
 export const getEmailNotVerifiedMessage = (error: AxiosError): { message: string; hint: string } => {
-  const detail = error.response?.data?.detail as { message?: string; hint?: string }
+  const detail = (error.response?.data as { detail?: { message?: string; hint?: string } } | undefined)?.detail
   return {
     message: detail?.message || 'Please verify your email before logging in',
     hint: detail?.hint || 'Check your inbox for a verification email or request a new one',

@@ -297,7 +297,7 @@ export const ReviewQueue = ({ clientId, clientName, onClose, onActionComplete }:
               size="sm"
               onClick={() => {
                 setError(null)
-                load()
+                fetchDocuments()
               }}
             >
               <ArrowClockwise size={16} className="mr-2" />

@@ -34,18 +34,14 @@ from app.schemas.work_queue import (
 from app.services.work_queue import WorkQueueService, SLAService
 from app.services.reminders import ReminderService, RateLimitExceededError as ReminderRateLimitError
 from app.services.evidence_pack import EvidencePackService, EvidencePackServiceError, RateLimitExceededError as EvidenceRateLimitError
-from app.api.v1.deps import CurrentUser
+from app.api.v1.deps import CurrentUser, require_accountant
 
 router = APIRouter()
 
 
 def verify_accountant_role(current_user: User) -> None:
-    """Verify user has accountant or admin role."""
-    if current_user.role not in ["accountant", "admin"]:
-        raise HTTPException(
-            status_code=403,
-            detail="This endpoint is only available for accountants"
-        )
+    """Use the shared accountant role guard; client access is checked separately."""
+    require_accountant(current_user)
 
 
 def get_client_info(request: Request) -> tuple[Optional[str], Optional[str]]:

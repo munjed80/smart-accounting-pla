@@ -187,6 +187,8 @@ describe('SettingsPage', () => {
 
     vi.mocked(api.subscriptionApi.getSubscriptionMe).mockResolvedValue({
       status: 'trial',
+      planCode: null,
+      planName: null,
       startDate: '2026-01-01T00:00:00Z',
       endDate: '2026-02-01T00:00:00Z',
       daysRemaining: 10,
@@ -269,6 +271,7 @@ describe('SettingsPage', () => {
       trial_end_at: '2026-02-01T00:00:00Z',
       scheduled: true,
       provider_subscription_id: null,
+      checkout_url: null,
     })
 
     renderWithClient(<SettingsPage />)

@@ -556,7 +556,7 @@ export const SettingsPage = () => {
             zzpApi.customers.list().catch(() => []),
             zzpApi.invoices.list().catch(() => []),
             zzpApi.expenses.list().catch(() => ({ expenses: [] })),
-            zzpApi.time.list().catch(() => []),
+            zzpApi.timeEntries.list().catch(() => []),
           ])
           
           exportData.businessProfile = profile
@@ -597,7 +597,7 @@ export const SettingsPage = () => {
       }
       
       // Gather customers for CSV
-      const customers = await zzpApi.customers.list().catch(() => [])
+      const { customers } = await zzpApi.customers.list()
       
       // Create CSV content
       const headers = ['Naam', 'Email', 'Telefoon', 'KVK', 'BTW', 'Status']
@@ -612,7 +612,7 @@ export const SettingsPage = () => {
       
       const csvContent = [
         headers.join(','),
-        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
       ].join('\n')
       
       // Create CSV blob and download

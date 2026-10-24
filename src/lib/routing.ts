@@ -153,3 +153,14 @@ export const tabToPath = (tab: string, isAccountant: boolean, isSuperAdmin = fal
       return isSuperAdmin ? '/admin' : isAccountant ? '/accountant' : '/dashboard'
   }
 }
+
+
+export const DOSSIER_TABS = ['invoices', 'expenses', 'hours', 'vat', 'issues', 'bookkeeping', 'periods', 'decisions', 'audit', 'commitments', 'certificates'] as const
+export type DossierTab = typeof DOSSIER_TABS[number]
+
+export const parseClientDossierRoute = (path: string): { clientId: string; tab: DossierTab } | null => {
+  const match = path.match(/^\/accountant\/clients\/([^/]+)(?:\/([^/]+))?$/)
+  if (!match) return null
+  const tab = DOSSIER_TABS.find(tab => tab === match[2]) ?? 'invoices'
+  return { clientId: match[1], tab }
+}

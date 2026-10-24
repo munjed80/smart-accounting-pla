@@ -51,6 +51,7 @@ interface DagstartAction {
 interface DagstartPanelProps {
   summary: DashboardSummary | null
   clients: ClientStatusCard[]
+  portfolioCounts?: { documents?: number; vat_due?: number; inactive?: number }
   isLoading?: boolean
   onFilterChange?: (filter: string) => void
 }
@@ -112,7 +113,7 @@ const ActionItem = ({ action }: { action: DagstartAction }) => {
   )
 }
 
-export const DagstartPanel = ({ summary, clients, isLoading, onFilterChange }: DagstartPanelProps) => {
+export const DagstartPanel = ({ summary, clients, isLoading, onFilterChange, portfolioCounts }: DagstartPanelProps) => {
   // Derive actions from summary and clients data
   const actions = useMemo((): DagstartAction[] => {
     if (!summary) return []
@@ -120,7 +121,7 @@ export const DagstartPanel = ({ summary, clients, isLoading, onFilterChange }: D
     const allActions: DagstartAction[] = []
     
     // 1. Te beoordelen - Documents needing review
-    const totalDocsToReview = clients.reduce((sum, c) => sum + c.documents_needing_review_count, 0)
+    const totalDocsToReview = portfolioCounts?.documents ?? clients.reduce((sum, c) => sum + c.documents_needing_review_count, 0)
     if (totalDocsToReview > 0) {
       allActions.push({
         id: 'review',
@@ -155,7 +156,7 @@ export const DagstartPanel = ({ summary, clients, isLoading, onFilterChange }: D
     }
     
     // 3. BTW binnen 7 dagen - VAT deadlines within 7 days
-    const vatUrgentClients = clients.filter(c => 
+    const vatUrgentClients = portfolioCounts?.vat_due ?? clients.filter(c =>
       c.days_to_vat_deadline !== null && c.days_to_vat_deadline <= VAT_URGENT_DAYS
     ).length
     
@@ -198,7 +199,7 @@ export const DagstartPanel = ({ summary, clients, isLoading, onFilterChange }: D
     }
     
     // 5. Inactive clients (30+ days)
-    const inactiveClients = clients.filter(c => {
+    const inactiveClients = portfolioCounts?.inactive ?? clients.filter(c => {
       if (!c.last_activity_at) return true // Never active = inactive
       const lastActivity = new Date(c.last_activity_at)
       const daysSince = (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24)
@@ -233,7 +234,7 @@ export const DagstartPanel = ({ summary, clients, isLoading, onFilterChange }: D
     return allActions
       .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
       .slice(0, 5)
-  }, [summary, clients, onFilterChange])
+  }, [summary, clients, onFilterChange, portfolioCounts])
   
   // Show skeleton while loading
   if (isLoading) {

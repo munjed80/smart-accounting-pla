@@ -1,3 +1,5 @@
+import type { DossierTab } from '@/lib/routing'
+import { isAccountantRole } from '@/lib/roles'
 /**
  * Client Dossier Page
  * 
@@ -10,7 +12,7 @@
  * All UI text is Dutch (nl.ts).
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -68,7 +70,7 @@ import { ClientCertificatesTab } from '@/components/ClientCertificatesTab'
 
 interface ClientDossierPageProps {
   clientId: string
-  initialTab?: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'periods' | 'decisions' | 'bookkeeping' | 'audit' | 'commitments' | 'certificates'
+  initialTab?: DossierTab
 }
 
 // Session storage key for today's completed actions
@@ -119,6 +121,10 @@ export const ClientDossierPage = ({ clientId, initialTab = 'invoices' }: ClientD
   const [activeTab, setActiveTab] = useState<string>(initialTab)
   const [todayCompleted, setTodayCompleted] = useState(getTodayCompleted())
   const [showPermissions, setShowPermissions] = useState(false)
+  const [scopeError, setScopeError] = useState<string | null>(null)
+  const requestVersion = useRef(0)
+
+  useEffect(() => { setActiveTab(initialTab) }, [initialTab])
 
   // Use delayed loading to prevent skeleton flash
   const showLoading = useDelayedLoading(isLoading, 300, !!overview)
@@ -142,79 +148,52 @@ export const ClientDossierPage = ({ clientId, initialTab = 'invoices' }: ClientD
     return false
   }
 
-  const fetchScopes = async () => {
-    try {
-      const scopesData = await accountantApi.getClientScopes(clientId)
-      setScopes(scopesData)
-    } catch (err) {
-      console.warn('Could not fetch scopes:', err)
-      // Non-critical - set default full access
-      setScopes({
-        client_id: clientId,
-        client_name: '',
-        scopes: ALL_SCOPES,
-        available_scopes: ALL_SCOPES,
-      })
-    }
-  }
-
   const fetchOverview = async () => {
-    const logger = createDossierLogger(clientId)
-    const endpoint = `/accountant/clients/${clientId}/overview`
-    
+    const version = ++requestVersion.current
+    setIsLoading(true)
+    setOverview(null)
+    setScopes(null)
+    setScopeError(null)
+    setError(null)
+    setPermissionErrorCode(null)
+    setIsAccessDenied(false)
     try {
-      setIsLoading(true)
-      setError(null)
-      setPermissionErrorCode(null)
-      setIsAccessDenied(false)
-      logger.request(endpoint)
-      const data = await ledgerApi.getClientOverview(clientId)
-      logger.success(endpoint, { clientName: data.client_name })
-      setOverview(data)
-      
-      // Also fetch scopes
-      await fetchScopes()
-      
-      // If activeClient context doesn't match, sync it
-      if (activeClientId !== clientId) {
-        if (!trySyncActiveClient(allLinks)) {
-          // Links may not be loaded yet; refresh them
-          // After refresh, the ActiveClientContext will auto-select if matching
-          await refreshLinks()
-        }
+      const [overviewResult, scopesResult] = await Promise.allSettled([
+        ledgerApi.getClientOverview(clientId),
+        accountantApi.getClientScopes(clientId),
+      ])
+      if (version !== requestVersion.current) return
+      if (overviewResult.status === 'rejected') throw overviewResult.reason
+      setOverview(overviewResult.value)
+      if (scopesResult.status === 'fulfilled') {
+        setScopes(scopesResult.value)
+      } else {
+        setScopeError('Machtigingen konden niet worden geladen. Probeer opnieuw.')
       }
+      // Route administration is authoritative, even when another client is selected.
+      if (activeClientId !== clientId) trySyncActiveClient(allLinks)
     } catch (err: unknown) {
-      logger.error(endpoint, err)
-      // Check for specific permission error codes
-      const errCode = getPermissionErrorCode(err)
-      if (errCode) {
-        setPermissionErrorCode(errCode)
-        if (errCode === 'NOT_ASSIGNED') {
-          setIsAccessDenied(true)
-          return
-        }
-        // For other permission errors (PENDING_APPROVAL, ACCESS_REVOKED, SCOPE_MISSING)
-        // Still try to fetch scopes to show meaningful info
-        await fetchScopes()
-      }
-      const message = getErrorMessage(err)
-      setError(message)
+      if (version !== requestVersion.current) return
+      const code = getPermissionErrorCode(err)
+      setPermissionErrorCode(code)
+      setIsAccessDenied(code === 'NOT_ASSIGNED')
+      setError(getErrorMessage(err))
     } finally {
-      setIsLoading(false)
+      if (version === requestVersion.current) setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    if (!activeClientLoading && !activeClientId) {
-      toast.error('Selecteer eerst een klant om een dossier te openen.')
-      navigateTo('/accountant/clients')
-      return
-    }
-    if (clientId) {
-      fetchOverview()
-    }
+    if (clientId) fetchOverview()
+    return () => { requestVersion.current += 1 }
+    // Route changes trigger requests; context changes only synchronize selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, activeClientId, activeClientLoading])
+  }, [clientId])
+
+  useEffect(() => {
+    if (activeClientId !== clientId) trySyncActiveClient(allLinks)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, activeClientId, allLinks])
 
   const handleBack = () => {
     navigateTo('/accountant/clients')
@@ -237,7 +216,7 @@ export const ClientDossierPage = ({ clientId, initialTab = 'invoices' }: ClientD
   }
 
   // Check if user is accountant
-  if (user?.role !== 'accountant' && user?.role !== 'super_admin') {
+  if (!isAccountantRole(user?.role)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background p-8">
         <div className="max-w-4xl mx-auto">
@@ -528,6 +507,15 @@ export const ClientDossierPage = ({ clientId, initialTab = 'invoices' }: ClientD
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {scopeError && (
+          <Alert>
+            <AlertDescription className="flex items-center justify-between gap-3">
+              {scopeError}
+              <Button variant="outline" size="sm" onClick={fetchOverview}>Opnieuw proberen</Button>
+            </AlertDescription>
+          </Alert>
         )}
 
         {/* Tabs */}

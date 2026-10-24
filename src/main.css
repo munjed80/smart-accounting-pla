@@ -1,4 +1,6 @@
-@import 'tailwindcss';
+@import 'tailwindcss' source(none);
+@source './';
+@source '../index.html';
 
 @import './styles/theme.css';
 @import './index.css';
@@ -7,6 +9,9 @@
   ---break---
 */
 @custom-variant dark (&:is(.dark *));
+@custom-variant coarse (@media (pointer: coarse));
+@custom-variant fine (@media (pointer: fine));
+@custom-variant pwa (@media (display-mode: standalone));
 
 @config '../tailwind.config.js';
 

@@ -1,3 +1,4 @@
+import { isAccountantRole } from '@/lib/roles'
 /**
  * Accountant Home Page - Daily Work Queue (Master Dashboard)
  * 
@@ -67,7 +68,6 @@ import {
 } from '@phosphor-icons/react'
 import { format, formatDistanceToNow } from 'date-fns'
 import { nl as nlLocale } from 'date-fns/locale'
-import { ReviewQueue } from './ReviewQueue'
 import { navigateTo } from '@/lib/navigation'
 import { t } from '@/i18n'
 import { DagstartPanel } from './DagstartPanel'
@@ -250,7 +250,13 @@ export const AccountantHomePage = () => {
   
   // Data state
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
-  const [allClients, setAllClients] = useState<ClientStatusCard[]>([]) // All fetched clients
+  const [allClients, setAllClients] = useState<ClientStatusCard[]>([])
+  const [priorityClients, setPriorityClients] = useState<ClientStatusCard[]>([])
+  const [portfolioCounts, setPortfolioCounts] = useState<ClientsListResponse['portfolio_counts']>({})
+  const [filteredCount, setFilteredCount] = useState(0)
+  const [totalCount, setTotalCount] = useState(0)
+  const [selectedClientInfo, setSelectedClientInfo] = useState<{ id: string; name: string }[]>([])
+  const requestVersion = useRef(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -280,7 +286,7 @@ export const AccountantHomePage = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(() => {
     const stored = localStorage.getItem(PREF_PAGE_SIZE)
-    return stored ? parseInt(stored, 10) : 25
+    return [10, 25, 50].includes(Number(stored)) ? Number(stored) : 25
   })
   
   // Use shared selection hook
@@ -292,11 +298,7 @@ export const AccountantHomePage = () => {
     selectAll: selectAllClients,
     clearAll: clearSelection,
     selectOnlyFailed,
-    selectMany,
   } = useClientSelection()
-  
-  // Review Queue state - for viewing a specific client's documents
-  const [reviewQueueClient, setReviewQueueClient] = useState<ClientStatusCard | null>(null)
   
   // Track if "select all results" mode is active
   const [selectAllResultsMode, setSelectAllResultsMode] = useState(false)
@@ -329,120 +331,18 @@ export const AccountantHomePage = () => {
     localStorage.setItem(PREF_PAGE_SIZE, String(pageSize))
   }, [pageSize])
   
-  // Filter, search, and sort clients (client-side for now)
-  const filteredClients = useMemo(() => {
-    let result = [...allClients]
-    
-    // Apply search filter (name or email-like patterns in name)
-    if (debouncedSearch.trim()) {
-      const searchLower = debouncedSearch.toLowerCase().trim()
-      result = result.filter(c => 
-        c.name.toLowerCase().includes(searchLower) ||
-        (c.kvk_number && c.kvk_number.includes(searchLower)) ||
-        (c.btw_number && c.btw_number.toLowerCase().includes(searchLower))
-      )
-    }
-    
-    // Apply filter chip
-    switch (activeFilter) {
-      case 'has_red':
-        result = result.filter(c => c.red_issue_count > 0)
-        break
-      case 'has_yellow':
-        result = result.filter(c => c.yellow_issue_count > 0 && c.red_issue_count === 0)
-        break
-      case 'ok':
-        result = result.filter(c => c.red_issue_count === 0 && c.yellow_issue_count === 0)
-        break
-      case 'stale_30d':
-        result = result.filter(c => {
-          if (!c.last_activity_at) return true // Never active = stale
-          const lastActivity = new Date(c.last_activity_at)
-          const daysSince = (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24)
-          return daysSince >= 30
-        })
-        break
-      case 'deadline_7d':
-        result = result.filter(c => 
-          c.days_to_vat_deadline !== null && c.days_to_vat_deadline <= 7
-        )
-        break
-      // 'all' shows everything
-    }
-    
-    // Apply sorting
-    result.sort((a, b) => {
-      let comparison = 0
-      switch (sortBy) {
-        case 'readiness_score':
-          comparison = a.readiness_score - b.readiness_score
-          break
-        case 'deadline':
-          // null deadlines go to the end
-          if (a.days_to_vat_deadline === null && b.days_to_vat_deadline === null) comparison = 0
-          else if (a.days_to_vat_deadline === null) comparison = 1
-          else if (b.days_to_vat_deadline === null) comparison = -1
-          else comparison = a.days_to_vat_deadline - b.days_to_vat_deadline
-          break
-        case 'backlog':
-          comparison = (a.backlog_age_max_days ?? 0) - (b.backlog_age_max_days ?? 0)
-          break
-        case 'last_activity':
-          if (!a.last_activity_at && !b.last_activity_at) comparison = 0
-          else if (!a.last_activity_at) comparison = 1
-          else if (!b.last_activity_at) comparison = -1
-          else comparison = new Date(a.last_activity_at).getTime() - new Date(b.last_activity_at).getTime()
-          break
-        case 'red_issues':
-          comparison = b.red_issue_count - a.red_issue_count // desc by default
-          break
-        case 'name':
-          comparison = a.name.localeCompare(b.name, 'nl')
-          break
-      }
-      return sortOrder === 'asc' ? comparison : -comparison
-    })
-    
-    return result
-  }, [allClients, debouncedSearch, activeFilter, sortBy, sortOrder])
-  
-  // Paginated clients
-  const paginatedClients = useMemo(() => {
-    const startIdx = (currentPage - 1) * pageSize
-    return filteredClients.slice(startIdx, startIdx + pageSize)
-  }, [filteredClients, currentPage, pageSize])
-  
-  // Total pages
-  const totalPages = Math.ceil(filteredClients.length / pageSize)
-  
-  // Reset to page 1 when filters change
+  const paginatedClients = allClients
+  const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize))
+  const selectedClients = selectedClientInfo.filter(c => selectedClientIds.has(c.id))
+
   useEffect(() => {
     setCurrentPage(1)
+    clearSelection()
+    setSelectedClientInfo([])
+    setSelectAllResultsMode(false)
+    // Selection belongs to the current query, not a persisted filter from another session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, activeFilter, sortBy, sortOrder, pageSize])
-  
-  // Get selected clients with their names for the modal
-  const selectedClients = useMemo(() => {
-    // If "select all results" mode, use filtered clients
-    if (selectAllResultsMode) {
-      return filteredClients.map(c => ({ id: c.id, name: c.name }))
-    }
-    return allClients
-      .filter(c => selectedClientIds.has(c.id))
-      .map(c => ({ id: c.id, name: c.name }))
-  }, [allClients, filteredClients, selectedClientIds, selectAllResultsMode])
-  
-  // Check for selectedClientId in localStorage on mount
-  useEffect(() => {
-    const storedClientId = localStorage.getItem('selectedClientId')
-    if (storedClientId && allClients.length > 0) {
-      const client = allClients.find(c => c.id === storedClientId)
-      if (client) {
-        setReviewQueueClient(client)
-        // Clear from localStorage after use
-        localStorage.removeItem('selectedClientId')
-      }
-    }
-  }, [allClients])
 
   // Listen for tab changes from TodayCommandPanel (legacy support)
   useEffect(() => {
@@ -504,40 +404,48 @@ export const AccountantHomePage = () => {
     return () => window.removeEventListener('accountantTabChange', handleTabChange as EventListener)
   }, [])
 
-  // Fetch data - now fetches all clients and handles filtering/sorting client-side
+  const queryParams = useMemo(() => ({
+    sort: sortBy, order: sortOrder, search: debouncedSearch || undefined,
+    filter: activeFilter === 'all' ? undefined : activeFilter,
+    limit: pageSize, offset: (currentPage - 1) * pageSize,
+  }), [sortBy, sortOrder, debouncedSearch, activeFilter, pageSize, currentPage])
+
   const fetchData = useCallback(async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-      
-      // Fetch summary
-      const summaryRes = await api.get<DashboardSummary>('/accountant/dashboard/summary')
-      setSummary(summaryRes.data)
-      
-      // Fetch all clients (no server-side filters for better client-side UX)
-      const clientsRes = await api.get<ClientsListResponse>('/accountant/dashboard/clients', {
-        params: {
-          sort: 'readiness_score',
-          order: 'asc',
-        },
-      })
-      setAllClients(clientsRes.data.clients)
-      
-    } catch (err) {
-      setError(getErrorMessage(err))
-    } finally {
-      setIsLoading(false)
+    const version = ++requestVersion.current
+    setIsLoading(true)
+    setError(null)
+    const results = await Promise.allSettled([
+      api.get<DashboardSummary>('/accountant/dashboard/summary'),
+      api.get<ClientsListResponse>('/accountant/dashboard/clients', { params: queryParams }),
+    ])
+    if (version !== requestVersion.current) return
+    const [summaryResult, clientsResult] = results
+    if (summaryResult.status === 'fulfilled') setSummary(summaryResult.value.data)
+    if (clientsResult.status === 'fulfilled') {
+      const data = clientsResult.value.data
+      setAllClients(data.clients)
+      setPriorityClients(data.priority_clients)
+      setPortfolioCounts(data.portfolio_counts)
+      setFilteredCount(data.filtered_count)
+      setTotalCount(data.total_count)
+      if (currentPage > Math.max(1, Math.ceil(data.filtered_count / pageSize))) setCurrentPage(1)
     }
-  }, [])
+    const failure = results.find(r => r.status === 'rejected')
+    if (failure?.status === 'rejected') setError(getErrorMessage(failure.reason))
+    setIsLoading(false)
+  }, [queryParams, currentPage, pageSize])
 
   useEffect(() => {
     fetchData()
+    return () => { requestVersion.current += 1 }
   }, [fetchData])
 
   // Selection handlers
   const handleSelectClient = (id: string, selected: boolean) => {
     setSelectAllResultsMode(false) // Exit "select all results" mode
     toggleSelect(id)
+    const client = allClients.find(c => c.id === id)
+    if (client) setSelectedClientInfo(prev => [...prev.filter(c => c.id !== id), { id, name: client.name }])
   }
 
   const handleSelectAll = (selected: boolean) => {
@@ -545,17 +453,26 @@ export const AccountantHomePage = () => {
     if (selected) {
       // Select all visible (paginated) clients
       selectAllClients(paginatedClients.map(c => c.id))
+      setSelectedClientInfo(paginatedClients.map(c => ({ id: c.id, name: c.name })))
     } else {
       clearSelection()
     }
   }
   
   // Select all results (across all pages)
-  const handleSelectAllResults = () => {
-    setSelectAllResultsMode(true)
-    selectAllClients(filteredClients.map(c => c.id))
+  const handleSelectAllResults = async () => {
+    const version = requestVersion.current
+    try {
+      const response = await api.get<{ clients: { id: string; name: string }[] }>('/accountant/dashboard/client-selection', {
+        params: { search: queryParams.search, filter: queryParams.filter },
+      })
+      if (version !== requestVersion.current) return
+      setSelectedClientInfo(response.data.clients)
+      selectAllClients(response.data.clients.map(c => c.id))
+      setSelectAllResultsMode(true)
+    } catch (err) { setError(getErrorMessage(err)) }
   }
-  
+
   // Clear selection and exit select-all-results mode
   const handleClearSelection = () => {
     setSelectAllResultsMode(false)
@@ -575,7 +492,9 @@ export const AccountantHomePage = () => {
   }
 
   const handleOperationComplete = () => {
-    // Refresh data after bulk operation
+    // Completed operations invalidate the selection and the current data.
+    clearSelection()
+    setSelectedClientInfo([])
     fetchData()
     setSelectAllResultsMode(false)
   }
@@ -604,11 +523,6 @@ export const AccountantHomePage = () => {
   const handleViewReviewQueue = (client: ClientStatusCard) => {
     // Navigate to client dossier issues page - id is the administration ID
     navigateTo(`/accountant/clients/${client.id}/issues`)
-  }
-  
-  // Close review queue and go back to client list
-  const handleCloseReviewQueue = () => {
-    setReviewQueueClient(null)
   }
   
   // Pagination handlers
@@ -649,7 +563,7 @@ export const AccountantHomePage = () => {
   ]
 
   // Check access
-  if (user?.role !== 'accountant' && user?.role !== 'admin') {
+  if (!isAccountantRole(user?.role)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background p-8">
         <div className="max-w-7xl mx-auto">
@@ -665,28 +579,6 @@ export const AccountantHomePage = () => {
     )
   }
   
-  // If a client is selected for review queue, show that view
-  if (reviewQueueClient) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Back button */}
-          <div className="mb-4">
-            <Button variant="ghost" onClick={handleCloseReviewQueue}>
-              <CaretLeft size={18} className="mr-2" />
-              {t('accountantDashboard.backToClients')}
-            </Button>
-          </div>
-          
-          <ReviewQueue
-            clientId={reviewQueueClient.id}
-            clientName={reviewQueueClient.name}
-            onClose={handleCloseReviewQueue}
-          />
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
@@ -712,15 +604,16 @@ export const AccountantHomePage = () => {
 
         {/* Dagstart Panel - "Dagstart" Daily workflow panel */}
         <DagstartPanel 
-          summary={summary} 
-          clients={allClients} 
+          summary={summary}
+          portfolioCounts={portfolioCounts}
+          clients={priorityClients}
           isLoading={showLoading}
           onFilterChange={setActiveFilter as (filter: string) => void}
         />
 
         {/* Priority Clients Panel - "Top prioriteit klanten" */}
         <PriorityClientsPanel 
-          clients={allClients} 
+          clients={priorityClients}
           isLoading={showLoading} 
         />
 
@@ -779,7 +672,7 @@ export const AccountantHomePage = () => {
 
         {/* Bulk Actions Bar - Updated with new selection features */}
         <BulkActionBar
-          selectedCount={selectAllResultsMode ? filteredClients.length : selectedCount}
+          selectedCount={selectAllResultsMode ? filteredCount : selectedCount}
           visibleClientCount={paginatedClients.length}
           onSelectAll={handleSelectAllResults}
           onClearSelection={handleClearSelection}
@@ -787,13 +680,13 @@ export const AccountantHomePage = () => {
         />
         
         {/* Select All Results Banner */}
-        {selectedCount > 0 && selectedCount === paginatedClients.length && !selectAllResultsMode && filteredClients.length > paginatedClients.length && (
+        {selectedCount > 0 && selectedCount === paginatedClients.length && !selectAllResultsMode && filteredCount > paginatedClients.length && (
           <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-4 flex items-center justify-between">
             <span className="text-sm">
               {t('filters.onPageSelected').replace('{count}', String(paginatedClients.length))}
             </span>
             <Button variant="link" size="sm" onClick={handleSelectAllResults}>
-              {t('filters.selectAll')} {filteredClients.length} {t('filters.resultsFound')}
+              {t('filters.selectAll')} {filteredCount} {t('filters.resultsFound')}
             </Button>
           </div>
         )}
@@ -801,7 +694,7 @@ export const AccountantHomePage = () => {
         {selectAllResultsMode && (
           <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4 flex items-center justify-between">
             <span className="text-sm text-blue-700 dark:text-blue-300">
-              ✓ {t('filters.allFilteredSelected').replace('{count}', String(filteredClients.length))}
+              ✓ {t('filters.allFilteredSelected').replace('{count}', String(filteredCount))}
             </span>
             <Button variant="link" size="sm" className="text-blue-600" onClick={handleClearSelection}>
               {t('bulkOps.clearSelection')}
@@ -844,6 +737,7 @@ export const AccountantHomePage = () => {
                   <MagnifyingGlass size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     type="text"
+                    maxLength={200}
                     placeholder={t('filters.searchPlaceholder')}
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
@@ -905,7 +799,7 @@ export const AccountantHomePage = () => {
                     {chip.label}
                     {chip.value !== 'all' && activeFilter === chip.value && (
                       <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
-                        {filteredClients.length}
+                        {filteredCount}
                       </Badge>
                     )}
                   </Button>
@@ -914,7 +808,7 @@ export const AccountantHomePage = () => {
               
               {/* Results count */}
               <div className="text-sm text-muted-foreground">
-                {filteredClients.length} {t('filters.resultsFound')}
+                {filteredCount} {t('filters.resultsFound')}
                 {debouncedSearch && ` "${debouncedSearch}"`}
               </div>
             </div>
@@ -1016,14 +910,14 @@ export const AccountantHomePage = () => {
                   {/* Page info and navigation */}
                   <div className="flex items-center gap-4">
                     <span className="text-sm text-muted-foreground">
-                      {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, filteredClients.length)} {t('pagination.of')} {filteredClients.length}
+                      {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, filteredCount)} {t('pagination.of')} {filteredCount}
                     </span>
                     <div className="flex items-center gap-1">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={goToPrevPage}
-                        disabled={currentPage === 1}
+                        disabled={currentPage === 1 || isLoading}
                       >
                         <CaretLeft size={16} />
                         {t('pagination.previous')}
@@ -1032,7 +926,7 @@ export const AccountantHomePage = () => {
                         variant="outline"
                         size="sm"
                         onClick={goToNextPage}
-                        disabled={currentPage === totalPages}
+                        disabled={currentPage >= totalPages || isLoading}
                       >
                         {t('pagination.next')}
                         <CaretRight size={16} />
@@ -1041,7 +935,7 @@ export const AccountantHomePage = () => {
                   </div>
                 </div>
               </>
-            ) : allClients.length === 0 ? (
+            ) : totalCount === 0 ? (
               // No clients at all - show onboarding CTA
               <div className="text-center py-12 text-muted-foreground">
                 <Users size={48} className="mx-auto mb-4 opacity-50" />

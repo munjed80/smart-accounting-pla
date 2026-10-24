@@ -77,7 +77,10 @@ import {
 import { useAuth } from '@/lib/AuthContext'
 import { zzpApi, ZZPExpense, ZZPExpenseCreate, ZZPExpenseUpdate } from '@/lib/api'
 import { parseApiError } from '@/lib/utils'
-import { t } from '@/i18n'
+import { t, nl } from '@/i18n'
+
+const expenseCategoryLabel = (category: string): string =>
+  nl.zzpExpenses[`category_${category}` as keyof typeof nl.zzpExpenses] ?? category
 import { toast } from 'sonner'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
@@ -476,7 +479,7 @@ const ExpenseFormDialog = ({
                 <SelectContent>
                   {categories.map((cat) => (
                     <SelectItem key={cat} value={cat}>
-                      {t(`zzpExpenses.category_${cat}`) || cat}
+                      {expenseCategoryLabel(cat) || cat}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -624,7 +627,7 @@ const ExpenseCard = ({
             <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
               <span>{new Date(expense.expense_date).toLocaleDateString('nl-NL')}</span>
               <span>•</span>
-              <span>{t(`zzpExpenses.category_${expense.category}`) || expense.category}</span>
+              <span>{expenseCategoryLabel(expense.category) || expense.category}</span>
             </div>
           </div>
         </div>
@@ -663,7 +666,7 @@ const ExpenseCard = ({
 
 // Generate month options
 const generateMonthOptions = () => {
-  const months = []
+  const months: { value: string; label: string }[] = []
   const now = new Date()
   for (let i = 0; i < 12; i++) {
     months.push({
@@ -676,7 +679,7 @@ const generateMonthOptions = () => {
 
 // Generate year options (current year and 2 previous years)
 const generateYearOptions = () => {
-  const years = []
+  const years: { value: string; label: string }[] = []
   const currentYear = new Date().getFullYear()
   for (let i = 0; i < 3; i++) {
     const year = currentYear - i
@@ -1005,7 +1008,7 @@ export const ZZPExpensesPage = () => {
                     <SelectItem value="all">{t('zzpExpenses.filterAllCategories')}</SelectItem>
                     {categories.map((cat) => (
                       <SelectItem key={cat} value={cat}>
-                        {t(`zzpExpenses.category_${cat}`) || cat}
+                        {expenseCategoryLabel(cat) || cat}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1079,7 +1082,7 @@ export const ZZPExpensesPage = () => {
                             </div>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
-                            {t(`zzpExpenses.category_${expense.category}`) || expense.category}
+                            {expenseCategoryLabel(expense.category) || expense.category}
                           </TableCell>
                           <TableCell className="text-right font-medium">
                             {formatAmount(expense.amount_cents)}

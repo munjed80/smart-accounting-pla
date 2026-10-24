@@ -99,6 +99,17 @@ def verify_accountant_role(current_user: User) -> None:
     require_accountant(current_user)
 
 
+async def _issue_counts_for_clients(db: AsyncSession, client_ids: list[UUID]) -> dict:
+    if not client_ids:
+        return {}
+    result = await db.execute(
+        select(ClientIssue.administration_id, ClientIssue.severity, func.count(ClientIssue.id))
+        .where(ClientIssue.administration_id.in_(client_ids), ClientIssue.is_resolved.is_(False))
+        .group_by(ClientIssue.administration_id, ClientIssue.severity)
+    )
+    return {(admin_id, severity): count for admin_id, severity, count in result.all()}
+
+
 # ============ Dashboard Aggregation Endpoints ============
 
 @router.get("/dashboard/summary", response_model=DashboardSummaryResponse)
@@ -150,6 +161,9 @@ async def get_dashboard_summary(
 async def get_dashboard_clients(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = Query(25, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    search: Optional[str] = Query(None, max_length=200),
     sort: Optional[str] = Query(
         "readiness_score",
         description="Sort field: readiness_score, red_issues, backlog, deadline, name, last_activity"
@@ -195,6 +209,7 @@ async def get_dashboard_clients(
         sort_by=sort,
         sort_order=order,
         filters=filter,
+        search=search, limit=limit, offset=offset,
     )
     
     def safe_parse_datetime(dt_str: str | None) -> datetime | None:
@@ -238,6 +253,8 @@ async def get_dashboard_clients(
             )
             for c in result["clients"]
         ],
+        priority_clients=result.get("priority_clients", []),
+        portfolio_counts=result.get("portfolio_counts", {}),
         total_count=result["total_count"],
         filtered_count=result["filtered_count"],
         sort_by=result["sort_by"],
@@ -245,6 +262,19 @@ async def get_dashboard_clients(
         filters_applied=result["filters_applied"],
         generated_at=result["generated_at"],
     )
+
+
+@router.get('/dashboard/client-selection')
+async def get_dashboard_client_selection(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    search: Optional[str] = Query(None, max_length=200),
+    filter: Optional[List[str]] = Query(None),
+):
+    """Return minimal IDs/names only when the user explicitly selects all results."""
+    verify_accountant_role(current_user)
+    result = await AccountantDashboardService(db, current_user.id).get_clients_list(search=search, filters=filter)
+    return {'clients': [{'id': c['id'], 'name': c['name']} for c in result['clients']]}
 
 
 # ============ Bulk Operations Endpoints ============
@@ -891,6 +921,9 @@ async def list_client_links(
     )
     assignments = assignments_result.scalars().all()
     
+    issue_counts = await _issue_counts_for_clients(
+        db, [a.administration_id for a in assignments if a.status == AssignmentStatus.ACTIVE]
+    )
     links = []
     pending_count = 0
     active_count = 0
@@ -908,26 +941,9 @@ async def list_client_links(
         elif assignment.status == AssignmentStatus.ACTIVE:
             active_count += 1
         
-        # Get issue counts for ACTIVE assignments
-        red_count = 0
-        yellow_count = 0
-        if assignment.status == AssignmentStatus.ACTIVE:
-            red_count_result = await db.execute(
-                select(func.count(ClientIssue.id))
-                .where(ClientIssue.administration_id == admin.id)
-                .where(ClientIssue.severity == IssueSeverity.RED)
-                .where(ClientIssue.is_resolved == False)
-            )
-            red_count = red_count_result.scalar() or 0
-            
-            yellow_count_result = await db.execute(
-                select(func.count(ClientIssue.id))
-                .where(ClientIssue.administration_id == admin.id)
-                .where(ClientIssue.severity == IssueSeverity.YELLOW)
-                .where(ClientIssue.is_resolved == False)
-            )
-            yellow_count = yellow_count_result.scalar() or 0
-        
+        red_count = issue_counts.get((admin.id, IssueSeverity.RED), 0)
+        yellow_count = issue_counts.get((admin.id, IssueSeverity.YELLOW), 0)
+
         links.append(
             ClientLinkItem(
                 assignment_id=assignment.id,
@@ -975,55 +991,33 @@ async def list_assigned_clients(
     # Get all assignments for current accountant
     assignments_result = await db.execute(
         select(AccountantClientAssignment)
-        .options(selectinload(AccountantClientAssignment.administration))
+        .options(selectinload(AccountantClientAssignment.administration), selectinload(AccountantClientAssignment.client_user))
         .where(AccountantClientAssignment.accountant_id == current_user.id)
+        .where(AccountantClientAssignment.status.in_([AssignmentStatus.ACTIVE, AssignmentStatus.PENDING]))
         .order_by(AccountantClientAssignment.assigned_at.desc())
     )
     assignments = assignments_result.scalars().all()
     
+    issue_counts = await _issue_counts_for_clients(
+        db, [a.administration_id for a in assignments if a.status == AssignmentStatus.ACTIVE]
+    )
     clients = []
     for assignment in assignments:
         admin = assignment.administration
         if not admin:
             continue
         
-        # Find the owner of this administration (the client)
-        owner_result = await db.execute(
-            select(AdministrationMember)
-            .options(selectinload(AdministrationMember.user))
-            .where(AdministrationMember.administration_id == admin.id)
-            .where(AdministrationMember.role == MemberRole.OWNER)
-            .limit(1)
-        )
-        owner_member = owner_result.scalar_one_or_none()
-        
-        if not owner_member or not owner_member.user:
+        client_user = assignment.client_user
+        if not client_user:
             continue
-        
-        client_user = owner_member.user
-        
-        # Get issue counts for this administration
-        red_count_result = await db.execute(
-            select(func.count(ClientIssue.id))
-            .where(ClientIssue.administration_id == admin.id)
-            .where(ClientIssue.severity == IssueSeverity.RED)
-            .where(ClientIssue.is_resolved == False)
-        )
-        red_count = red_count_result.scalar() or 0
-        
-        yellow_count_result = await db.execute(
-            select(func.count(ClientIssue.id))
-            .where(ClientIssue.administration_id == admin.id)
-            .where(ClientIssue.severity == IssueSeverity.YELLOW)
-            .where(ClientIssue.is_resolved == False)
-        )
-        yellow_count = yellow_count_result.scalar() or 0
-        
+        red_count = issue_counts.get((admin.id, IssueSeverity.RED), 0)
+        yellow_count = issue_counts.get((admin.id, IssueSeverity.YELLOW), 0)
+
         clients.append(AccountantClientListItem(
             id=client_user.id,
             email=client_user.email,
             name=client_user.full_name,
-            status="active",
+            status=assignment.status.value.lower(),
             last_activity=client_user.last_login_at,
             open_red_count=red_count,
             open_yellow_count=yellow_count,
@@ -1208,6 +1202,9 @@ async def list_client_links_with_scopes(
     )
     assignments = assignments_result.scalars().all()
     
+    issue_counts = await _issue_counts_for_clients(
+        db, [a.administration_id for a in assignments if a.status == AssignmentStatus.ACTIVE]
+    )
     links = []
     pending_count = 0
     active_count = 0
@@ -1226,26 +1223,9 @@ async def list_client_links_with_scopes(
         elif assignment.status == AssignmentStatus.ACTIVE:
             active_count += 1
         
-        # Get issue counts for ACTIVE assignments
-        red_count = 0
-        yellow_count = 0
-        if assignment.status == AssignmentStatus.ACTIVE:
-            red_count_result = await db.execute(
-                select(func.count(ClientIssue.id))
-                .where(ClientIssue.administration_id == admin.id)
-                .where(ClientIssue.severity == IssueSeverity.RED)
-                .where(ClientIssue.is_resolved == False)
-            )
-            red_count = red_count_result.scalar() or 0
-            
-            yellow_count_result = await db.execute(
-                select(func.count(ClientIssue.id))
-                .where(ClientIssue.administration_id == admin.id)
-                .where(ClientIssue.severity == IssueSeverity.YELLOW)
-                .where(ClientIssue.is_resolved == False)
-            )
-            yellow_count = yellow_count_result.scalar() or 0
-        
+        red_count = issue_counts.get((admin.id, IssueSeverity.RED), 0)
+        yellow_count = issue_counts.get((admin.id, IssueSeverity.YELLOW), 0)
+
         # Get scopes
         scopes = assignment.scopes or DEFAULT_SCOPES.copy()
         granted_set = set(scopes)

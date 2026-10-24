@@ -317,15 +317,6 @@ async def require_approved_mandate_client(
     """
     require_accountant(current_user)
 
-    if current_user.role not in (UserRole.ACCOUNTANT.value, UserRole.SUPER_ADMIN.value):
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "code": "FORBIDDEN_ROLE",
-                "message": "Deze endpoint is alleen beschikbaar voor accountants met goedgekeurde machtiging.",
-            },
-        )
-
     from app.models.accountant_dashboard import AssignmentStatus
 
     assignment_result = await db.execute(

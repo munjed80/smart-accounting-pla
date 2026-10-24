@@ -118,6 +118,8 @@ class ClientsListResponse(BaseModel):
     Response for GET /api/v1/accountant/dashboard/clients
     """
     clients: List[ClientStatusCard]
+    priority_clients: List[ClientStatusCard] = Field(default_factory=list)
+    portfolio_counts: Dict[str, int] = Field(default_factory=dict)
     total_count: int
     filtered_count: int
     sort_by: str

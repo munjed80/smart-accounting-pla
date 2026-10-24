@@ -1,3 +1,4 @@
+import { isAccountantRole } from '@/lib/roles'
 /**
  * Accountant Review Queue Page
  * 
@@ -41,7 +42,7 @@ export const AccountantReviewQueuePage = () => {
   }
   
   // Check access
-  if (user?.role !== 'accountant' && user?.role !== 'admin') {
+  if (!isAccountantRole(user?.role)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background p-8">
         <div className="max-w-7xl mx-auto">

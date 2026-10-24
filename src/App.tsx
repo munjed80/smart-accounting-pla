@@ -1,66 +1,15 @@
-import { useState, useEffect } from 'react'
+import { isAccountantRole } from '@/lib/roles'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from '@/lib/AuthContext'
 import { NetworkError, ServerError } from '@/lib/errors'
 import { ActiveClientProvider } from '@/lib/ActiveClientContext'
 import { isPublicRoutePath } from '@/lib/publicRoutes'
-import { LoginPage } from '@/components/LoginPage'
-import { VerifyEmailPage } from '@/components/VerifyEmailPage'
-import { ForgotPasswordPage } from '@/components/ForgotPasswordPage'
-import { ResetPasswordPage } from '@/components/ResetPasswordPage'
-import { OnboardingPage } from '@/components/OnboardingPage'
-import { AccountantOnboardingPage } from '@/components/AccountantOnboardingPage'
-import { LandingPage } from '@/pages/LandingPage'
-import { PrivacyPage } from '@/pages/PrivacyPage'
-import { CookiesPage } from '@/pages/CookiesPage'
-import { TermsPage } from '@/pages/TermsPage'
-import { DisclaimerPage } from '@/pages/DisclaimerPage'
-import { ContactPage } from '@/pages/ContactPage'
-import { HelpPage } from '@/pages/HelpPage'
-import { FaqPage } from '@/pages/FaqPage'
-import { PrijzenPage } from '@/pages/PrijzenPage'
-import { BedanktPage } from '@/pages/BedanktPage'
-import { SmartDashboard } from '@/components/SmartDashboard'
-import { AccountantHomePage } from '@/components/AccountantHomePage'
-import { AccountantReviewQueuePage } from '@/components/AccountantReviewQueuePage'
-import { AccountantRemindersPage } from '@/components/AccountantRemindersPage'
-import { AccountantActionsPage } from '@/components/AccountantActionsPage'
-import { AccountantClientsPage } from '@/components/AccountantClientsPage'
-import { AccountantNotFoundPage } from '@/components/AccountantNotFoundPage'
-import { CrediteurenPage } from '@/components/CrediteurenPage'
-import { ProfitLossPage } from '@/components/ProfitLossPage'
-import { GrootboekPage } from '@/components/GrootboekPage'
-import { ZZPAccountantLinksPage } from '@/components/ZZPAccountantLinksPage'
-import { ZZPCustomersPage } from '@/components/ZZPCustomersPage'
-import { ZZPInvoicesPage } from '@/components/ZZPInvoicesPage'
-import { ZZPOffertesPage } from '@/components/ZZPOffertesPage'
-import { ZZPExpensesPage } from '@/components/ZZPExpensesPage'
-import { ZZPTimeTrackingPage } from '@/components/ZZPTimeTrackingPage'
-import { ZZPAgendaPage } from '@/components/ZZPAgendaPage'
-import { ZZPCommitmentsOverviewPage } from '@/components/ZZPCommitmentsOverviewPage'
-import { ZZPLeaseLoansPage } from '@/components/ZZPLeaseLoansPage'
-import { ZZPDocumentInboxPage } from '@/components/ZZPDocumentInboxPage'
-import { ZZPBtwAangiftePage } from '@/components/ZZPBtwAangiftePage'
-import { ZZPSubscriptionsPage } from '@/components/ZZPSubscriptionsPage'
-import { BelastinghulpInkomstenbelastingPage } from '@/components/BelastinghulpInkomstenbelastingPage'
-import { BelastinghulpUitlegPage } from '@/components/BelastinghulpUitlegPage'
-import { BelastinghulpJaaroverzichtPage } from '@/components/BelastinghulpJaaroverzichtPage'
-import { DataImportPage } from '@/components/DataImportPage'
-import { ZZPIntegrationsPage } from '@/components/ZZPIntegrationsPage'
-import { ZZPSalesReviewPage } from '@/components/ZZPSalesReviewPage'
-import { ClientDossierPage } from '@/components/ClientDossierPage'
-import { BulkOperationsHistoryPage } from '@/components/BulkOperationsHistoryPage'
-import { BankReconciliationPage } from '@/components/BankReconciliationPage'
-import { IntelligentUploadPortal } from '@/components/IntelligentUploadPortal'
-import { SmartTransactionList } from '@/components/SmartTransactionList'
-import { SettingsPage } from '@/components/SettingsPage'
-import { SupportPage } from '@/components/SupportPage'
-import { AdminDashboard } from '@/components/AdminDashboard'
 import { AppShell } from '@/components/AppShell'
 import { DashboardErrorBoundary } from '@/components/DashboardErrorBoundary'
 import { administrationApi, accountantClientApi, getApiBaseUrl } from '@/lib/api'
 import { navigateTo } from '@/lib/navigation'
-import { pathToTab, tabToPath } from '@/lib/routing'
+import { pathToTab, tabToPath, parseClientDossierRoute, type DossierTab } from '@/lib/routing'
 import { cleanupOverlayPortals } from '@/hooks/useCloseOverlayOnRouteChange'
 import { useOnboardingTour } from '@/hooks/useOnboardingTour'
 import { useEntitlements } from '@/hooks/useEntitlements'
@@ -68,6 +17,59 @@ import { OnboardingTour } from '@/components/OnboardingTour'
 import { Database, LockSimple } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+
+const LoginPage = lazy(() => import('@/components/LoginPage').then(module => ({ default: module.LoginPage })))
+const VerifyEmailPage = lazy(() => import('@/components/VerifyEmailPage').then(module => ({ default: module.VerifyEmailPage })))
+const ForgotPasswordPage = lazy(() => import('@/components/ForgotPasswordPage').then(module => ({ default: module.ForgotPasswordPage })))
+const ResetPasswordPage = lazy(() => import('@/components/ResetPasswordPage').then(module => ({ default: module.ResetPasswordPage })))
+const OnboardingPage = lazy(() => import('@/components/OnboardingPage').then(module => ({ default: module.OnboardingPage })))
+const AccountantOnboardingPage = lazy(() => import('@/components/AccountantOnboardingPage').then(module => ({ default: module.AccountantOnboardingPage })))
+const LandingPage = lazy(() => import('@/pages/LandingPage').then(module => ({ default: module.LandingPage })))
+const PrivacyPage = lazy(() => import('@/pages/PrivacyPage').then(module => ({ default: module.PrivacyPage })))
+const CookiesPage = lazy(() => import('@/pages/CookiesPage').then(module => ({ default: module.CookiesPage })))
+const TermsPage = lazy(() => import('@/pages/TermsPage').then(module => ({ default: module.TermsPage })))
+const DisclaimerPage = lazy(() => import('@/pages/DisclaimerPage').then(module => ({ default: module.DisclaimerPage })))
+const ContactPage = lazy(() => import('@/pages/ContactPage').then(module => ({ default: module.ContactPage })))
+const HelpPage = lazy(() => import('@/pages/HelpPage').then(module => ({ default: module.HelpPage })))
+const FaqPage = lazy(() => import('@/pages/FaqPage').then(module => ({ default: module.FaqPage })))
+const PrijzenPage = lazy(() => import('@/pages/PrijzenPage').then(module => ({ default: module.PrijzenPage })))
+const BedanktPage = lazy(() => import('@/pages/BedanktPage').then(module => ({ default: module.BedanktPage })))
+const SmartDashboard = lazy(() => import('@/components/SmartDashboard').then(module => ({ default: module.SmartDashboard })))
+const AccountantHomePage = lazy(() => import('@/components/AccountantHomePage').then(module => ({ default: module.AccountantHomePage })))
+const AccountantReviewQueuePage = lazy(() => import('@/components/AccountantReviewQueuePage').then(module => ({ default: module.AccountantReviewQueuePage })))
+const AccountantRemindersPage = lazy(() => import('@/components/AccountantRemindersPage').then(module => ({ default: module.AccountantRemindersPage })))
+const AccountantActionsPage = lazy(() => import('@/components/AccountantActionsPage').then(module => ({ default: module.AccountantActionsPage })))
+const AccountantClientsPage = lazy(() => import('@/components/AccountantClientsPage').then(module => ({ default: module.AccountantClientsPage })))
+const AccountantNotFoundPage = lazy(() => import('@/components/AccountantNotFoundPage').then(module => ({ default: module.AccountantNotFoundPage })))
+const CrediteurenPage = lazy(() => import('@/components/CrediteurenPage').then(module => ({ default: module.CrediteurenPage })))
+const ProfitLossPage = lazy(() => import('@/components/ProfitLossPage').then(module => ({ default: module.ProfitLossPage })))
+const GrootboekPage = lazy(() => import('@/components/GrootboekPage').then(module => ({ default: module.GrootboekPage })))
+const ZZPAccountantLinksPage = lazy(() => import('@/components/ZZPAccountantLinksPage').then(module => ({ default: module.ZZPAccountantLinksPage })))
+const ZZPCustomersPage = lazy(() => import('@/components/ZZPCustomersPage').then(module => ({ default: module.ZZPCustomersPage })))
+const ZZPInvoicesPage = lazy(() => import('@/components/ZZPInvoicesPage').then(module => ({ default: module.ZZPInvoicesPage })))
+const ZZPOffertesPage = lazy(() => import('@/components/ZZPOffertesPage').then(module => ({ default: module.ZZPOffertesPage })))
+const ZZPExpensesPage = lazy(() => import('@/components/ZZPExpensesPage').then(module => ({ default: module.ZZPExpensesPage })))
+const ZZPTimeTrackingPage = lazy(() => import('@/components/ZZPTimeTrackingPage').then(module => ({ default: module.ZZPTimeTrackingPage })))
+const ZZPAgendaPage = lazy(() => import('@/components/ZZPAgendaPage').then(module => ({ default: module.ZZPAgendaPage })))
+const ZZPCommitmentsOverviewPage = lazy(() => import('@/components/ZZPCommitmentsOverviewPage').then(module => ({ default: module.ZZPCommitmentsOverviewPage })))
+const ZZPLeaseLoansPage = lazy(() => import('@/components/ZZPLeaseLoansPage').then(module => ({ default: module.ZZPLeaseLoansPage })))
+const ZZPDocumentInboxPage = lazy(() => import('@/components/ZZPDocumentInboxPage').then(module => ({ default: module.ZZPDocumentInboxPage })))
+const ZZPBtwAangiftePage = lazy(() => import('@/components/ZZPBtwAangiftePage').then(module => ({ default: module.ZZPBtwAangiftePage })))
+const ZZPSubscriptionsPage = lazy(() => import('@/components/ZZPSubscriptionsPage').then(module => ({ default: module.ZZPSubscriptionsPage })))
+const BelastinghulpInkomstenbelastingPage = lazy(() => import('@/components/BelastinghulpInkomstenbelastingPage').then(module => ({ default: module.BelastinghulpInkomstenbelastingPage })))
+const BelastinghulpUitlegPage = lazy(() => import('@/components/BelastinghulpUitlegPage').then(module => ({ default: module.BelastinghulpUitlegPage })))
+const BelastinghulpJaaroverzichtPage = lazy(() => import('@/components/BelastinghulpJaaroverzichtPage').then(module => ({ default: module.BelastinghulpJaaroverzichtPage })))
+const DataImportPage = lazy(() => import('@/components/DataImportPage').then(module => ({ default: module.DataImportPage })))
+const ZZPIntegrationsPage = lazy(() => import('@/components/ZZPIntegrationsPage').then(module => ({ default: module.ZZPIntegrationsPage })))
+const ZZPSalesReviewPage = lazy(() => import('@/components/ZZPSalesReviewPage').then(module => ({ default: module.ZZPSalesReviewPage })))
+const ClientDossierPage = lazy(() => import('@/components/ClientDossierPage').then(module => ({ default: module.ClientDossierPage })))
+const BulkOperationsHistoryPage = lazy(() => import('@/components/BulkOperationsHistoryPage').then(module => ({ default: module.BulkOperationsHistoryPage })))
+const BankReconciliationPage = lazy(() => import('@/components/BankReconciliationPage').then(module => ({ default: module.BankReconciliationPage })))
+const IntelligentUploadPortal = lazy(() => import('@/components/IntelligentUploadPortal').then(module => ({ default: module.IntelligentUploadPortal })))
+const SmartTransactionList = lazy(() => import('@/components/SmartTransactionList').then(module => ({ default: module.SmartTransactionList })))
+const SettingsPage = lazy(() => import('@/components/SettingsPage').then(module => ({ default: module.SettingsPage })))
+const SupportPage = lazy(() => import('@/components/SupportPage').then(module => ({ default: module.SupportPage })))
+const AdminDashboard = lazy(() => import('@/components/AdminDashboard').then(module => ({ default: module.AdminDashboard })))
 
 // Delay for Radix UI to complete cleanup before our global cleanup runs
 // Increased to 200ms to handle slower devices and ensure animations complete
@@ -110,23 +112,9 @@ type Route =
   | { type: 'faq' }
   | { type: 'prijzen' }
   | { type: 'bedankt' }
-  | { type: 'client-dossier'; clientId: string; tab: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'bookkeeping' | 'periods' | 'decisions' | 'audit' | 'commitments' }
+  | { type: 'client-dossier'; clientId: string; tab: DossierTab }
   | { type: 'bulk-operations-history' }
   | { type: 'bank-reconciliation' }
-
-// Parse client dossier route
-const parseClientDossierRoute = (path: string): { clientId: string; tab: 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'bookkeeping' | 'periods' | 'decisions' | 'audit' | 'commitments' } | null => {
-  // Match /accountant/clients/:clientId or /accountant/clients/:clientId/:tab
-  const match = path.match(/^\/accountant\/clients\/([^/]+)(?:\/([^/]+))?$/)
-  if (match) {
-    const clientId = match[1]
-    const tabParam = match[2] || 'invoices'
-    const validTabs = ['invoices', 'expenses', 'hours', 'vat', 'issues', 'bookkeeping', 'periods', 'decisions', 'audit', 'commitments']
-    const tab = validTabs.includes(tabParam) ? tabParam as 'invoices' | 'expenses' | 'hours' | 'vat' | 'issues' | 'bookkeeping' | 'periods' | 'decisions' | 'audit' | 'commitments' : 'invoices'
-    return { clientId, tab }
-  }
-  return null
-}
 
 const getRouteFromURL = (): Route => {
   const path = window.location.pathname
@@ -278,10 +266,10 @@ const TrialExpiredScreen = ({ onGoToSubscriptions, onLogout }: { onGoToSubscript
 
 const AppContent = () => {
   const { user, isAuthenticated, isLoading, checkSession, logout } = useAuth()
-  const isAccountant = user?.role === 'accountant' || user?.role === 'admin'
+  const isAccountant = isAccountantRole(user?.role)
   const isSuperAdmin = user?.role === 'super_admin'
   const isZzp = user?.role === 'zzp'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'offertes' | 'expenses' | 'time' | 'agenda' | 'obligations-overview' | 'lease-loans' | 'subscriptions' | 'documents' | 'admin' | 'tax-btw' | 'tax-income' | 'tax-help' | 'tax-annual' | 'data-import' | 'integrations'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'workqueue' | 'reviewqueue' | 'reminders' | 'acties' | 'bank' | 'crediteuren' | 'profitloss' | 'grootboek' | 'transactions' | 'upload' | 'settings' | 'support' | 'boekhouder' | 'customers' | 'invoices' | 'offertes' | 'expenses' | 'time' | 'agenda' | 'obligations-overview' | 'lease-loans' | 'subscriptions' | 'documents' | 'admin' | 'tax-btw' | 'tax-income' | 'tax-help' | 'tax-annual' | 'data-import' | 'integrations' | 'sales-review'>('dashboard')
   const [route, setRoute] = useState<Route>(getRouteFromURL)
   
   // Onboarding state - tracks if user needs onboarding (no administrations for ZZP, no clients for accountants)
@@ -343,7 +331,7 @@ const AppContent = () => {
   // Update active tab when user role becomes available (after login) or route changes
   useEffect(() => {
     if (user && isAuthenticated) {
-      const userIsAccountant = user.role === 'accountant' || user.role === 'admin'
+      const userIsAccountant = isAccountantRole(user.role)
       
       if (!hasSetInitialTab) {
         // Set initial tab based on URL path or default to role-appropriate tab
@@ -405,7 +393,7 @@ const AppContent = () => {
       setIsCheckingOnboarding(true)
       setBootStage('onboarding-check')
       try {
-        const userIsAccountant = user.role === 'accountant' || user.role === 'admin'
+        const userIsAccountant = isAccountantRole(user.role)
 
         if (user.role === 'super_admin') {
           setNeedsOnboarding(false)
@@ -519,7 +507,7 @@ const AppContent = () => {
     // collapses /login, /auth and /register into route.type === 'login'
     // (see getRouteFromURL), so this branch covers all three.
     if (route.type === 'login') {
-      const userIsAccountant = user?.role === 'accountant' || user?.role === 'admin'
+      const userIsAccountant = isAccountantRole(user?.role)
       const landingPath = user?.role === 'super_admin'
         ? '/admin'
         : userIsAccountant
@@ -696,7 +684,7 @@ const AppContent = () => {
         onComplete={() => {
           setNeedsOnboarding(false)
           // Navigate to role-appropriate landing page - no "/" fallback
-          const userIsAccountant = user?.role === 'accountant' || user?.role === 'admin'
+          const userIsAccountant = isAccountantRole(user?.role)
           const landingPath = isSuperAdmin ? '/admin' : userIsAccountant ? '/accountant' : '/dashboard'
           navigateTo(landingPath)
         }}
@@ -738,6 +726,7 @@ const AppContent = () => {
         onTabChange={handleTabChange}
       >
         <ClientDossierPage 
+          key={route.clientId}
           clientId={route.clientId} 
           initialTab={route.tab}
         />
@@ -931,7 +920,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ActiveClientProvider>
-          <AppContent />
+          <Suspense fallback={<div role="status" className="p-8 text-center text-muted-foreground">Pagina laden...</div>}>
+            <AppContent />
+          </Suspense>
         </ActiveClientProvider>
       </AuthProvider>
     </QueryClientProvider>

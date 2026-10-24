@@ -9,23 +9,23 @@ describe('getBrandName', () => {
     expect(getBrandName('zzp')).toBe('ZZPers Hub')
   })
 
-  it('returns "Smart Accounting" for accountant role', () => {
-    expect(getBrandName('accountant')).toBe('Smart Accounting')
+  it('returns "ZZPers Hub" for accountant role', () => {
+    expect(getBrandName('accountant')).toBe('ZZPers Hub')
   })
 
-  it('returns "Smart Accounting" for super_admin role', () => {
-    expect(getBrandName('super_admin')).toBe('Smart Accounting')
+  it('returns "ZZPers Hub" for super_admin role', () => {
+    expect(getBrandName('super_admin')).toBe('ZZPers Hub')
   })
 
-  it('returns "Smart Accounting" for admin role', () => {
-    expect(getBrandName('admin')).toBe('Smart Accounting')
+  it('returns "ZZPers Hub" for admin role', () => {
+    expect(getBrandName('admin')).toBe('ZZPers Hub')
   })
 
-  it('returns "Smart Accounting" when role is undefined', () => {
-    expect(getBrandName(undefined)).toBe('Smart Accounting')
+  it('returns "ZZPers Hub" when role is undefined', () => {
+    expect(getBrandName(undefined)).toBe('ZZPers Hub')
   })
 
-  it('returns "Smart Accounting" when role is an empty string', () => {
-    expect(getBrandName('')).toBe('Smart Accounting')
+  it('returns "ZZPers Hub" when role is an empty string', () => {
+    expect(getBrandName('')).toBe('ZZPers Hub')
   })
 })

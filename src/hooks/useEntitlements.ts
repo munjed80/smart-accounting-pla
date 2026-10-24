@@ -6,7 +6,7 @@
  */
 import { subscriptionApi, type EntitlementResponse, type SubscriptionResponse } from '@/lib/api'
 import { useAuth } from '@/lib/AuthContext'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, type QueryObserverResult } from '@tanstack/react-query'
 
 // Roles that bypass subscription checks
 const SUBSCRIPTION_BYPASS_ROLES = ['accountant', 'admin', 'super_admin']
@@ -16,7 +16,7 @@ export interface UseEntitlementsResult {
   subscription: SubscriptionResponse | null
   isLoading: boolean
   error: Error | null
-  refetch: () => void
+  refetch: () => Promise<QueryObserverResult<SubscriptionResponse, Error>>
   canUseFeature: (feature: string) => boolean
   isAccountantBypass: boolean
   /** True when BILLING_FORCE_PAYWALL=true is returned by the backend */

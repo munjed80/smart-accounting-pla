@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -29,11 +29,16 @@ export function ClientDossierDataTab({ clientId, type }: Props) {
   const [expenses, setExpenses] = useState<ZZPExpense[]>([])
   const [hours, setHours] = useState<ZZPTimeEntry[]>([])
   const [isExporting, setIsExporting] = useState(false)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const pageSize = 50
+  const version = useRef(0)
+  const search = window.location.search
   const commitmentIdFilter = useMemo(() => {
     if (type !== 'expenses') return null
     const params = new URLSearchParams(window.location.search)
     return params.get('commitmentId')
-  }, [type])
+  }, [type, search])
 
   const load = async () => {
     if (!clientId) {
@@ -42,32 +47,41 @@ export function ClientDossierDataTab({ clientId, type }: Props) {
       return
     }
 
+    const request = ++version.current
+    const pagination = { limit: pageSize, offset: (page - 1) * pageSize }
     setIsLoading(true)
     setError(null)
     try {
       if (type === 'invoices') {
-        const response = await accountantDossierApi.getInvoices(clientId)
+        const response = await accountantDossierApi.getInvoices(clientId, pagination)
+        if (request !== version.current) return
+        setTotal(response.total)
         setInvoices(response.invoices)
       } else if (type === 'expenses') {
         const response = await accountantDossierApi.getExpenses(
           clientId,
-          commitmentIdFilter ? { commitment_id: commitmentIdFilter } : undefined,
+          { ...pagination, ...(commitmentIdFilter ? { commitment_id: commitmentIdFilter } : {}) },
         )
+        if (request !== version.current) return
+        setTotal(response.total)
         setExpenses(response.expenses)
       } else {
-        const response = await accountantDossierApi.getHours(clientId)
+        const response = await accountantDossierApi.getHours(clientId, pagination)
+        if (request !== version.current) return
+        setTotal(response.total)
         setHours(response.entries)
       }
     } catch (err: unknown) {
-      setError(err)
+      if (request === version.current) setError(err)
     } finally {
-      setIsLoading(false)
+      if (request === version.current) setIsLoading(false)
     }
   }
 
   useEffect(() => {
     load()
-  }, [clientId, type, commitmentIdFilter])
+    return () => { version.current += 1 }
+  }, [clientId, type, commitmentIdFilter, page])
 
   const handleExport = async () => {
     setIsExporting(true)
@@ -174,6 +188,15 @@ export function ClientDossierDataTab({ clientId, type }: Props) {
               <CardContent className="text-sm text-muted-foreground">{entry.entry_date} · {entry.hours} uur · {entry.billable ? 'Declarabel' : 'Niet declarabel'}</CardContent>
             </Card>
           ))}
+        </div>
+      )}
+      {total > pageSize && (
+        <div className="mt-4 flex items-center justify-between gap-3" aria-label="Paginering">
+          <span className="text-sm text-muted-foreground">{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} van {total}</span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Vorige</Button>
+            <Button variant="outline" size="sm" disabled={page * pageSize >= total} onClick={() => setPage(p => p + 1)}>Volgende</Button>
+          </div>
         </div>
       )}
     </div>

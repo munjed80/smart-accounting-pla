@@ -27,6 +27,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Production build and type check
+        run: npm run build
+
       - name: Frontend tests
         run: npm test
 

@@ -19,7 +19,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -148,10 +148,12 @@ async def list_client_invoices(
     client_id: UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     status: Optional[str] = Query(None, pattern=r'^(draft|sent|paid|overdue|cancelled)$'),
     customer_id: Optional[UUID] = Query(None),
-    from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
-    to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    from_date: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
 ):
     """
     List all invoices for a client (accountant access).
@@ -176,22 +178,24 @@ async def list_client_invoices(
     if customer_id:
         query = query.where(ZZPInvoice.customer_id == customer_id)
     if from_date:
-        query = query.where(ZZPInvoice.issue_date >= date.fromisoformat(from_date))
+        query = query.where(ZZPInvoice.issue_date >= from_date)
     if to_date:
-        query = query.where(ZZPInvoice.issue_date <= date.fromisoformat(to_date))
+        query = query.where(ZZPInvoice.issue_date <= to_date)
     
-    query = query.order_by(ZZPInvoice.issue_date.desc(), ZZPInvoice.invoice_number.desc())
-    
+    rows = query.subquery()
+    total = (await db.execute(select(func.count()).select_from(rows))).scalar_one()
+    query = query.order_by(ZZPInvoice.issue_date.desc(), ZZPInvoice.id.desc()).limit(limit).offset(offset)
+
     result = await db.execute(query)
     invoices = result.scalars().all()
     
     return InvoiceListResponse(
         invoices=[invoice_to_response(inv) for inv in invoices],
-        total=len(invoices)
+        total=total
     )
 
 
-@router.get("/clients/{client_id}/invoices/{invoice_id}", response_model=InvoiceResponse)
+@router.get("/clients/{client_id}/invoices/{invoice_id:uuid}", response_model=InvoiceResponse)
 async def get_client_invoice(
     client_id: UUID,
     invoice_id: UUID,
@@ -272,8 +276,10 @@ async def list_client_expenses(
     client_id: UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
-    to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    from_date: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
     category: Optional[str] = Query(None),
     commitment_id: Optional[UUID] = Query(None),
 ):
@@ -295,24 +301,29 @@ async def list_client_expenses(
     
     # Apply filters
     if from_date:
-        query = query.where(ZZPExpense.expense_date >= date.fromisoformat(from_date))
+        query = query.where(ZZPExpense.expense_date >= from_date)
     if to_date:
-        query = query.where(ZZPExpense.expense_date <= date.fromisoformat(to_date))
+        query = query.where(ZZPExpense.expense_date <= to_date)
     if category:
         query = query.where(ZZPExpense.category == category)
     if commitment_id:
         query = query.where(ZZPExpense.commitment_id == commitment_id)
     
-    query = query.order_by(ZZPExpense.expense_date.desc())
-    
+    rows = query.subquery()
+    total, total_amount, total_vat = (await db.execute(select(
+        func.count(), func.coalesce(func.sum(rows.c.amount_cents), 0),
+        func.coalesce(func.sum(rows.c.vat_amount_cents), 0),
+    ))).one()
+    query = query.order_by(ZZPExpense.expense_date.desc(), ZZPExpense.id.desc()).limit(limit).offset(offset)
+
     result = await db.execute(query)
     expenses = result.scalars().all()
     
     return ExpenseListResponse(
         expenses=[ExpenseResponse.model_validate(e) for e in expenses],
-        total=len(expenses),
-        total_amount_cents=sum(e.amount_cents for e in expenses),
-        total_vat_cents=sum(e.vat_amount_cents for e in expenses),
+        total=total,
+        total_amount_cents=total_amount,
+        total_vat_cents=total_vat,
     )
 
 
@@ -322,8 +333,10 @@ async def list_client_time_entries(
     client_id: UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
-    to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    from_date: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
     billable: Optional[bool] = Query(None),
 ):
     """
@@ -344,24 +357,31 @@ async def list_client_time_entries(
     
     # Apply filters
     if from_date:
-        query = query.where(ZZPTimeEntry.entry_date >= date.fromisoformat(from_date))
+        query = query.where(ZZPTimeEntry.entry_date >= from_date)
     if to_date:
-        query = query.where(ZZPTimeEntry.entry_date <= date.fromisoformat(to_date))
+        query = query.where(ZZPTimeEntry.entry_date <= to_date)
     if billable is not None:
         query = query.where(ZZPTimeEntry.billable == billable)
     
-    query = query.order_by(ZZPTimeEntry.entry_date.desc())
-    
+    rows = query.subquery()
+    total, total_hours, billable_hours, open_count, invoiced_count = (await db.execute(select(
+        func.count(), func.coalesce(func.sum(rows.c.hours), 0),
+        func.coalesce(func.sum(case((rows.c.billable.is_(True), rows.c.hours), else_=0)), 0),
+        func.coalesce(func.sum(case((rows.c.is_invoiced.is_(False), 1), else_=0)), 0),
+        func.coalesce(func.sum(case((rows.c.is_invoiced.is_(True), 1), else_=0)), 0),
+    ))).one()
+    query = query.order_by(ZZPTimeEntry.entry_date.desc(), ZZPTimeEntry.id.desc()).limit(limit).offset(offset)
+
     result = await db.execute(query)
     time_entries = result.scalars().all()
     
     return TimeEntryListResponse(
         entries=time_entries,
-        total=len(time_entries),
-        total_hours=sum((t.hours for t in time_entries), Decimal("0")),
-        total_billable_hours=sum((t.hours for t in time_entries if t.billable), Decimal("0")),
-        open_entries=sum(1 for t in time_entries if not t.is_invoiced),
-        invoiced_entries=sum(1 for t in time_entries if t.is_invoiced),
+        total=total,
+        total_hours=total_hours,
+        total_billable_hours=billable_hours,
+        open_entries=open_count,
+        invoiced_entries=invoiced_count,
     )
 
 
@@ -491,8 +511,8 @@ async def export_client_invoices_csv(
     db: Annotated[AsyncSession, Depends(get_db)],
     status: Optional[str] = Query(None, pattern=r'^(draft|sent|paid|overdue|cancelled)$'),
     customer_id: Optional[UUID] = Query(None),
-    from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
-    to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    from_date: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
 ):
     """
     Export invoices as CSV for a client (accountant access).
@@ -507,7 +527,6 @@ async def export_client_invoices_csv(
     # Build query - ALWAYS filter by administration_id for data isolation
     query = (
         select(ZZPInvoice)
-        .options(selectinload(ZZPInvoice.lines))
         .where(ZZPInvoice.administration_id == administration.id)
     )
     
@@ -517,9 +536,9 @@ async def export_client_invoices_csv(
     if customer_id:
         query = query.where(ZZPInvoice.customer_id == customer_id)
     if from_date:
-        query = query.where(ZZPInvoice.issue_date >= date.fromisoformat(from_date))
+        query = query.where(ZZPInvoice.issue_date >= from_date)
     if to_date:
-        query = query.where(ZZPInvoice.issue_date <= date.fromisoformat(to_date))
+        query = query.where(ZZPInvoice.issue_date <= to_date)
     
     query = query.order_by(ZZPInvoice.issue_date.desc(), ZZPInvoice.invoice_number.desc())
     
@@ -575,8 +594,8 @@ async def export_client_expenses_csv(
     db: Annotated[AsyncSession, Depends(get_db)],
     category: Optional[str] = Query(None),
     commitment_id: Optional[UUID] = Query(None),
-    from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
-    to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    from_date: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
 ):
     """
     Export expenses as CSV for a client (accountant access).
@@ -600,9 +619,9 @@ async def export_client_expenses_csv(
     if commitment_id:
         query = query.where(ZZPExpense.commitment_id == commitment_id)
     if from_date:
-        query = query.where(ZZPExpense.expense_date >= date.fromisoformat(from_date))
+        query = query.where(ZZPExpense.expense_date >= from_date)
     if to_date:
-        query = query.where(ZZPExpense.expense_date <= date.fromisoformat(to_date))
+        query = query.where(ZZPExpense.expense_date <= to_date)
     
     query = query.order_by(ZZPExpense.expense_date.desc())
     
@@ -656,8 +675,8 @@ async def export_client_hours_csv(
     db: Annotated[AsyncSession, Depends(get_db)],
     customer_id: Optional[UUID] = Query(None),
     billable: Optional[bool] = Query(None),
-    from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
-    to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    from_date: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
 ):
     """
     Export time entries (hours) as CSV for a client (accountant access).
@@ -681,9 +700,9 @@ async def export_client_hours_csv(
     if billable is not None:
         query = query.where(ZZPTimeEntry.billable == billable)
     if from_date:
-        query = query.where(ZZPTimeEntry.entry_date >= date.fromisoformat(from_date))
+        query = query.where(ZZPTimeEntry.entry_date >= from_date)
     if to_date:
-        query = query.where(ZZPTimeEntry.entry_date <= date.fromisoformat(to_date))
+        query = query.where(ZZPTimeEntry.entry_date <= to_date)
     
     query = query.order_by(ZZPTimeEntry.entry_date.desc())
     

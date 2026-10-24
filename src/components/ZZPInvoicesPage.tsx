@@ -1,3 +1,5 @@
+import { useServerPagination } from '@/hooks/useServerPagination'
+import { ServerPagination } from './ServerPagination'
 /**
  * ZZP Invoices Page
  * 
@@ -1486,6 +1488,17 @@ const ZZPInvoicesPageContent = () => {
     }
   }, [debouncedSearch, filters.q, setFilter])
   
+  const pagination = useServerPagination(JSON.stringify([user?.id, filters]))
+  const [serverStats, setServerStats] = useState<Awaited<ReturnType<typeof zzpApi.invoices.list>>['stats']>()
+  const listOptions = useMemo(() => ({ limit: pagination.pageSize, offset: pagination.offset,
+    status: filters.status === 'all' ? undefined : filters.status, customer_id: filters.customer_id || undefined,
+    q: filters.q || undefined,
+    from_date: (filters.from && filters.to ? [filters.from,filters.to].sort()[0] : filters.from) || undefined,
+    to_date: (filters.from && filters.to ? [filters.from,filters.to].sort()[1] : filters.to) || undefined,
+    min_cents: filters.min && Number.isFinite(Number(filters.min.replace(',', '.'))) ? Math.round(Number(filters.min.replace(',', '.')) * 100) : undefined,
+    max_cents: filters.max && Number.isFinite(Number(filters.max.replace(',', '.'))) ? Math.round(Number(filters.max.replace(',', '.')) * 100) : undefined,
+  }), [pagination.pageSize, pagination.offset, filters.status, filters.customer_id, filters.q, filters.from, filters.to, filters.min, filters.max])
+
   // Dialog state
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingInvoice, setEditingInvoice] = useState<ZZPInvoice | undefined>()
@@ -1548,6 +1561,7 @@ const ZZPInvoicesPageContent = () => {
 
   // Load data from API
   const loadData = useCallback(async () => {
+    const isCurrent = pagination.beginRequest()
     if (!user?.id) {
       // Auth not yet resolved — clear the initial loading state so the page
       // doesn't get stuck showing a skeleton indefinitely on back navigation.
@@ -1568,7 +1582,7 @@ const ZZPInvoicesPageContent = () => {
     try {
       // Load invoices, customers, and business profile in parallel
       const [invoicesResponse, customersResponse, profileData] = await Promise.all([
-        zzpApi.invoices.list(),
+        zzpApi.invoices.list(listOptions),
         zzpApi.customers.list(),
         zzpApi.profile.get().catch((profileError) => {
           console.error('[Invoices] Failed to load profile during invoices bootstrap', {
@@ -1582,6 +1596,7 @@ const ZZPInvoicesPageContent = () => {
         }), // Profile might not exist
       ])
 
+      if (!isCurrent()) return
       const normalizedInvoices = normalizeListResponse<ZZPInvoice>(invoicesResponse, 'invoices')
       const normalizedCustomers = normalizeListResponse<ZZPCustomer>(customersResponse, 'customers')
 
@@ -1601,14 +1616,17 @@ const ZZPInvoicesPageContent = () => {
         ...prev,
       ].slice(0, 12))
 
+      pagination.setTotal(invoicesResponse?.total ?? normalizedInvoices.length)
+      setServerStats(invoicesResponse?.stats ?? undefined)
       setInvoices(normalizedInvoices)
       setCustomers(normalizedCustomers)
       setBusinessProfile(profileData)
       setLoadState('success')
       setLastErrorMessage(null)
       // Refresh monthly summary after loading invoices
-      setMonthlyRefreshKey(k => k + 1)
+
     } catch (err) {
+      if (!isCurrent()) return
       console.error('[Invoices] Failed to load invoices page data', {
         route: 'Facturen',
         endpoint: invoiceEndpoint,
@@ -1649,9 +1667,9 @@ const ZZPInvoicesPageContent = () => {
       setInvoices([])
       setCustomers([])
     } finally {
-      setIsLoading(false)
+      if (isCurrent()) setIsLoading(false)
     }
-  }, [administrationId, user?.id, user?.role])
+  }, [administrationId, user?.id, user?.role, listOptions])
 
   useEffect(() => {
     loadData()
@@ -1670,19 +1688,14 @@ const ZZPInvoicesPageContent = () => {
     }
   }, [preSelectedCustomerId, customers, isLoading])
   
-  // Auto-open invoice view when pre-selected invoice ID is set and data is loaded
   useEffect(() => {
-    if (preSelectedInvoiceId && invoices.length > 0 && !isLoading) {
-      // Find the invoice
-      const invoice = invoices.find(inv => inv.id === preSelectedInvoiceId)
-      if (invoice) {
-        setViewingInvoice(invoice)
-      } else {
-        toast.error(t('zzpInvoices.invoiceNotFound') || 'Invoice not found')
-      }
-      setPreSelectedInvoiceId(null) // Clear after opening
-    }
-  }, [preSelectedInvoiceId, invoices, isLoading])
+    if (!preSelectedInvoiceId) return
+    let cancelled = false
+    zzpApi.invoices.get(preSelectedInvoiceId).then(invoice => {
+      if (!cancelled) { setViewingInvoice(invoice); setPreSelectedInvoiceId(null) }
+    }).catch(error => { if (!cancelled) { toast.error(parseApiError(error)); setPreSelectedInvoiceId(null) } })
+    return () => { cancelled = true }
+  }, [preSelectedInvoiceId])
 
   // Create customer lookup map
   const customerMap = useMemo(() => {
@@ -1693,6 +1706,7 @@ const ZZPInvoicesPageContent = () => {
 
   // Calculate stats
   const stats = useMemo(() => {
+    if (serverStats) return serverStats
     const total = invoices.length
     const draft = invoices.filter(i => i.status === 'draft').length
     const sent = invoices.filter(i => i.status === 'sent').length
@@ -1702,11 +1716,11 @@ const ZZPInvoicesPageContent = () => {
     const paidAmount = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.total_cents, 0)
     const openAmount = invoices.filter(i => i.status === 'sent' || i.status === 'overdue').reduce((sum, i) => sum + i.total_cents, 0)
     return { total, draft, sent, paid, overdue, totalAmount, paidAmount, openAmount }
-  }, [invoices])
+  }, [invoices, serverStats])
 
   // Filter invoices based on search and status
   const filteredInvoices = useMemo(() => {
-    return filterInvoices(invoices, { ...filters, q: debouncedSearch })
+    return invoices
   }, [invoices, filters, debouncedSearch])
 
   const activeFilterChips = useMemo(() => {
@@ -1763,6 +1777,7 @@ const ZZPInvoicesPageContent = () => {
       setEditingInvoice(undefined)
       // Reload data
       await loadData()
+      setMonthlyRefreshKey(k => k + 1)
     } catch (err) {
       console.error('Failed to save invoice:', err)
       toast.error(parseApiError(err))
@@ -1778,6 +1793,7 @@ const ZZPInvoicesPageContent = () => {
       toast.success(t('zzpInvoices.statusChanged'))
       // Reload data
       await loadData()
+      setMonthlyRefreshKey(k => k + 1)
     } catch (err) {
       console.error('Failed to update status:', err)
       toast.error(parseApiError(err))
@@ -1793,6 +1809,7 @@ const ZZPInvoicesPageContent = () => {
       await zzpApi.invoices.updateStatus(invoice.id, 'draft')
       toast.success(t('zzpInvoices.restoredToConcept'))
       await loadData()
+      setMonthlyRefreshKey(k => k + 1)
     } catch (err) {
       console.error('Failed to restore invoice to concept:', err)
       toast.error(parseApiError(err))
@@ -1814,6 +1831,7 @@ const ZZPInvoicesPageContent = () => {
         toast.success(t('zzpInvoices.invoiceSent'))
       }
       await loadData()
+      setMonthlyRefreshKey(k => k + 1)
     } catch (err) {
       console.error('Failed to send invoice:', err)
       toast.error(parseApiError(err))
@@ -1832,6 +1850,7 @@ const ZZPInvoicesPageContent = () => {
       setDeletingInvoice(undefined)
       // Reload data
       await loadData()
+      setMonthlyRefreshKey(k => k + 1)
     } catch (err) {
       console.error('Failed to delete invoice:', err)
       toast.error(parseApiError(err))
@@ -1970,6 +1989,7 @@ const ZZPInvoicesPageContent = () => {
       })
       toast.success(t('zzpInvoices.markedPaid'))
       await loadData()
+      setMonthlyRefreshKey(k => k + 1)
     } catch (err) {
       console.error('Failed to mark as paid:', err)
       toast.error(parseApiError(err))
@@ -1986,6 +2006,7 @@ const ZZPInvoicesPageContent = () => {
       await zzpApi.invoices.markUnpaid(invoice.id)
       toast.success(t('zzpInvoices.markedUnpaid'))
       await loadData()
+      setMonthlyRefreshKey(k => k + 1)
     } catch (err) {
       console.error('Failed to mark as unpaid:', err)
       toast.error(parseApiError(err))
@@ -2035,6 +2056,7 @@ const ZZPInvoicesPageContent = () => {
       setIsFormOpen(true)
       toast.success(t('zzpInvoices.invoiceGenerated'))
       await loadData()
+      setMonthlyRefreshKey(k => k + 1)
     } catch (err) {
       console.error('Failed to generate invoice:', err)
       toast.error(parseApiError(err))
@@ -2061,6 +2083,7 @@ const ZZPInvoicesPageContent = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
+        <ServerPagination {...pagination} loading={isLoading} />
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>

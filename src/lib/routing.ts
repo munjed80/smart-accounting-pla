@@ -1,6 +1,9 @@
 export const pathToTab = (path: string, isAccountant: boolean, isSuperAdmin = false): string => {
   const normalizedPath = path.toLowerCase().replace(/\/$/, '') || '/'
 
+  if (/^\/zzp\/invoices\/[^/]+$/.test(normalizedPath)) return 'invoices'
+  if (/^\/zzp\/offertes\/[^/]+$/.test(normalizedPath)) return 'offertes'
+
   switch (normalizedPath) {
     case '/dashboard':
       return 'dashboard'
@@ -32,6 +35,7 @@ export const pathToTab = (path: string, isAccountant: boolean, isSuperAdmin = fa
     case '/ai-upload':
     case '/upload':
       return 'upload'
+    case '/zzp/settings':
     case '/settings':
       return 'settings'
     case '/support':
@@ -61,6 +65,7 @@ export const pathToTab = (path: string, isAccountant: boolean, isSuperAdmin = fa
       return 'subscriptions'
     case '/zzp/documenten':
       return 'documents'
+    case '/zzp/btw-aangifte':
     case '/zzp/belastinghulp/btw':
       return 'tax-btw'
     case '/zzp/belastinghulp/inkomstenbelasting':

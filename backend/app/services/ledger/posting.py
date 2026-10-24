@@ -407,7 +407,7 @@ class LedgerService:
             .join(JournalEntry, JournalLine.journal_entry_id == JournalEntry.id)
             .where(JournalLine.account_id == account_id)
             .where(JournalEntry.administration_id == self.administration_id)
-            .where(JournalEntry.status == JournalEntryStatus.POSTED)
+            .where(JournalEntry.status.in_([JournalEntryStatus.POSTED, JournalEntryStatus.REVERSED]))
         )
         
         if as_of_date:

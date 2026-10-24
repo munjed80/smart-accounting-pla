@@ -10,7 +10,7 @@ from app.models.ledger import JournalEntry, JournalLine
 
 
 @pytest.mark.asyncio
-async def test_invoice_creation_posts_balanced_journal_entry(async_client, db_session, auth_headers, test_administration, test_customer):
+async def test_sent_invoice_posts_balanced_journal_entry(async_client, db_session, auth_headers, test_administration, test_customer):
     accounts = [
         ChartOfAccount(administration_id=test_administration.id, account_code='1100', account_name='Bank', account_type='ASSET', is_active=True),
         ChartOfAccount(administration_id=test_administration.id, account_code='1300', account_name='Debiteuren', account_type='ASSET', is_active=True),
@@ -41,6 +41,12 @@ async def test_invoice_creation_posts_balanced_journal_entry(async_client, db_se
 
     assert response.status_code == 201
     invoice_id = response.json()['id']
+
+    assert response.json()['status'] == 'draft'
+    before = await db_session.scalar(select(JournalEntry.id).where(JournalEntry.source_id == UUID(invoice_id)))
+    assert before is None
+    sent = await async_client.patch(f'/api/v1/zzp/invoices/{invoice_id}/status', headers=auth_headers, json={'status':'sent'})
+    assert sent.status_code == 200, sent.text
 
     entry_result = await db_session.execute(
         select(JournalEntry)

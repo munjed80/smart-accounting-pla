@@ -25,8 +25,7 @@ from app.schemas.zzp import (
     ExpenseListResponse,
 )
 from app.api.v1.deps import CurrentUser, require_zzp
-from app.repositories.ledger_repository import LedgerRepository
-from app.services.ledger_service import LedgerPostingService, LedgerPostingError
+from app.services.zzp_integrity import require_open_dates, sync_expense
 
 router = APIRouter()
 
@@ -57,6 +56,19 @@ async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administra
     return administration
 
 
+async def refresh_commitment_dates(db, administration_id, *ids):
+    for commitment_id in set(i for i in ids if i):
+        item = await db.scalar(select(FinancialCommitment).where(
+            FinancialCommitment.id == commitment_id,
+            FinancialCommitment.administration_id == administration_id,
+        ).with_for_update())
+        if item:
+            item.last_booked_date = await db.scalar(select(func.max(ZZPExpense.expense_date)).where(
+                ZZPExpense.administration_id == administration_id,
+                ZZPExpense.commitment_id == commitment_id,
+            ))
+
+
 def calculate_vat_amount(amount_cents: int, vat_rate: float) -> int:
     """Calculate VAT amount from total amount (including VAT)."""
     # Assuming amount_cents is including VAT, calculate the VAT portion
@@ -71,6 +83,8 @@ def calculate_vat_amount(amount_cents: int, vat_rate: float) -> int:
 def get_period_key(expense_date: date, frequency: Optional[RecurringFrequency]) -> str:
     if frequency == RecurringFrequency.YEARLY:
         return f"{expense_date.year}-Y"
+    if frequency == RecurringFrequency.QUARTERLY:
+        return f'{expense_date.year}-Q{(expense_date.month - 1) // 3 + 1}'
     return expense_date.strftime('%Y-%m')
 
 def expense_to_response(expense: ZZPExpense) -> ExpenseResponse:
@@ -97,11 +111,13 @@ def expense_to_response(expense: ZZPExpense) -> ExpenseResponse:
 async def list_expenses(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    limit: Optional[int] = Query(None, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     category: Optional[str] = Query(None, max_length=100),
     year: Optional[int] = Query(None, ge=2000, le=2100),
     month: Optional[int] = Query(None, ge=1, le=12),
-    from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
-    to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    from_date: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
 ):
     """
     List all expenses for the current user's administration.
@@ -129,23 +145,23 @@ async def list_expenses(
         query = query.where(extract('month', ZZPExpense.expense_date) == month)
     
     if from_date:
-        query = query.where(ZZPExpense.expense_date >= date.fromisoformat(from_date))
+        query = query.where(ZZPExpense.expense_date >= from_date)
     
     if to_date:
-        query = query.where(ZZPExpense.expense_date <= date.fromisoformat(to_date))
+        query = query.where(ZZPExpense.expense_date <= to_date)
     
-    query = query.order_by(ZZPExpense.expense_date.desc())
+    query = query.order_by(ZZPExpense.expense_date.desc(), ZZPExpense.id)
     
+    rows = query.order_by(None).subquery()
+    total = (await db.execute(select(func.count()).select_from(rows))).scalar_one()
+    total_amount, total_vat = (await db.execute(select(func.coalesce(func.sum(rows.c.amount_cents), 0), func.coalesce(func.sum(rows.c.vat_amount_cents), 0)))).one()
+    if limit is not None: query = query.limit(limit).offset(offset)
     result = await db.execute(query)
     expenses = result.scalars().all()
-    
-    # Calculate totals
-    total_amount = sum(e.amount_cents for e in expenses)
-    total_vat = sum(e.vat_amount_cents for e in expenses)
-    
+
     return ExpenseListResponse(
         expenses=[expense_to_response(e) for e in expenses],
-        total=len(expenses),
+        total=total,
         total_amount_cents=total_amount,
         total_vat_cents=total_vat,
     )
@@ -229,24 +245,19 @@ async def create_expense(
     db.add(expense)
 
     if linked_commitment:
-        linked_commitment.last_booked_date = expense_date_value
+        linked_commitment.last_booked_date = max(linked_commitment.last_booked_date or expense_date_value, expense_date_value)
         if linked_commitment.vat_rate is None:
             linked_commitment.vat_rate = Decimal(str(expense_in.vat_rate))
         if linked_commitment.btw_rate is None:
             linked_commitment.btw_rate = Decimal(str(expense_in.vat_rate))
 
     try:
+        await db.flush()
+        await sync_expense(db, administration.id, expense.id)
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
         raise HTTPException(status_code=409, detail={"code": "DUPLICATE_COMMITMENT_EXPENSE", "message": "Er bestaat al een uitgave voor deze periode."}) from exc
-
-    try:
-        ledger_service = LedgerPostingService(LedgerRepository(db, administration.id))
-        await ledger_service.post_expense(expense.id)
-        await db.commit()
-    except LedgerPostingError:
-        pass
 
     await db.refresh(expense)
     
@@ -301,7 +312,7 @@ async def update_expense(
         select(ZZPExpense).where(
             ZZPExpense.id == expense_id,
             ZZPExpense.administration_id == administration.id
-        )
+        ).with_for_update()
     )
     expense = result.scalar_one_or_none()
     
@@ -311,27 +322,41 @@ async def update_expense(
             detail={"code": "EXPENSE_NOT_FOUND", "message": "Uitgave niet gevonden."}
         )
     
+    await require_open_dates(db, administration.id, expense.expense_date,
+        date.fromisoformat(expense_in.expense_date) if expense_in.expense_date else None)
     # Update fields
     update_data = expense_in.model_dump(exclude_unset=True)
     
+    old_commitment_id = expense.commitment_id
+    target_commitment_id = update_data.get('commitment_id', expense.commitment_id)
+    target_date = date.fromisoformat(update_data['expense_date']) if update_data.get('expense_date') else expense.expense_date
+    period_key = None
+    if target_commitment_id:
+        linked = await db.scalar(select(FinancialCommitment).where(
+            FinancialCommitment.id == target_commitment_id,
+            FinancialCommitment.administration_id == administration.id,
+        ).with_for_update())
+        if not linked:
+            raise HTTPException(404, detail={'code': 'COMMITMENT_NOT_FOUND', 'message': 'Verplichting niet gevonden.'})
+        period_key = get_period_key(target_date, linked.recurring_frequency)
+        duplicate = await db.scalar(select(ZZPExpense.id).where(
+            ZZPExpense.administration_id == administration.id,
+            ZZPExpense.commitment_id == target_commitment_id,
+            ZZPExpense.period_key == period_key, ZZPExpense.id != expense.id,
+        ).limit(1))
+        if duplicate:
+            raise HTTPException(409, detail={'code': 'DUPLICATE_COMMITMENT_EXPENSE', 'message': 'Er bestaat al een uitgave voor deze periode.'})
+
     for field, value in update_data.items():
         if field == 'expense_date' and value:
             setattr(expense, field, date.fromisoformat(value))
         elif field == 'vat_rate' and value is not None:
             setattr(expense, field, Decimal(str(value)))
-        elif field == 'commitment_id' and value is not None:
-            commitment_check = await db.execute(
-                select(FinancialCommitment.id).where(
-                    FinancialCommitment.id == value,
-                    FinancialCommitment.administration_id == administration.id,
-                )
-            )
-            if not commitment_check.scalar_one_or_none():
-                raise HTTPException(status_code=404, detail={"code": "COMMITMENT_NOT_FOUND", "message": "Verplichting niet gevonden."})
-            setattr(expense, field, value)
         else:
             setattr(expense, field, value)
     
+    expense.period_key = period_key
+
     # Recalculate VAT if amount or rate changed
     if 'amount_cents' in update_data or 'vat_rate' in update_data:
         expense.vat_amount_cents = calculate_vat_amount(
@@ -339,6 +364,9 @@ async def update_expense(
             float(expense.vat_rate)
         )
     
+    await db.flush()
+    await refresh_commitment_dates(db, administration.id, old_commitment_id, expense.commitment_id)
+    await sync_expense(db, administration.id, expense.id, replace=True)
     await db.commit()
     await db.refresh(expense)
     
@@ -362,7 +390,7 @@ async def delete_expense(
         select(ZZPExpense).where(
             ZZPExpense.id == expense_id,
             ZZPExpense.administration_id == administration.id
-        )
+        ).with_for_update()
     )
     expense = result.scalar_one_or_none()
     
@@ -372,7 +400,12 @@ async def delete_expense(
             detail={"code": "EXPENSE_NOT_FOUND", "message": "Uitgave niet gevonden."}
         )
     
+    await require_open_dates(db, administration.id, expense.expense_date)
+    await sync_expense(db, administration.id, expense.id, delete=True)
+    linked_id = expense.commitment_id
     await db.delete(expense)
+    await db.flush()
+    await refresh_commitment_dates(db, administration.id, linked_id)
     await db.commit()
     
     return None

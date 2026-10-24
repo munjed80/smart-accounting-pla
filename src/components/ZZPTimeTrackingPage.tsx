@@ -1,3 +1,5 @@
+import { useServerPagination } from '@/hooks/useServerPagination'
+import { useAuth } from '@/lib/AuthContext'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -105,6 +107,8 @@ const defaultFormState = (): EntryFormState => ({
 })
 
 export const ZZPTimeTrackingPage = () => {
+  const { user } = useAuth()
+  const metadataKey = `${SESSION_METADATA_STORAGE_KEY}:${user?.id ?? 'none'}`
   const [invoiceMode, setInvoiceMode] = useState<InvoicePeriodMode>(() => getInitialInvoiceMode())
   const initialPeriod = useMemo(
     () => getInvoicePeriodRange(invoiceMode, new Date()) ?? getInvoicePeriodRange('weekly', new Date()),
@@ -128,6 +132,8 @@ export const ZZPTimeTrackingPage = () => {
   const [hourlyRate, setHourlyRate] = useState<string>('')
 
   const { filters: invoicedFilters, setFilter: setInvoicedFilter } = useQueryFilters(defaultInvoicedFilters)
+  const invoicedPagination = useServerPagination(JSON.stringify([user?.id, invoicedFilters.inv_customer, invoicedFilters.inv_from, invoicedFilters.inv_to]))
+  const [hasMoreInvoiced, setHasMoreInvoiced] = useState(false)
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<ZZPTimeEntry | null>(null)
@@ -141,78 +147,64 @@ export const ZZPTimeTrackingPage = () => {
   const [isStartSessionDialogOpen, setIsStartSessionDialogOpen] = useState(false)
   const [isInvoiceConfirmOpen, setIsInvoiceConfirmOpen] = useState(false)
   const [startSessionForm, setStartSessionForm] = useState({ customer_id: '', description: '', hourly_rate: '' })
-  const [sessionMetadata, setSessionMetadata] = useState<{ customer_id: string; description: string; hourly_rate: string } | null>(() => {
+  const [sessionMetadata, setSessionMetadata] = useState<{ session_id: string; customer_id: string; description: string; hourly_rate: string } | null>(null)
+  useEffect(() => {
     try {
-      const stored = localStorage.getItem(SESSION_METADATA_STORAGE_KEY)
-      if (!stored) return null
-      const parsed = JSON.parse(stored)
-      if (parsed && typeof parsed === 'object' && 'customer_id' in parsed && 'description' in parsed && 'hourly_rate' in parsed) {
-        return parsed as { customer_id: string; description: string; hourly_rate: string }
-      }
-      return null
-    } catch {
-      return null
-    }
-  })
+      const parsed = JSON.parse(localStorage.getItem(metadataKey) || 'null')
+      setSessionMetadata(parsed && parsed.session_id === activeSession?.id ? parsed : null)
+    } catch { setSessionMetadata(null) }
+  }, [metadataKey, activeSession?.id])
 
   const customerMap = useMemo(() => Object.fromEntries(customers.map((c) => [c.id, c.name])), [customers])
 
-  const fetchInvoiceNumbers = useCallback(async (entries: ZZPTimeEntry[]) => {
+  const fetchInvoiceNumbers = useCallback(async (entries: ZZPTimeEntry[], isCurrent: () => boolean) => {
     const invoiceIds = Array.from(new Set(entries.map((entry) => entry.invoice_id).filter(Boolean))) as string[]
     if (invoiceIds.length === 0) {
       setInvoiceNumberMap({})
       return
     }
 
-    const results = await Promise.allSettled(
-      invoiceIds.map(async (invoiceId) => {
-        const invoice = await zzpApi.invoices.get(invoiceId)
-        return [invoiceId, invoice.invoice_number] as const
-      }),
-    )
-
-    const map: Record<string, string> = {}
-    results.forEach((result) => {
-      if (result.status === 'fulfilled') {
-        map[result.value[0]] = result.value[1]
-      }
-    })
-    setInvoiceNumberMap(map)
+    const numbers = await zzpApi.invoices.numbers(invoiceIds)
+    if (isCurrent()) setInvoiceNumberMap(numbers)
   }, [])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     setPageError(null)
+    const isCurrent = invoicedPagination.beginRequest()
     try {
       const [customerRes, openRes, invoicedRes, activeSessionRes] = await Promise.all([
         zzpApi.customers.list(),
-        zzpApi.timeEntries.listOpen(),
-        zzpApi.timeEntries.listInvoiced(),
+        zzpApi.timeEntries.listOpen({ period_start: filters.from || periodStart || undefined, period_end: filters.to || periodEnd || undefined }),
+        zzpApi.timeEntries.listInvoiced({ limit: 51, offset: invoicedPagination.offset, customer_id: (invoicedFilters.inv_customer as string) || undefined, period_start: (invoicedFilters.inv_from as string) || undefined, period_end: (invoicedFilters.inv_to as string) || undefined }),
         zzpApi.workSessions.getActive(),
       ])
 
+      if (!isCurrent()) return
       setCustomers(customerRes.customers)
       setOpenEntries(openRes)
-      setInvoicedEntries(invoicedRes)
+      setInvoicedEntries(invoicedRes.slice(0, 50))
+      setHasMoreInvoiced(invoicedRes.length > 50)
       setActiveSession(activeSessionRes)
-      await fetchInvoiceNumbers(invoicedRes)
+      await fetchInvoiceNumbers(invoicedRes.slice(0, 50), isCurrent)
 
       try {
         const profile = await zzpApi.profile.get()
-        if (profile?.default_hourly_rate && !hourlyRate) {
-          setHourlyRate(String(profile.default_hourly_rate))
+        if (isCurrent() && profile?.default_hourly_rate) {
+          setHourlyRate(current => current || String(profile.default_hourly_rate))
         }
       } catch {
         // profile default is optional for this workflow
       }
     } catch (error) {
+      if (!isCurrent()) return
       const message = parseApiError(error)
       setPageError(message)
       toast.error(message)
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [fetchInvoiceNumbers, hourlyRate])
+  }, [fetchInvoiceNumbers, user?.id, filters.from, filters.to, periodStart, periodEnd, invoicedPagination.offset, invoicedFilters.inv_customer, invoicedFilters.inv_from, invoicedFilters.inv_to])
 
   useEffect(() => {
     void fetchData()
@@ -258,7 +250,7 @@ export const ZZPTimeTrackingPage = () => {
 
   useEffect(() => {
     if (!loading && !activeSession) {
-      localStorage.removeItem(SESSION_METADATA_STORAGE_KEY)
+      localStorage.removeItem(metadataKey)
     }
   }, [loading, activeSession])
 
@@ -343,9 +335,9 @@ export const ZZPTimeTrackingPage = () => {
     try {
       const session = await zzpApi.workSessions.start({ note: description || undefined })
       setActiveSession(session)
-      const metadata = { customer_id, description, hourly_rate }
+      const metadata = { session_id: session.id, customer_id, description, hourly_rate }
       setSessionMetadata(metadata)
-      localStorage.setItem(SESSION_METADATA_STORAGE_KEY, JSON.stringify(metadata))
+      localStorage.setItem(metadataKey, JSON.stringify(metadata))
       setIsStartSessionDialogOpen(false)
       toast.success('Sessie gestart')
     } catch (error) {
@@ -361,7 +353,7 @@ export const ZZPTimeTrackingPage = () => {
       const response = await zzpApi.workSessions.stop()
       let timeEntry = response.time_entry
 
-      if (sessionMetadata && (sessionMetadata.customer_id || sessionMetadata.description || sessionMetadata.hourly_rate)) {
+      if (sessionMetadata && sessionMetadata.session_id === activeSession?.id && (sessionMetadata.customer_id || sessionMetadata.description || sessionMetadata.hourly_rate)) {
         const updateData: ZZPTimeEntryUpdate = {}
         if (sessionMetadata.customer_id) updateData.customer_id = sessionMetadata.customer_id
         if (sessionMetadata.description) updateData.description = sessionMetadata.description
@@ -376,7 +368,7 @@ export const ZZPTimeTrackingPage = () => {
 
       setActiveSession(null)
       setSessionMetadata(null)
-      localStorage.removeItem(SESSION_METADATA_STORAGE_KEY)
+      localStorage.removeItem(metadataKey)
       setOpenEntries((prev) => [timeEntry, ...prev])
       toast.success('Uitgecheckt en uren toegevoegd')
     } catch (error) {
@@ -987,6 +979,11 @@ export const ZZPTimeTrackingPage = () => {
             <Input type="date" value={invoicedFilters.inv_to as string} onChange={(event) => setInvoicedFilter('inv_to', event.target.value)} />
           </div>
 
+          <nav aria-label="Gefactureerde uren paginering" className="flex items-center justify-between gap-2">
+            <Button variant="outline" disabled={loading || invoicedPagination.page === 1} onClick={() => invoicedPagination.setPage(invoicedPagination.page - 1)}>Vorige pagina</Button>
+            <span>Pagina {invoicedPagination.page}</span>
+            <Button variant="outline" disabled={loading || !hasMoreInvoiced} onClick={() => invoicedPagination.setPage(invoicedPagination.page + 1)}>Volgende pagina</Button>
+          </nav>
           {loading ? (
             <div className="space-y-3">
               <Skeleton className="h-14 w-full" />

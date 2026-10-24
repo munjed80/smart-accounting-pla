@@ -12,8 +12,9 @@ from typing import Annotated, List, Optional
 from uuid import UUID
 
 import aiofiles
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -30,6 +31,8 @@ from app.schemas.zzp import (
     ZZPDocStatusEnum,
 )
 from app.api.v1.deps import CurrentUser, require_zzp
+from app.schemas.zzp import ExpenseCreate
+from app.services.zzp_integrity import require_open_dates, sync_expense
 from app.api.v1.zzp_expenses import get_user_administration, calculate_vat_amount
 
 router = APIRouter()
@@ -184,6 +187,36 @@ async def list_documents(
     return [_doc_to_response(d) for d in docs]
 
 
+class DocumentPage(BaseModel):
+    documents: List[ZZPDocumentResponse]
+    total: int
+    counts: dict[str, int]
+
+
+@router.get('/documents/page', response_model=DocumentPage)
+async def document_page(
+    current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)],
+    group: str = Query('inbox', pattern='^(inbox|processed|failed)$'),
+    q: Optional[str] = Query(None, max_length=200),
+    limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0),
+):
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
+    query = select(ZZPDocument).where(ZZPDocument.administration_id == administration.id)
+    if q:
+        query = query.where(ZZPDocument.filename.ilike(f'%{q}%'))
+    counts_rows = await db.execute(select(ZZPDocument.status, func.count(ZZPDocument.id)).where(
+        query.whereclause,
+    ).group_by(ZZPDocument.status))
+    counts = {state.value: count for state, count in counts_rows.all()}
+    groups = {'inbox': [ZZPDocStatus.NEW, ZZPDocStatus.REVIEW], 'processed': [ZZPDocStatus.PROCESSED], 'failed': [ZZPDocStatus.FAILED]}
+    states = groups[group]
+    total = sum(counts.get(state.value, 0) for state in states)
+    documents = (await db.execute(query.where(ZZPDocument.status.in_(states))
+        .order_by(ZZPDocument.created_at.desc(), ZZPDocument.id).limit(limit).offset(offset))).scalars().all()
+    return DocumentPage(documents=[_doc_to_response(doc) for doc in documents], total=total, counts=counts)
+
+
 @router.get("/documents/{document_id}", response_model=ZZPDocumentResponse)
 async def get_document(
     document_id: UUID,
@@ -226,72 +259,40 @@ async def update_document(
 @router.post("/documents/{document_id}/create-expense", response_model=ZZPDocumentCreateExpenseResponse, status_code=201)
 async def create_expense_from_document(
     document_id: UUID,
-    expense_data: dict,
+    expense_data: ExpenseCreate,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """
-    Convert a ZZP document to an expense.
-    Creates an expense record linked to the document and sets document status to PROCESSED.
-    Expects a JSON body with expense fields (vendor, description, expense_date, amount_cents, vat_rate, category).
-    """
+    """Convert once under a document lock, using the normal expense validation/guards."""
     require_zzp(current_user)
     administration = await get_user_administration(current_user.id, db)
-    doc = await _get_owned_document(document_id, administration, db)
-
-    # Validate required expense fields
-    vendor = expense_data.get("vendor", "").strip()
-    if not vendor:
-        raise HTTPException(status_code=422, detail={"code": "MISSING_VENDOR", "message": "Leveranciersnaam is verplicht."})
-
-    expense_date_str = expense_data.get("expense_date", "")
-    try:
-        expense_date_val = date.fromisoformat(expense_date_str) if expense_date_str else date.today()
-    except ValueError:
-        raise HTTPException(status_code=422, detail={"code": "INVALID_DATE", "message": "Ongeldige datum."})
-
-    amount_cents = int(expense_data.get("amount_cents", doc.amount_cents or 0))
-    vat_rate_val = float(expense_data.get("vat_rate", float(doc.vat_rate) if doc.vat_rate else 21.0))
-    category = expense_data.get("category", "algemeen")
-    description = expense_data.get("description", "")
-    notes = expense_data.get("notes", "")
-
-    vat_amount = calculate_vat_amount(amount_cents, vat_rate_val)
-
+    doc = await db.scalar(select(ZZPDocument).where(
+        ZZPDocument.id == document_id, ZZPDocument.administration_id == administration.id,
+    ).with_for_update())
+    if doc is None:
+        raise HTTPException(404, detail={'code': 'DOCUMENT_NOT_FOUND', 'message': 'Document niet gevonden.'})
+    existing = await db.scalar(select(ZZPExpense).where(
+        ZZPExpense.document_id == doc.id, ZZPExpense.administration_id == administration.id,
+    ).order_by(ZZPExpense.created_at).limit(1))
+    if existing:
+        return ZZPDocumentCreateExpenseResponse(expense_id=existing.id, document_id=doc.id)
+    expense_date = date.fromisoformat(expense_data.expense_date)
+    await require_open_dates(db, administration.id, expense_date)
+    if expense_data.commitment_id:
+        raise HTTPException(422, detail={'code': 'USE_COMMITMENT_WORKFLOW', 'message': 'Boek verplichtingen via de verplichtingenpagina.'})
     expense = ZZPExpense(
-        administration_id=administration.id,
-        vendor=vendor,
-        description=description or None,
-        expense_date=expense_date_val,
-        amount_cents=amount_cents,
-        vat_rate=Decimal(str(vat_rate_val)),
-        vat_amount_cents=vat_amount,
-        category=category,
-        notes=notes or None,
-        document_id=doc.id,
+        administration_id=administration.id, vendor=expense_data.vendor.strip(),
+        description=expense_data.description, expense_date=expense_date,
+        amount_cents=expense_data.amount_cents, vat_rate=Decimal(str(expense_data.vat_rate)),
+        vat_amount_cents=calculate_vat_amount(expense_data.amount_cents, expense_data.vat_rate),
+        category=expense_data.category, notes=expense_data.notes, document_id=doc.id,
     )
     db.add(expense)
-
-    # Update document status to PROCESSED
     doc.status = ZZPDocStatus.PROCESSED
-
+    await db.flush()
+    await sync_expense(db, administration.id, expense.id)
     await db.commit()
-    await db.refresh(expense)
-
-    # Optionally post to ledger (non-blocking)
-    try:
-        from app.repositories.ledger_repository import LedgerRepository
-        from app.services.ledger_service import LedgerPostingService, LedgerPostingError
-        ledger_service = LedgerPostingService(LedgerRepository(db, administration.id))
-        await ledger_service.post_expense(expense.id)
-        await db.commit()
-    except Exception:
-        pass
-
-    return ZZPDocumentCreateExpenseResponse(
-        expense_id=expense.id,
-        document_id=doc.id,
-    )
+    return ZZPDocumentCreateExpenseResponse(expense_id=expense.id, document_id=doc.id)
 
 
 @router.delete("/documents/{document_id}", status_code=204)
@@ -305,6 +306,9 @@ async def delete_document(
     administration = await get_user_administration(current_user.id, db)
     doc = await _get_owned_document(document_id, administration, db)
 
+    linked = await db.scalar(select(ZZPExpense.id).where(ZZPExpense.document_id == doc.id).limit(1))
+    if linked:
+        raise HTTPException(409, detail={'code': 'DOCUMENT_HAS_EXPENSE', 'message': 'Dit document is gekoppeld aan een uitgave en kan niet worden verwijderd.'})
     await db.delete(doc)
     await db.commit()
     return None

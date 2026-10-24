@@ -58,7 +58,7 @@ async def list_zzp_ledger_entries(
     if account_id:
         entries = [e for e in entries if any(l.account_id == account_id for l in e.lines)]
 
-    balances_result = await db.execute(
+    balance_query = (
         select(
             ChartOfAccount.id,
             ChartOfAccount.account_code,
@@ -73,6 +73,13 @@ async def list_zzp_ledger_entries(
         .order_by(ChartOfAccount.account_code)
     )
 
+    if from_date:
+        balance_query = balance_query.where(JournalEntry.entry_date >= from_date)
+    if to_date:
+        balance_query = balance_query.where(JournalEntry.entry_date <= to_date)
+    if account_id:
+        balance_query = balance_query.where(ChartOfAccount.id == account_id)
+    balances_result = await db.execute(balance_query)
     balances = []
     for row in balances_result:
         total_debit = Decimal(str(row.total_debit or 0))

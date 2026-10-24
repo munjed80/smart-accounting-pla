@@ -48,8 +48,10 @@ router = APIRouter()
 
 
 def _monthly_normalized_cents(item: FinancialCommitment) -> int:
-    if item.type == CommitmentType.SUBSCRIPTION and item.recurring_frequency == RecurringFrequency.YEARLY:
-        return item.amount_cents // 12
+    if item.recurring_frequency == RecurringFrequency.YEARLY:
+        return (item.monthly_payment_cents or item.amount_cents) // 12
+    if item.recurring_frequency == RecurringFrequency.QUARTERLY:
+        return (item.monthly_payment_cents or item.amount_cents) // 3
     return item.monthly_payment_cents or item.amount_cents
 
 

@@ -10,7 +10,7 @@ from typing import Annotated, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from sqlalchemy import select, func
+from sqlalchemy import case, or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -168,10 +168,13 @@ def quote_to_response(quote: ZZPQuote) -> QuoteResponse:
 async def list_quotes(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    limit: Optional[int] = Query(None, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    q: Optional[str] = Query(None, max_length=200),
     status: Optional[str] = Query(None, description="Filter by status"),
     customer_id: Optional[UUID] = Query(None, description="Filter by customer"),
-    from_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
-    to_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    from_date: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
 ) -> QuoteListResponse:
     """List all quotes with optional filters."""
     require_zzp(current_user)
@@ -181,40 +184,42 @@ async def list_quotes(
         select(ZZPQuote)
         .where(ZZPQuote.administration_id == administration.id)
         .options(selectinload(ZZPQuote.lines))
-        .order_by(ZZPQuote.created_at.desc())
+        .order_by(ZZPQuote.created_at.desc(), ZZPQuote.id)
     )
     
+    if q:
+        term = f'%{q}%'
+        query = query.where(or_(ZZPQuote.quote_number.ilike(term), ZZPQuote.customer_name.ilike(term), ZZPQuote.title.ilike(term)))
     if status:
         query = query.where(ZZPQuote.status == status)
     if customer_id:
         query = query.where(ZZPQuote.customer_id == customer_id)
     if from_date:
-        query = query.where(ZZPQuote.issue_date >= date.fromisoformat(from_date))
+        query = query.where(ZZPQuote.issue_date >= from_date)
     if to_date:
-        query = query.where(ZZPQuote.issue_date <= date.fromisoformat(to_date))
-    
+        query = query.where(ZZPQuote.issue_date <= to_date)
+
+    rows = query.order_by(None).subquery()
+    stats = dict((await db.execute(select(
+        func.count().label('total'),
+        func.coalesce(func.sum(case((rows.c.status == 'draft', 1), else_=0)), 0).label('draft'),
+        func.coalesce(func.sum(case((rows.c.status == 'sent', 1), else_=0)), 0).label('sent'),
+        func.coalesce(func.sum(case((rows.c.status == 'accepted', 1), else_=0)), 0).label('accepted'),
+        func.coalesce(func.sum(case((rows.c.status == 'rejected', 1), else_=0)), 0).label('rejected'),
+        func.coalesce(func.sum(case((rows.c.status == 'expired', 1), else_=0)), 0).label('expired'),
+        func.coalesce(func.sum(case((rows.c.status == 'converted', 1), else_=0)), 0).label('converted'),
+        func.coalesce(func.sum(rows.c.total_cents), 0).label('totalAmount'),
+        func.coalesce(func.sum(case((rows.c.status == 'accepted', rows.c.total_cents), else_=0)), 0).label('acceptedAmount')
+    ))).mappings().one())
+    total = stats['total']
+    if limit is not None: query = query.limit(limit).offset(offset)
     result = await db.execute(query)
     quotes = result.scalars().all()
     
-    # Calculate stats
-    stats = {
-        "draft": 0,
-        "sent": 0,
-        "accepted": 0,
-        "rejected": 0,
-        "expired": 0,
-        "converted": 0,
-    }
-    total_amount = 0
-    for q in quotes:
-        if q.status in stats:
-            stats[q.status] += 1
-        total_amount += q.total_cents
-    
     return QuoteListResponse(
         quotes=[quote_to_response(q) for q in quotes],
-        total=len(quotes),
-        total_amount_cents=total_amount,
+        total=total,
+        total_amount_cents=stats['totalAmount'],
         stats=stats,
     )
 

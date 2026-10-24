@@ -4,11 +4,11 @@ ZZP Customers API Endpoints
 CRUD operations for ZZP customers with validation.
 Scoped to the user's administration.
 """
-from typing import Annotated, List
+from typing import Annotated, Optional, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func
+from sqlalchemy import case, or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -58,6 +58,8 @@ async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administra
 async def list_customers(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    limit: Optional[int] = Query(None, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     status: str = Query(None, pattern=r'^(active|inactive)$', description="Filter by status"),
     search: str = Query(None, max_length=100, description="Search by name, email, or phone"),
 ):
@@ -90,13 +92,22 @@ async def list_customers(
         )
     
     # Execute query
-    query = query.order_by(ZZPCustomer.name)
+    query = query.order_by(ZZPCustomer.name, ZZPCustomer.id)
+    rows = query.order_by(None).subquery()
+    stats = dict((await db.execute(select(
+        func.count().label('total'),
+        func.coalesce(func.sum(case((rows.c.status == 'active', 1), else_=0)), 0).label('active'),
+        func.coalesce(func.sum(case((rows.c.status == 'inactive', 1), else_=0)), 0).label('inactive')
+    ))).mappings().one())
+    total = stats['total']
+    if limit is not None: query = query.limit(limit).offset(offset)
     result = await db.execute(query)
     customers = result.scalars().all()
-    
+
     return CustomerListResponse(
         customers=[CustomerResponse.model_validate(c) for c in customers],
-        total=len(customers)
+        stats=stats,
+        total=total
     )
 
 

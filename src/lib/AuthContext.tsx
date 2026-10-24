@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react'
 import { authApi, User, LoginRequest, RegisterRequest, getErrorMessage, RegisterResponse } from '@/lib/api'
 import { toast } from 'sonner'
 import { AxiosError, isAxiosError } from 'axios'
@@ -59,10 +60,13 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const queryClient = useQueryClient()
+  const sessionVersion = useRef(0)
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   const checkSession = useCallback(async () => {
+    const version = ++sessionVersion.current
     const token = localStorage.getItem('access_token')
     if (!token) {
       setIsLoading(false)
@@ -71,34 +75,44 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     try {
       const userData = await authApi.me()
+      if (version !== sessionVersion.current) return
       setUser(userData)
     } catch (error) {
+      if (version !== sessionVersion.current) return
+      queryClient.clear()
       console.error('Session check failed:', error)
       localStorage.removeItem('access_token')
       localStorage.removeItem('user')
       setUser(null)
     } finally {
-      setIsLoading(false)
+      if (version === sessionVersion.current) setIsLoading(false)
     }
-  }, [])
+  }, [queryClient])
 
   useEffect(() => {
     checkSession()
   }, [checkSession])
 
   const login = useCallback(async (credentials: LoginRequest): Promise<User> => {
+    const version = ++sessionVersion.current
+    await queryClient.cancelQueries()
+    queryClient.clear()
+    setUser(null)
     try {
       setIsLoading(true)
       const tokenResponse = await authApi.login(credentials)
+      if (version !== sessionVersion.current) throw new Error('Sessie gewijzigd. Log opnieuw in.')
       
       localStorage.setItem('access_token', tokenResponse.access_token)
       
       const userData = await authApi.me()
+      if (version !== sessionVersion.current) throw new Error('Sessie gewijzigd. Log opnieuw in.')
       setUser(userData)
       
       toast.success(`Welcome back, ${userData.full_name}!`)
       return userData
     } catch (error) {
+      if (version === sessionVersion.current) localStorage.removeItem('access_token')
       // Check for EMAIL_NOT_VERIFIED error specifically
       if (isEmailNotVerifiedError(error)) {
         const { message } = getEmailNotVerifiedMessage(error)
@@ -109,9 +123,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       toast.error('Login failed: ' + message)
       throw error
     } finally {
-      setIsLoading(false)
+      if (version === sessionVersion.current) setIsLoading(false)
     }
-  }, [])
+  }, [queryClient])
 
   const register = useCallback(async (data: RegisterRequest): Promise<RegisterResponse> => {
     try {
@@ -190,6 +204,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, [])
 
   const logout = useCallback(() => {
+    sessionVersion.current += 1
+    void queryClient.cancelQueries()
+    queryClient.clear()
+    for (const key of ['activeClient', 'selectedClientId', 'selectedClientName', 'administration_id', 'uren_session_metadata']) localStorage.removeItem(key)
     // Clear localStorage tokens and user data
     localStorage.removeItem('access_token')
     localStorage.removeItem('user')
@@ -207,6 +225,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     })
     
     setUser(null)
+    setIsLoading(false)
     toast.success('Logged out successfully')
   }, [])
 

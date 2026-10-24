@@ -398,7 +398,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
   // (e-commerce endpoints require Pro plan; calling them for all ZZP users
   //  causes 403/500 errors that pollute unrelated pages)
   const { data: salesReviewSummary } = useQuery({
-    queryKey: ['sales-review-summary'],
+    queryKey: ['sales-review-summary', user?.id],
     queryFn: () => salesReviewApi.getSummary(),
     enabled: hasProAccess,
     staleTime: 60_000, // re-fetch at most once per minute

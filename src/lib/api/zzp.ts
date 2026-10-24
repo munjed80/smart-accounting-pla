@@ -59,6 +59,7 @@ export interface ZZPCustomerCreate {
 export interface ZZPCustomerUpdate extends Partial<ZZPCustomerCreate> {}
 
 export interface ZZPCustomerListResponse {
+  stats?: { total: number; active: number; inactive: number }
   customers: ZZPCustomer[]
   total: number
 }
@@ -183,6 +184,7 @@ export interface ZZPInvoiceUpdate {
 }
 
 export interface ZZPInvoiceListResponse {
+  stats?: { total: number; draft: number; sent: number; paid: number; overdue: number; totalAmount: number; paidAmount: number; openAmount: number }
   invoices: ZZPInvoice[]
   total: number
 }
@@ -779,6 +781,9 @@ export interface WorkSessionStopResponse {
 
 
 export interface ZZPCommitment {
+  legacy_source_key?: string | null
+  notes?: string | null
+  remaining_balance_override_cents?: number | null
   id: string
   administration_id: string
   type: 'lease' | 'loan' | 'subscription'
@@ -787,7 +792,7 @@ export interface ZZPCommitment {
   monthly_payment_cents?: number | null
   principal_amount_cents?: number | null
   interest_rate?: number | null
-  recurring_frequency?: 'monthly' | 'yearly' | null
+  recurring_frequency?: 'monthly' | 'quarterly' | 'yearly' | null
   start_date: string
   end_date?: string | null
   contract_term_months?: number | null
@@ -812,13 +817,16 @@ export interface ZZPCommitment {
 }
 
 export interface ZZPCommitmentCreate {
+  legacy_source_key?: string
+  notes?: string
+  remaining_balance_override_cents?: number
   type: 'lease' | 'loan' | 'subscription'
   name: string
   amount_cents: number
   monthly_payment_cents?: number
   principal_amount_cents?: number
   interest_rate?: number
-  recurring_frequency?: 'monthly' | 'yearly'
+  recurring_frequency?: 'monthly' | 'quarterly' | 'yearly'
   start_date: string
   end_date?: string
   contract_term_months?: number
@@ -834,7 +842,7 @@ export interface ZZPCommitmentCreate {
   status?: 'active' | 'paused' | 'ended'
 }
 
-export type ZZPCommitmentUpdate = Partial<ZZPCommitmentCreate>
+export type ZZPCommitmentUpdate = Omit<Partial<ZZPCommitmentCreate>, 'end_date' | 'remaining_balance_override_cents' | 'contract_term_months' | 'notice_period_days'> & { end_date?: string | null; remaining_balance_override_cents?: number | null; contract_term_months?: number | null; notice_period_days?: number | null }
 
 
 export interface CommitmentExpenseCreatePayload {
@@ -883,6 +891,10 @@ export interface ZZPCommitmentAlert {
 }
 
 export interface ZZPCommitmentOverview {
+  average_monthly_receipts_cents: number
+  cashflow_from: string
+  cashflow_to: string
+  linked_expense_counts: Record<string, number>
   monthly_total_cents: number
   upcoming_total_cents: number
   warning_count: number
@@ -958,8 +970,8 @@ const zzpConsentApi = {
 export const zzpApi = {
   // ------------ Customers ------------
   customers: {
-    list: async (options?: { status?: string; search?: string }): Promise<ZZPCustomerListResponse> => {
-      const params: Record<string, string> = {}
+    list: async (options?: { status?: string; search?: string; limit?: number; offset?: number }): Promise<ZZPCustomerListResponse> => {
+      const params: Record<string, string | number> = { ...options }
       if (options?.status) params.status = options.status
       if (options?.search) params.search = options.search
       const response = await api.get<ZZPCustomerListResponse>('/zzp/customers', { params })
@@ -1006,13 +1018,28 @@ export const zzpApi = {
 
   // ------------ Invoices ------------
   invoices: {
+    numbers: async (ids: string[]): Promise<Record<string, string>> => {
+      const result: Record<string, string> = {}
+      for (let offset = 0; offset < ids.length; offset += 100) {
+        const response = await api.get<{ numbers: Record<string, string> }>('/zzp/invoice-numbers', {
+          params: { ids: ids.slice(offset, offset + 100) }, paramsSerializer: { indexes: null },
+        })
+        Object.assign(result, response.data.numbers)
+      }
+      return result
+    },
     list: async (options?: {
+      limit?: number
+      offset?: number
+      q?: string
+      min_cents?: number
+      max_cents?: number
       status?: string
       customer_id?: string
       from_date?: string
       to_date?: string
     }): Promise<ZZPInvoiceListResponse> => {
-      const params: Record<string, string> = {}
+      const params: Record<string, string | number> = { ...options }
       if (options?.status) params.status = options.status
       if (options?.customer_id) params.customer_id = options.customer_id
       if (options?.from_date) params.from_date = options.from_date
@@ -1139,13 +1166,18 @@ export const zzpApi = {
   // ------------ Expenses ------------
   expenses: {
     list: async (options?: {
+      limit?: number
+      offset?: number
+      q?: string
+      min_cents?: number
+      max_cents?: number
       category?: string
       year?: number
       month?: number
       from_date?: string
       to_date?: string
     }): Promise<ZZPExpenseListResponse> => {
-      const params: Record<string, string | number> = {}
+      const params: Record<string, string | number> = { ...options }
       if (options?.category) params.category = options.category
       if (options?.year) params.year = options.year
       if (options?.month) params.month = options.month
@@ -1201,6 +1233,9 @@ export const zzpApi = {
 
   // ------------ Document Inbox ------------
   documents: {
+    page: async (options: { group: string; q?: string; limit: number; offset: number }): Promise<{ documents: ZZPDocument[]; total: number; counts: Record<string, number> }> => {
+      return (await api.get('/zzp/documents/page', { params: options })).data
+    },
     upload: async (files: File[]): Promise<ZZPDocumentUploadResponse> => {
       const formData = new FormData()
       files.forEach(f => formData.append('files', f))
@@ -1278,11 +1313,13 @@ export const zzpApi = {
     },
 
     listInvoiced: async (options?: {
+      limit?: number
+      offset?: number
       customer_id?: string
       period_start?: string
       period_end?: string
     }): Promise<ZZPTimeEntry[]> => {
-      const params: Record<string, string> = {}
+      const params: Record<string, string | number> = { ...options }
       if (options?.customer_id) params.customer_id = options.customer_id
       if (options?.period_start) params.period_start = options.period_start
       if (options?.period_end) params.period_end = options.period_end
@@ -1609,12 +1646,17 @@ export const zzpApi = {
   quotes: {
     /** List all quotes */
     list: async (options?: {
+      limit?: number
+      offset?: number
+      q?: string
+      min_cents?: number
+      max_cents?: number
       status?: QuoteStatus
       customer_id?: string
       from_date?: string
       to_date?: string
     }): Promise<ZZPQuoteListResponse> => {
-      const params: Record<string, string> = {}
+      const params: Record<string, string | number> = { ...options }
       if (options?.status) params.status = options.status
       if (options?.customer_id) params.customer_id = options.customer_id
       if (options?.from_date) params.from_date = options.from_date

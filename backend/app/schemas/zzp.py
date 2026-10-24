@@ -110,6 +110,7 @@ class CustomerResponse(BaseModel):
 
 
 class CustomerListResponse(BaseModel):
+    stats: Optional[dict[str, int]] = None
     """List of ZZP customers with pagination."""
     customers: List[CustomerResponse]
     total: int
@@ -328,6 +329,7 @@ class InvoiceResponse(BaseModel):
 
 
 class InvoiceListResponse(BaseModel):
+    stats: Optional[dict[str, int]] = None
     """List of invoices with pagination."""
     invoices: List[InvoiceResponse]
     total: int

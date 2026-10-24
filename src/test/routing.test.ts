@@ -53,3 +53,11 @@ it('restores the certificates dossier tab from a direct URL', () => {
   expect(parseClientDossierRoute('/accountant/clients/client-1')).toEqual({ clientId: 'client-1', tab: 'invoices' })
   expect(parseClientDossierRoute('/accountant/clients')).toBeNull()
 })
+
+
+it('resolves ZZP dashboard links and direct invoice/quote details', () => {
+  expect(pathToTab('/zzp/settings', false)).toBe('settings')
+  expect(pathToTab('/zzp/btw-aangifte', false)).toBe('tax-btw')
+  expect(pathToTab('/zzp/invoices/invoice-1', false)).toBe('invoices')
+  expect(pathToTab('/zzp/offertes/quote-1', false)).toBe('offertes')
+})

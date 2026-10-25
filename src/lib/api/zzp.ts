@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { api } from '../api'
+import { validateInvoicePdf, readPdfResponseText } from '../invoicePdf'
 import type {
   ZZPLinksResponse,
   ZZPActiveLinksResponse,
@@ -131,7 +132,8 @@ export interface ZZPInvoice {
   invoice_number: string
   status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
   issue_date: string
-  due_date?: string
+  delivery_date?: string | null
+  due_date?: string | null
   // Seller snapshot
   seller_company_name?: string
   seller_trading_name?: string
@@ -159,7 +161,7 @@ export interface ZZPInvoice {
   amount_paid_cents: number
   // Payment timestamp
   paid_at?: string
-  notes?: string
+  notes?: string | null
   lines: ZZPInvoiceLine[]
   created_at: string
   updated_at: string
@@ -169,8 +171,9 @@ export interface ZZPInvoiceCreate {
   customer_id: string
   invoice_number?: string
   issue_date: string
-  due_date?: string
-  notes?: string
+  delivery_date?: string | null
+  due_date?: string | null
+  notes?: string | null
   lines: ZZPInvoiceLineCreate[]
 }
 
@@ -178,8 +181,9 @@ export interface ZZPInvoiceUpdate {
   customer_id?: string
   invoice_number?: string
   issue_date?: string
-  due_date?: string
-  notes?: string
+  delivery_date?: string | null
+  due_date?: string | null
+  notes?: string | null
   lines?: ZZPInvoiceLineCreate[]
 }
 
@@ -1048,13 +1052,16 @@ export const zzpApi = {
       return response.data
     },
 
+    preview: async (data: ZZPInvoiceCreate): Promise<Blob> => {
+      return validateInvoicePdf((await api.post('/zzp/invoices/preview', data, { responseType: 'blob' })).data)
+    },
     get: async (invoiceId: string): Promise<ZZPInvoice> => {
       const response = await api.get<ZZPInvoice>(`/zzp/invoices/${invoiceId}`)
       return response.data
     },
 
-    create: async (data: ZZPInvoiceCreate): Promise<ZZPInvoice> => {
-      const response = await api.post<ZZPInvoice>('/zzp/invoices', data)
+    create: async (data: ZZPInvoiceCreate, creationKey?: string): Promise<ZZPInvoice> => {
+      const response = await api.post<ZZPInvoice>('/zzp/invoices', data, creationKey ? { headers: { 'Idempotency-Key': creationKey } } : undefined)
       return response.data
     },
 
@@ -1077,31 +1084,18 @@ export const zzpApi = {
      * Returns a Blob that can be used for download or preview.
      */
     downloadPdf: async (invoiceId: string): Promise<Blob> => {
-      const response = await api.get(`/zzp/invoices/${invoiceId}/pdf`, {
-        responseType: 'blob',
-      })
-      return response.data as Blob
-    },
-
-    /**
-     * Get the invoice PDF URL for direct download (browser navigation).
-     * Includes `?download=1` to signal explicit download intent and
-     * `?token=<jwt>` so that browsers (e.g. iOS Safari) that cannot attach
-     * Authorization headers during direct navigation are still authenticated.
-     *
-     * NOTE: The JWT is short-lived and scoped to the authenticated user.
-     * Passing it in the URL is an accepted trade-off for file-download flows
-     * where custom headers are unavailable (see iOS Safari / PWA constraints).
-     */
-    getPdfUrl: (invoiceId: string): string => {
-      let token: string | null = null
       try {
-        token = localStorage.getItem('access_token')
-      } catch {
-        // localStorage may be unavailable in certain browser contexts (e.g. private mode)
+        return await validateInvoicePdf((await api.get(`/zzp/invoices/${invoiceId}/pdf`, { responseType: 'blob' })).data)
+      } catch (error) {
+        const data = (error as { response?: { data?: unknown } }).response?.data
+        if (data instanceof Blob) {
+          try {
+            const body = JSON.parse(await readPdfResponseText(data))
+            throw new Error(body?.detail?.message || 'PDF ophalen mislukt. Probeer opnieuw.')
+          } catch (parsed) { if (parsed instanceof Error && !(parsed instanceof SyntaxError)) throw parsed }
+        }
+        throw error
       }
-      const tokenParam = token ? `&token=${encodeURIComponent(token)}` : ''
-      return `${api.defaults.baseURL}/zzp/invoices/${invoiceId}/pdf?download=1${tokenParam}`
     },
 
     /**

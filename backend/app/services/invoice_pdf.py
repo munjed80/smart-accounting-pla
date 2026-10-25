@@ -9,6 +9,7 @@ from typing import Optional
 import logging
 
 from app.models.zzp import ZZPInvoice
+from app.services.invoice_view import invoice_view
 from app.services.invoice_formatting import (
     format_amount,
     format_date_nl,
@@ -27,6 +28,8 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
     Returns:
         HTML string for the invoice
     """
+    invoice = invoice_view(invoice, escape_text=True)
+    status_label = {'draft': 'CONCEPT', 'cancelled': 'GEANNULEERD', 'paid': 'BETAALD'}.get(invoice.status, 'FACTUUR')
     # ── Company / seller details ───────────────────────────────────────────────
     company_name = invoice.seller_company_name or invoice.seller_trading_name
     company_missing = not company_name
@@ -85,8 +88,15 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
             <td class="col-amount">{format_amount(line.line_total_cents)}</td>
         </tr>"""
 
+    vat_breakdown_html = ''
+    for rate in sorted({line.vat_rate for line in invoice.lines}):
+        taxable = sum(line.line_total_cents for line in invoice.lines if line.vat_rate == rate)
+        vat = sum(line.vat_amount_cents for line in invoice.lines if line.vat_rate == rate)
+        vat_breakdown_html += f'<div class="totals-row"><span>BTW {float(rate):g}% over {format_amount(taxable)}</span><span>{format_amount(vat)}</span></div>'
+
     # ── Dates ──────────────────────────────────────────────────────────────────
     issue_date_str = format_date_nl(invoice.issue_date)
+    delivery_date_str = format_date_nl(invoice.delivery_date) if invoice.delivery_date else None
     due_date_str   = format_date_nl(invoice.due_date) if invoice.due_date else "&mdash;"
 
     # ── Payment details ────────────────────────────────────────────────────────
@@ -130,12 +140,15 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
         }}
 
         body {{
-            font-family: Arial, Helvetica, sans-serif;
+            font-family: 'DejaVu Sans', Arial, sans-serif;
             font-size: 10pt;
             line-height: 1.5;
             color: #1e293b;
         }}
 
+        .col-desc, .customer-name, .notes-text {{ unicode-bidi: plaintext; }}
+        thead {{ display: table-header-group; }}
+        @page {{ @bottom-right {{ content: "{invoice.invoice_number} · " counter(page) " / " counter(pages); font-size: 8pt; }} }}
         /* ── HEADER ─────────────────────────────────────────────────────────── */
         .header {{
             display: flex;
@@ -298,7 +311,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
         }}
 
         .totals-box {{
-            width: 230px;
+            width: 310px;
         }}
 
         .totals-row {{
@@ -309,6 +322,8 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
             color: #64748b;
             border-bottom: 1px solid #e2e8f0;
         }}
+
+        .totals-row span:last-child {{ white-space: nowrap; margin-left: 14px; }}
 
         .totals-row:last-child {{
             border-bottom: none;
@@ -402,7 +417,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                 {f'<div class="company-details">{seller_details_html}</div>' if seller_details_html else ''}
             </div>
             <div class="factuur-block">
-                <div class="factuur-title">FACTUUR</div>
+                <div class="factuur-title">{status_label}</div>
                 <table class="meta-table">
                     <tr>
                         <td class="ml">Factuurdatum</td>
@@ -420,6 +435,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
             </div>
         </div>
 
+        {f'<p class="section-label">Leverdatum: {delivery_date_str}</p>' if delivery_date_str else ''}
         <!-- ── CUSTOMER ── -->
         <div class="customer-section">
             <div class="section-label">Factuur voor</div>
@@ -455,8 +471,9 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                     <span>Subtotaal</span>
                     <span>{format_amount(invoice.subtotal_cents)}</span>
                 </div>
+                {vat_breakdown_html}
                 <div class="totals-row">
-                    <span>BTW</span>
+                    <span>BTW totaal</span>
                     <span>{format_amount(invoice.vat_total_cents)}</span>
                 </div>
                 <div class="totals-row grand-total">
@@ -514,7 +531,9 @@ def generate_invoice_pdf(invoice: ZZPInvoice) -> bytes:
         html_content = generate_invoice_html(invoice)
         
         # Generate PDF
-        html = HTML(string=html_content)
+        def reject_external_resource(url, *args, **kwargs):
+            raise ValueError('External PDF resources are disabled')
+        html = HTML(string=html_content, url_fetcher=reject_external_resource)
         pdf_buffer = io.BytesIO()
         html.write_pdf(pdf_buffer)
         pdf_buffer.seek(0)

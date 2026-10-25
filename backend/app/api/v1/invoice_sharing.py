@@ -15,7 +15,7 @@ import time
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,11 +23,11 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.zzp import ZZPInvoice, BusinessProfile
+from app.models.zzp import ZZPInvoice
 from app.models.administration import Administration, AdministrationMember
 from app.api.v1.deps import CurrentUser, require_zzp
-from app.services.invoice_pdf_reportlab import generate_invoice_pdf_reportlab
-from app.services.invoice_pdf import generate_invoice_pdf, get_invoice_pdf_filename
+from starlette.concurrency import run_in_threadpool
+from app.services.invoice_rendering import render_invoice_pdf, pdf_disposition
 
 logger = logging.getLogger(__name__)
 
@@ -160,53 +160,17 @@ async def get_public_invoice_pdf(
     if not invoice:
         raise HTTPException(status_code=404, detail="Factuur niet gevonden.")
 
-    # Back-fill seller details from business profile (same logic as
-    # the authenticated PDF endpoint).
-    profile_result = await db.execute(
-        select(BusinessProfile).where(
-            BusinessProfile.administration_id == invoice.administration_id
-        )
-    )
-    profile = profile_result.scalar_one_or_none()
-    if profile:
-        _fields = [
-            ("seller_company_name",        "company_name"),
-            ("seller_trading_name",        "trading_name"),
-            ("seller_address_street",      "address_street"),
-            ("seller_address_postal_code", "address_postal_code"),
-            ("seller_address_city",        "address_city"),
-            ("seller_address_country",     "address_country"),
-            ("seller_kvk_number",          "kvk_number"),
-            ("seller_btw_number",          "btw_number"),
-            ("seller_iban",                "iban"),
-            ("seller_email",               "email"),
-            ("seller_phone",               "phone"),
-        ]
-        for inv_field, prof_field in _fields:
-            if not getattr(invoice, inv_field, None):
-                setattr(invoice, inv_field, getattr(profile, prof_field, None))
-
-    # Generate PDF
     try:
-        pdf_bytes = generate_invoice_pdf_reportlab(invoice)
-        filename = get_invoice_pdf_filename(invoice)
-    except Exception as reportlab_err:
-        logger.warning("ReportLab failed for public PDF, trying WeasyPrint: %s", reportlab_err)
-        try:
-            pdf_bytes = generate_invoice_pdf(invoice)
-            filename = get_invoice_pdf_filename(invoice)
-        except Exception:
-            raise HTTPException(
-                status_code=503,
-                detail="PDF-generatie is tijdelijk niet beschikbaar.",
-            )
+        pdf_bytes = await run_in_threadpool(render_invoice_pdf, invoice)
+    except Exception as error:
+        raise HTTPException(503, detail='PDF-generatie is tijdelijk niet beschikbaar.') from error
 
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'inline; filename="{filename}"',
+            "Content-Disposition": pdf_disposition(invoice, inline=True),
             "Content-Length": str(len(pdf_bytes)),
-            "Cache-Control": "private, max-age=3600",
+            "Cache-Control": "no-store",
         },
     )

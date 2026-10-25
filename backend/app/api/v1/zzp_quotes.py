@@ -21,7 +21,6 @@ from app.models.zzp import (
     ZZPQuoteCounter, 
     ZZPInvoice,
     ZZPInvoiceLine,
-    ZZPInvoiceCounter,
     ZZPCustomer, 
     BusinessProfile,
     QuoteStatus,
@@ -37,6 +36,7 @@ from app.schemas.zzp import (
     QuoteLineResponse,
     QuoteConvertToInvoiceResponse,
 )
+from app.api.v1._zzp_invoices_helpers import generate_invoice_number
 from app.api.v1.deps import CurrentUser, require_zzp
 from app.services.invoice_pdf_reportlab import generate_quote_pdf_reportlab, get_quote_pdf_filename
 
@@ -569,6 +569,7 @@ async def convert_quote_to_invoice(
     require_zzp(current_user)
     administration = await get_user_administration(current_user.id, db)
     
+    await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
     result = await db.execute(
         select(ZZPQuote)
         .where(ZZPQuote.id == quote_id)
@@ -604,33 +605,8 @@ async def convert_quote_to_invoice(
             }
         )
     
-    # Generate invoice number
-    current_year = datetime.now().year
-    counter_result = await db.execute(
-        select(ZZPInvoiceCounter)
-        .where(ZZPInvoiceCounter.administration_id == administration.id)
-        .with_for_update()
-    )
-    counter = counter_result.scalar_one_or_none()
-    
-    if counter is None:
-        counter = ZZPInvoiceCounter(
-            administration_id=administration.id,
-            current_year=current_year,
-            current_sequence=1
-        )
-        db.add(counter)
-        await db.flush()
-        invoice_number = f"INV-{current_year}-0001"
-    else:
-        if counter.current_year != current_year:
-            counter.current_year = current_year
-            counter.current_sequence = 1
-        else:
-            counter.current_sequence += 1
-        await db.flush()
-        invoice_number = f"INV-{current_year}-{counter.current_sequence:04d}"
-    
+    invoice_number = await generate_invoice_number(administration.id, db)
+
     # Create invoice from quote
     invoice = ZZPInvoice(
         administration_id=administration.id,

@@ -9,7 +9,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional, List
 from enum import Enum
-from sqlalchemy import String, DateTime, Date, Numeric, Integer, Boolean, Text, func, ForeignKey, Enum as SQLEnum
+from sqlalchemy import String, DateTime, Date, Numeric, Integer, Boolean, Text, func, ForeignKey, Enum as SQLEnum, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -254,6 +254,13 @@ class ZZPInvoice(Base):
     - notes: Optional invoice notes
     """
     __tablename__ = "zzp_invoices"
+    __table_args__ = (
+        UniqueConstraint('administration_id', 'invoice_number', name='uq_zzp_invoice_number'),
+        UniqueConstraint('administration_id', 'creation_key', name='uq_zzp_invoice_creation'),
+    )
+    creation_key: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    creation_payload_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    delivery_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

@@ -5,35 +5,36 @@ CRUD operations for ZZP invoices with lines, status transitions,
 race-safe invoice number generation, and PDF generation.
 """
 import base64
+import hashlib
 import logging
 from datetime import datetime, date, timezone
 from decimal import Decimal
 from typing import Annotated, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from fastapi.responses import Response
-from sqlalchemy import and_, select, func, and_, or_, case
+from sqlalchemy import and_, select, func, or_, case
+from sqlalchemy.exc import IntegrityError
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import decode_token
-from app.services.invoice_pdf import generate_invoice_pdf, get_invoice_pdf_filename
-from app.services.invoice_pdf_reportlab import generate_invoice_pdf_reportlab
+from app.services.invoice_rendering import render_invoice_pdf, pdf_disposition
+from app.services.invoice_pdf import get_invoice_pdf_filename
 from app.services.email import email_service
 from app.models.zzp import (
     ZZPInvoice, 
     ZZPInvoiceLine, 
-    ZZPInvoiceCounter, 
     ZZPCustomer, 
     BusinessProfile,
     InvoiceStatus,
 )
 from app.models.administration import Administration, AdministrationMember
 from app.schemas.zzp import (
-    InvoiceCreate,
+    InvoiceCreate, InvoicePreview,
     InvoiceUpdate,
     InvoiceStatusUpdate,
     InvoiceResponse,
@@ -42,9 +43,8 @@ from app.schemas.zzp import (
 )
 from app.api.v1.deps import CurrentUser, require_zzp
 from app.api.v1._zzp_invoices_helpers import (
-    _get_user_for_pdf,
     calculate_line_totals,
-    generate_invoice_number,
+    generate_invoice_number, refresh_seller_snapshot,
     get_user_administration,
     invoice_to_response,
 )
@@ -53,6 +53,35 @@ from app.services.zzp_integrity import require_open_dates, sync_invoice
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
+
+@router.post('/invoices/preview')
+async def preview_invoice(payload: InvoicePreview, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+    """Render an unsaved concept without reserving an invoice number or writing rows."""
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
+    customer = await db.scalar(select(ZZPCustomer).where(ZZPCustomer.id == payload.customer_id, ZZPCustomer.administration_id == administration.id))
+    if not customer:
+        raise HTTPException(404, detail={'code': 'CUSTOMER_NOT_FOUND', 'message': 'Klant niet gevonden.'})
+    invoice = ZZPInvoice(invoice_number=payload.invoice_number or 'CONCEPT', status='draft', issue_date=date.fromisoformat(payload.issue_date),
+        due_date=date.fromisoformat(payload.due_date) if payload.due_date else None,
+        delivery_date=date.fromisoformat(payload.delivery_date) if payload.delivery_date else None,
+        notes=payload.notes, subtotal_cents=0, vat_total_cents=0, total_cents=0)
+    for name in ('name', 'address_street', 'address_postal_code', 'address_city', 'address_country', 'kvk_number', 'btw_number'):
+        setattr(invoice, f'customer_{name}', getattr(customer, name))
+    await refresh_seller_snapshot(invoice, administration.id, db)
+    invoice.lines = []
+    for index, line in enumerate(payload.lines, 1):
+        net, vat = calculate_line_totals(line.quantity, line.unit_price_cents, line.vat_rate)
+        invoice.lines.append(ZZPInvoiceLine(line_number=index, **line.model_dump(), line_total_cents=net, vat_amount_cents=vat))
+        invoice.subtotal_cents += net
+        invoice.vat_total_cents += vat
+    invoice.total_cents = invoice.subtotal_cents + invoice.vat_total_cents
+    try:
+        data = await run_in_threadpool(render_invoice_pdf, invoice)
+    except Exception as error:
+        raise HTTPException(503, detail={'code': 'PDF_NOT_AVAILABLE', 'message': 'Voorbeeld genereren mislukt. Probeer opnieuw.'}) from error
+    return Response(data, media_type='application/pdf', headers={'Content-Disposition': 'inline; filename="concept.pdf"', 'Cache-Control':'no-store'})
 
 
 @router.get("/invoices", response_model=InvoiceListResponse)
@@ -129,6 +158,7 @@ async def create_invoice(
     invoice_in: InvoiceCreate,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    creation_key: Annotated[Optional[UUID], Header(alias="Idempotency-Key")] = None,
 ):
     """
     Create a new invoice.
@@ -142,6 +172,17 @@ async def create_invoice(
     
     administration = await get_user_administration(current_user.id, db)
     
+    await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
+    payload_hash = hashlib.sha256(invoice_in.model_dump_json().encode()).hexdigest()
+    if creation_key:
+        previous = await db.scalar(select(ZZPInvoice).options(selectinload(ZZPInvoice.lines)).where(
+            ZZPInvoice.administration_id == administration.id, ZZPInvoice.creation_key == creation_key,
+        ))
+        if previous:
+            if previous.creation_payload_hash != payload_hash:
+                raise HTTPException(409, detail={'code': 'CREATION_KEY_REUSED', 'message': 'Deze bewaaractie hoort bij andere factuurgegevens. Open een nieuwe factuur.'})
+            return invoice_to_response(previous)
+
     # Verify customer exists and belongs to this administration
     customer_result = await db.execute(
         select(ZZPCustomer).where(
@@ -173,6 +214,8 @@ async def create_invoice(
         administration_id=administration.id,
         customer_id=customer.id,
         invoice_number=invoice_number,
+        creation_key=creation_key, creation_payload_hash=payload_hash if creation_key else None,
+        delivery_date=date.fromisoformat(invoice_in.delivery_date) if invoice_in.delivery_date else None,
         status=InvoiceStatus.DRAFT.value,
         issue_date=date.fromisoformat(invoice_in.issue_date),
         due_date=date.fromisoformat(invoice_in.due_date) if invoice_in.due_date else None,
@@ -235,8 +278,12 @@ async def create_invoice(
     
     await db.flush()
     await sync_invoice(db, administration.id, invoice)
-    await db.commit()
-    
+    try:
+        await db.commit()
+    except IntegrityError as error:
+        await db.rollback()
+        raise HTTPException(409, detail={'code': 'INVOICE_NUMBER_CONFLICT', 'message': 'Factuurnummer bestaat al. Probeer opnieuw.'}) from error
+
     # Reload with lines
     result = await db.execute(
         select(ZZPInvoice)
@@ -306,6 +353,7 @@ async def update_invoice(
     
     administration = await get_user_administration(current_user.id, db)
     
+    await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
     result = await db.execute(
         select(ZZPInvoice)
         .options(selectinload(ZZPInvoice.lines))
@@ -354,13 +402,18 @@ async def update_invoice(
     # Update basic fields
     if invoice_in.issue_date:
         invoice.issue_date = date.fromisoformat(invoice_in.issue_date)
-    if invoice_in.due_date is not None:
+    if 'due_date' in invoice_in.model_fields_set:
         invoice.due_date = date.fromisoformat(invoice_in.due_date) if invoice_in.due_date else None
-    if invoice_in.notes is not None:
+    if 'delivery_date' in invoice_in.model_fields_set:
+        invoice.delivery_date = date.fromisoformat(invoice_in.delivery_date) if invoice_in.delivery_date else None
+    if 'notes' in invoice_in.model_fields_set:
         invoice.notes = invoice_in.notes
+    if invoice.due_date and invoice.due_date < invoice.issue_date:
+        raise HTTPException(422, detail={'code': 'INVALID_DUE_DATE', 'message': 'Vervaldatum mag niet vóór de factuurdatum liggen.'})
+    await refresh_seller_snapshot(invoice, administration.id, db)
     
     # Update customer if changed
-    if invoice_in.customer_id and invoice_in.customer_id != invoice.customer_id:
+    if invoice_in.customer_id:
         customer_result = await db.execute(
             select(ZZPCustomer).where(
                 ZZPCustomer.id == invoice_in.customer_id,
@@ -423,12 +476,17 @@ async def update_invoice(
     
     await db.flush()
     await sync_invoice(db, administration.id, invoice)
-    await db.commit()
-    
+    try:
+        await db.commit()
+    except IntegrityError as error:
+        await db.rollback()
+        raise HTTPException(409, detail={'code': 'INVOICE_NUMBER_CONFLICT', 'message': 'Factuurnummer bestaat al. Probeer opnieuw.'}) from error
+
     # Reload with lines
     result = await db.execute(
         select(ZZPInvoice)
         .options(selectinload(ZZPInvoice.lines))
+        .execution_options(populate_existing=True)
         .where(ZZPInvoice.id == invoice.id)
     )
     invoice = result.scalar_one()
@@ -498,6 +556,8 @@ async def update_invoice_status(
             }
         )
     
+    if current_status == InvoiceStatus.DRAFT.value and new_status == InvoiceStatus.SENT.value:
+        await refresh_seller_snapshot(invoice, administration.id, db)
     invoice.status = new_status
     
     # Update paid_at timestamp based on status change
@@ -572,32 +632,10 @@ async def delete_invoice(
 async def get_invoice_pdf(
     invoice_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated["User", Depends(_get_user_for_pdf)],
+    current_user: CurrentUser,
     download: bool = Query(default=False),
 ):
-    """
-    Generate and download a PDF for an invoice.
-
-    Accepts auth via Authorization header (Bearer) **or** via the ``?token=``
-    query parameter.  The query-parameter form is required for direct browser
-    navigation (``window.location.href``) which cannot set custom headers —
-    this is the only reliable way to trigger a native download on iOS Safari.
-
-    Query parameters:
-    - ``download=1``  – signals an explicit download intent; sets
-      ``Cache-Control: no-store`` so the browser never shows a cached copy.
-    - ``token=<jwt>`` – alternative auth for browsers that cannot send
-      Authorization headers (e.g. iOS Safari direct navigation).
-
-    Returns the invoice as a downloadable PDF file with proper headers:
-    - Content-Type: application/pdf
-    - Content-Disposition: attachment; filename="INV-YYYY-XXXX.pdf"
-    - Content-Length: <size> (for mobile browser compatibility)
-    - Cache-Control: no-store when download=1, otherwise no-cache
-
-    Uses ReportLab as the primary PDF generator (pure Python, Docker-safe).
-    Falls back to WeasyPrint if ReportLab fails.
-    """
+    """Download a PDF with Bearer authentication; no login token is accepted in URLs."""
     require_zzp(current_user)
 
     administration = await get_user_administration(current_user.id, db)
@@ -618,64 +656,10 @@ async def get_invoice_pdf(
             detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
         )
 
-    # Backfill missing seller snapshot fields from the current business profile.
-    # This handles invoices that were created before the profile was fully set up,
-    # ensuring the PDF always shows the most complete company data available.
-    profile_result = await db.execute(
-        select(BusinessProfile).where(
-            BusinessProfile.administration_id == administration.id
-        )
-    )
-    profile = profile_result.scalar_one_or_none()
-    if profile:
-        _seller_profile_fields = [
-            ("seller_company_name",        "company_name"),
-            ("seller_trading_name",        "trading_name"),
-            ("seller_address_street",      "address_street"),
-            ("seller_address_postal_code", "address_postal_code"),
-            ("seller_address_city",        "address_city"),
-            ("seller_address_country",     "address_country"),
-            ("seller_kvk_number",          "kvk_number"),
-            ("seller_btw_number",          "btw_number"),
-            ("seller_iban",                "iban"),
-            ("seller_email",               "email"),
-            ("seller_phone",               "phone"),
-        ]
-        for invoice_field, profile_field in _seller_profile_fields:
-            if not getattr(invoice, invoice_field, None):
-                setattr(invoice, invoice_field, getattr(profile, profile_field, None))
-
     try:
-        # Try ReportLab first (pure Python, Docker-safe, no system dependencies)
-        pdf_bytes = generate_invoice_pdf_reportlab(invoice)
-        filename = get_invoice_pdf_filename(invoice)
-
-    except Exception as reportlab_error:
-        # Fallback to WeasyPrint if ReportLab fails
-        logger.warning(f"ReportLab PDF generation failed, trying WeasyPrint fallback: {reportlab_error}")
-
-        try:
-            pdf_bytes = generate_invoice_pdf(invoice)
-            filename = get_invoice_pdf_filename(invoice)
-        except RuntimeError as e:
-            # Both methods failed
-            error_msg = str(e)
-            if "not available" in error_msg or "not installed" in error_msg:
-                raise HTTPException(
-                    status_code=503,
-                    detail={
-                        "code": "PDF_NOT_AVAILABLE",
-                        "message": "PDF-generatie is tijdelijk niet beschikbaar. Probeer het later opnieuw."
-                    }
-                )
-            else:
-                raise HTTPException(
-                    status_code=500,
-                    detail={
-                        "code": "PDF_GENERATION_FAILED",
-                        "message": "Kon de PDF niet genereren. Probeer het later opnieuw."
-                    }
-                )
+        pdf_bytes = await run_in_threadpool(render_invoice_pdf, invoice)
+    except Exception as error:
+        raise HTTPException(503, detail={'code': 'PDF_NOT_AVAILABLE', 'message': 'PDF-generatie is tijdelijk niet beschikbaar. Probeer opnieuw.'}) from error
 
     # Cache-Control: use no-store for explicit download requests so that
     # browsers (especially iOS Safari) never serve a stale cached copy.
@@ -685,7 +669,7 @@ async def get_invoice_pdf(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": pdf_disposition(invoice),
             "Content-Length": str(len(pdf_bytes)),
             "Cache-Control": cache_control,
             "Pragma": "no-cache",
@@ -754,6 +738,7 @@ async def send_invoice(
     # Resending a paid/overdue invoice must preserve its financial state.
     await require_open_dates(db, administration.id, invoice.issue_date)
     if invoice.status == InvoiceStatus.DRAFT.value:
+        await refresh_seller_snapshot(invoice, administration.id, db)
         invoice.status = InvoiceStatus.SENT.value
     await db.flush()
     await sync_invoice(db, administration.id, invoice)
@@ -763,7 +748,7 @@ async def send_invoice(
     
     # Generate PDF
     try:
-        pdf_bytes = generate_invoice_pdf_reportlab(invoice)
+        pdf_bytes = await run_in_threadpool(render_invoice_pdf, invoice)
         filename = get_invoice_pdf_filename(invoice)
     except Exception as pdf_error:
         logger.error(f"Failed to generate PDF for invoice {invoice_id}: {pdf_error}")

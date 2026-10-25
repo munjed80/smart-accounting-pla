@@ -1,3 +1,6 @@
+import { invoiceDecimal, invoicePriceCents, invoiceLineAmounts } from '@/lib/invoiceMoney'
+import { saveInvoicePdf } from '@/lib/invoicePdf'
+import { InvoicePdfPreview } from './InvoicePdfPreview'
 import { useServerPagination } from '@/hooks/useServerPagination'
 import { ServerPagination } from './ServerPagination'
 /**
@@ -16,7 +19,7 @@ import { ServerPagination } from './ServerPagination'
  * - Seller details preview from Business Profile
  */
 
-import { useState, useEffect, useMemo, useCallback, Component, ReactNode } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, Component, ReactNode } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -127,12 +130,11 @@ import {
   getStatusCodeFromError,
   normalizeListResponse,
   extractDatePart,
-  parseAmountToCents,
 } from '@/components/shared/page-formatting'
 
 // Format amount in cents to EUR currency string
 // (formatAmountEUR, formatDate, getStatusCodeFromError, normalizeListResponse,
-//  extractDatePart, parseAmountToCents are now imported from '@/components/shared/page-formatting')
+//  extractDatePart are imported from '@/components/shared/page-formatting')
 
 // Invoice status types (matches backend)
 type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
@@ -306,7 +308,7 @@ const createEmptyLine = (): InvoiceLineFormData => ({
   vatRate: '21',
 })
 // Invoice form dialog - now supports invoice lines
-const InvoiceFormDialog = ({
+export const InvoiceFormDialog = ({
   open,
   onOpenChange,
   invoice,
@@ -321,7 +323,7 @@ const InvoiceFormDialog = ({
   invoice?: ZZPInvoice
   customers: ZZPCustomer[]
   businessProfile: ZZPBusinessProfile | null
-  onSave: (data: ZZPInvoiceCreate, isEdit: boolean) => Promise<void>
+  onSave: (data: ZZPInvoiceCreate, isEdit: boolean, creationKey?: string) => Promise<void>
   isReadOnly?: boolean
   preSelectedCustomerId?: string | null
 }) => {
@@ -330,6 +332,14 @@ const InvoiceFormDialog = ({
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [issueDate, setIssueDate] = useState('')
   const [dueDate, setDueDate] = useState('')
+  const [deliveryDate, setDeliveryDate] = useState('')
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [initialFormKey, setInitialFormKey] = useState('')
+  const [confirmClose, setConfirmClose] = useState(false)
+  const [preview, setPreview] = useState<Blob | null>(null)
+  const [isPreviewing, setIsPreviewing] = useState(false)
+  const [actionError, setActionError] = useState('')
+  const creationKey = useRef('')
   const [notes, setNotes] = useState('')
   const [lines, setLines] = useState<InvoiceLineFormData[]>([createEmptyLine()])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -344,46 +354,40 @@ const InvoiceFormDialog = ({
 
   // Active customers only
   const activeCustomers = useMemo(() => 
-    customers.filter(c => c.status === 'active'), 
-    [customers]
+    customers.filter(c => c.status === 'active' || c.id === invoice?.customer_id),
+    [customers, invoice?.customer_id]
   )
 
-  // Reset form when dialog opens/closes or invoice changes
+  const formKey = JSON.stringify({ customerId, invoiceNumber, issueDate, dueDate, deliveryDate, notes, lines })
+  const dirty = open && !isReadOnly && !!initialFormKey && formKey !== initialFormKey
+  const requestOpenChange = (next: boolean) => {
+    if (isSubmitting || isPreviewing) return
+    if (!next && dirty) setConfirmClose(true)
+    else onOpenChange(next)
+  }
   useEffect(() => {
-    if (open) {
-      if (invoice) {
-        setCustomerId(invoice.customer_id)
-        setInvoiceNumber(invoice.invoice_number)
-        setIssueDate(extractDatePart(invoice.issue_date))
-        setDueDate(extractDatePart(invoice.due_date))
-        setNotes(invoice.notes || '')
-        // Convert existing lines to form data
-        if (invoice.lines && invoice.lines.length > 0) {
-          setLines(invoice.lines.map(line => ({
-            id: line.id,
-            description: line.description,
-            quantity: line.quantity.toString(),
-            unitPrice: (line.unit_price_cents / 100).toFixed(2).replace('.', ','),
-            vatRate: line.vat_rate.toString(),
-          })))
-        } else {
-          setLines([createEmptyLine()])
-        }
-      } else {
-        // New invoice - use pre-selected customer if available
-        setCustomerId(preSelectedCustomerId || '')
-        setInvoiceNumber('')
-        setIssueDate(extractDatePart(new Date().toISOString()))
-        setDueDate('')
-        setNotes('')
-        setLines([createEmptyLine()])
-      }
-      setCustomerError('')
-      setInvoiceNumberError('')
-      setDateError('')
-      setLinesError('')
-      setIsSubmitting(false)
+    if (!dirty) return
+    const preventLoss = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', preventLoss)
+    return () => window.removeEventListener('beforeunload', preventLoss)
+  }, [dirty])
+  useEffect(() => {
+    if (!open) { setPreview(null); return }
+    const next = {
+      customerId: invoice?.customer_id || preSelectedCustomerId || '',
+      invoiceNumber: invoice?.invoice_number || '',
+      issueDate: extractDatePart(invoice?.issue_date) || new Date().toLocaleDateString('sv-SE'),
+      dueDate: extractDatePart(invoice?.due_date || undefined),
+      deliveryDate: extractDatePart(invoice?.delivery_date || undefined),
+      notes: invoice?.notes || '',
+      lines: invoice?.lines?.length ? invoice.lines.map(line => ({ id: line.id, description: line.description,
+        quantity: String(line.quantity), unitPrice: (line.unit_price_cents / 100).toFixed(2).replace('.', ','), vatRate: String(line.vat_rate) })) : [createEmptyLine()],
     }
+    setCustomerId(next.customerId); setInvoiceNumber(next.invoiceNumber); setIssueDate(next.issueDate)
+    setDueDate(next.dueDate); setDeliveryDate(next.deliveryDate); setNotes(next.notes); setLines(next.lines)
+    setInitialFormKey(JSON.stringify(next)); creationKey.current = crypto.randomUUID()
+    setCustomerSearch(''); setConfirmClose(false); setActionError(''); setPreview(null)
+    setCustomerError(''); setInvoiceNumberError(''); setDateError(''); setLinesError(''); setIsSubmitting(false)
   }, [open, invoice, preSelectedCustomerId])
 
   // Fetch price suggestion when customer changes (for new invoices or when editing)
@@ -391,6 +395,7 @@ const InvoiceFormDialog = ({
   // since we update lines inside this effect. The first line's description is read
   // at the time the effect runs, which is sufficient for the suggestion logic.
   useEffect(() => {
+    let cancelled = false
     const fetchPriceSuggestion = async () => {
       if (!customerId || !open) {
         setPriceSuggestion(null)
@@ -403,18 +408,13 @@ const InvoiceFormDialog = ({
         const firstLineDescription = lines[0]?.description?.trim() || undefined
         const suggestion = await zzpApi.invoices.suggestPrice(customerId, firstLineDescription)
         
+        if (cancelled) return
         if (suggestion.suggested_price_euros !== null) {
           // Format price as Euro string with comma decimal separator
           const formattedPrice = suggestion.suggested_price_euros.toFixed(2).replace('.', ',')
           setPriceSuggestion(formattedPrice)
           setSuggestionMessage(suggestion.message)
           
-          // Auto-fill first line if it's empty and not in read-only mode
-          if (!isReadOnly && (!lines[0]?.unitPrice || lines[0].unitPrice === '0,00')) {
-            const newLines = [...lines]
-            newLines[0] = { ...newLines[0], unitPrice: formattedPrice }
-            setLines(newLines)
-          }
         } else {
           setPriceSuggestion(null)
           setSuggestionMessage(suggestion.message)
@@ -427,6 +427,7 @@ const InvoiceFormDialog = ({
     }
     
     void fetchPriceSuggestion()
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId, open, isReadOnly])
 
@@ -452,9 +453,7 @@ const InvoiceFormDialog = ({
 
   // Calculate line total (for display)
   const calculateLineTotal = (line: InvoiceLineFormData): number => {
-    const qty = parseFloat(line.quantity.replace(',', '.')) || 0
-    const unitPriceCents = parseAmountToCents(line.unitPrice) || 0
-    return qty * unitPriceCents
+    return invoiceLineAmounts(line.quantity, line.unitPrice, line.vatRate).net
   }
 
   // Calculate totals (for display)
@@ -463,8 +462,7 @@ const InvoiceFormDialog = ({
     let vatTotal = 0
     lines.forEach(line => {
       const lineTotalCents = calculateLineTotal(line)
-      const vatRate = parseFloat(line.vatRate) || 0
-      const vatAmount = Math.round(lineTotalCents * (vatRate / 100))
+      const vatAmount = invoiceLineAmounts(line.quantity, line.unitPrice, line.vatRate).vat
       subtotal += lineTotalCents
       vatTotal += vatAmount
     })
@@ -485,18 +483,18 @@ const InvoiceFormDialog = ({
         setLinesError(t('zzpInvoices.lineDescriptionRequired'))
         return null
       }
-      const qty = parseFloat(line.quantity.replace(',', '.'))
-      if (isNaN(qty) || qty <= 0) {
+      const qty = invoiceDecimal(line.quantity)?.toNumber() ?? NaN
+      if (!Number.isFinite(qty) || qty <= 0 || qty > 99999999.99) {
         setLinesError(t('zzpInvoices.lineQuantityRequired'))
         return null
       }
-      const unitPriceCents = parseAmountToCents(line.unitPrice)
+      const unitPriceCents = invoicePriceCents(line.unitPrice)
       if (unitPriceCents === null || unitPriceCents <= 0) {
         setLinesError(t('zzpInvoices.lineUnitPriceRequired'))
         return null
       }
       const vatRate = parseFloat(line.vatRate)
-      if (isNaN(vatRate) || vatRate < 0) {
+      if (![0, 9, 21].includes(vatRate)) {
         setLinesError(t('zzpInvoices.lineVatRateRequired'))
         return null
       }
@@ -535,6 +533,8 @@ const InvoiceFormDialog = ({
       hasError = true
     }
 
+    if (dueDate && issueDate && dueDate < issueDate) { setDateError('Vervaldatum mag niet vóór de factuurdatum liggen.'); hasError = true }
+
     // Validate lines
     const validLines = validateAndConvertLines()
     if (!validLines) {
@@ -546,40 +546,75 @@ const InvoiceFormDialog = ({
       return
     }
 
+    setActionError('')
     setIsSubmitting(true)
 
     try {
       const invoiceData: ZZPInvoiceCreate = {
         customer_id: customerId, // Use the selected customer for both new and edit
         issue_date: issueDate, // Already in YYYY-MM-DD format from input
-        due_date: dueDate || undefined, // Already in YYYY-MM-DD format from input
-        notes: notes.trim() || undefined,
+        due_date: dueDate || null,
+        delivery_date: deliveryDate || null, // Already in YYYY-MM-DD format from input
+        notes: notes.trim() || null,
         lines: validLines,
         ...(isEdit && { invoice_number: invoiceNumber.trim() }),
       }
-      await onSave(invoiceData, isEdit)
+      await onSave(invoiceData, isEdit, creationKey.current)
     } catch (err) {
       // Error toast is handled by the parent onSave callback
+      setActionError(parseApiError(err))
       console.error('Failed to save invoice:', err)
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const handlePreview = async () => {
+    setActionError('')
+    if (isReadOnly && invoice) {
+      setIsPreviewing(true)
+      try { setPreview(await zzpApi.invoices.downloadPdf(invoice.id)) }
+      catch(error) { setActionError(parseApiError(error)) }
+      finally { setIsPreviewing(false) }
+      return
+    }
+    const valid = validateAndConvertLines()
+    if (!customerId || !issueDate || !valid || (dueDate && dueDate < issueDate)) {
+      setActionError('Controleer klant, datum en regels voordat je het voorbeeld opent. Gebruik maximaal twee decimalen voor aantal en tarief.')
+      return
+    }
+    setIsPreviewing(true)
+    try { setPreview(await zzpApi.invoices.preview({ customer_id: customerId, invoice_number: invoiceNumber || undefined, issue_date: issueDate,
+      due_date: dueDate || null, delivery_date: deliveryDate || null, notes: notes.trim() || null, lines: valid })) }
+    catch(error) { setActionError(parseApiError(error)) }
+    finally { setIsPreviewing(false) }
+  }
+
+  const handleDownloadSaved = async () => {
+    if (!invoice) return
+    setActionError(''); setIsPreviewing(true)
+    try {
+      saveInvoicePdf(await zzpApi.invoices.downloadPdf(invoice.id), invoice.invoice_number)
+      toast.success('PDF-bestand gereed. Kies waar je het wilt bewaren.')
+    } catch(error) { setActionError(parseApiError(error)) }
+    finally { setIsPreviewing(false) }
+  }
+
   const hasValidLines = lines.some(line => 
     line.description.trim() && 
-    parseFloat(line.quantity.replace(',', '.')) > 0 && 
-    (parseAmountToCents(line.unitPrice) ?? 0) > 0
+    (invoiceDecimal(line.quantity)?.toNumber() ?? 0) > 0 &&
+    (invoicePriceCents(line.unitPrice) ?? 0) > 0
   )
 
   const isFormValid = (isEdit || customerId) && issueDate && hasValidLines
 
   // For non-draft invoices, form is read-only
-  const formDisabled = isSubmitting || isReadOnly
+  const formDisabled = isSubmitting || isPreviewing || isReadOnly
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+    <>
+    <Dialog open={open} onOpenChange={requestOpenChange}>
+      <DialogContent className="flex max-h-[94dvh] flex-col overflow-hidden sm:max-w-4xl">
         <DialogHeader className="pb-4 border-b border-border/50">
           <DialogTitle className="flex items-center gap-3 text-xl">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -609,13 +644,14 @@ const InvoiceFormDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4 space-y-5">
+        <div className="min-h-0 overflow-y-auto py-4 space-y-5">
           {/* Customer section - Always show selector, but with info if editing */}
           <div className="space-y-2">
             <Label className="text-sm font-medium flex items-center gap-2">
               <Users size={14} className="text-muted-foreground" />
               {t('zzpInvoices.formCustomer')} <span className="text-destructive">*</span>
             </Label>
+            {!isReadOnly && <Input aria-label="Zoek klant" placeholder="Zoek klant op naam of e-mail" value={customerSearch} onChange={event => setCustomerSearch(event.target.value)} disabled={formDisabled} />}
             <Select value={customerId} onValueChange={(value) => {
               setCustomerId(value)
               setCustomerError('')
@@ -629,7 +665,7 @@ const InvoiceFormDialog = ({
                     {t('zzpInvoices.noActiveCustomers')}
                   </div>
                 ) : (
-                  activeCustomers.map((customer) => (
+                  activeCustomers.filter(customer => customer.id === customerId || `${customer.name} ${customer.email || ''}`.toLowerCase().includes(customerSearch.toLowerCase())).map((customer) => (
                     <SelectItem key={customer.id} value={String(customer.id)}>
                       <div className="flex items-center gap-2">
                         <Users size={14} className="text-muted-foreground" />
@@ -656,6 +692,7 @@ const InvoiceFormDialog = ({
               <p className="text-xs text-primary flex items-center gap-1">
                 <CurrencyCircleDollar size={12} />
                 {suggestionMessage}: €{priceSuggestion}
+                {!isReadOnly && <Button type="button" variant="outline" size="sm" onClick={() => setLines(current => current.map((line, index) => index === 0 ? { ...line, unitPrice: priceSuggestion } : line))}>Tarief toepassen</Button>}
               </p>
             )}
           </div>
@@ -728,6 +765,8 @@ const InvoiceFormDialog = ({
               />
             </div>
           </div>
+
+          <div className="space-y-2"><Label htmlFor="invoice-delivery-date">Leverdatum / datum dienstverlening</Label><Input id="invoice-delivery-date" type="date" value={deliveryDate} onChange={event => setDeliveryDate(event.target.value)} disabled={formDisabled}/><p className="text-xs text-muted-foreground">Vul de werkelijke leverdatum in. Alle regeltarieven zijn exclusief BTW; maximaal twee decimalen voor aantal en tarief.</p></div>
 
           {/* Invoice Lines Section */}
           <div className="space-y-3">
@@ -948,6 +987,7 @@ const InvoiceFormDialog = ({
             </div>
           </div>
 
+          {isReadOnly && !invoice?.seller_company_name && !invoice?.seller_trading_name && <Alert><AlertDescription>Bedrijfsgegevens ontbreken in deze factuur. Werk het bedrijfsprofiel en vervolgens de conceptfactuur bij voordat je deze verstuurt.</AlertDescription></Alert>}
           {/* Seller Details Preview */}
           {(isReadOnly && invoice?.seller_company_name) ? (
             <div className="space-y-3">
@@ -1037,19 +1077,22 @@ const InvoiceFormDialog = ({
           </div>
         </div>
 
-        <DialogFooter className="pt-4 border-t border-border/50 gap-2 sm:gap-0">
+        {actionError && <p role="alert" className="text-sm text-destructive">{actionError}</p>}
+        <DialogFooter className="shrink-0 pt-4 border-t border-border/50 gap-2 sm:gap-0">
           <Button 
             variant="outline" 
-            onClick={() => onOpenChange(false)}
+            onClick={() => requestOpenChange(false)}
             disabled={isSubmitting}
             className="h-11"
           >
             {isReadOnly ? t('common.close') : t('common.cancel')}
           </Button>
+          {isReadOnly && <Button onClick={handleDownloadSaved} disabled={isSubmitting || isPreviewing}>PDF downloaden</Button>}
+          <Button variant="outline" onClick={handlePreview} disabled={isSubmitting || isPreviewing}>{isPreviewing ? 'PDF laden...' : 'Voorbeeld PDF'}</Button>
           {!isReadOnly && (
-            <Button 
+            <Button
               onClick={handleSave}
-              disabled={isSubmitting || !isFormValid}
+              disabled={isSubmitting || isPreviewing || !isFormValid}
               className="h-11 min-w-[140px]"
             >
               {isSubmitting ? (
@@ -1068,6 +1111,9 @@ const InvoiceFormDialog = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Wijzigingen niet opgeslagen</AlertDialogTitle><AlertDialogDescription>Je wijzigingen gaan verloren als je deze factuur sluit.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Verder bewerken</AlertDialogCancel><AlertDialogAction onClick={() => { setConfirmClose(false); onOpenChange(false) }}>Wijzigingen verwerpen</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <InvoicePdfPreview pdf={preview} title={invoiceNumber || 'concept'} onClose={() => setPreview(null)} />
+    </>
   )
 }
 
@@ -1692,7 +1738,7 @@ const ZZPInvoicesPageContent = () => {
     if (!preSelectedInvoiceId) return
     let cancelled = false
     zzpApi.invoices.get(preSelectedInvoiceId).then(invoice => {
-      if (!cancelled) { setViewingInvoice(invoice); setPreSelectedInvoiceId(null) }
+      if (!cancelled) { setViewingInvoice(invoice); setIsFormOpen(true); setPreSelectedInvoiceId(null) }
     }).catch(error => { if (!cancelled) { toast.error(parseApiError(error)); setPreSelectedInvoiceId(null) } })
     return () => { cancelled = true }
   }, [preSelectedInvoiceId])
@@ -1751,7 +1797,7 @@ const ZZPInvoicesPageContent = () => {
   }, [activeCustomers])
 
   // Handle adding/editing invoice
-  const handleSaveInvoice = useCallback(async (data: ZZPInvoiceCreate, isEdit: boolean) => {
+  const handleSaveInvoice = useCallback(async (data: ZZPInvoiceCreate, isEdit: boolean, creationKey?: string) => {
     try {
       if (isEdit && editingInvoice) {
         const wasCancelled = editingInvoice.status === 'cancelled'
@@ -1761,14 +1807,15 @@ const ZZPInvoicesPageContent = () => {
           invoice_number: data.invoice_number,
           issue_date: data.issue_date,
           due_date: data.due_date,
+          delivery_date: data.delivery_date,
           notes: data.notes,
           lines: data.lines,
         })
         toast.success(wasCancelled ? t('zzpInvoices.savedAndRestoredToConcept') : t('zzpInvoices.invoiceSaved'))
       } else {
         // Create new
-        await zzpApi.invoices.create(data)
-        toast.success(t('zzpInvoices.invoiceSaved'))
+        const saved = await zzpApi.invoices.create(data, creationKey)
+        toast.success(t('zzpInvoices.invoiceSaved'), { action: { label: 'Open factuur', onClick: () => navigateTo(`/zzp/invoices/${saved.id}`) } })
         // Emit onboarding event so the tour can auto-advance
         window.dispatchEvent(new CustomEvent('onboarding:invoice_created'))
       }
@@ -1857,38 +1904,14 @@ const ZZPInvoicesPageContent = () => {
     }
   }, [deletingInvoice, loadData])
 
-  // Handle PDF download via window.location.assign so the download works correctly
-  // even when triggered from within a modal/overlay. The backend sends
-  // Content-Disposition: attachment, so the browser triggers a native download
-  // prompt without navigating away from the current SPA state.
   const handleDownloadPdf = useCallback(async (invoice: ZZPInvoice) => {
-    console.log('[PDF Download] Starting download for invoice:', invoice.id)
-
+    setDownloadingInvoiceId(invoice.id)
     try {
-      setDownloadingInvoiceId(invoice.id)
-      toast.info(t('zzpInvoices.pdfDownloading'))
-
-      // Build direct download URL (includes ?download=1&token=<jwt>).
-      // The backend sends Content-Disposition: attachment so window.location.assign
-      // triggers the native download prompt without navigating away from the SPA.
-      const directUrl = zzpApi.invoices.getPdfUrl(invoice.id)
-      console.log('[PDF Download] Direct URL constructed (token included)')
-
-      window.location.assign(directUrl)
-
-      console.log('[PDF Download] Download initiated successfully')
-      toast.success(t('zzpInvoices.pdfDownloaded'))
-    } catch (err) {
-      console.error('[PDF Download] Failed to download PDF:', err)
-      const errorMessage = parseApiError(err)
-      if (errorMessage) {
-        toast.error(`${t('zzpInvoices.pdfError')}: ${errorMessage}`)
-      } else {
-        toast.error(t('zzpInvoices.pdfError'))
-      }
-    } finally {
-      setDownloadingInvoiceId(null)
-    }
+      const pdf = await zzpApi.invoices.downloadPdf(invoice.id)
+      saveInvoicePdf(pdf, invoice.invoice_number)
+      toast.success('PDF-bestand gereed. Kies waar je het wilt bewaren.')
+    } catch (error) { toast.error(parseApiError(error)) }
+    finally { setDownloadingInvoiceId(null) }
   }, [])
 
   // Handle copy invoice link to clipboard (public share URL)

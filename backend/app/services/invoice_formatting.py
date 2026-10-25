@@ -29,7 +29,5 @@ def format_quantity_nl(qty) -> str:
     Whole numbers are shown without decimals; fractional values use a comma as
     the decimal separator, e.g. 28.75 → "28,75".
     """
-    val = float(qty)
-    if val == int(val):
-        return str(int(val))
-    return f"{val:.2f}".replace(".", ",")
+    val = Decimal(str(qty))
+    return format(val, 'f').rstrip('0').rstrip('.').replace('.', ',') if '.' in format(val, 'f') else str(val)

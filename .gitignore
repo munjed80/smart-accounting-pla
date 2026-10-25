@@ -59,3 +59,7 @@ venv/
 data/
 uploads/
 
+
+# Browser style regression outputs
+playwright-report/
+test-results/

@@ -15,7 +15,8 @@
         "test:watch": "vitest",
         "test:backend:smoke": "bash scripts/backend-smoke.sh",
         "check:all": "npm run typecheck && npm run lint && npm test && npm run test:backend:smoke",
-        "lighthouse:pwa": "echo 'Install lighthouse CLI: npm install -g lighthouse' && echo 'Then run: lighthouse <YOUR_DEPLOYED_URL> --only-categories=pwa --view'"
+        "lighthouse:pwa": "echo 'Install lighthouse CLI: npm install -g lighthouse' && echo 'Then run: lighthouse <YOUR_DEPLOYED_URL> --only-categories=pwa --view'",
+        "test:styles": "playwright test --config=playwright.styles.config.ts"
     },
     "dependencies": {
         "@github/spark": ">=0.43.1 <1",
@@ -84,6 +85,7 @@
     },
     "devDependencies": {
         "@eslint/js": "^9.39.2",
+        "@playwright/test": "1.64.1",
         "@tailwindcss/postcss": "^4.2.1",
         "@testing-library/jest-dom": "^6.9.1",
         "@testing-library/react": "^16.3.2",

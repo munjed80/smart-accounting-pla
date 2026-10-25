@@ -1,122 +1,17 @@
-
-@import '@radix-ui/colors/sage-dark.css' layer(base);
-@import '@radix-ui/colors/olive.css' layer(base);
-@import '@radix-ui/colors/olive-dark.css' layer(base);
-@import '@radix-ui/colors/sand.css' layer(base);
-@import '@radix-ui/colors/sand-dark.css' layer(base);
-@import '@radix-ui/colors/red.css' layer(base);
-@import '@radix-ui/colors/red-dark.css' layer(base);
-@import '@radix-ui/colors/ruby.css' layer(base);
-@import '@radix-ui/colors/ruby-dark.css' layer(base);
-@import '@radix-ui/colors/crimson.css' layer(base);
-@import '@radix-ui/colors/crimson-dark.css' layer(base);
-@import '@radix-ui/colors/pink.css' layer(base);
-@import '@radix-ui/colors/pink-dark.css' layer(base);
-@import '@radix-ui/colors/plum.css' layer(base);
-@import '@radix-ui/colors/plum-dark.css' layer(base);
-@import '@radix-ui/colors/purple.css' layer(base);
-@import '@radix-ui/colors/purple-dark.css' layer(base);
-@import '@radix-ui/colors/violet.css' layer(base);
-@import '@radix-ui/colors/violet-dark.css' layer(base);
-@import '@radix-ui/colors/iris.css' layer(base);
-@import '@radix-ui/colors/iris-dark.css' layer(base);
-@import '@radix-ui/colors/indigo.css' layer(base);
-@import '@radix-ui/colors/indigo-dark.css' layer(base);
-@import '@radix-ui/colors/blue.css' layer(base);
-@import '@radix-ui/colors/blue-dark.css' layer(base);
-@import '@radix-ui/colors/cyan.css' layer(base);
-@import '@radix-ui/colors/cyan-dark.css' layer(base);
-@import '@radix-ui/colors/teal.css' layer(base);
-@import '@radix-ui/colors/teal-dark.css' layer(base);
-@import '@radix-ui/colors/jade.css' layer(base);
-@import '@radix-ui/colors/jade-dark.css' layer(base);
-@import '@radix-ui/colors/green.css' layer(base);
-@import '@radix-ui/colors/green-dark.css' layer(base);
-@import '@radix-ui/colors/grass.css' layer(base);
-@import '@radix-ui/colors/grass-dark.css' layer(base);
-@import '@radix-ui/colors/bronze.css' layer(base);
-@import '@radix-ui/colors/bronze-dark.css' layer(base);
-@import '@radix-ui/colors/gold.css' layer(base);
-@import '@radix-ui/colors/gold-dark.css' layer(base);
-@import '@radix-ui/colors/brown.css' layer(base);
-@import '@radix-ui/colors/brown-dark.css' layer(base);
-@import '@radix-ui/colors/orange.css' layer(base);
-@import '@radix-ui/colors/orange-dark.css' layer(base);
-@import '@radix-ui/colors/amber.css' layer(base);
-@import '@radix-ui/colors/amber-dark.css' layer(base);
-@import '@radix-ui/colors/yellow.css' layer(base);
-@import '@radix-ui/colors/yellow-dark.css' layer(base);
-@import '@radix-ui/colors/lime.css' layer(base);
-@import '@radix-ui/colors/lime-dark.css' layer(base);
-@import '@radix-ui/colors/mint.css' layer(base);
-@import '@radix-ui/colors/mint-dark.css' layer(base);
-@import '@radix-ui/colors/sky.css' layer(base);
-@import '@radix-ui/colors/sky-dark.css' layer(base);
-@import '@radix-ui/colors/tomato.css' layer(base);
-@import '@radix-ui/colors/tomato-dark.css' layer(base);
-@import '@radix-ui/colors/gray.css' layer(base);
-@import '@radix-ui/colors/gray-dark.css' layer(base);
-@import '@radix-ui/colors/mauve.css' layer(base);
-@import '@radix-ui/colors/mauve-dark.css' layer(base);
 @import '@radix-ui/colors/slate.css' layer(base);
 @import '@radix-ui/colors/slate-dark.css' layer(base);
 @import '@radix-ui/colors/slate-alpha.css' layer(base);
 @import '@radix-ui/colors/slate-dark-alpha.css' layer(base);
-
-
-
-/*
-  The default border color has changed to `currentColor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
-
-  If we ever want to remove these styles, we need to add an explicit border
-  color utility to any element that depends on these defaults.
-*/
-@layer base {
-  *,
-  ::after,
-  ::before,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--color-gray-200, currentColor);
-  }
-}
+@import '@radix-ui/colors/blue.css' layer(base);
+@import '@radix-ui/colors/blue-dark.css' layer(base);
+@import '@radix-ui/colors/teal.css' layer(base);
+@import '@radix-ui/colors/teal-dark.css' layer(base);
 
 @layer base {
-  #spark-app {
-    --tomato-contrast: #fff;
-    --red-contrast: #fff;
-    --ruby-contrast: #fff;
-    --crimson-contrast: #fff;
-    --pink-contrast: #fff;
-    --plum-contrast: #fff;
-    --purple-contrast: #fff;
-    --violet-contrast: #fff;
-    --iris-contrast: #fff;
-    --indigo-contrast: #fff;
-    --blue-contrast: #fff;
-    --cyan-contrast: #fff;
-    --teal-contrast: #fff;
-    --jade-contrast: #fff;
-    --green-contrast: #fff;
-    --grass-contrast: #fff;
-    --bronze-contrast: #fff;
-    --gold-contrast: #fff;
-    --brown-contrast: #fff;
-    --orange-contrast: #fff;
-    --amber-contrast: #000;
-    --yellow-contrast: #000;
-    --lime-contrast: #000;
-    --mint-contrast: #000;
-    --sky-contrast: #000;
-    --gray-contrast: #fff;
-    --mauve-contrast: #fff;
+  :root {
     --slate-contrast: #fff;
-    --sage-contrast: #fff;
-    --olive-contrast: #fff;
-    --sand-contrast: #fff;
-
+    --blue-contrast: #fff;
+    --teal-contrast: #fff;
     /**
    * Spacing scale
    *
@@ -163,15 +58,6 @@
     --size-72: calc(18rem * var(--size-scale));
     --size-80: calc(20rem * var(--size-scale));
     --size-96: calc(24rem * var(--size-scale));
-
-    /* Border radii */
-    --radius-factor: 1;
-    --radius-sm: calc(2px * var(--radius-factor) * var(--size-scale));
-    --radius-md: calc(6px * var(--radius-factor) * var(--size-scale));
-    --radius-lg: calc(8px * var(--radius-factor) * var(--size-scale));
-    --radius-xl: calc(12px * var(--radius-factor) * var(--size-scale));
-    --radius-2xl: calc(16px * var(--radius-factor) * var(--size-scale));
-    --radius-full: 9999px;
 
     /* Neutral colors */
     --color-neutral-1: var(--slate-1);
@@ -231,16 +117,16 @@
     --color-accent-secondary-contrast: var(--teal-contrast);
 
     /* Foreground colors */
-    --color-fg: var(--color-neutral-12);
-    --color-fg-secondary: var(--color-neutral-a11);
+    --color-fg: var(--foreground);
+    --color-fg-secondary: var(--muted-foreground);
 
     /* Background colors */
-    --color-bg: #ffffff;
-    --color-bg-inset: var(--color-neutral-2);
-    --color-bg-overlay: #ffffff;
+    --color-bg: var(--background);
+    --color-bg-inset: var(--muted);
+    --color-bg-overlay: var(--popover);
 
     /* Focus ring */
-    --color-focus-ring: var(--color-accent-9);
+    --color-focus-ring: var(--ring);
 
     /* Fonts */
     --font-sans-serif: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
@@ -249,11 +135,5 @@
     --font-monospace: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
       "Liberation Mono", "Courier New", monospace;
     --font-family: var(--font-sans-serif);
-  }
-
-  #spark-app.dark-theme {
-    --color-bg: var(--color-neutral-1);
-    --color-bg-inset: #000000;
-    --color-bg-overlay: var(--color-neutral-3);
   }
 }

@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, EmailStr
+from pydantic import BaseModel, Field, field_validator, model_validator, EmailStr
 
 
 # ============================================================================
@@ -188,9 +188,23 @@ class BusinessProfileResponse(BaseModel):
 class InvoiceLineCreate(BaseModel):
     """Create an invoice line."""
     description: str = Field(..., min_length=1, max_length=500, description="Line item description")
-    quantity: float = Field(1.0, gt=0, description="Quantity")
+    quantity: Decimal = Field(Decimal("1"), gt=0, max_digits=10, decimal_places=2, description="Quantity, at most two decimal places")
     unit_price_cents: int = Field(..., ge=0, description="Unit price in cents")
-    vat_rate: float = Field(21.0, ge=0, le=100, description="VAT rate percentage")
+    vat_rate: Decimal = Field(Decimal('21'), ge=0, le=100, description="VAT rate percentage")
+
+    @field_validator('description')
+    @classmethod
+    def nonblank_description(cls, value):
+        if not value.strip():
+            raise ValueError('Description cannot be blank')
+        return value.strip()
+
+    @field_validator('vat_rate')
+    @classmethod
+    def invoice_vat_rate(cls, value):
+        if value not in (0, 9, 21):
+            raise ValueError('VAT rate must be 0, 9, or 21')
+        return value
 
 
 class InvoiceLineResponse(BaseModel):
@@ -219,20 +233,27 @@ class InvoiceCreate(BaseModel):
     """Create a new invoice."""
     customer_id: UUID = Field(..., description="Customer ID")
     issue_date: str = Field(..., description="Issue date (ISO 8601)")
+    delivery_date: Optional[str] = Field(None, description="Delivery/service date")
     due_date: Optional[str] = Field(None, description="Due date (ISO 8601)")
-    notes: Optional[str] = Field(None, description="Invoice notes")
+    notes: Optional[str] = Field(None, max_length=20000, description="Invoice notes")
     lines: List[InvoiceLineCreate] = Field(..., min_length=1, description="Invoice lines")
     
-    @field_validator('issue_date', 'due_date')
+    @field_validator('issue_date', 'due_date', 'delivery_date')
     @classmethod
     def validate_date(cls, v):
         if v is None:
             return v
         try:
-            datetime.strptime(v, '%Y-%m-%d')
+            parsed = datetime.strptime(v, '%Y-%m-%d')
         except ValueError:
             raise ValueError("Date must be in YYYY-MM-DD format")
-        return v
+        return parsed.date().isoformat()
+
+    @model_validator(mode='after')
+    def ordered_dates(self):
+        if self.due_date and self.issue_date and self.due_date < self.issue_date:
+            raise ValueError('Due date cannot precede issue date')
+        return self
 
 
 class InvoiceUpdate(BaseModel):
@@ -240,9 +261,17 @@ class InvoiceUpdate(BaseModel):
     customer_id: Optional[UUID] = Field(None, description="Customer ID")
     invoice_number: Optional[str] = Field(None, description="Invoice number (must be unique per administration)")
     issue_date: Optional[str] = Field(None, description="Issue date (ISO 8601)")
+    delivery_date: Optional[str] = Field(None, description="Delivery/service date")
     due_date: Optional[str] = Field(None, description="Due date (ISO 8601)")
-    notes: Optional[str] = Field(None, description="Invoice notes")
-    lines: Optional[List[InvoiceLineCreate]] = Field(None, description="Invoice lines")
+    notes: Optional[str] = Field(None, max_length=20000, description="Invoice notes")
+    lines: Optional[List[InvoiceLineCreate]] = Field(None, min_length=1, description="Invoice lines")
+
+    @model_validator(mode='before')
+    @classmethod
+    def nonnullable_fields(cls, values):
+        if isinstance(values, dict) and any(key in values and values[key] is None for key in ('customer_id', 'invoice_number', 'issue_date', 'lines')):
+            raise ValueError('Customer, invoice number, date and lines cannot be null')
+        return values
 
     @field_validator('invoice_number')
     @classmethod
@@ -256,16 +285,20 @@ class InvoiceUpdate(BaseModel):
             raise ValueError("Invoice number must be 50 characters or fewer")
         return v
 
-    @field_validator('issue_date', 'due_date')
+    @field_validator('issue_date', 'due_date', 'delivery_date')
     @classmethod
     def validate_date(cls, v):
         if v is None:
             return v
         try:
-            datetime.strptime(v, '%Y-%m-%d')
+            parsed = datetime.strptime(v, '%Y-%m-%d')
         except ValueError:
             raise ValueError("Date must be in YYYY-MM-DD format")
-        return v
+        return parsed.date().isoformat()
+
+
+class InvoicePreview(InvoiceCreate):
+    invoice_number: Optional[str] = Field(None, max_length=50)
 
 
 class InvoiceStatusUpdate(BaseModel):
@@ -289,6 +322,7 @@ class InvoiceResponse(BaseModel):
     invoice_number: str
     status: str
     issue_date: str  # ISO 8601 string
+    delivery_date: Optional[str] = None
     due_date: Optional[str]  # ISO 8601 string
     
     # Seller snapshot

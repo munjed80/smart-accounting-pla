@@ -18,6 +18,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
 
 from app.models.zzp import ZZPInvoice, ZZPQuote
+from app.services.invoice_view import invoice_view
 from app.services.invoice_formatting import (
     format_amount,
     format_date_nl,
@@ -89,6 +90,7 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
     Raises:
         RuntimeError: If PDF generation fails.
     """
+    invoice = invoice_view(invoice, escape_text=True)
     try:
         buffer = io.BytesIO()
 
@@ -280,7 +282,7 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         ]))
 
         right_inner = Table(
-            [[Paragraph("FACTUUR", s_factuur_title)], [meta_tbl]],
+            [[Paragraph({"draft": "CONCEPT", "cancelled": "GEANNULEERD", "paid": "BETAALD"}.get(invoice.status, "FACTUUR"), s_factuur_title)], [meta_tbl]],
             colWidths=[_RIGHT_COL],
         )
         right_inner.setStyle(TableStyle([
@@ -316,6 +318,8 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         if invoice.customer_address_country and invoice.customer_address_country.lower() != "nederland":
             cust_addr_lines.append(invoice.customer_address_country)
 
+        if invoice.delivery_date:
+            elements.append(Paragraph(f"Leverdatum: {format_date_nl(invoice.delivery_date)}", s_customer_addr))
         elements.append(Paragraph("FACTUUR VOOR", s_section_label))
         elements.append(Paragraph(invoice.customer_name or "\u2014", s_customer_name))
         if cust_addr_lines:

@@ -232,7 +232,7 @@ async def test_email_resend_preserves_paid_state_and_unconfigured_service_does_n
     test_invoice_draft.paid_at = datetime.now(timezone.utc)
     test_invoice_draft.amount_paid_cents = test_invoice_draft.total_cents
     await db_session.commit()
-    with patch('app.api.v1.zzp_invoices.email_service') as email, patch('app.api.v1.zzp_invoices.generate_invoice_pdf_reportlab', return_value=b'pdf'):
+    with patch('app.api.v1.zzp_invoices.email_service') as email, patch('app.services.invoice_rendering.generate_invoice_pdf_reportlab', return_value=b'pdf'):
         email.client = MagicMock()
         email.client.Emails.send.return_value = {'id':'mock-message'}
         result = await async_client.post(path, headers=auth_headers)

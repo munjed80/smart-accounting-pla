@@ -1,89 +1,21 @@
-"""
-Internal helpers for the ZZP invoices route module.
-
-Extracted from `app.api.v1.zzp_invoices` as part of the routes-file
-decomposition. Behavior is unchanged.
-"""
+"""Shared invoice numbering, snapshots, arithmetic and response conversion."""
 from datetime import datetime
-from decimal import Decimal
-from typing import Annotated, Optional
+from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, Query, Request
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
-from app.core.security import decode_token
 from app.models.administration import Administration, AdministrationMember
 from app.models.zzp import (
     ZZPInvoice,
-    ZZPInvoiceCounter,
+    ZZPInvoiceCounter, BusinessProfile,
 )
 from app.schemas.zzp import (
     InvoiceLineResponse,
     InvoiceResponse,
 )
-
-
-async def _get_user_for_pdf(
-    request: Request,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    token: Optional[str] = Query(default=None),
-) -> "User":  # type: ignore[name-defined]  # noqa: F821 (forward ref)
-    """
-    Resolve the current user for PDF download.
-
-    Supports two auth methods so that iOS Safari can navigate directly to the
-    PDF URL without custom request headers:
-      1. Query parameter  ?token=<jwt>  (used by direct browser navigation)
-      2. Authorization: Bearer <jwt>    (used by fetch/axios calls)
-    """
-    from app.models.user import User as _User
-
-    # Prefer Authorization header; fall back to ?token= query parameter.
-    bearer = request.headers.get("Authorization", "")
-    if bearer.startswith("Bearer "):
-        jwt_token = bearer.split(" ", 1)[1]
-    elif token:
-        jwt_token = token
-    else:
-        raise HTTPException(
-            status_code=401,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    payload = decode_token(jwt_token)
-    if payload is None:
-        raise HTTPException(
-            status_code=401,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    user_id_str = payload.get("sub")
-    if user_id_str is None:
-        raise HTTPException(
-            status_code=401,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    try:
-        user_uuid = UUID(user_id_str)
-    except ValueError:
-        raise HTTPException(
-            status_code=401,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    result = await db.execute(select(_User).where(_User.id == user_uuid))
-    user = result.scalar_one_or_none()
-    if user is None or not user.is_active:
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
-    return user
 
 
 async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
@@ -110,6 +42,13 @@ async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administra
     return administration
 
 
+async def refresh_seller_snapshot(invoice, administration_id, db):
+    profile = await db.scalar(select(BusinessProfile).where(BusinessProfile.administration_id == administration_id))
+    if profile:
+        for name in ('company_name', 'trading_name', 'address_street', 'address_postal_code', 'address_city', 'address_country', 'kvk_number', 'btw_number', 'iban', 'email', 'phone'):
+            setattr(invoice, f'seller_{name}', getattr(profile, name))
+
+
 async def generate_invoice_number(admin_id: UUID, db: AsyncSession) -> str:
     """
     Generate a sequential invoice number for an administration.
@@ -118,6 +57,9 @@ async def generate_invoice_number(admin_id: UUID, db: AsyncSession) -> str:
     Format: INV-YYYY-0001
     """
     current_year = datetime.now().year
+
+    # Lock an existing parent before the first counter can exist.
+    await db.execute(select(Administration.id).where(Administration.id == admin_id).with_for_update())
 
     # Try to get or create counter with lock
     result = await db.execute(
@@ -144,14 +86,20 @@ async def generate_invoice_number(admin_id: UUID, db: AsyncSession) -> str:
         db.add(counter)
 
     # Format: INV-2026-0001
-    invoice_number = f"INV-{current_year}-{counter.counter:04d}"
-    return invoice_number
+    while True:
+        invoice_number = f"INV-{current_year}-{counter.counter:04d}"
+        exists = await db.scalar(select(ZZPInvoice.id).where(
+            ZZPInvoice.administration_id == admin_id, ZZPInvoice.invoice_number == invoice_number,
+        ))
+        if exists is None:
+            return invoice_number
+        counter.counter += 1
 
 
 def calculate_line_totals(quantity: float, unit_price_cents: int, vat_rate: float) -> tuple[int, int]:
     """Calculate line total and VAT amount in cents."""
-    line_total = int(Decimal(str(quantity)) * Decimal(str(unit_price_cents)))
-    vat_amount = int(Decimal(str(line_total)) * Decimal(str(vat_rate)) / Decimal('100'))
+    line_total = int((Decimal(str(quantity)) * Decimal(str(unit_price_cents))).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    vat_amount = int((Decimal(str(line_total)) * Decimal(str(vat_rate)) / Decimal('100')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
     return line_total, vat_amount
 
 
@@ -164,6 +112,7 @@ def invoice_to_response(invoice: ZZPInvoice) -> InvoiceResponse:
         invoice_number=invoice.invoice_number,
         status=invoice.status,
         issue_date=invoice.issue_date.isoformat(),
+        delivery_date=invoice.delivery_date.isoformat() if invoice.delivery_date else None,
         due_date=invoice.due_date.isoformat() if invoice.due_date else None,
         seller_company_name=invoice.seller_company_name,
         seller_trading_name=invoice.seller_trading_name,
@@ -211,9 +160,9 @@ def invoice_to_response(invoice: ZZPInvoice) -> InvoiceResponse:
 
 
 __all__ = [
-    "_get_user_for_pdf",
     "get_user_administration",
     "generate_invoice_number",
+    "refresh_seller_snapshot",
     "calculate_line_totals",
     "invoice_to_response",
 ]

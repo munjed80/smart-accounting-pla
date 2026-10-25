@@ -191,7 +191,6 @@ class TestInvoiceUpdate:
                 "customer_id": str(test_invoice_draft.customer_id),
                 "issue_date": str(test_invoice_draft.issue_date),
                 "notes": "Updated notes",
-                "lines": [],
             },
             headers=auth_headers
         )
@@ -215,7 +214,6 @@ class TestInvoiceUpdate:
                 "customer_id": str(test_invoice_cancelled.customer_id),
                 "issue_date": str(test_invoice_cancelled.issue_date),
                 "notes": "Restored and updated",
-                "lines": [],
             },
             headers=auth_headers
         )
@@ -239,7 +237,6 @@ class TestInvoiceUpdate:
                 "customer_id": str(test_invoice_cancelled.customer_id),
                 "issue_date": str(test_invoice_cancelled.issue_date),
                 "notes": "Persisted change",
-                "lines": [],
             },
             headers=auth_headers
         )
@@ -268,7 +265,6 @@ class TestInvoiceUpdate:
                 "customer_id": str(test_invoice_sent.customer_id),
                 "issue_date": str(test_invoice_sent.issue_date),
                 "notes": "Should not save",
-                "lines": [],
             },
             headers=auth_headers
         )
@@ -311,7 +307,7 @@ class TestInvoicePdfEndpoint:
         auth_headers: dict
     ):
         """?download=1 sets Cache-Control: no-store for iOS Safari compatibility."""
-        with patch('app.api.v1.zzp_invoices.generate_invoice_pdf_reportlab') as mock_pdf:
+        with patch('app.services.invoice_rendering.generate_invoice_pdf_reportlab') as mock_pdf:
             mock_pdf.return_value = b'%PDF-1.4 fake pdf content'
 
             response = await async_client.get(
@@ -325,32 +321,11 @@ class TestInvoicePdfEndpoint:
             assert response.headers["cache-control"] == "no-store"
 
     @pytest.mark.asyncio
-    async def test_pdf_download_with_token_query_param(
-        self,
-        async_client: AsyncClient,
-        test_invoice_sent: ZZPInvoice,
-        test_user,
-    ):
-        """JWT token in ?token= query param authenticates without Authorization header.
-
-        This is the mechanism used by iOS Safari direct URL navigation where
-        custom request headers cannot be set.
-        """
+    async def test_pdf_download_rejects_login_token_in_url(self, async_client, test_invoice_sent, test_user):
         from app.core.security import create_access_token
-
-        token = create_access_token(data={"sub": str(test_user.id), "email": test_user.email})
-
-        with patch('app.api.v1.zzp_invoices.generate_invoice_pdf_reportlab') as mock_pdf:
-            mock_pdf.return_value = b'%PDF-1.4 fake pdf content'
-
-            # No Authorization header – token is passed in query string only
-            response = await async_client.get(
-                f"/api/v1/zzp/invoices/{test_invoice_sent.id}/pdf?download=1&token={token}"
-            )
-
-            assert response.status_code == 200
-            assert response.headers["content-type"] == "application/pdf"
-            assert "attachment" in response.headers["content-disposition"]
+        token = create_access_token(data={'sub': str(test_user.id)})
+        response = await async_client.get(f'/api/v1/zzp/invoices/{test_invoice_sent.id}/pdf', params={'token': token})
+        assert response.status_code == 401
 
     @pytest.mark.asyncio
     async def test_pdf_download_no_auth_returns_401(
@@ -392,8 +367,8 @@ class TestInvoicePdfEndpoint:
         """PDF endpoint returns 503 when both PDF libraries are not available."""
         # Mock both ReportLab and WeasyPrint to raise RuntimeError
         # Patch where they're used (in zzp_invoices module)
-        with patch('app.api.v1.zzp_invoices.generate_invoice_pdf_reportlab') as mock_reportlab:
-            with patch('app.api.v1.zzp_invoices.generate_invoice_pdf') as mock_weasyprint:
+        with patch('app.services.invoice_rendering.generate_invoice_pdf_reportlab') as mock_reportlab:
+            with patch('app.services.invoice_rendering.generate_invoice_pdf') as mock_weasyprint:
                 mock_reportlab.side_effect = RuntimeError("ReportLab not available")
                 mock_weasyprint.side_effect = RuntimeError(
                     "PDF generation is not available. WeasyPrint library or its system dependencies are not installed."
@@ -492,7 +467,7 @@ class TestInvoiceSendEmail:
         """Draft invoice can be sent via email."""
         # Mock the email service and PDF generation
         with patch('app.api.v1.zzp_invoices.email_service') as mock_email, \
-             patch('app.api.v1.zzp_invoices.generate_invoice_pdf_reportlab') as mock_pdf, \
+             patch('app.services.invoice_rendering.generate_invoice_pdf_reportlab') as mock_pdf, \
              patch('app.api.v1.zzp_invoices.get_invoice_pdf_filename') as mock_filename:
             
             # Setup mocks

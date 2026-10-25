@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1._zzp_invoices_helpers import generate_invoice_number, refresh_seller_snapshot
 from app.api.v1.deps import CurrentUser, require_zzp
 from app.core.database import get_db
 from app.models.administration import Administration, AdministrationMember
@@ -15,7 +16,6 @@ from app.models.zzp import (
     InvoiceStatus,
     ZZPCustomer,
     ZZPInvoice,
-    ZZPInvoiceCounter,
     ZZPInvoiceLine,
     ZZPTimeEntry,
 )
@@ -79,27 +79,6 @@ async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administra
             detail={"code": "NO_ADMINISTRATION", "message": "Geen administratie gevonden."},
         )
     return administration
-
-
-async def generate_invoice_number(admin_id: UUID, db: AsyncSession) -> str:
-    current_year = date.today().year
-    result = await db.execute(
-        select(ZZPInvoiceCounter)
-        .where(ZZPInvoiceCounter.administration_id == admin_id)
-        .with_for_update()
-    )
-    counter = result.scalar_one_or_none()
-    if counter:
-        if counter.year != current_year:
-            counter.year = current_year
-            counter.counter = 1
-        else:
-            counter.counter += 1
-    else:
-        counter = ZZPInvoiceCounter(administration_id=admin_id, year=current_year, counter=1)
-        db.add(counter)
-    await db.flush()
-    return f"INV-{counter.year}-{counter.counter:04d}"
 
 
 @router.post("/time-entries", response_model=TimeEntryOut, status_code=201)
@@ -378,6 +357,7 @@ async def invoice_week(
         invoice_number = await generate_invoice_number(administration.id, db)
         issue_date = date.today()
         due_date = issue_date + timedelta(days=30)
+        rate = Decimal(_to_cents(rate)) / 100
         subtotal = (total_hours * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         vat_rate = Decimal("21.00")
         vat_amount = (subtotal * vat_rate / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -402,6 +382,7 @@ async def invoice_week(
             vat_total_cents=_to_cents(vat_amount),
             total_cents=_to_cents(total_amount),
         )
+        await refresh_seller_snapshot(invoice, administration.id, db)
         db.add(invoice)
         await db.flush()
 

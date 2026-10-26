@@ -14,6 +14,7 @@ Metrics provided per quarter:
 """
 
 from app.services.zzp_administration import get_user_administration
+from app.services.dashboard_metrics import vat_overview_totals, paid_invoice_day
 import logging
 import xml.etree.ElementTree as ET
 from datetime import datetime, date, timedelta, timezone
@@ -24,7 +25,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -217,6 +218,8 @@ async def build_quarter_overview(
     invoice_result = await db.execute(
         select(ZZPInvoice)
         .where(ZZPInvoice.administration_id == admin_id)
+        .where(or_(and_(ZZPInvoice.status == 'paid', paid_invoice_day() >= quarter_start, paid_invoice_day() <= quarter_end),
+            and_(ZZPInvoice.status != 'paid', ZZPInvoice.issue_date >= quarter_start, ZZPInvoice.issue_date <= quarter_end)))
     )
     all_invoices = invoice_result.scalars().all()
 
@@ -320,6 +323,7 @@ async def build_quarter_overview(
     # ------------------------------------------------------------------
     # 4. Net VAT calculation
     # ------------------------------------------------------------------
+    total_output_vat, total_input_vat = await vat_overview_totals(db, admin_id, quarter_start, quarter_end)
     net_vat = total_output_vat - total_input_vat
 
     # ------------------------------------------------------------------

@@ -1,3 +1,4 @@
+import { useQuickCreate } from '@/hooks/useQuickCreate'
 import { useServerPagination } from '@/hooks/useServerPagination'
 import { useAuth } from '@/lib/AuthContext'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -405,6 +406,8 @@ export const ZZPTimeTrackingPage = () => {
     }
     setIsFormOpen(true)
   }
+
+  useQuickCreate('new', () => openForm(), !loading && !!user?.id)
 
   const saveEntry = async () => {
     const parsedHours = parseDecimalInput(formState.hours)

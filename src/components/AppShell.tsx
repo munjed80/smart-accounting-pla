@@ -925,14 +925,10 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
           {renderSidebarContent()}
         </aside>
 
-        {/* Main Content Area with sidebar offset and top padding */}
-        <main className="flex-1 ml-64 pt-4">
-          <Suspense fallback={<div role="status" className="p-8 text-center text-muted-foreground">Pagina laden...</div>}>{children}</Suspense>
-        </main>
       </div>
 
-      {/* Mobile/Tablet Content - No sidebar offset but with top padding */}
-      <main className={isZZP ? 'lg:hidden pb-20 pt-4' : 'lg:hidden pt-4'}>
+      {/* Mount the page once: CSS adapts the same content to each viewport. */}
+      <main className={isZZP ? 'min-w-0 lg:ml-64 pb-20 lg:pb-0 pt-4' : 'min-w-0 lg:ml-64 pt-4'}>
         <Suspense fallback={<div role="status" className="p-8 text-center text-muted-foreground">Pagina laden...</div>}>{children}</Suspense>
       </main>
 

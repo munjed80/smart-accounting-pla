@@ -1,0 +1,131 @@
+// Shared API contract fixture for component and real-browser dashboard checks.
+export const dashboardUser = {
+  id: 'u1',
+  full_name: 'Sam de Vries',
+  email: 'sam@example.com',
+  role: 'zzp',
+  is_email_verified: true,
+}
+export const dashboardAdministration = {
+  id: 'a1',
+  name: 'Studio de Vries',
+  is_active: true,
+  created_at: '2025-01-01T00:00:00Z',
+}
+export const dashboardSummary = {
+  administration_id: 'a1',
+  generated_at: '2026-10-26T09:42:00Z',
+  profile_complete: true,
+  invoices: {
+    open_count: 4,
+    open_total_cents: 834000,
+    overdue_count: 1,
+    overdue_total_cents: 121000,
+    draft_count: 2,
+    paid_this_month_count: 3,
+    paid_this_month_cents: 592900,
+  },
+  expenses: {
+    this_month_count: 12,
+    this_month_total_cents: 143800,
+    this_month_vat_cents: 24957,
+  },
+  time: {
+    this_week_hours: 18.5,
+    this_week_billable_hours: 16,
+    this_week_value_cents: 128000,
+  },
+  btw: {
+    quarter: 'Q4 2026',
+    quarter_start: '2026-10-01',
+    quarter_end: '2026-12-31',
+    deadline: '2027-01-31',
+    days_until_deadline: 97,
+    vat_collected_cents: 102900,
+    vat_deductible_cents: 24957,
+    vat_payable_cents: 77943,
+    net_vat_cents: 77943,
+    basis: 'kasstelsel',
+    review_required: true,
+  },
+  actions: [
+    {
+      id: 'overdue-invoices',
+      type: 'overdue_invoice',
+      title: '1 factuur te laat',
+      description:
+        'Een factuur is over de vervaldatum. Bekijk wat er nog openstaat.',
+      severity: 'error',
+      route: '/zzp/invoices?status=overdue',
+      count: 1,
+      amount_cents: 121000,
+    },
+    {
+      id: 'review-documents',
+      type: 'review_documents',
+      title: 'Documenten om na te kijken',
+      description: 'Controleer je uploads en verwerk ze in je administratie.',
+      severity: 'warning',
+      route: '/zzp/documents',
+      count: 3,
+    },
+    {
+      id: 'draft-invoices',
+      type: 'draft_invoice',
+      title: '2 conceptfacturen wachten',
+      description: 'Je hebt conceptfacturen die nog verstuurd moeten worden.',
+      severity: 'info',
+      route: '/zzp/invoices?status=draft',
+      count: 2,
+      amount_cents: 242000,
+    },
+    {
+      id: 'unbilled-hours',
+      type: 'unbilled_hours',
+      title: 'Gewerkte uren nog niet gefactureerd',
+      description: '16 uur staat klaar om te factureren.',
+      severity: 'info',
+      route: '/zzp/time',
+      amount_cents: 128000,
+    },
+  ],
+  notes: { this_month_range: '2026-10-01 tot 2026-10-26' },
+}
+export const dashboardMonths = {
+  administration_id: 'a1',
+  period: 'last_6_months',
+  months: [
+    ['2026-05', 650000, 520000],
+    ['2026-06', 790000, 840000],
+    ['2026-07', 630000, 580000],
+    ['2026-08', 910000, 720000],
+    ['2026-09', 740000, 815000],
+    ['2026-10', 834000, 592900],
+  ].map(([month, billed, received]) => ({
+    month_key: month as string,
+    month_label: month as string,
+    sent_total: billed as number,
+    sent_count: 4,
+    paid_total: 0,
+    paid_count: 0,
+    open_total: 0,
+    open_count: 0,
+    received_total: received as number,
+    received_count: 3,
+  })),
+}
+export const dashboardReceipts = {
+  administration_id: 'a1',
+  total: 1,
+  total_amount_cents: 592900,
+  receipts: [
+    {
+      id: 'r1',
+      source: 'payment' as const,
+      payment_date: '2026-10-22',
+      amount_cents: 592900,
+      reference: 'Deelbetaling oktober',
+      invoices: [{ id: 'i1', invoice_number: '2026-0042' }],
+    },
+  ],
+}

@@ -1,565 +1,561 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { PageContainer, PageHeader } from '@/components/ui/page'
+import {
+  ArrowDownLeft,
+  ArrowRight,
+  ArrowUpRight,
+  Check,
+  ChevronDown,
+  Clock3,
+  FilePlus2,
+  Receipt,
+  RefreshCw,
+  Upload,
+  Wallet,
+  AlertCircle,
+} from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
-import { zzpApi, ZZPDashboardResponse, MonthlyInvoiceSummary, administrationApi, Administration, getErrorMessage } from '@/lib/api'
-import { navigateTo } from '@/lib/navigation'
+import { zzpApi, administrationApi, getErrorMessage } from '@/lib/api'
 import { NoAdministrationsEmptyState } from '@/components/EmptyState'
-import { AIInsightsPanel } from '@/components/AIInsightsPanel'
-import { 
-  Receipt, 
-  TrendDown,
-  FileText, 
-  House,
-  Sparkle,
-  Clock,
-  ArrowsClockwise,
-  WarningCircle,
-  CheckCircle,
-  Warning,
-  Info,
-  CurrencyEur,
-  CalendarCheck,
-  ArrowRight
-} from '@phosphor-icons/react'
-import { format } from 'date-fns'
-import { nl as nlLocale } from 'date-fns/locale'
+import { OverviewLink } from '@/components/dashboard/OverviewLink'
+import {
+  ActivityChart,
+  formatMoney,
+  monthLabel,
+} from '@/components/dashboard/ActivityChart'
+import { ReceiptDetails } from '@/components/dashboard/ReceiptDetails'
 import { t } from '@/i18n'
+import '@/styles/zzp-dashboard.css'
+
+const currencyOrUnknown = (value: number | undefined) =>
+  typeof value === 'number' && Number.isFinite(value) ? formatMoney(value) : '—'
+const quickActions = [
+  {
+    label: 'Nieuwe factuur',
+    icon: FilePlus2,
+    href: '/zzp/invoices?action=new',
+    primary: true,
+  },
+  {
+    label: 'Uitgave toevoegen',
+    icon: Receipt,
+    href: '/zzp/expenses?action=new',
+  },
+  {
+    label: 'Bonnetje uploaden',
+    icon: Upload,
+    href: '/zzp/documents?action=upload',
+  },
+  { label: 'Uren registreren', icon: Clock3, href: '/zzp/time?action=new' },
+]
+
+function SectionError({
+  error,
+  onRetry,
+}: {
+  error: unknown
+  onRetry: () => void
+}) {
+  return (
+    <div className="ov-error" role="alert">
+      <AlertCircle size={19} />
+      <div>
+        <strong>Dit onderdeel kon niet worden bijgewerkt.</strong>
+        <p>{getErrorMessage(error)}</p>
+        <button onClick={onRetry}>
+          {t('common.retry')} <RefreshCw size={13} />
+        </button>
+      </div>
+    </div>
+  )
+}
+function LoadingCards() {
+  return (
+    <div
+      className="ov-metrics"
+      aria-label="Financieel overzicht laden"
+      role="status"
+    >
+      {[0, 1, 2, 3].map((item) => (
+        <div key={item} className="ov-metric ov-skeleton">
+          <span />
+          <strong />
+          <small />
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export const SmartDashboard = () => {
   const { user } = useAuth()
-
-  // Fetch administrations using react-query
-  const { 
-    data: administrations = [], 
-    isLoading: isLoadingAdmins,
-    error: adminError,
-    refetch: refetchAdmins,
-  } = useQuery<Administration[], Error>({
+  const isZzp = user?.role === 'zzp'
+  const [allActions, setAllActions] = useState(false)
+  const [receiptMonth, setReceiptMonth] = useState<{
+    userId: string
+    month: string
+  } | null>(null)
+  const admins = useQuery({
     queryKey: ['administrations', user?.id],
     queryFn: () => administrationApi.list(),
-    enabled: !!user?.id,
+    enabled: !!user?.id && isZzp,
+    staleTime: 60000,
     refetchOnWindowFocus: false,
   })
-
-  // Fetch dashboard data using react-query
-  const { 
-    data: dashboardData,
-    isLoading: isLoadingDashboard,
-    isFetching,
-    error: dashboardError,
-    refetch
-  } = useQuery<ZZPDashboardResponse | null, Error>({
-    queryKey: ['zzp-dashboard', user?.id],
+  const activeAdmin = admins.data
+    ?.filter((admin) => admin.is_active !== false)
+    .slice()
+    .sort(
+      (a, b) =>
+        String(a.created_at || '').localeCompare(String(b.created_at || '')) ||
+        a.id.localeCompare(b.id),
+    )[0]
+  const enabled = isZzp && !!user?.id && !!activeAdmin
+  const summary = useQuery({
+    queryKey: ['zzp-dashboard', user?.id, activeAdmin?.id],
+    enabled,
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
-      if (administrations.length === 0) {
-        return null
-      }
-      return await zzpApi.dashboard.get()
+      const response = await zzpApi.dashboard.get()
+      if (
+        response.administration_id &&
+        response.administration_id !== activeAdmin?.id
+      )
+        throw new Error('Je administratie is gewijzigd. Vernieuw de pagina.')
+      return response
     },
-    enabled: !!user?.id && !isLoadingAdmins && administrations.length > 0,
-    refetchOnWindowFocus: false,
   })
-
-  // Fetch monthly invoice summary
-  const {
-    data: monthlyInvoicesData,
-    isLoading: isLoadingMonthly,
-    refetch: refetchMonthly,
-    error: monthlyError,
-  } = useQuery({
-    queryKey: ['zzp-monthly-invoices', user?.id, 'last_6_months'],
+  const activity = useQuery({
+    queryKey: [
+      'zzp-monthly-invoices',
+      user?.id,
+      activeAdmin?.id,
+      'last_6_months',
+    ],
+    enabled,
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
-      if (administrations.length === 0) return null
-      return await zzpApi.dashboard.monthlyInvoices('last_6_months')
+      const response = await zzpApi.dashboard.monthlyInvoices('last_6_months')
+      if (
+        response.administration_id &&
+        response.administration_id !== activeAdmin?.id
+      )
+        throw new Error('Je administratie is gewijzigd. Vernieuw de pagina.')
+      if (
+        response.months.some(
+          (month) => typeof month.received_total !== 'number',
+        )
+      )
+        throw new Error(
+          'Ontvangsten per maand zijn niet beschikbaar. Probeer het opnieuw.',
+        )
+      return response
     },
-    enabled: !!user?.id && !isLoadingAdmins && administrations.length > 0,
-    refetchOnWindowFocus: false,
   })
-
-  // Determine loading states
-  // Only show full skeleton on initial load when we have no data yet
-  const isInitialLoading = isLoadingAdmins || (isLoadingDashboard && !dashboardData && administrations.length > 0)
-  const fetchError = adminError || dashboardError || monthlyError
-
-  const handleRefresh = () => {
-    refetchAdmins()
-    refetch()
-    refetchMonthly()
+  const data = summary.data
+  const date =
+    data?.generated_at && !Number.isNaN(Date.parse(data.generated_at))
+      ? new Date(data.generated_at)
+      : new Date()
+  const currentMonth =
+    data?.notes?.this_month_range?.slice(0, 7) ||
+    new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'Europe/Amsterdam',
+      year: 'numeric',
+      month: '2-digit',
+    }).format(date)
+  const openReceipts = (month: string) => {
+    if (user?.id) setReceiptMonth({ userId: user.id, month })
   }
-
-  const formatCurrency = (cents: number) => {
-    return new Intl.NumberFormat('nl-NL', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(cents / 100)
-  }
-
-  const getCurrentMonthName = () => {
-    return format(new Date(), 'MMMM', { locale: nlLocale })
-  }
-  
-  // Show loading state only on initial load (not on background refetches)
-  if (isInitialLoading) {
-    return (
-      <PageContainer>
-        <PageHeader
-          icon={<House size={32} weight="duotone" />}
-          title={t('dashboard.overzichtTitle')}
-          description={
-            <>
-              {t('dashboard.welcomeBack')},{' '}
-              <span className="font-semibold">{user?.full_name}</span>
-            </>
-          }
-        />
-
-        {/* Loading skeleton for stats cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="bg-card/80 backdrop-blur-sm border-2 border-primary/20">
-              <CardHeader className="pb-3">
-                <Skeleton className="h-4 w-24" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-16 mb-2" />
-                <Skeleton className="h-3 w-32" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Loading skeleton for content cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {[1, 2].map((i) => (
-            <Card key={i} className="bg-card/80 backdrop-blur-sm">
-              <CardHeader>
-                <Skeleton className="h-6 w-40 mb-2" />
-                <Skeleton className="h-4 w-56" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </PageContainer>
-    )
-  }
-  
-  // Show error state if fetching failed
-  if (fetchError) {
-    return (
-      <PageContainer>
-        <PageHeader
-          icon={<House size={32} weight="duotone" />}
-          title={t('dashboard.overzichtTitle')}
-          description={
-            <>
-              {t('dashboard.welcomeBack')},{' '}
-              <span className="font-semibold">{user?.full_name}</span>
-            </>
-          }
-        />
-
-        <Alert variant="destructive">
-          <WarningCircle size={18} />
-          <AlertDescription className="ml-2 flex items-center justify-between">
-            <span>{getErrorMessage(fetchError)}</span>
-            <Button variant="outline" size="sm" onClick={handleRefresh} className="ml-4">
-              <ArrowsClockwise size={16} className="mr-2" />
-              {t('common.retry')}
-            </Button>
-          </AlertDescription>
-        </Alert>
-      </PageContainer>
-    )
-  }
-
-  // Show empty state if user has no administrations
-  if (administrations.length === 0) {
-    return (
-      <PageContainer>
-        <PageHeader
-          icon={<House size={32} weight="duotone" />}
-          title={t('dashboard.overzichtTitle')}
-          description={
-            <>
-              {t('dashboard.welcomeBack')},{' '}
-              <span className="font-semibold">{user?.full_name}</span>
-            </>
-          }
-        />
-
-        <div className="mt-12">
-          <NoAdministrationsEmptyState
-            userRole={user?.role as 'zzp' | 'accountant' | 'admin'}
-            onCreateAdministration={() => navigateTo('/onboarding')}
-          />
-        </div>
-      </PageContainer>
-    )
-  }
-
-  // Get severity icon for action items
-  const getSeverityIcon = (severity: string) => {
-    switch (severity) {
-      case 'error':
-        return <WarningCircle size={16} weight="duotone" className="text-destructive/70 flex-shrink-0" />
-      case 'warning':
-        return <Warning size={16} weight="duotone" className="text-amber-500/80 flex-shrink-0" />
-      default:
-        return <Info size={16} weight="duotone" className="text-blue-400/80 flex-shrink-0" />
+  const refresh = () => {
+    if (admins.isError || !activeAdmin) {
+      void admins.refetch()
+      return
     }
+    void summary.refetch()
+    void activity.refetch()
   }
-
-  // Get subtle left-border color for notification rows
-  const getSeverityBorderClass = (severity: string) => {
-    switch (severity) {
-      case 'error':
-        return 'border-l-destructive/50'
-      case 'warning':
-        return 'border-l-amber-500/50'
-      default:
-        return 'border-l-blue-400/50'
-    }
-  }
+  const actions = [...(data?.actions || [])]
+    .filter(
+      (item, index, items) =>
+        items.findIndex((other) => other.id === item.id) === index,
+    )
+    .sort(
+      (a, b) =>
+        (({ error: 0, warning: 1, info: 2 })[a.severity] ?? 2) -
+        ({ error: 0, warning: 1, info: 2 }[b.severity] ?? 2),
+    )
+  const displayedActions = allActions ? actions : actions.slice(0, 5)
+  const netVat = data?.btw?.net_vat_cents ?? data?.btw?.vat_payable_cents
+  const busy = admins.isFetching || summary.isFetching || activity.isFetching
+  const monthText = monthLabel(currentMonth)
 
   return (
-    <PageContainer>
-      <PageHeader
-        icon={<House size={32} weight="duotone" />}
-        title={t('dashboard.overzichtTitle')}
-        description={
+    <div className="zzp-overview">
+      <div className="ov-container">
+        <header className="ov-header">
+          <div>
+            <p className="ov-eyebrow">
+              JOUW WERKPLEK{' '}
+              {activeAdmin?.name && <span> / {activeAdmin.name}</span>}
+            </p>
+            <h1>Overzicht</h1>
+            <p>
+              Welkom terug
+              {user?.full_name ? `, ${user.full_name.split(' ')[0]}` : ''}. Dit
+              speelt er in je administratie.
+            </p>
+          </div>
+          <div className="ov-update">
+            {data?.generated_at && (
+              <span>
+                Bijgewerkt om{' '}
+                {new Intl.DateTimeFormat('nl-NL', {
+                  timeZone: 'Europe/Amsterdam',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }).format(date)}
+              </span>
+            )}
+            <button
+              onClick={refresh}
+              disabled={busy || !isZzp}
+              aria-label="Overzicht vernieuwen"
+            >
+              <RefreshCw size={15} className={busy ? 'ov-spinning' : ''} />{' '}
+              Vernieuwen
+            </button>
+          </div>
+        </header>
+        {isZzp && (
+          <nav className="ov-quick-actions" aria-label="Snel aan de slag">
+            {quickActions.map((action) => (
+              <OverviewLink
+                href={action.href}
+                key={action.label}
+                className={action.primary ? 'ov-action-primary' : ''}
+              >
+                <action.icon size={18} />
+                <span>{action.label}</span>
+                <ArrowUpRight size={15} />
+              </OverviewLink>
+            ))}
+          </nav>
+        )}
+        {!isZzp ? (
+          <section className="ov-panel ov-empty">
+            <h2>Open je werkruimte</h2>
+            <OverviewLink
+              href={user?.role === 'super_admin' ? '/admin' : '/accountant'}
+            >
+              Naar je overzicht <ArrowRight size={16} />
+            </OverviewLink>
+          </section>
+        ) : admins.isError ? (
+          <SectionError
+            error={admins.error}
+            onRetry={() => void admins.refetch()}
+          />
+        ) : admins.isLoading ? (
+          <LoadingCards />
+        ) : !activeAdmin ? (
+          <NoAdministrationsEmptyState
+            userRole="zzp"
+            onCreateAdministration={() => window.location.assign('/onboarding')}
+          />
+        ) : (
           <>
-            {t('dashboard.welcomeBack')},{' '}
-            <span className="font-semibold">{user?.full_name}</span>
-          </>
-        }
-        actions={
-          <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isFetching}>
-            <ArrowsClockwise size={18} className={`mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-            {t('common.refresh')}
-          </Button>
-        }
-      />
-
-      {/* Main KPI Cards - ZZP focused metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Open Invoices Card */}
-          <Card 
-            className="bg-card/80 backdrop-blur-sm border-2 border-primary/20 cursor-pointer hover:border-primary/40 transition-colors"
-            onClick={() => navigateTo('/zzp/invoices')}
-          >
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <FileText size={18} weight="duotone" className="text-primary" />
-                💰 {t('dashboard.openInvoices')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {formatCurrency(dashboardData?.invoices.open_total_cents || 0)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {dashboardData?.invoices.open_count || 0} {t('dashboard.invoicesCount')}
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Overdue (Te laat) Card */}
-          <Card 
-            className={`bg-card/80 backdrop-blur-sm border-2 cursor-pointer transition-colors ${
-              (dashboardData?.invoices.overdue_count || 0) > 0 
-                ? 'border-destructive/30 hover:border-destructive/50' 
-                : 'border-accent/20 hover:border-accent/40'
-            }`}
-            onClick={() => navigateTo('/zzp/invoices?status=overdue')}
-          >
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Clock size={18} weight="duotone" className={(dashboardData?.invoices.overdue_count || 0) > 0 ? "text-destructive" : "text-accent"} />
-                ⏰ {t('dashboard.overdue')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-3xl font-bold ${(dashboardData?.invoices.overdue_count || 0) > 0 ? 'text-destructive' : 'text-accent'}`}>
-                {formatCurrency(dashboardData?.invoices.overdue_total_cents || 0)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {dashboardData?.invoices.overdue_count || 0} {t('dashboard.invoicesCount')}
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* BTW Dit Kwartaal Card */}
-          <Card 
-            className="bg-card/80 backdrop-blur-sm border-2 border-primary/20 cursor-pointer hover:border-primary/40 transition-colors"
-            onClick={() => navigateTo('/zzp/belastinghulp/btw')}
-          >
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <CurrencyEur size={18} weight="duotone" className="text-primary" />
-                📊 BTW dit kwartaal
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {formatCurrency(dashboardData?.btw.vat_payable_cents || 0)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                af te dragen ({dashboardData?.btw?.quarter || ''})
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Hours This Week Card */}
-          <Card 
-            className="bg-card/80 backdrop-blur-sm border-2 border-accent/20 cursor-pointer hover:border-accent/40 transition-colors"
-            onClick={() => navigateTo('/zzp/time')}
-          >
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Clock size={18} weight="duotone" className="text-accent" />
-                {t('dashboard.hoursThisWeek')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-accent">
-                {dashboardData?.time.this_week_hours || 0}u
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {dashboardData?.time.this_week_billable_hours || 0}u {t('dashboard.billableHours')}
-                {(dashboardData?.time.this_week_value_cents || 0) > 0 && (
-                  <span className="text-accent ml-1">
-                    ({formatCurrency(dashboardData?.time.this_week_value_cents || 0)})
-                  </span>
-                )}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Second row: BTW tracker + Actions needed */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* BTW Tracker Card */}
-          <Card className="bg-card/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CurrencyEur size={24} weight="duotone" className="text-primary" />
-                {t('dashboard.btwEstimate')}
-              </CardTitle>
-              <CardDescription>
-                {dashboardData?.btw?.quarter || 'Q1 2024'} - deadline {dashboardData?.btw?.deadline ? format(new Date(dashboardData.btw.deadline), 'd MMMM yyyy', { locale: nlLocale }) : 'TBD'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Net VAT payable */}
-                <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg border border-primary/20">
-                  <div className="flex items-center gap-3">
-                    <CalendarCheck size={20} className="text-primary" weight="duotone" />
-                    <span className="font-medium">{t('dashboard.btwToPayLabel')}</span>
-                  </div>
-                  <span className="text-2xl font-bold text-primary">
-                    {formatCurrency(dashboardData?.btw.vat_payable_cents || 0)}
-                  </span>
-                </div>
-                
-                {/* Breakdown */}
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between text-muted-foreground">
-                    <span>{t('dashboard.btwCollectedFrom')}</span>
-                    <span className="font-medium">{formatCurrency(dashboardData?.btw.vat_collected_cents || 0)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-muted-foreground">
-                    <span>{t('dashboard.btwDeductibleFrom')}</span>
-                    <span className="font-medium">- {formatCurrency(dashboardData?.btw.vat_deductible_cents || 0)}</span>
-                  </div>
-                </div>
-                
-                {/* Days until deadline */}
-                {(dashboardData?.btw.days_until_deadline || 0) <= 30 && (
-                  <div className={`text-xs px-2 py-1 rounded ${(dashboardData?.btw.days_until_deadline || 0) <= 14 ? 'bg-amber-500/20 text-amber-700' : 'bg-blue-500/20 text-blue-700'}`}>
-                    {t('dashboard.daysUntilDeadline').replace('{days}', String(dashboardData?.btw.days_until_deadline || 0))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Actions Needed — "Wat moet je doen?" */}
-          <Card className="bg-card/80 backdrop-blur-sm">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  <Sparkle size={14} weight="duotone" className="text-primary/60" />
-                  Wat moet je doen?
-                </CardTitle>
-                {dashboardData?.actions && dashboardData.actions.length > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    {dashboardData.actions.length}
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="pt-1">
-              {dashboardData?.actions && dashboardData.actions.length > 0 ? (
-                <ul className="space-y-1">
-                  {dashboardData.actions.map((action) => (
-                    <li
-                      key={action.id}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-md border border-border/20 border-l-2 ${getSeverityBorderClass(action.severity)} hover:bg-accent/5 transition-colors cursor-pointer`}
-                      onClick={() => action.route && navigateTo(action.route)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => e.key === 'Enter' && action.route && navigateTo(action.route)}
+            <div className="ov-financial-label">
+              <h2>Je geldzaken</h2>
+              <span>Bedragen inclusief btw · {monthText}</span>
+            </div>
+            {summary.isError && (
+              <SectionError
+                error={summary.error}
+                onRetry={() => void summary.refetch()}
+              />
+            )}
+            {summary.isLoading ? (
+              <LoadingCards />
+            ) : (
+              data && (
+                <>
+                  <div className="ov-metrics">
+                    <button
+                      className="ov-metric ov-metric-income"
+                      onClick={() => openReceipts(currentMonth)}
                     >
-                      {getSeverityIcon(action.severity)}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium leading-tight">{action.title}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{action.description}</p>
-                      </div>
-                      {action.route && (
-                        <ArrowRight size={14} className="text-muted-foreground/50 flex-shrink-0" />
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="flex items-center gap-3 px-3 py-4">
-                  <CheckCircle size={20} className="text-accent/60" weight="duotone" />
+                      <span>
+                        <ArrowDownLeft size={16} /> Ontvangen deze maand{' '}
+                        <ArrowUpRight size={13} />
+                      </span>
+                      <strong>
+                        {currencyOrUnknown(
+                          data.invoices?.paid_this_month_cents,
+                        )}
+                      </strong>
+                      <small>
+                        Geregistreerde betalingen, ook deelbetalingen
+                      </small>
+                    </button>
+                    <OverviewLink className="ov-metric" href="/zzp/expenses">
+                      <span>
+                        <Receipt size={16} /> Uitgaven deze maand{' '}
+                        <ArrowUpRight size={13} />
+                      </span>
+                      <strong>
+                        {currencyOrUnknown(
+                          data.expenses?.this_month_total_cents,
+                        )}
+                      </strong>
+                      <small>
+                        {data.expenses?.this_month_count ?? '—'} uitgaven
+                        vastgelegd
+                      </small>
+                    </OverviewLink>
+                    <OverviewLink
+                      className="ov-metric"
+                      href="/zzp/invoices?status=open"
+                    >
+                      <span>
+                        <Wallet size={16} /> Nog te ontvangen{' '}
+                        <ArrowUpRight size={13} />
+                      </span>
+                      <strong>
+                        {currencyOrUnknown(data.invoices?.open_total_cents)}
+                      </strong>
+                      <small>
+                        {data.invoices?.open_count ?? '—'} openstaande facturen
+                        · alle perioden
+                      </small>
+                    </OverviewLink>
+                    <OverviewLink
+                      className={`ov-metric ${(data.invoices?.overdue_count || 0) > 0 ? 'ov-metric-overdue' : ''}`}
+                      href="/zzp/invoices?status=overdue"
+                    >
+                      <span>
+                        <Clock3 size={16} /> Daarvan te laat{' '}
+                        <ArrowUpRight size={13} />
+                      </span>
+                      <strong>
+                        {currencyOrUnknown(data.invoices?.overdue_total_cents)}
+                      </strong>
+                      <small>Onderdeel van het openstaande bedrag</small>
+                    </OverviewLink>
+                  </div>
+                  <p className="ov-money-note">
+                    Ontvangsten zijn gebaseerd op je registraties. Dit is geen
+                    live banksaldo.
+                    {summary.isError &&
+                      ' Je ziet de laatst opgehaalde bedragen.'}
+                  </p>
+                </>
+              )
+            )}
+            <div className="ov-main-grid">
+              <section
+                className="ov-panel ov-attention"
+                aria-labelledby="ov-attention-title"
+              >
+                <div className="ov-panel-heading">
                   <div>
-                    <p className="text-sm font-medium">✅ Alles is bijgewerkt!</p>
-                    <p className="text-xs text-muted-foreground">Geen openstaande taken.</p>
+                    <p className="ov-eyebrow">JE VOLGENDE STAP</p>
+                    <h2 id="ov-attention-title">Dit vraagt aandacht</h2>
                   </div>
+                  {data && <span className="ov-count">{actions.length}</span>}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-        
-        {/* Monthly Invoice Summary Block */}
-        <div className="mb-8">
-          <Card className="bg-card/80 backdrop-blur-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Receipt size={20} weight="duotone" className="text-primary" />
-                    {t('dashboard.monthlyInvoicesTitle')}
-                  </CardTitle>
-                  <CardDescription className="text-xs mt-0.5">
-                    {t('dashboard.monthlyInvoicesDescription')}
-                  </CardDescription>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs text-muted-foreground hover:text-foreground gap-1"
-                  onClick={() => navigateTo('/zzp/invoices')}
-                >
-                  {t('dashboard.monthlyInvoicesViewAll')}
-                  <ArrowRight size={14} />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {isLoadingMonthly ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map(i => (
-                    <Skeleton key={i} className="h-10 w-full rounded-md" />
-                  ))}
-                </div>
-              ) : !monthlyInvoicesData || monthlyInvoicesData.months.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-2">{t('zzpInvoices.monthlyNoData')}</p>
-              ) : (
-                <div className="space-y-1">
-                  {/* Header row */}
-                  <div className="grid grid-cols-4 gap-2 px-2 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b border-border/30">
-                    <span>{t('zzpInvoices.monthlyColumnMonth')}</span>
-                    <span className="text-right">{t('dashboard.monthlyInvoicesSent')}</span>
-                    <span className="text-right">{t('dashboard.monthlyInvoicesPaid')}</span>
-                    <span className="text-right">{t('dashboard.monthlyInvoicesOpen')}</span>
+                {summary.isLoading ? (
+                  <p role="status" className="ov-empty">
+                    Aandachtspunten laden…
+                  </p>
+                ) : !data ? (
+                  <p className="ov-empty">
+                    Aandachtspunten zijn tijdelijk niet beschikbaar.
+                  </p>
+                ) : actions.length ? (
+                  <>
+                    <ul className="ov-task-list">
+                      {displayedActions.map((action) => (
+                        <li
+                          key={action.id}
+                          className={`ov-task-${action.severity}`}
+                        >
+                          <OverviewLink href={action.route || '/settings'}>
+                            <span className="ov-task-dot" aria-hidden="true" />
+                            <span className="ov-task-copy">
+                              <strong>{action.title}</strong>
+                              <small>{action.description}</small>
+                              {typeof action.amount_cents === 'number' &&
+                                action.amount_cents > 0 && (
+                                  <span className="ov-task-amount">
+                                    {formatMoney(action.amount_cents)}
+                                  </span>
+                                )}
+                            </span>
+                            {action.count ? (
+                              <span className="ov-task-count">
+                                {action.count}
+                              </span>
+                            ) : null}
+                            <ArrowUpRight size={16} />
+                          </OverviewLink>
+                        </li>
+                      ))}
+                    </ul>
+                    {actions.length > 5 && (
+                      <button
+                        className="ov-expand"
+                        aria-expanded={allActions}
+                        onClick={() => setAllActions(!allActions)}
+                      >
+                        {allActions
+                          ? 'Minder tonen'
+                          : `Alle ${actions.length} aandachtspunten`}
+                        <ChevronDown size={15} />
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <div className="ov-clear">
+                    <span>
+                      <Check size={21} />
+                    </span>
+                    <h3>Je bent bij.</h3>
+                    <p>
+                      Er zijn op dit moment geen aandachtspunten in je
+                      administratie.
+                    </p>
+                    <OverviewLink href="/zzp/invoices?action=new">
+                      Je volgende factuur maken <ArrowRight size={15} />
+                    </OverviewLink>
                   </div>
-                  {/* Month rows — show last 6 reversed (most recent first) */}
-                  {[...monthlyInvoicesData.months].reverse().map((m: MonthlyInvoiceSummary) => (
-                    <div
-                      key={m.month_key}
-                      className="grid grid-cols-4 gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-muted/30 transition-colors"
+                )}
+              </section>
+              <aside className="ov-panel ov-vat" aria-labelledby="ov-vat-title">
+                <div className="ov-panel-heading">
+                  <div>
+                    <p className="ov-eyebrow">
+                      {data?.btw?.quarter || 'LOPEND KWARTAAL'}
+                    </p>
+                    <h2 id="ov-vat-title">Je btw-overzicht</h2>
+                  </div>
+                  <span className="ov-estimate">Schatting</span>
+                </div>
+                {summary.isLoading ? (
+                  <p role="status" className="ov-empty">
+                    Btw-overzicht laden…
+                  </p>
+                ) : data ? (
+                  <>
+                    <p className="ov-vat-label">
+                      {typeof netVat === 'number' && netVat < 0
+                        ? 'Terug te vragen'
+                        : 'Te reserveren voor btw'}
+                    </p>
+                    <strong className="ov-vat-total">
+                      {typeof netVat === 'number'
+                        ? formatMoney(Math.abs(netVat))
+                        : '—'}
+                    </strong>
+                    <dl>
+                      <div>
+                        <dt>Btw op betaalde facturen</dt>
+                        <dd>
+                          {currencyOrUnknown(data.btw?.vat_collected_cents)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Voorbelasting op uitgaven</dt>
+                        <dd>
+                          − {currencyOrUnknown(data.btw?.vat_deductible_cents)}
+                        </dd>
+                      </div>
+                    </dl>
+                    <p className="ov-vat-note">
+                      Volgens je BTW-overzicht (kasstelsel). Controleer
+                      openstaande facturen en deelbetalingen bij het
+                      voorbereiden van je aangifte.
+                    </p>
+                    <OverviewLink
+                      href="/zzp/belastinghulp/btw"
+                      className="ov-text-link"
                     >
-                      <span className="font-medium truncate">{m.month_label}</span>
-                      <span className="text-right text-muted-foreground">
-                        {formatCurrency(m.sent_total)}
-                      </span>
-                      <span className="text-right text-accent">
-                        {formatCurrency(m.paid_total)}
-                      </span>
-                      <span className={`text-right ${m.open_total > 0 ? 'text-amber-500' : 'text-muted-foreground'}`}>
-                        {formatCurrency(m.open_total)}
-                      </span>
-                    </div>
-                  ))}
+                      Naar het btw-overzicht <ArrowUpRight size={16} />
+                    </OverviewLink>
+                  </>
+                ) : (
+                  <p className="ov-empty">
+                    Het btw-bedrag is tijdelijk niet beschikbaar.
+                  </p>
+                )}
+              </aside>
+            </div>
+            <section
+              className="ov-panel ov-activity"
+              aria-labelledby="ov-activity-title"
+            >
+              <div className="ov-panel-heading">
+                <div>
+                  <p className="ov-eyebrow">DE AFGELOPEN ZES MAANDEN</p>
+                  <h2 id="ov-activity-title">Je bedrijf in beweging</h2>
                 </div>
+                <span className="ov-chart-unit">Inclusief btw</span>
+              </div>
+              {activity.isError ? (
+                <SectionError
+                  error={activity.error}
+                  onRetry={() => void activity.refetch()}
+                />
+              ) : activity.isLoading ? (
+                <div className="ov-chart-loading" role="status">
+                  Maandoverzicht laden…
+                </div>
+              ) : (
+                activity.data && (
+                  <ActivityChart
+                    months={activity.data.months}
+                    onReceipts={openReceipts}
+                  />
+                )
               )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* AI Insights Panel + Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="lg:col-span-2">
-            <AIInsightsPanel maxItems={4} />
-          </div>
-          <div className="hidden lg:block">
-            {/* Quick actions */}
-            <Card className="bg-card/80 backdrop-blur-sm h-full">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Sparkle size={20} weight="duotone" className="text-primary" />
-                  {t('dashboard.quickActions')}
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  {t('dashboard.quickActionsDescription')}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start gap-2 h-10"
-                  onClick={() => navigateTo('/zzp/invoices')}
-                >
-                  <FileText size={18} />
-                  {t('dashboard.newInvoice')}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start gap-2 h-10"
-                  onClick={() => navigateTo('/zzp/time')}
-                >
-                  <Clock size={18} />
-                  {t('dashboard.logHours')}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start gap-2 h-10"
-                  onClick={() => navigateTo('/zzp/expenses')}
-                >
-                  <TrendDown size={18} />
-                  {t('dashboard.addExpense')}
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-    </PageContainer>
+            </section>
+            <section className="ov-hours">
+              <div>
+                <Clock3 size={19} />
+                <div>
+                  <strong>Je uren deze week</strong>
+                  <span>Maandag tot en met vandaag</span>
+                </div>
+              </div>
+              <p>
+                <strong>{data?.time?.this_week_hours ?? '—'} u</strong>
+                <span>
+                  {data?.time?.this_week_billable_hours ?? '—'} u declarabel
+                </span>
+              </p>
+              <OverviewLink href="/zzp/time">
+                Uren bekijken <ArrowUpRight size={15} />
+              </OverviewLink>
+            </section>
+          </>
+        )}
+        <footer className="ov-footer">
+          <span>Een helder overzicht. Meer ruimte voor je werk.</span>
+          <OverviewLink href="/help">
+            Hulp nodig? <ArrowUpRight size={13} />
+          </OverviewLink>
+        </footer>
+      </div>
+      {isZzp && (
+        <ReceiptDetails
+          month={receiptMonth?.userId === user?.id ? receiptMonth.month : null}
+          userId={user?.id}
+          administrationId={activeAdmin?.id}
+          onClose={() => setReceiptMonth(null)}
+        />
+      )}
+    </div>
   )
 }

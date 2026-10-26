@@ -1,3 +1,4 @@
+import { useQuickCreate } from '@/hooks/useQuickCreate'
 import { useServerPagination } from '@/hooks/useServerPagination'
 import { ServerPagination } from './ServerPagination'
 /**
@@ -846,6 +847,8 @@ export const ZZPExpensesPage = () => {
     setScannedData(null)
     setIsFormOpen(true)
   }, [])
+
+  useQuickCreate('new', openNewForm, !isLoading && !!user?.id)
 
   // Open form for editing
   const openEditForm = useCallback((expense: ZZPExpense) => {

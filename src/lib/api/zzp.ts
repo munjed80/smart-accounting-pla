@@ -427,9 +427,13 @@ export interface ZZPDashboardBTWStats {
   vat_collected_cents: number
   vat_deductible_cents: number
   vat_payable_cents: number
+  net_vat_cents?: number
+  basis?: string
+  review_required?: boolean
 }
 
 export interface ZZPDashboardResponse {
+  administration_id?: string
   invoices: ZZPDashboardInvoiceStats
   expenses: ZZPDashboardExpenseStats
   time: ZZPDashboardTimeStats
@@ -444,6 +448,8 @@ export interface ZZPDashboardResponse {
 export interface MonthlyInvoiceSummary {
   month_key: string      // e.g. "2026-03"
   month_label: string    // e.g. "Maart 2026"
+  received_total?: number // actual receipts by payment date
+  received_count?: number
   sent_total: number     // cents
   paid_total: number     // cents
   open_total: number     // cents
@@ -453,8 +459,23 @@ export interface MonthlyInvoiceSummary {
 }
 
 export interface MonthlyInvoicesResponse {
+  administration_id?: string
   months: MonthlyInvoiceSummary[]
   period: string
+}
+
+export interface DashboardReceiptsResponse {
+  administration_id: string
+  total: number
+  total_amount_cents: number
+  receipts: {
+    id: string
+    source: 'payment' | 'invoice'
+    payment_date: string
+    amount_cents: number
+    reference?: string | null
+    invoices: { id: string; invoice_number: string }[]
+  }[]
 }
 
 export type MonthlyInvoicePeriod = 'this_month' | 'last_6_months' | 'this_year'
@@ -1602,6 +1623,10 @@ export const zzpApi = {
 
   // ------------ Dashboard (Overzicht) ------------
   dashboard: {
+    receipts: async (year: number, month: number, limit = 20, offset = 0): Promise<DashboardReceiptsResponse> => {
+      const response = await api.get<DashboardReceiptsResponse>('/zzp/dashboard/receipts', { params: { year, month, limit, offset } })
+      return response.data
+    },
     /**
      * Get aggregated dashboard metrics for the ZZP user.
      * 

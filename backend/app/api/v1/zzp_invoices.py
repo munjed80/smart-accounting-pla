@@ -4,6 +4,7 @@ ZZP Invoices API Endpoints
 CRUD operations for ZZP invoices with lines, status transitions,
 race-safe invoice number generation, and PDF generation.
 """
+from app.services.dashboard_metrics import outstanding_cents
 import base64
 import hashlib
 import logging
@@ -92,7 +93,7 @@ async def list_invoices(
     q: Optional[str] = Query(None, max_length=200),
     min_cents: Optional[int] = Query(None, ge=0),
     max_cents: Optional[int] = Query(None, ge=0),
-    status: Optional[str] = Query(None, pattern=r'^(draft|sent|paid|overdue|cancelled)$'),
+    status: Optional[str] = Query(None, pattern=r'^(draft|sent|paid|overdue|cancelled|open)$'),
     customer_id: Optional[UUID] = Query(None),
     from_date: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
     to_date: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
@@ -117,8 +118,13 @@ async def list_invoices(
     if min_cents is not None: query = query.where(ZZPInvoice.total_cents >= min_cents)
     if max_cents is not None: query = query.where(ZZPInvoice.total_cents <= max_cents)
     # Apply filters
-    if status:
-        query = query.where(or_(ZZPInvoice.status == 'overdue', and_(ZZPInvoice.status == 'sent', ZZPInvoice.due_date < date.today())) if status == 'overdue' else ZZPInvoice.status == status)
+    if status == 'open':
+        query = query.where(ZZPInvoice.status.in_(['sent','overdue']), outstanding_cents() > 0)
+    elif status == 'overdue':
+        query = query.where(ZZPInvoice.status.in_(['sent','overdue']), outstanding_cents() > 0,
+            or_(ZZPInvoice.status == 'overdue', ZZPInvoice.due_date < date.today()))
+    elif status:
+        query = query.where(ZZPInvoice.status == status)
     if customer_id:
         query = query.where(ZZPInvoice.customer_id == customer_id)
     if from_date:
@@ -129,6 +135,8 @@ async def list_invoices(
     query = query.order_by(ZZPInvoice.issue_date.desc(), ZZPInvoice.invoice_number.desc(), ZZPInvoice.id)
 
     rows = query.order_by(None).subquery()
+    remainder = rows.c.total_cents - func.coalesce(rows.c.amount_paid_cents, 0)
+    remainder = case((remainder > 0, remainder), else_=0)
     stats = dict((await db.execute(select(
         func.count().label('total'),
         func.coalesce(func.sum(case((rows.c.status == 'draft', 1), else_=0)), 0).label('draft'),
@@ -138,7 +146,7 @@ async def list_invoices(
         func.coalesce(func.sum(case((rows.c.status == 'cancelled', 1), else_=0)), 0).label('cancelled'),
         func.coalesce(func.sum(rows.c.total_cents), 0).label('totalAmount'),
         func.coalesce(func.sum(case((rows.c.status == 'paid', rows.c.total_cents), else_=0)), 0).label('paidAmount'),
-        func.coalesce(func.sum(case((rows.c.status.in_(['sent','overdue']), rows.c.total_cents), else_=0)), 0).label('openAmount')
+        func.coalesce(func.sum(case((rows.c.status.in_(['sent','overdue']), remainder), else_=0)), 0).label('openAmount')
     ))).mappings().one())
     total = stats['total']
     if limit is not None: query = query.limit(limit).offset(offset)

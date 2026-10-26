@@ -15,6 +15,8 @@ Metrics provided:
 """
 
 from app.services.zzp_administration import get_user_administration
+from app.services.money import round_cents
+from app.services.dashboard_metrics import outstanding_cents, receipt_rows, receipt_months, vat_overview_totals
 from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from typing import Annotated, List, Optional
@@ -33,6 +35,8 @@ from app.models.zzp import (
     BusinessProfile,
     InvoiceStatus,
 )
+from app.models.payment import ZZPPaymentAllocation, ZZPPayment
+from app.models.zzp import ZZPDocument, ZZPDocStatus
 from app.models.administration import Administration
 from app.api.v1.deps import CurrentUser, require_zzp
 
@@ -63,8 +67,8 @@ class InvoiceStats(BaseModel):
     draft_count: int = Field(0, description="Number of draft invoices")
     overdue_count: int = Field(0, description="Number of overdue invoices")
     overdue_total_cents: int = Field(0, description="Total amount of overdue invoices in cents")
-    paid_this_month_count: int = Field(0, description="Invoices paid this month")
-    paid_this_month_cents: int = Field(0, description="Total paid this month in cents")
+    paid_this_month_count: int = Field(0, description="Registered receipts this month, including legacy invoice registrations")
+    paid_this_month_cents: int = Field(0, description="Actual registered receipt amounts by payment date in cents")
 
 
 class ExpenseStats(BaseModel):
@@ -95,12 +99,17 @@ class BTWStats(BaseModel):
     # Deductible VAT (from expenses)
     vat_deductible_cents: int = Field(0, description="VAT paid on expenses this quarter (deductible)")
     
+    basis: str = 'kasstelsel'
+    net_vat_cents: int = 0
+    review_required: bool = False
+
     # Net VAT payable
     vat_payable_cents: int = Field(0, description="Estimated VAT to pay (collected - deductible)")
 
 
 class ZZPDashboardResponse(BaseModel):
     """Complete ZZP dashboard data."""
+    administration_id: UUID
     invoices: InvoiceStats
     expenses: ExpenseStats
     time: TimeStats
@@ -184,7 +193,7 @@ def get_quarter_info(target_date: date) -> tuple[str, date, date, date]:
     
     **Data calculation notes:**
     - 'This month' = calendar month of current date
-    - 'This week' = Monday to Sunday containing current date
+    - 'This week' = Monday through today
     - 'BTW estimate' = VAT collected (from paid invoices) - VAT deductible (from expenses)
     """
 )
@@ -213,58 +222,47 @@ async def get_zzp_dashboard(
     def total_when(condition, value=1):
         return func.coalesce(func.sum(case((condition, value), else_=0)), 0)
 
-    is_open = ZZPInvoice.status.in_(['sent', 'overdue'])
-    is_overdue = or_(ZZPInvoice.status == 'overdue', and_(ZZPInvoice.status == 'sent', ZZPInvoice.due_date < today))
-    is_paid = ZZPInvoice.status == 'paid'
-    paid_month = and_(is_paid, ZZPInvoice.paid_at >= month_start, ZZPInvoice.paid_at < today + timedelta(days=1))
-    paid_quarter = and_(is_paid, ZZPInvoice.paid_at >= quarter_start, ZZPInvoice.paid_at < quarter_end + timedelta(days=1))
+    remaining = outstanding_cents()
+    is_open = and_(ZZPInvoice.status.in_(['sent', 'overdue']), remaining > 0)
+    is_overdue = and_(is_open, or_(ZZPInvoice.status == 'overdue', ZZPInvoice.due_date < today))
     invoice_totals = (await db.execute(select(
-        total_when(is_open).label('open_count'), total_when(is_open, ZZPInvoice.total_cents).label('open_total_cents'),
+        total_when(is_open).label('open_count'), total_when(is_open, remaining).label('open_total_cents'),
         total_when(ZZPInvoice.status == 'draft').label('draft_count'),
         total_when(ZZPInvoice.status == 'draft', ZZPInvoice.total_cents).label('draft_total_cents'),
-        total_when(is_overdue).label('overdue_count'), total_when(is_overdue, ZZPInvoice.total_cents).label('overdue_total_cents'),
-        total_when(paid_month).label('paid_this_month_count'), total_when(paid_month, ZZPInvoice.total_cents).label('paid_this_month_cents'),
-        total_when(paid_quarter, ZZPInvoice.vat_total_cents).label('vat_collected'),
+        total_when(is_overdue).label('overdue_count'), total_when(is_overdue, remaining).label('overdue_total_cents'),
     ).where(ZZPInvoice.administration_id == admin_id))).mappings().one()
-    invoice_stats = InvoiceStats(**{key: invoice_totals[key] for key in InvoiceStats.model_fields})
-    vat_collected = invoice_totals['vat_collected']
+    invoice_stats = InvoiceStats(**{key: invoice_totals[key] for key in InvoiceStats.model_fields if key in invoice_totals})
+    receipts = await receipt_months(db, admin_id, month_start, today)
+    received = receipts.get(month_start.strftime('%Y-%m'), {'amount': 0, 'count': 0})
+    invoice_stats.paid_this_month_cents = received['amount']
+    invoice_stats.paid_this_month_count = received['count']
+    vat_collected, vat_deductible = await vat_overview_totals(db, admin_id, quarter_start, quarter_end)
     month_expense = and_(ZZPExpense.expense_date >= month_start, ZZPExpense.expense_date <= today)
-    quarter_expense = and_(ZZPExpense.expense_date >= quarter_start, ZZPExpense.expense_date <= quarter_end)
     expense_totals = (await db.execute(select(
         total_when(month_expense).label('this_month_count'),
         total_when(month_expense, ZZPExpense.amount_cents).label('this_month_total_cents'),
         total_when(month_expense, ZZPExpense.vat_amount_cents).label('this_month_vat_cents'),
-        total_when(quarter_expense, ZZPExpense.vat_amount_cents).label('vat_deductible'),
         total_when(or_(ZZPExpense.category.is_(None), func.trim(ZZPExpense.category) == '')).label('uncategorized'),
-        total_when(and_(ZZPExpense.vat_amount_cents == 0, or_(ZZPExpense.vat_rate.is_(None), ZZPExpense.vat_rate == 0), ZZPExpense.amount_cents > 0)).label('missing_btw'),
     ).where(ZZPExpense.administration_id == admin_id))).mappings().one()
     expense_stats = ExpenseStats(**{key: expense_totals[key] for key in ExpenseStats.model_fields})
-    vat_deductible = expense_totals['vat_deductible']
+
 
     # ========================================================================
     # Time Statistics
     # ========================================================================
     
-    time_result = await db.execute(
-        select(ZZPTimeEntry)
-        .where(
-            ZZPTimeEntry.administration_id == admin_id,
-            ZZPTimeEntry.entry_date >= week_start,
-            ZZPTimeEntry.entry_date <= week_end,
-        )
-    )
-    time_entries = time_result.scalars().all()
-    
-    total_hours = sum(float(t.hours or 0) for t in time_entries)
-    billable_hours = sum(float(t.hours or 0) for t in time_entries if t.billable)
-    billable_value = sum(
-        int(float(t.hours or 0) * (t.hourly_rate_cents or 0))
-        for t in time_entries if t.billable and t.hourly_rate_cents
-    )
-    
+    effective_rate = case((ZZPTimeEntry.hourly_rate_cents > 0, ZZPTimeEntry.hourly_rate_cents),
+        else_=func.coalesce(ZZPTimeEntry.hourly_rate * 100, 0))
+    total_hours, billable_hours, value = (await db.execute(select(
+        func.coalesce(func.sum(ZZPTimeEntry.hours), 0),
+        func.coalesce(func.sum(case((ZZPTimeEntry.billable.is_(True), ZZPTimeEntry.hours), else_=0)), 0),
+        func.coalesce(func.sum(case((ZZPTimeEntry.billable.is_(True), ZZPTimeEntry.hours * effective_rate), else_=0)), 0),
+    ).where(ZZPTimeEntry.administration_id == admin_id,
+        ZZPTimeEntry.entry_date >= week_start, ZZPTimeEntry.entry_date <= min(week_end, today)))).one()
+    billable_value = round_cents(Decimal(str(value)))
     time_stats = TimeStats(
-        this_week_hours=round(total_hours, 1),
-        this_week_billable_hours=round(billable_hours, 1),
+        this_week_hours=round(float(total_hours), 1),
+        this_week_billable_hours=round(float(billable_hours), 1),
         this_week_value_cents=billable_value,
     )
     
@@ -283,6 +281,8 @@ async def get_zzp_dashboard(
         vat_collected_cents=vat_collected,
         vat_deductible_cents=vat_deductible,
         vat_payable_cents=max(0, vat_collected - vat_deductible),
+        net_vat_cents=vat_collected - vat_deductible,
+        review_required=bool(invoice_stats.open_count),
     )
     
     # ========================================================================
@@ -395,32 +395,39 @@ async def get_zzp_dashboard(
             count=uncategorized_count,
         ))
     
-    # Expenses without BTW rate assigned
-    missing_btw_count = expense_totals['missing_btw']
-    if missing_btw_count > 0:
-        actions.append(ActionItem(
-            id="missing-btw-expenses",
-            type="missing_btw_on_expense",
-            title=f"{missing_btw_count} bonn{'en' if missing_btw_count > 1 else ''} zonder BTW-tarief",
-            description="Controleer of de BTW-tarieven correct zijn ingesteld.",
-            severity="warning",
-            route="/zzp/expenses",
-            count=missing_btw_count,
-        ))
-    
+    unbilled_hours, unbilled_value = (await db.execute(select(
+        func.coalesce(func.sum(ZZPTimeEntry.hours), 0),
+        func.coalesce(func.sum(ZZPTimeEntry.hours * effective_rate), 0),
+    ).where(ZZPTimeEntry.administration_id == admin_id, ZZPTimeEntry.billable.is_(True),
+        ZZPTimeEntry.is_invoiced.is_(False), ZZPTimeEntry.invoice_id.is_(None),
+        ZZPTimeEntry.entry_date <= today))).one()
+    if unbilled_hours > 0:
+        actions.append(ActionItem(id='unbilled-hours', type='unbilled_hours', severity='info',
+            title='Gewerkte uren nog niet gefactureerd', description=f'{unbilled_hours:g} uur staat klaar om te factureren.',
+            amount_cents=round_cents(Decimal(str(unbilled_value))), route='/zzp/time'))
+    pending_documents = await db.scalar(select(func.count(ZZPDocument.id)).where(
+        ZZPDocument.administration_id == admin_id, ZZPDocument.status.in_([ZZPDocStatus.NEW, ZZPDocStatus.REVIEW, ZZPDocStatus.FAILED])))
+    if pending_documents:
+        actions.append(ActionItem(id='review-documents', type='review_documents', severity='warning',
+            title='Documenten om na te kijken', description='Controleer je uploads en verwerk ze in je administratie.',
+            count=pending_documents, route='/zzp/documents'))
+    actions.sort(key=lambda item: ({'error': 0, 'warning': 1, 'info': 2}[item.severity], item.id))
+
     # ========================================================================
     # Build Response
     # ========================================================================
     
     notes = {
         "this_month_range": f"{month_start.isoformat()} tot {today.isoformat()}",
-        "this_week_range": f"{week_start.isoformat()} tot {week_end.isoformat()}",
+        "this_week_range": f"{week_start.isoformat()} tot {min(week_end, today).isoformat()}",
         "this_quarter_range": f"{quarter_start.isoformat()} tot {quarter_end.isoformat()}",
-        "btw_calculation": "BTW te betalen = BTW ontvangen (betaalde facturen) - BTW voorbelasting (uitgaven)",
+        "btw_calculation": "Schatting volgens BTW-overzicht (kasstelsel): betaalde facturen min voorbelasting.",
+        "receipts_basis": "Geregistreerde betalingen op betaaldatum, met historische betaalregistraties; geen live banksaldo.",
         "overdue_definition": "Facturen met status 'verstuurd' waarvan de vervaldatum is verstreken",
     }
     
     return ZZPDashboardResponse(
+        administration_id=admin_id,
         invoices=invoice_stats,
         expenses=expense_stats,
         time=time_stats,
@@ -455,7 +462,8 @@ class DashboardActionsResponse(BaseModel):
     - `uncategorized_expense`: Expenses without a category
     - `draft_invoice`: Draft invoices not yet sent
     - `btw_deadline`: BTW filing deadline approaching (within 30 days)
-    - `missing_btw_on_expense`: Expenses without a BTW rate assigned
+    - `unbilled_hours`: Worked billable hours not yet invoiced
+    - `review_documents`: Uploads requiring review
     - `missing_profile` / `incomplete_profile`: Business profile issues
 
     Each action includes a `route` field for navigation and optional `count` / `amount_cents`.
@@ -465,143 +473,9 @@ async def get_zzp_dashboard_actions(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DashboardActionsResponse:
-    """Get action items from the dashboard (lightweight standalone endpoint)."""
-    require_zzp(current_user)
-
-    administration = await get_user_administration(current_user.id, db)
-    admin_id = administration.id
-    today = date.today()
-    quarter_label, _, _, btw_deadline = get_quarter_info(today)
-    days_until_deadline = (btw_deadline - today).days
-
-    actions: List[ActionItem] = []
-
-    # ---- Profile checks ----
-    profile_result = await db.execute(
-        select(BusinessProfile)
-        .where(BusinessProfile.administration_id == admin_id)
-    )
-    profile = profile_result.scalar_one_or_none()
-
-    if not profile:
-        actions.append(ActionItem(
-            id="missing-profile",
-            type="missing_profile",
-            title="Bedrijfsprofiel ontbreekt",
-            description="Vul je bedrijfsgegevens in om facturen te kunnen versturen.",
-            severity="error",
-            route="/settings",
-        ))
-    elif not all([profile.company_name, profile.kvk_number, profile.btw_number, profile.iban]):
-        missing_fields = []
-        if not profile.company_name:
-            missing_fields.append("bedrijfsnaam")
-        if not profile.kvk_number:
-            missing_fields.append("KVK-nummer")
-        if not profile.btw_number:
-            missing_fields.append("BTW-nummer")
-        if not profile.iban:
-            missing_fields.append("IBAN")
-        actions.append(ActionItem(
-            id="incomplete-profile",
-            type="incomplete_profile",
-            title="Bedrijfsprofiel incompleet",
-            description=f"Ontbrekende gegevens: {', '.join(missing_fields)}",
-            severity="warning",
-            route="/settings",
-        ))
-
-    # ---- Invoice checks ----
-    invoice_result = await db.execute(
-        select(ZZPInvoice)
-        .where(ZZPInvoice.administration_id == admin_id)
-    )
-    invoices = invoice_result.scalars().all()
-
-    draft_invoices = [i for i in invoices if i.status == InvoiceStatus.DRAFT.value]
-    overdue_invoices = [
-        i for i in invoices
-        if i.status == InvoiceStatus.SENT.value and i.due_date and i.due_date < today
-    ]
-
-    if len(overdue_invoices) > 0:
-        overdue_total_cents = sum(i.total_cents or 0 for i in overdue_invoices)
-        total_overdue = overdue_total_cents / 100
-        actions.append(ActionItem(
-            id="overdue-invoices",
-            type="overdue_invoice",
-            title=f"{len(overdue_invoices)} factuur{'en' if len(overdue_invoices) > 1 else ''} te laat",
-            description=f"€{total_overdue:,.2f} aan openstaande facturen is over de vervaldatum.",
-            severity="error",
-            route="/zzp/invoices?status=overdue",
-            count=len(overdue_invoices),
-            amount_cents=overdue_total_cents,
-        ))
-
-    if len(draft_invoices) > 0:
-        draft_total_cents = sum(i.total_cents or 0 for i in draft_invoices)
-        actions.append(ActionItem(
-            id="draft-invoices",
-            type="draft_invoice",
-            title=f"{len(draft_invoices)} conceptfactuur{'en' if len(draft_invoices) > 1 else ''} wachten",
-            description="Je hebt conceptfacturen die nog verstuurd moeten worden.",
-            severity="info",
-            route="/zzp/invoices?status=draft",
-            count=len(draft_invoices),
-            amount_cents=draft_total_cents,
-        ))
-
-    # ---- Expense checks ----
-    expense_result = await db.execute(
-        select(ZZPExpense)
-        .where(ZZPExpense.administration_id == admin_id)
-    )
-    all_expenses = expense_result.scalars().all()
-
-    uncategorized = [e for e in all_expenses if not e.category or e.category.strip() == ""]
-    if len(uncategorized) > 0:
-        actions.append(ActionItem(
-            id="uncategorized-expenses",
-            type="uncategorized_expense",
-            title=f"{len(uncategorized)} bonn{'en' if len(uncategorized) > 1 else ''} zonder categorie",
-            description="Categoriseer je uitgaven voor een beter overzicht.",
-            severity="warning",
-            route="/zzp/expenses",
-            count=len(uncategorized),
-        ))
-
-    missing_btw = [
-        e for e in all_expenses
-        if e.vat_amount_cents == 0 and (e.vat_rate is None or e.vat_rate == 0)
-        and e.amount_cents > 0
-    ]
-    if len(missing_btw) > 0:
-        actions.append(ActionItem(
-            id="missing-btw-expenses",
-            type="missing_btw_on_expense",
-            title=f"{len(missing_btw)} bonn{'en' if len(missing_btw) > 1 else ''} zonder BTW-tarief",
-            description="Controleer of de BTW-tarieven correct zijn ingesteld.",
-            severity="warning",
-            route="/zzp/expenses",
-            count=len(missing_btw),
-        ))
-
-    # ---- BTW deadline ----
-    if 0 < days_until_deadline <= 30:
-        severity = "warning" if days_until_deadline <= 14 else "info"
-        actions.append(ActionItem(
-            id="btw-deadline",
-            type="btw_deadline",
-            title=f"BTW-aangifte {quarter_label} deadline: {btw_deadline.strftime('%d-%m-%Y')}",
-            description=f"Nog {days_until_deadline} dag{'en' if days_until_deadline != 1 else ''} tot de deadline.",
-            severity=severity,
-            route="/zzp/belastinghulp/btw",
-        ))
-
-    return DashboardActionsResponse(
-        actions=actions,
-        count=len(actions),
-    )
+    """Return the same attention queue as the dashboard."""
+    overview = await get_zzp_dashboard(current_user, db)
+    return DashboardActionsResponse(actions=overview.actions, count=len(overview.actions), generated_at=overview.generated_at)
 
 
 # ============================================================================
@@ -626,6 +500,8 @@ class MonthlyInvoiceSummary(BaseModel):
     sent_total: int = Field(0, description="Total cents of all non-draft/non-cancelled invoices issued this month")
     paid_total: int = Field(0, description="Total cents of paid invoices issued this month")
     open_total: int = Field(0, description="Total cents of open (sent/overdue) invoices issued this month")
+    received_total: int = 0
+    received_count: int = 0
     sent_count: int = Field(0, description="Number of non-draft/non-cancelled invoices issued this month")
     paid_count: int = Field(0, description="Number of paid invoices issued this month")
     open_count: int = Field(0, description="Number of open (sent/overdue) invoices issued this month")
@@ -633,6 +509,7 @@ class MonthlyInvoiceSummary(BaseModel):
 
 class MonthlyInvoicesResponse(BaseModel):
     """Response wrapper for monthly invoice summaries."""
+    administration_id: UUID
     months: List[MonthlyInvoiceSummary]
     period: str = Field(..., description="Requested period: this_month | last_6_months | this_year")
 
@@ -691,17 +568,18 @@ async def get_monthly_invoices(
         range_start = date(y, m, 1)
         range_end = today
 
-    # Fetch all relevant invoices in the date range (by issue_date)
-    result = await db.execute(
-        select(ZZPInvoice).where(
-            ZZPInvoice.administration_id == admin_id,
-            ZZPInvoice.issue_date >= range_start,
-            ZZPInvoice.issue_date <= range_end,
-            ZZPInvoice.status != InvoiceStatus.DRAFT.value,
-            ZZPInvoice.status != InvoiceStatus.CANCELLED.value,
-        )
-    )
-    invoices = result.scalars().all()
+    net_open = outstanding_cents()
+    issued = await db.execute(select(extract('year', ZZPInvoice.issue_date).label('year'),
+        extract('month', ZZPInvoice.issue_date).label('month'), func.sum(ZZPInvoice.total_cents).label('sent_total'),
+        func.count().label('sent_count'),
+        func.sum(case((ZZPInvoice.status == 'paid', ZZPInvoice.total_cents), else_=0)).label('paid_total'),
+        func.sum(case((ZZPInvoice.status == 'paid', 1), else_=0)).label('paid_count'),
+        func.sum(case((ZZPInvoice.status.in_(['sent','overdue']), net_open), else_=0)).label('open_total'),
+        func.sum(case((and_(ZZPInvoice.status.in_(['sent','overdue']), net_open > 0), 1), else_=0)).label('open_count'),
+    ).where(ZZPInvoice.administration_id == admin_id, ZZPInvoice.issue_date >= range_start,
+        ZZPInvoice.issue_date <= range_end, ZZPInvoice.status.notin_(['draft','cancelled']))
+        .group_by(extract('year', ZZPInvoice.issue_date), extract('month', ZZPInvoice.issue_date)))
+    received = await receipt_months(db, admin_id, range_start, range_end)
 
     # Build a dict of month_key -> MonthlyInvoiceSummary
     summaries: dict[str, MonthlyInvoiceSummary] = {}
@@ -722,29 +600,71 @@ async def get_monthly_invoices(
             cursor_month = 1
             cursor_year += 1
 
-    # Populate stats from invoice data
-    for inv in invoices:
-        key = f"{inv.issue_date.year:04d}-{inv.issue_date.month:02d}"
-        if key not in summaries:
-            summaries[key] = MonthlyInvoiceSummary(
-                month_key=key,
-                month_label=dutch_month_label(inv.issue_date.year, inv.issue_date.month),
-            )
-        s = summaries[key]
-        total = inv.total_cents or 0
-
-        # Verstuurd: all non-draft, non-cancelled (already filtered above)
-        s.sent_total += total
-        s.sent_count += 1
-
-        if inv.status == InvoiceStatus.PAID.value:
-            s.paid_total += total
-            s.paid_count += 1
-        elif inv.status in (InvoiceStatus.SENT.value, InvoiceStatus.OVERDUE.value):
-            s.open_total += total
-            s.open_count += 1
+    for item in issued.mappings():
+        key = f"{int(item['year']):04d}-{int(item['month']):02d}"
+        if key in summaries:
+            for field in ('sent_total','sent_count','paid_total','paid_count','open_total','open_count'):
+                setattr(summaries[key], field, item[field] or 0)
+    for key, item in received.items():
+        if key in summaries:
+            summaries[key].received_total = item['amount']
+            summaries[key].received_count = item['count']
 
     # Return sorted by month_key ascending
     sorted_months = sorted(summaries.values(), key=lambda x: x.month_key)
 
-    return MonthlyInvoicesResponse(months=sorted_months, period=period)
+    return MonthlyInvoicesResponse(administration_id=admin_id, months=sorted_months, period=period)
+
+
+class ReceiptInvoiceLink(BaseModel):
+    id: UUID
+    invoice_number: str
+
+
+class ReceiptItem(BaseModel):
+    id: UUID
+    source: str
+    payment_date: date
+    amount_cents: int
+    reference: Optional[str] = None
+    invoices: List[ReceiptInvoiceLink] = Field(default_factory=list)
+
+
+class ReceiptPage(BaseModel):
+    administration_id: UUID
+    receipts: List[ReceiptItem]
+    total: int
+    total_amount_cents: int
+
+
+@router.get('/dashboard/receipts', response_model=ReceiptPage)
+async def get_dashboard_receipts(current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    year: int = Query(..., ge=2000, le=2100), month: int = Query(..., ge=1, le=12),
+    limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
+    """Drill into the same receipts used by the cash card and monthly chart."""
+    import calendar
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
+    rows = receipt_rows(administration.id)
+    start = date(year, month, 1)
+    end = min(date(year, month, calendar.monthrange(year, month)[1]), date.today())
+    scope = and_(rows.c.day >= start, rows.c.day <= end)
+    total, amount = (await db.execute(select(func.count(), func.coalesce(func.sum(rows.c.amount_cents), 0))
+        .select_from(rows).where(scope))).one()
+    page = (await db.execute(select(rows).where(scope)
+        .order_by(rows.c.day.desc(), rows.c.id.desc(), rows.c.source).limit(limit).offset(offset))).mappings().all()
+    payment_ids = [r['id'] for r in page if r['source'] == 'payment']
+    links = {}
+    if payment_ids:
+        linked = await db.execute(select(ZZPPaymentAllocation.payment_id, ZZPInvoice.id, ZZPInvoice.invoice_number)
+            .join(ZZPInvoice, ZZPInvoice.id == ZZPPaymentAllocation.invoice_id)
+            .where(ZZPPaymentAllocation.payment_id.in_(payment_ids), ZZPInvoice.administration_id == administration.id)
+            .distinct().order_by(ZZPInvoice.invoice_number))
+        for payment_id, invoice_id, number in linked:
+            links.setdefault(payment_id, []).append(ReceiptInvoiceLink(id=invoice_id, invoice_number=number))
+    return ReceiptPage(administration_id=administration.id, total=total, total_amount_cents=amount,
+        receipts=[ReceiptItem(id=r['id'], source=r['source'], payment_date=r['day'],
+            amount_cents=r['amount_cents'], reference=r['reference'],
+            invoices=(links.get(r['id'], []) if r['source'] == 'payment' else
+                      [ReceiptInvoiceLink(id=r['id'], invoice_number=r['reference'])])) for r in page])

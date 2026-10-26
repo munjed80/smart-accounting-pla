@@ -1,6 +1,6 @@
 import { ZZPInvoice, ZZPTimeEntry } from '@/lib/api'
 
-export type InvoiceStatusFilter = 'all' | ZZPInvoice['status']
+export type InvoiceStatusFilter = 'all' | 'open' | ZZPInvoice['status']
 export type TimeBillableFilter = 'all' | 'billable' | 'non_billable'
 export type TimeInvoicedFilter = 'all' | 'invoiced' | 'not_invoiced'
 
@@ -46,7 +46,9 @@ export const filterInvoices = (invoices: ZZPInvoice[], filters: InvoiceFilters):
   const query = filters.q.trim().toLowerCase()
 
   return invoices.filter((invoice) => {
-    if (filters.status !== 'all' && invoice.status !== filters.status) return false
+    if (filters.status === 'open') {
+      if (!['sent', 'overdue'].includes(invoice.status) || invoice.total_cents - (invoice.amount_paid_cents || 0) <= 0) return false
+    } else if (filters.status !== 'all' && invoice.status !== filters.status) return false
     if (filters.customer_id && invoice.customer_id !== filters.customer_id) return false
 
     const issueDate = normalizeDate(invoice.issue_date)

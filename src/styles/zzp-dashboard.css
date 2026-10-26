@@ -1,0 +1,1000 @@
+.zzp-overview {
+  --ov-bg: #f6f7f2;
+  --ov-card: #fff;
+  --ov-ink: #213e34;
+  --ov-muted: #63746a;
+  --ov-line: #dce4d9;
+  --ov-green: #245c4e;
+  --ov-soft: #edf3e7;
+  --ov-warning: #9a4b37;
+  --ov-billed: #adbfb0;
+  --ov-received: #2f6b55;
+  background: var(--ov-bg);
+  color: var(--ov-ink);
+  min-height: 100%;
+  font-family: 'ZZP Sans', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.dark .zzp-overview {
+  --ov-bg: #14231e;
+  --ov-card: #1b2e26;
+  --ov-ink: #edf1e7;
+  --ov-muted: #b1c4b5;
+  --ov-line: #354a3c;
+  --ov-green: #c6dda8;
+  --ov-soft: #263d2d;
+  --ov-warning: #efb09a;
+  --ov-billed: #617c67;
+  --ov-received: #b1ce94;
+}
+.zzp-overview * {
+  box-sizing: border-box;
+}
+.zzp-overview :where(h1, h2, h3, p, ul, dl, dd) {
+  margin: 0;
+}
+.zzp-overview a {
+  color: inherit;
+  text-decoration: none;
+}
+.zzp-overview button {
+  cursor: pointer;
+  font: inherit;
+}
+.zzp-overview :where(a, button, summary):focus-visible {
+  outline: 3px solid var(--ov-green);
+  outline-offset: 4px;
+}
+.zzp-overview button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+.ov-container {
+  max-width: 1270px;
+  margin-inline: auto;
+  padding: 36px 38px 24px;
+}
+.ov-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 24px;
+  padding-bottom: 24px;
+}
+.ov-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--ov-muted);
+}
+.ov-eyebrow span {
+  font-weight: 400;
+  letter-spacing: 0.5px;
+}
+.zzp-overview h1 {
+  font:
+    52px/1.08 'ZZP Editorial',
+    Georgia,
+    serif;
+  letter-spacing: -1px;
+  margin-block: 10px 8px;
+}
+.ov-header > div > p:last-child {
+  color: var(--ov-muted);
+  font-size: 13px;
+}
+.ov-update {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  padding-bottom: 4px;
+}
+.ov-update > span {
+  font-size: 11px;
+  color: var(--ov-muted);
+  white-space: nowrap;
+}
+.ov-update button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--ov-line);
+  border-radius: 5px;
+  padding: 9px 12px;
+  font-size: 12px;
+  background: var(--ov-card);
+}
+.ov-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  border-bottom: 1px solid var(--ov-line);
+  padding-bottom: 26px;
+}
+.ov-quick-actions a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 15px;
+  min-height: 50px;
+  border: 1px solid var(--ov-line);
+  border-radius: 5px;
+  background: var(--ov-card);
+  font-size: 13px;
+  font-weight: 500;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.ov-quick-actions a > svg:last-child {
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.ov-quick-actions a > svg:first-child {
+  flex-shrink: 0;
+}
+.ov-quick-actions a:hover {
+  border-color: var(--ov-green);
+  background: var(--ov-soft);
+}
+.ov-quick-actions a.ov-action-primary {
+  background: #245c4e;
+  border-color: #245c4e;
+  color: #fff;
+}
+.ov-quick-actions a.ov-action-primary:hover {
+  background: #193e34;
+}
+.ov-financial-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 23px 0 12px;
+}
+.ov-financial-label h2 {
+  font-size: 13px;
+  font-weight: 600;
+}
+.ov-financial-label > span {
+  color: var(--ov-muted);
+  font-size: 11px;
+}
+.ov-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.zzp-overview .ov-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  min-width: 0;
+  padding: 20px 18px 18px;
+  background: var(--ov-card);
+  border: 1px solid var(--ov-line);
+  border-radius: 6px;
+  text-align: left;
+  transition: border-color 0.15s;
+}
+.ov-metric:hover {
+  border-color: var(--ov-green);
+}
+.ov-metric > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  color: var(--ov-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ov-metric > span > svg {
+  flex-shrink: 0;
+}
+.ov-metric > span > svg:last-child {
+  margin-left: auto;
+  width: 11px;
+}
+.ov-metric > strong {
+  font-size: clamp(22px, 2.15vw, 31px);
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -1px;
+  margin-top: 16px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.ov-metric > small {
+  color: var(--ov-muted);
+  font-size: 10px;
+  margin-top: 9px;
+  line-height: 1.7;
+}
+.zzp-overview .ov-metric-income {
+  background: var(--ov-soft);
+  border-color: #bed0b5;
+}
+.ov-metric-income > strong {
+  color: var(--ov-green);
+}
+.ov-metric-overdue > strong,
+.ov-metric-overdue > span {
+  color: var(--ov-warning);
+}
+.ov-money-note {
+  margin-top: 9px !important;
+  font-size: 10px;
+  color: var(--ov-muted);
+}
+.ov-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 20px;
+  margin-top: 25px;
+  align-items: start;
+}
+.ov-panel {
+  padding: 25px;
+  border: 1px solid var(--ov-line);
+  background: var(--ov-card);
+  border-radius: 7px;
+  min-width: 0;
+}
+.ov-panel-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 23px;
+}
+.zzp-overview .ov-panel h2 {
+  font:
+    28px/1.2 'ZZP Editorial',
+    Georgia,
+    serif;
+  letter-spacing: -0.4px;
+  margin-top: 5px;
+}
+.ov-count {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--ov-line);
+  border-radius: 50%;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.ov-task-list {
+  padding: 0;
+  list-style: none;
+}
+.ov-task-list > li {
+  border-top: 1px solid var(--ov-line);
+}
+.ov-task-list > li:last-child {
+  border-bottom: 1px solid var(--ov-line);
+}
+.ov-task-list > li > a {
+  display: flex;
+  align-items: start;
+  gap: 13px;
+  padding-block: 15px;
+}
+.ov-task-list > li > a > svg {
+  margin-left: auto;
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--ov-muted);
+}
+.ov-task-list > li > a:hover .ov-task-copy > strong {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.ov-task-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  background: #7c9272;
+  border-radius: 50%;
+  margin-top: 7px;
+}
+.ov-task-error .ov-task-dot {
+  background: #bd7157;
+}
+.ov-task-warning .ov-task-dot {
+  background: #be9c52;
+}
+.ov-task-copy {
+  min-width: 0;
+}
+.ov-task-copy > strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ov-task-copy > small {
+  display: block;
+  font-size: 11px;
+  line-height: 1.75;
+  color: var(--ov-muted);
+  margin-top: 4px;
+}
+.ov-task-amount {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.ov-task-count {
+  color: var(--ov-muted);
+  font-size: 11px;
+  background: var(--ov-soft);
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-left: auto;
+}
+.ov-task-count + svg {
+  margin-left: 0 !important;
+}
+.ov-expand {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: 12px !important;
+  color: var(--ov-green);
+}
+.ov-clear {
+  padding: 14px 0 28px;
+  max-width: 330px;
+}
+.ov-clear > span {
+  display: grid;
+  place-items: center;
+  width: 39px;
+  height: 39px;
+  background: var(--ov-soft);
+  border-radius: 50%;
+  color: var(--ov-green);
+  margin-bottom: 17px;
+}
+.ov-clear h3 {
+  font-size: 15px;
+  font-weight: 500;
+}
+.ov-clear p {
+  margin-top: 7px;
+  font-size: 13px;
+  color: var(--ov-muted);
+}
+.ov-clear a {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--ov-green);
+}
+.ov-estimate {
+  border: 1px solid var(--ov-line);
+  color: var(--ov-muted);
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+.ov-vat-label {
+  font-size: 13px;
+  color: var(--ov-muted);
+}
+.ov-vat-total {
+  display: block;
+  color: var(--ov-green);
+  font-size: 37px;
+  line-height: 1.3;
+  letter-spacing: -1px;
+  font-weight: 400;
+  margin-top: 7px;
+  font-variant-numeric: tabular-nums;
+}
+.ov-vat dl {
+  padding-top: 19px;
+  margin-top: 20px !important;
+  border-top: 1px solid var(--ov-line);
+  font-size: 12px;
+}
+.ov-vat dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 8px;
+}
+.ov-vat dt {
+  color: var(--ov-muted);
+}
+.ov-vat dd {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ov-vat-note {
+  font-size: 11px;
+  color: var(--ov-muted);
+  line-height: 1.8;
+  margin-top: 18px !important;
+}
+.ov-text-link {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--ov-green) !important;
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 20px;
+}
+.ov-activity {
+  margin-top: 20px;
+}
+.ov-chart-unit {
+  font-size: 11px;
+  color: var(--ov-muted);
+}
+.ov-chart-inspector {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 15px;
+  padding-bottom: 12px;
+  font-size: 13px;
+}
+.ov-chart-inspector > span {
+  color: var(--ov-muted);
+  text-transform: capitalize;
+}
+.ov-chart-inspector > div {
+  display: flex;
+  gap: 25px;
+}
+.ov-chart-inspector > div > span,
+.ov-chart-inspector button {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--ov-muted);
+}
+.ov-chart-inspector strong {
+  color: var(--ov-ink);
+  font-weight: 500;
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.ov-chart-inspector i {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.ov-legend-billed {
+  background: var(--ov-billed);
+}
+.ov-legend-received {
+  background: var(--ov-received);
+}
+.ov-chart {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 17px;
+  height: 190px;
+  padding: 12px 10px 0;
+  background: repeating-linear-gradient(
+    to top,
+    transparent 0,
+    transparent 48px,
+    var(--ov-line) 49px,
+    transparent 50px
+  );
+}
+.ov-chart > button {
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  align-items: stretch;
+  min-width: 0;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--ov-line);
+}
+.ov-chart-columns {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 6px;
+  padding-inline: 15%;
+}
+.ov-chart-columns > span {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  max-width: 44px;
+  min-width: 5px;
+  opacity: 0.75;
+}
+.ov-bar-billed {
+  background: var(--ov-billed);
+}
+.ov-bar-received {
+  background: var(--ov-received);
+}
+.ov-chart > button.is-selected .ov-chart-columns > span,
+.ov-chart > button:hover .ov-chart-columns > span {
+  opacity: 1;
+}
+.ov-chart-month {
+  font-size: 11px;
+  color: var(--ov-muted);
+  padding: 8px 0;
+  background: var(--ov-card);
+}
+.ov-chart > button.is-selected .ov-chart-month {
+  color: var(--ov-green);
+  font-weight: 600;
+}
+.ov-chart-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 20px;
+  margin-top: 18px;
+  font-size: 11px;
+  color: var(--ov-muted);
+}
+.ov-chart-footer a {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  color: var(--ov-green);
+}
+.ov-chart-data {
+  margin-top: 15px;
+  border-top: 1px solid var(--ov-line);
+  padding-top: 15px;
+}
+.ov-chart-data summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--ov-muted);
+}
+.ov-table-scroll {
+  overflow-x: auto;
+}
+.ov-chart-data table {
+  width: 100%;
+  text-align: right;
+  font-size: 12px;
+  margin-top: 12px;
+}
+.ov-chart-data th:first-child {
+  text-align: left;
+}
+.ov-chart-data th,
+.ov-chart-data td {
+  padding: 8px 5px;
+  border-bottom: 1px solid var(--ov-line);
+  font-weight: 400;
+  white-space: nowrap;
+}
+.ov-chart-data th {
+  color: var(--ov-muted);
+}
+.ov-chart-data td a,
+.ov-chart-data td button {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ov-hours {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+  margin-top: 20px;
+  padding: 20px 25px;
+  border: 1px solid var(--ov-line);
+  border-radius: 6px;
+  background: var(--ov-card);
+}
+.ov-hours > div {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.ov-hours > div > svg {
+  color: var(--ov-green);
+}
+.ov-hours strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.ov-hours span {
+  display: block;
+  font-size: 11px;
+  color: var(--ov-muted);
+}
+.ov-hours > p {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-left: auto;
+}
+.ov-hours > p > strong {
+  font-size: 22px;
+  font-weight: 400;
+}
+.ov-hours a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ov-green);
+}
+.ov-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  margin-top: 25px;
+  font-size: 10px;
+  color: var(--ov-muted);
+}
+.ov-footer a {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.ov-error {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  background: var(--ov-card);
+  border: 1px solid #c99680;
+  padding: 18px;
+  border-radius: 5px;
+  margin-block: 12px;
+}
+.ov-error > svg {
+  color: var(--ov-warning);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.ov-error strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.ov-error p {
+  font-size: 12px;
+  color: var(--ov-muted);
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+.ov-error button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ov-green);
+  font-size: 12px;
+  margin-top: 10px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ov-empty,
+.ov-chart-loading {
+  padding-block: 28px;
+  font-size: 13px;
+  color: var(--ov-muted);
+}
+.ov-chart-loading {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+}
+.ov-skeleton {
+  min-height: 148px;
+}
+.ov-skeleton > span,
+.ov-skeleton > strong,
+.ov-skeleton > small {
+  display: block;
+  height: 10px;
+  width: 65%;
+  border-radius: 3px;
+  background: var(--ov-line);
+}
+.ov-skeleton > strong {
+  height: 28px;
+  margin-top: 20px;
+}
+.ov-skeleton > small {
+  width: 85%;
+  margin-top: 15px;
+}
+.ov-receipt-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.ov-receipt-list > li {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 18px;
+  padding-block: 15px;
+  border-bottom: 1px solid var(--border);
+}
+.ov-receipt-list > li > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 4px;
+}
+.ov-receipt-list strong {
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.ov-receipt-list > li > strong {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ov-receipt-list small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.ov-receipt-list a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@keyframes ov-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ov-spinning {
+  animation: ov-spin 1s linear infinite;
+}
+@media (max-width: 1150px) {
+  .ov-container {
+    padding: 28px 24px 22px;
+  }
+  .ov-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ov-metric > strong {
+    font-size: 30px;
+  }
+  .ov-quick-actions a {
+    padding-inline: 11px;
+    font-size: 12px;
+    gap: 7px;
+  }
+  .ov-main-grid {
+    gap: 16px;
+  }
+  .ov-panel {
+    padding: 21px;
+  }
+  .ov-update > span {
+    display: none;
+  }
+}
+@media (max-width: 700px) {
+  .ov-container {
+    padding: 24px 17px 20px;
+  }
+  .ov-header {
+    align-items: start;
+    gap: 14px;
+    padding-bottom: 20px;
+  }
+  .zzp-overview h1 {
+    font-size: 42px;
+  }
+  .ov-header > div > p:last-child {
+    font-size: 12px;
+    max-width: 260px;
+  }
+  .ov-update {
+    padding-top: 7px;
+  }
+  .ov-update button {
+    font-size: 0;
+    gap: 0;
+    padding: 10px;
+  }
+  .ov-quick-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    padding-bottom: 21px;
+  }
+  .ov-quick-actions a {
+    min-height: 52px;
+    padding-inline: 12px;
+    font-size: 12px;
+    gap: 9px;
+  }
+  .ov-quick-actions a > svg:first-child {
+    width: 16px;
+    height: 16px;
+  }
+  .ov-quick-actions a > svg:last-child {
+    width: 12px;
+  }
+  .ov-financial-label {
+    flex-direction: column;
+    align-items: start;
+    gap: 4px;
+    margin-top: 20px;
+  }
+  .ov-financial-label > span {
+    font-size: 10px;
+  }
+  .zzp-overview .ov-metric {
+    padding: 15px 12px;
+  }
+  .ov-metric > span {
+    font-size: 10px;
+    gap: 5px;
+    white-space: normal;
+  }
+  .ov-metric > span > svg:first-child {
+    width: 13px;
+  }
+  .ov-metric > span > svg:last-child {
+    display: none;
+  }
+  .ov-metric > strong {
+    font-size: 26px;
+    margin-top: 13px;
+    letter-spacing: -0.8px;
+  }
+  .ov-metric > small {
+    font-size: 10px;
+    margin-top: 6px;
+  }
+  .ov-money-note {
+    font-size: 10px;
+    line-height: 1.7;
+  }
+  .ov-main-grid {
+    grid-template-columns: 1fr;
+    margin-top: 20px;
+  }
+  .ov-panel {
+    padding: 20px;
+  }
+  .zzp-overview .ov-panel h2 {
+    font-size: 27px;
+  }
+  .ov-panel-heading {
+    margin-bottom: 20px;
+  }
+  .ov-eyebrow {
+    font-size: 10px;
+    letter-spacing: 1.1px;
+  }
+  .ov-task-list > li > a {
+    gap: 10px;
+    padding-block: 16px;
+  }
+  .ov-task-copy > strong {
+    font-size: 13px;
+  }
+  .ov-task-copy > small {
+    font-size: 11px;
+  }
+  .ov-vat-total {
+    font-size: 35px;
+  }
+  .ov-chart-inspector {
+    flex-direction: column;
+    gap: 11px;
+  }
+  .ov-chart-inspector > div {
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .ov-chart-inspector > div > span,
+  .ov-chart-inspector button {
+    font-size: 10px;
+  }
+  .ov-chart {
+    height: 165px;
+    gap: 8px;
+    padding-inline: 0;
+    margin-top: 8px;
+  }
+  .ov-chart > button {
+    padding-inline: 2px;
+  }
+  .ov-chart-columns {
+    gap: 4px;
+    padding-inline: 8%;
+  }
+  .ov-chart-month {
+    font-size: 10px;
+  }
+  .ov-chart-footer {
+    flex-direction: column;
+    gap: 11px;
+    font-size: 10px;
+  }
+  .ov-chart-data {
+    margin-top: 13px;
+  }
+  .ov-chart-data table {
+    font-size: 11px;
+  }
+  .ov-chart-unit {
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .ov-hours {
+    flex-wrap: wrap;
+    gap: 15px;
+    padding: 18px 20px;
+  }
+  .ov-hours > p {
+    gap: 10px;
+  }
+  .ov-hours > p > strong {
+    font-size: 20px;
+  }
+  .ov-hours > p > span {
+    font-size: 10px;
+  }
+  .ov-hours a {
+    width: 100%;
+    justify-content: space-between;
+    border-top: 1px solid var(--ov-line);
+    padding-top: 12px;
+    font-size: 12px;
+  }
+  .ov-footer {
+    flex-direction: column;
+    gap: 10px;
+    font-size: 10px;
+    margin-top: 20px;
+  }
+}
+@media (max-width: 359px) {
+  .ov-metric > strong {
+    font-size: 22px;
+  }
+  .ov-quick-actions a {
+    font-size: 11px;
+    gap: 5px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ov-spinning {
+    animation: none;
+  }
+  .zzp-overview * {
+    transition: none !important;
+  }
+}

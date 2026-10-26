@@ -1,3 +1,4 @@
+import { useQuickCreate } from '@/hooks/useQuickCreate'
 import { invoiceDecimal, invoicePriceCents, invoiceLineAmounts } from '@/lib/invoiceMoney'
 import { saveInvoicePdf } from '@/lib/invoicePdf'
 import { InvoicePdfPreview } from './InvoicePdfPreview'
@@ -1760,7 +1761,7 @@ const ZZPInvoicesPageContent = () => {
     const overdue = invoices.filter(i => i.status === 'overdue').length
     const totalAmount = invoices.reduce((sum, i) => sum + i.total_cents, 0)
     const paidAmount = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.total_cents, 0)
-    const openAmount = invoices.filter(i => i.status === 'sent' || i.status === 'overdue').reduce((sum, i) => sum + i.total_cents, 0)
+    const openAmount = invoices.filter(i => i.status === 'sent' || i.status === 'overdue').reduce((sum, i) => sum + Math.max(0, i.total_cents - (i.amount_paid_cents || 0)), 0)
     return { total, draft, sent, paid, overdue, totalAmount, paidAmount, openAmount }
   }, [invoices, serverStats])
 
@@ -2045,6 +2046,8 @@ const ZZPInvoicesPageContent = () => {
     setIsFormOpen(true)
   }, [])
 
+  useQuickCreate('new', openNewForm, !isLoading && !!user?.id)
+
   // Generate invoice draft with sensible defaults and open it directly
   const handleGenerateInvoice = useCallback(async () => {
     if (activeCustomers.length === 0) {
@@ -2290,6 +2293,7 @@ const ZZPInvoicesPageContent = () => {
                   <CardDescription>
                     {filteredInvoices.length} {filteredInvoices.length === 1 ? 'factuur' : 'facturen'}
                     {filters.status !== 'all' && ` (${
+                      filters.status === 'open' ? 'Openstaand' :
                       filters.status === 'draft' ? t('zzpInvoices.filterDraft') :
                       filters.status === 'sent' ? t('zzpInvoices.filterSent') :
                       filters.status === 'paid' ? t('zzpInvoices.filterPaid') :
@@ -2311,6 +2315,7 @@ const ZZPInvoicesPageContent = () => {
                   <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t('zzpInvoices.filterAll')}</SelectItem>
+                    <SelectItem value="open">Openstaand</SelectItem>
                     <SelectItem value="draft">{t('zzpInvoices.filterDraft')}</SelectItem>
                     <SelectItem value="sent">{t('zzpInvoices.filterSent')}</SelectItem>
                     <SelectItem value="paid">{t('zzpInvoices.filterPaid')}</SelectItem>

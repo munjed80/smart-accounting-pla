@@ -1,3 +1,4 @@
+import { useQuickCreate } from '@/hooks/useQuickCreate'
 /**
  * ZZP Document Inbox Page (Documenten)
  *
@@ -607,6 +608,8 @@ export const ZZPDocumentInboxPage = () => {
       </div>
     )
   }
+
+  useQuickCreate('upload', () => setShowUploadChooser(true), !!user?.id)
 
   return (
     <div className="flex-1 overflow-auto">

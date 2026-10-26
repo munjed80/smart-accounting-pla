@@ -189,7 +189,7 @@ async def test_zzp_dashboard_with_time_entries(
     # Create a non-billable time entry
     non_billable = ZZPTimeEntry()
     non_billable.administration_id = test_administration.id
-    non_billable.entry_date = monday + timedelta(days=1)
+    non_billable.entry_date = min(today, monday + timedelta(days=1))  # worked hours through today
     non_billable.description = "Admin work"
     non_billable.hours = Decimal("2.0")
     non_billable.billable = False

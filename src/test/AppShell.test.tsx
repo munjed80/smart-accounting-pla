@@ -117,6 +117,18 @@ describe('AppShell - ZZP Menu', () => {
     } as any)
   })
 
+  it('mounts the page and its effects once across responsive layouts', () => {
+    const mounted = vi.fn()
+    function Page() {
+      React.useEffect(mounted, [])
+      return <div>Single page instance</div>
+    }
+    render(<AppShell activeTab="dashboard"><Page /></AppShell>, { wrapper: createWrapper() })
+    expect(screen.getAllByRole('main')).toHaveLength(1)
+    expect(screen.getAllByText('Single page instance')).toHaveLength(1)
+    expect(mounted).toHaveBeenCalledOnce()
+  })
+
   it('includes Overzicht as the first ZZP menu item', () => {
     render(
       <AppShell activeTab="dashboard">

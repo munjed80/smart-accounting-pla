@@ -602,6 +602,7 @@ async def delete_invoice(
     
     administration = await get_user_administration(current_user.id, db)
     
+    await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
     result = await db.execute(
         select(ZZPInvoice).where(
             ZZPInvoice.id == invoice_id,
@@ -703,6 +704,7 @@ async def send_invoice(
     administration = await get_user_administration(current_user.id, db)
     
     # Fetch invoice with lines and customer (need customer for email)
+    await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
     result = await db.execute(
         select(ZZPInvoice)
         .options(

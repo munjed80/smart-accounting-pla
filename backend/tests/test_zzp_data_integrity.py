@@ -11,6 +11,7 @@ from app.models.accounting import ChartOfAccount
 from app.models.ledger import JournalEntry, JournalLine, AccountingPeriod, PeriodStatus
 from app.models.zzp import ZZPExpense, ZZPDocument, ZZPDocType, ZZPDocStatus
 from app.models.financial_commitment import FinancialCommitment
+from app.models.payment import ZZPPaymentAllocation
 
 
 @pytest_asyncio.fixture
@@ -107,7 +108,12 @@ async def test_invoice_posting_follows_lifecycle_and_repayment(async_client, db_
     await status('paid')
     active=(await db_session.execute(select(JournalEntry).where(JournalEntry.source_id==UUID(id),JournalEntry.reversed_by_id.is_(None)))).scalars().all()
     assert len([e for e in active if e.source_type=='INVOICE'])==1
-    assert len([e for e in active if e.source_type=='INVOICE_PAYMENT'])==1
+    receipts = (await db_session.execute(select(JournalEntry).join(ZZPPaymentAllocation,
+        JournalEntry.source_id == ZZPPaymentAllocation.id).where(
+            ZZPPaymentAllocation.invoice_id == UUID(id), JournalEntry.source_type == 'PAYMENT_ALLOCATION',
+            JournalEntry.reversed_by_id.is_(None)))).scalars().all()
+    assert len(receipts) == 1
+    assert receipts[0].total_debit == Decimal('121.00')
     # All entries, including reversals, remain balanced.
     assert all(e.total_debit==e.total_credit for e in (await db_session.execute(select(JournalEntry))).scalars())
 

@@ -1,3 +1,4 @@
+import { STARTER_PRICE_NL, PRO_PRICE_NL } from '@/lib/billingCatalog'
 /**
  * Settings Page
  * 
@@ -1258,7 +1259,7 @@ export const SettingsPage = () => {
                             disabled={isActivating}
                           >
                             {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Starter (€4,99/mnd)
+                            Starter ({STARTER_PRICE_NL}/mnd)
                           </Button>
                           <Button
                             onClick={handleActivateSubscriptionPro}
@@ -1266,7 +1267,7 @@ export const SettingsPage = () => {
                             className="bg-purple-600 hover:bg-purple-700"
                           >
                             {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Pro (€6,95/mnd)
+                            Pro ({PRO_PRICE_NL}/mnd)
                           </Button>
                           <Button
                             variant="outline"
@@ -1303,7 +1304,7 @@ export const SettingsPage = () => {
                             disabled={isActivating}
                           >
                             {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Starter (€4,99/mnd)
+                            Starter ({STARTER_PRICE_NL}/mnd)
                           </Button>
                           <Button
                             onClick={handleActivateSubscriptionPro}
@@ -1311,7 +1312,7 @@ export const SettingsPage = () => {
                             className="bg-purple-600 hover:bg-purple-700"
                           >
                             {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Pro (€6,95/mnd)
+                            Pro ({PRO_PRICE_NL}/mnd)
                           </Button>
                         </>
                       )}

@@ -1,3 +1,5 @@
+
+from app.services.zzp_administration import get_user_administration
 from datetime import date
 from decimal import Decimal
 from typing import Annotated, Optional
@@ -11,22 +13,10 @@ from sqlalchemy.orm import selectinload
 from app.api.v1.deps import CurrentUser, require_zzp
 from app.core.database import get_db
 from app.models.accounting import ChartOfAccount
-from app.models.administration import Administration, AdministrationMember
+from app.models.administration import Administration
 from app.models.ledger import JournalEntry, JournalLine
 
 router = APIRouter()
-
-
-async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(AdministrationMember.user_id == user_id)
-        .where(Administration.is_active.is_(True))
-        .order_by(Administration.created_at)
-        .limit(1)
-    )
-    return result.scalar_one()
 
 
 @router.get('/ledger')

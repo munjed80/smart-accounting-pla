@@ -1,0 +1,4 @@
+{
+  "starter": { "price_monthly": "4.95", "description": "Starter abonnement" },
+  "zzp_pro": { "price_monthly": "6.95", "description": "Pro abonnement" }
+}

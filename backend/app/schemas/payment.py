@@ -4,7 +4,7 @@ Payment System Schemas
 Pydantic schemas for payment API requests and responses.
 """
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
@@ -12,12 +12,27 @@ from pydantic import BaseModel, Field, field_validator
 
 # Request Schemas
 
-class PaymentCreate(BaseModel):
+PaymentMethodInput = Literal['bank_transfer', 'cash', 'card', 'ideal', 'other']
+
+
+class PaymentInput(BaseModel):
+    @field_validator('payment_date', check_fields=False)
+    @classmethod
+    def validate_payment_date(cls, value):
+        if value is not None:
+            try:
+                datetime.fromisoformat(value)
+            except ValueError as exc:
+                raise ValueError('Payment date must use ISO 8601 format') from exc
+        return value
+
+
+class PaymentCreate(PaymentInput):
     """Create a new payment."""
     customer_id: Optional[UUID] = Field(None, description="Customer who made the payment")
     amount_cents: int = Field(..., gt=0, description="Payment amount in cents")
     payment_date: str = Field(..., description="Payment date (ISO 8601 format)")
-    payment_method: str = Field("bank_transfer", description="Payment method")
+    payment_method: PaymentMethodInput = Field("bank_transfer", description="Payment method")
     reference: Optional[str] = Field(None, max_length=255, description="Payment reference")
     notes: Optional[str] = Field(None, description="Additional notes")
     
@@ -37,10 +52,10 @@ class PaymentAllocationCreate(BaseModel):
     notes: Optional[str] = Field(None, description="Allocation notes")
 
 
-class PaymentUpdate(BaseModel):
+class PaymentUpdate(PaymentInput):
     """Update payment details."""
     payment_date: Optional[str] = Field(None, description="Payment date (ISO 8601 format)")
-    payment_method: Optional[str] = Field(None, description="Payment method")
+    payment_method: Optional[PaymentMethodInput] = Field(None, description="Payment method")
     reference: Optional[str] = Field(None, max_length=255, description="Payment reference")
     notes: Optional[str] = Field(None, description="Additional notes")
     status: Optional[str] = Field(None, description="Payment status")
@@ -66,19 +81,19 @@ class PaymentUpdate(BaseModel):
         return v
 
 
-class MarkInvoicePaidRequest(BaseModel):
+class MarkInvoicePaidRequest(PaymentInput):
     """Mark an invoice as paid by creating a payment."""
     payment_date: Optional[str] = Field(None, description="Payment date (defaults to today)")
-    payment_method: str = Field("bank_transfer", description="Payment method")
+    payment_method: PaymentMethodInput = Field("bank_transfer", description="Payment method")
     reference: Optional[str] = Field(None, description="Payment reference")
     notes: Optional[str] = Field(None, description="Payment notes")
 
 
-class PartialPaymentRequest(BaseModel):
+class PartialPaymentRequest(PaymentInput):
     """Record a partial payment on an invoice."""
     amount_cents: int = Field(..., gt=0, description="Partial payment amount in cents")
     payment_date: Optional[str] = Field(None, description="Payment date (defaults to today)")
-    payment_method: str = Field("bank_transfer", description="Payment method")
+    payment_method: PaymentMethodInput = Field("bank_transfer", description="Payment method")
     reference: Optional[str] = Field(None, description="Payment reference")
     notes: Optional[str] = Field(None, description="Payment notes")
 

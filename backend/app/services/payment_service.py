@@ -1,29 +1,63 @@
-"""
-Payment Service
+"""Tenant-scoped payment allocations and ledger synchronization in one transaction."""
 
-Business logic for payment tracking and reconciliation.
-Handles payment creation, allocation, and invoice status updates.
-"""
-from datetime import datetime, date, timezone
-from decimal import Decimal
-from typing import List, Optional, Tuple
+from datetime import datetime, timezone
+from typing import Optional
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.administration import Administration
 from app.models.payment import ZZPPayment, ZZPPaymentAllocation, PaymentStatus
-from app.models.zzp import ZZPInvoice, InvoiceStatus
+from app.models.zzp import ZZPInvoice, ZZPCustomer
+from app.services.zzp_integrity import (
+    require_open_dates,
+    sync_invoice,
+    sync_payment_allocation,
+)
 
 
 class PaymentService:
-    """Service for managing payments and payment allocations."""
-    
     def __init__(self, db: AsyncSession, administration_id: UUID):
         self.db = db
         self.administration_id = administration_id
-    
+
+    async def _invoice(self, invoice_id: UUID, *, lock: bool = False) -> ZZPInvoice:
+        if lock:
+            # Match invoice/ledger mutation lock order and serialize competing payments.
+            await self.db.execute(
+                select(Administration.id)
+                .where(Administration.id == self.administration_id)
+                .with_for_update()
+            )
+        query = select(ZZPInvoice).where(
+            ZZPInvoice.id == invoice_id,
+            ZZPInvoice.administration_id == self.administration_id,
+        )
+        if lock:
+            query = query.with_for_update().execution_options(populate_existing=True)
+        invoice = await self.db.scalar(query)
+        if invoice is None:
+            raise HTTPException(
+                404,
+                detail={
+                    "code": "INVOICE_NOT_FOUND",
+                    "message": "Factuur niet gevonden.",
+                },
+            )
+        return invoice
+
+    @staticmethod
+    def _date(value: datetime | None) -> datetime:
+        value = value or datetime.now(timezone.utc)
+        return (
+            value.replace(tzinfo=timezone.utc)
+            if value.tzinfo is None
+            else value.astimezone(timezone.utc)
+        )
+
     async def create_payment(
         self,
         amount_cents: int,
@@ -34,21 +68,29 @@ class PaymentService:
         notes: Optional[str] = None,
         bank_transaction_id: Optional[UUID] = None,
     ) -> ZZPPayment:
-        """
-        Create a new payment record.
-        
-        Args:
-            amount_cents: Payment amount in cents
-            payment_date: When the payment was received
-            customer_id: Optional customer who made the payment
-            payment_method: How the payment was made
-            reference: Payment reference or transaction ID
-            notes: Additional notes
-            bank_transaction_id: Link to bank transaction if from reconciliation
-            
-        Returns:
-            Created payment record
-        """
+        if amount_cents <= 0 or payment_method not in (
+            "bank_transfer",
+            "cash",
+            "card",
+            "ideal",
+            "other",
+        ):
+            raise ValueError("Ongeldig bedrag of betaalmethode.")
+        payment_date = self._date(payment_date)
+        await require_open_dates(self.db, self.administration_id, payment_date.date())
+        if customer_id and not await self.db.scalar(
+            select(ZZPCustomer.id).where(
+                ZZPCustomer.id == customer_id,
+                ZZPCustomer.administration_id == self.administration_id,
+            )
+        ):
+            raise HTTPException(
+                404,
+                detail={
+                    "code": "CUSTOMER_NOT_FOUND",
+                    "message": "Klant niet gevonden.",
+                },
+            )
         payment = ZZPPayment(
             administration_id=self.administration_id,
             customer_id=customer_id,
@@ -60,160 +102,116 @@ class PaymentService:
             bank_transaction_id=bank_transaction_id,
             status=PaymentStatus.COMPLETED.value,
         )
-        
         self.db.add(payment)
         await self.db.flush()
-        
         return payment
-    
+
     async def allocate_payment_to_invoice(
         self,
         payment_id: UUID,
         invoice_id: UUID,
         allocated_amount_cents: int,
         notes: Optional[str] = None,
-    ) -> ZZPPaymentAllocation:
-        """
-        Allocate a payment (or part of it) to a specific invoice.
-        
-        Args:
-            payment_id: Payment to allocate
-            invoice_id: Invoice to pay
-            allocated_amount_cents: Amount to allocate in cents
-            notes: Allocation notes
-            
-        Returns:
-            Created allocation record
-            
-        Raises:
-            ValueError: If allocation exceeds available payment amount or invoice balance
-        """
-        # Verify payment exists and belongs to this administration
-        payment_result = await self.db.execute(
+    ):
+        invoice = await self._invoice(invoice_id, lock=True)
+        if invoice.status not in ("sent", "overdue"):
+            raise ValueError(
+                "Alleen een verzonden of vervallen factuur kan worden betaald."
+            )
+        payment = await self.db.scalar(
             select(ZZPPayment)
-            .options(selectinload(ZZPPayment.allocations))
             .where(
                 ZZPPayment.id == payment_id,
-                ZZPPayment.administration_id == self.administration_id
+                ZZPPayment.administration_id == self.administration_id,
             )
+            .with_for_update()
         )
-        payment = payment_result.scalar_one_or_none()
-        
-        if not payment:
-            raise ValueError("Payment not found")
-        
-        # Calculate allocated amount
-        total_allocated = sum(a.allocated_amount_cents for a in payment.allocations)
-        available_amount = payment.amount_cents - total_allocated
-        
-        if allocated_amount_cents > available_amount:
-            raise ValueError(
-                f"Allocation amount ({allocated_amount_cents}) exceeds available "
-                f"payment amount ({available_amount})"
-            )
-        
-        # Verify invoice exists and belongs to this administration
-        invoice_result = await self.db.execute(
-            select(ZZPInvoice)
-            .where(
-                ZZPInvoice.id == invoice_id,
-                ZZPInvoice.administration_id == self.administration_id
-            )
+        if payment is None or payment.status != PaymentStatus.COMPLETED.value:
+            raise ValueError("Betaling niet gevonden of niet actief.")
+        await require_open_dates(
+            self.db,
+            self.administration_id,
+            invoice.issue_date,
+            payment.payment_date.date(),
         )
-        invoice = invoice_result.scalar_one_or_none()
-        
-        if not invoice:
-            raise ValueError("Invoice not found")
-        
-        # Calculate invoice outstanding amount
-        invoice_paid = await self.get_invoice_paid_amount(invoice_id)
-        invoice_outstanding = invoice.total_cents - invoice_paid
-        
-        if allocated_amount_cents > invoice_outstanding:
+        if payment.customer_id and payment.customer_id != invoice.customer_id:
+            raise ValueError("De betaling hoort bij een andere klant.")
+        used = await self.db.scalar(
+            select(
+                func.coalesce(func.sum(ZZPPaymentAllocation.allocated_amount_cents), 0)
+            ).where(ZZPPaymentAllocation.payment_id == payment.id)
+        )
+        outstanding = invoice.total_cents - await self.get_invoice_paid_amount(
+            invoice_id
+        )
+        if allocated_amount_cents <= 0 or allocated_amount_cents > min(
+            payment.amount_cents - used, outstanding
+        ):
             raise ValueError(
-                f"Allocation amount ({allocated_amount_cents}) exceeds invoice "
-                f"outstanding amount ({invoice_outstanding})"
+                "Het bedrag overschrijdt het beschikbare of openstaande bedrag."
             )
-        
-        # Create allocation
         allocation = ZZPPaymentAllocation(
             payment_id=payment_id,
             invoice_id=invoice_id,
             allocated_amount_cents=allocated_amount_cents,
             notes=notes,
         )
-        
         self.db.add(allocation)
         await self.db.flush()
-        
-        # Update invoice payment tracking
         await self.update_invoice_payment_status(invoice_id)
-        
+        await sync_payment_allocation(
+            self.db, self.administration_id, invoice, payment, allocation
+        )
         return allocation
-    
+
     async def get_invoice_paid_amount(self, invoice_id: UUID) -> int:
-        """
-        Calculate total paid amount for an invoice from allocations.
-        
-        Args:
-            invoice_id: Invoice to calculate for
-            
-        Returns:
-            Total paid amount in cents
-        """
-        result = await self.db.execute(
-            select(func.coalesce(func.sum(ZZPPaymentAllocation.allocated_amount_cents), 0))
-            .join(ZZPPayment)
-            .where(
-                ZZPPaymentAllocation.invoice_id == invoice_id,
-                ZZPPayment.status == PaymentStatus.COMPLETED.value
+        invoice = await self._invoice(invoice_id)
+        count, paid = (
+            await self.db.execute(
+                select(
+                    func.count(ZZPPaymentAllocation.id),
+                    func.coalesce(
+                        func.sum(ZZPPaymentAllocation.allocated_amount_cents), 0
+                    ),
+                )
+                .join(ZZPPayment)
+                .where(
+                    ZZPPaymentAllocation.invoice_id == invoice_id,
+                    ZZPPayment.administration_id == self.administration_id,
+                    ZZPPayment.status == PaymentStatus.COMPLETED.value,
+                )
             )
+        ).one()
+        # Preserve historical status-only payments until they are explicitly reversed.
+        return (
+            paid
+            if count
+            else (invoice.amount_paid_cents if invoice.status == "paid" else 0)
         )
-        
-        return result.scalar() or 0
-    
+
     async def update_invoice_payment_status(self, invoice_id: UUID) -> None:
-        """
-        Update invoice payment status and amount_paid_cents based on allocations.
-        
-        Also updates invoice status to 'paid' if fully paid.
-        
-        Args:
-            invoice_id: Invoice to update
-        """
-        # Get invoice
-        invoice_result = await self.db.execute(
-            select(ZZPInvoice).where(ZZPInvoice.id == invoice_id)
-        )
-        invoice = invoice_result.scalar_one_or_none()
-        
-        if not invoice:
-            return
-        
-        # Calculate total paid amount
-        total_paid = await self.get_invoice_paid_amount(invoice_id)
-        
-        # Update invoice
-        invoice.amount_paid_cents = total_paid
-        
-        # Update status based on payment
-        if total_paid >= invoice.total_cents:
-            # Fully paid
-            invoice.status = InvoiceStatus.PAID.value
-            if not invoice.paid_at:
-                invoice.paid_at = datetime.now(timezone.utc)
-        elif total_paid > 0:
-            # Partially paid - keep current status (sent/overdue) but track payment
-            # Don't change status to "paid" until fully paid
-            pass
+        invoice = await self._invoice(invoice_id)
+        paid = await self.get_invoice_paid_amount(invoice_id)
+        invoice.amount_paid_cents = paid
+        if paid >= invoice.total_cents and invoice.total_cents > 0:
+            invoice.status = "paid"
+            latest = await self.db.scalar(
+                select(func.max(ZZPPayment.payment_date))
+                .join(ZZPPaymentAllocation)
+                .where(
+                    ZZPPaymentAllocation.invoice_id == invoice_id,
+                    ZZPPayment.administration_id == self.administration_id,
+                    ZZPPayment.status == PaymentStatus.COMPLETED.value,
+                )
+            )
+            invoice.paid_at = latest or invoice.paid_at or datetime.now(timezone.utc)
         else:
-            # No payment - if status was paid, change back to sent
-            if invoice.status == InvoiceStatus.PAID.value:
-                invoice.status = InvoiceStatus.SENT.value
-                invoice.paid_at = None
-        
+            if invoice.status == "paid":
+                invoice.status = "sent"
+            invoice.paid_at = None
         await self.db.flush()
-    
+        await sync_invoice(self.db, self.administration_id, invoice)
+
     async def mark_invoice_paid(
         self,
         invoice_id: UUID,
@@ -221,87 +219,17 @@ class PaymentService:
         payment_method: str = "bank_transfer",
         reference: Optional[str] = None,
         notes: Optional[str] = None,
-    ) -> Tuple[ZZPPayment, ZZPPaymentAllocation]:
-        """
-        Mark an invoice as paid by creating a payment and allocation.
-        
-        Creates a payment for the full invoice amount and allocates it.
-        
-        Args:
-            invoice_id: Invoice to mark as paid
-            payment_date: When payment was received (defaults to now)
-            payment_method: How payment was made
-            reference: Payment reference
-            notes: Payment notes
-            
-        Returns:
-            Tuple of (payment, allocation)
-        """
-        # Get invoice
-        invoice_result = await self.db.execute(
-            select(ZZPInvoice)
-            .where(
-                ZZPInvoice.id == invoice_id,
-                ZZPInvoice.administration_id == self.administration_id
-            )
+    ):
+        invoice = await self._invoice(invoice_id, lock=True)
+        outstanding = invoice.total_cents - await self.get_invoice_paid_amount(
+            invoice_id
         )
-        invoice = invoice_result.scalar_one_or_none()
-        
-        if not invoice:
-            raise ValueError("Invoice not found")
-        
-        # Calculate outstanding amount
-        total_paid = await self.get_invoice_paid_amount(invoice_id)
-        outstanding_amount = invoice.total_cents - total_paid
-        
-        if outstanding_amount <= 0:
-            raise ValueError("Invoice is already fully paid")
-        
-        # Create payment for outstanding amount
-        payment = await self.create_payment(
-            amount_cents=outstanding_amount,
-            payment_date=payment_date or datetime.now(timezone.utc),
-            customer_id=invoice.customer_id,
-            payment_method=payment_method,
-            reference=reference or f"Payment for {invoice.invoice_number}",
-            notes=notes,
+        if outstanding <= 0:
+            raise ValueError("Deze factuur is al volledig betaald.")
+        return await self.record_partial_payment(
+            invoice_id, outstanding, payment_date, payment_method, reference, notes
         )
-        
-        # Allocate full amount to invoice
-        allocation = await self.allocate_payment_to_invoice(
-            payment_id=payment.id,
-            invoice_id=invoice_id,
-            allocated_amount_cents=outstanding_amount,
-            notes=f"Full payment for invoice {invoice.invoice_number}",
-        )
-        
-        return payment, allocation
-    
-    async def mark_invoice_unpaid(self, invoice_id: UUID) -> None:
-        """
-        Mark an invoice as unpaid by removing all payment allocations.
-        
-        This reverses all payments allocated to the invoice.
-        
-        Args:
-            invoice_id: Invoice to mark as unpaid
-        """
-        # Get all allocations for this invoice
-        result = await self.db.execute(
-            select(ZZPPaymentAllocation)
-            .where(ZZPPaymentAllocation.invoice_id == invoice_id)
-        )
-        allocations = result.scalars().all()
-        
-        # Delete all allocations
-        for allocation in allocations:
-            await self.db.delete(allocation)
-        
-        await self.db.flush()
-        
-        # Update invoice status
-        await self.update_invoice_payment_status(invoice_id)
-    
+
     async def record_partial_payment(
         self,
         invoice_id: UUID,
@@ -310,109 +238,106 @@ class PaymentService:
         payment_method: str = "bank_transfer",
         reference: Optional[str] = None,
         notes: Optional[str] = None,
-    ) -> Tuple[ZZPPayment, ZZPPaymentAllocation]:
-        """
-        Record a partial payment on an invoice.
-        
-        Args:
-            invoice_id: Invoice to pay
-            amount_cents: Partial payment amount
-            payment_date: When payment was received
-            payment_method: How payment was made
-            reference: Payment reference
-            notes: Payment notes
-            
-        Returns:
-            Tuple of (payment, allocation)
-        """
-        # Get invoice
-        invoice_result = await self.db.execute(
-            select(ZZPInvoice)
-            .where(
-                ZZPInvoice.id == invoice_id,
-                ZZPInvoice.administration_id == self.administration_id
-            )
-        )
-        invoice = invoice_result.scalar_one_or_none()
-        
-        if not invoice:
-            raise ValueError("Invoice not found")
-        
-        # Validate amount
-        total_paid = await self.get_invoice_paid_amount(invoice_id)
-        outstanding_amount = invoice.total_cents - total_paid
-        
-        if amount_cents > outstanding_amount:
+    ):
+        invoice = await self._invoice(invoice_id, lock=True)
+        if invoice.status not in ("sent", "overdue"):
             raise ValueError(
-                f"Payment amount ({amount_cents}) exceeds outstanding amount ({outstanding_amount})"
+                "Alleen een verzonden of vervallen factuur kan worden betaald."
             )
-        
-        # Create payment
+        payment_date = self._date(payment_date)
+        await require_open_dates(
+            self.db, self.administration_id, invoice.issue_date, payment_date.date()
+        )
+        outstanding = invoice.total_cents - await self.get_invoice_paid_amount(
+            invoice_id
+        )
+        if amount_cents <= 0 or amount_cents > outstanding:
+            raise ValueError("Het bedrag overschrijdt het openstaande bedrag.")
         payment = await self.create_payment(
-            amount_cents=amount_cents,
-            payment_date=payment_date or datetime.now(timezone.utc),
-            customer_id=invoice.customer_id,
-            payment_method=payment_method,
-            reference=reference or f"Partial payment for {invoice.invoice_number}",
-            notes=notes,
+            amount_cents,
+            payment_date,
+            invoice.customer_id,
+            payment_method,
+            reference or f"Betaling {invoice.invoice_number}",
+            notes,
         )
-        
-        # Allocate to invoice
         allocation = await self.allocate_payment_to_invoice(
-            payment_id=payment.id,
-            invoice_id=invoice_id,
-            allocated_amount_cents=amount_cents,
-            notes=f"Partial payment for invoice {invoice.invoice_number}",
+            payment.id, invoice_id, amount_cents, notes
         )
-        
         return payment, allocation
-    
+
+    async def mark_invoice_unpaid(self, invoice_id: UUID) -> None:
+        invoice = await self._invoice(invoice_id, lock=True)
+        result = await self.db.execute(
+            select(ZZPPaymentAllocation, ZZPPayment)
+            .join(ZZPPayment)
+            .where(
+                ZZPPaymentAllocation.invoice_id == invoice.id,
+                ZZPPayment.administration_id == self.administration_id,
+            )
+            .order_by(ZZPPayment.id)
+            .with_for_update()
+        )
+        rows = result.all()
+        await require_open_dates(
+            self.db,
+            self.administration_id,
+            invoice.issue_date,
+            invoice.paid_at.date() if invoice.paid_at else None,
+            *(payment.payment_date.date() for _, payment in rows),
+        )
+        for allocation, payment in rows:
+            await sync_payment_allocation(
+                self.db,
+                self.administration_id,
+                invoice,
+                payment,
+                allocation,
+                reverse=True,
+            )
+            await self.db.delete(allocation)
+        # Clear legacy status-only payments before recalculating from remaining allocations.
+        invoice.status = "sent" if invoice.status == "paid" else invoice.status
+        invoice.amount_paid_cents = 0
+        invoice.paid_at = None
+        await self.db.flush()
+        for payment in {payment.id: payment for _, payment in rows}.values():
+            remaining = await self.db.scalar(
+                select(func.count(ZZPPaymentAllocation.id)).where(
+                    ZZPPaymentAllocation.payment_id == payment.id
+                )
+            )
+            if not remaining:
+                payment.status = PaymentStatus.REVERSED.value
+        await self.update_invoice_payment_status(invoice_id)
+
     async def get_invoice_payment_summary(self, invoice_id: UUID) -> dict:
-        """
-        Get payment summary for an invoice.
-        
-        Args:
-            invoice_id: Invoice to get summary for
-            
-        Returns:
-            Dictionary with payment summary
-        """
-        # Get invoice
-        invoice_result = await self.db.execute(
-            select(ZZPInvoice)
-            .where(
-                ZZPInvoice.id == invoice_id,
-                ZZPInvoice.administration_id == self.administration_id
+        invoice = await self._invoice(invoice_id)
+        payments = (
+            (
+                await self.db.execute(
+                    select(ZZPPayment)
+                    .join(ZZPPaymentAllocation)
+                    .options(selectinload(ZZPPayment.allocations))
+                    .where(
+                        ZZPPaymentAllocation.invoice_id == invoice_id,
+                        ZZPPayment.administration_id == self.administration_id,
+                        ZZPPayment.status == PaymentStatus.COMPLETED.value,
+                    )
+                    .order_by(ZZPPayment.payment_date.desc())
+                )
             )
+            .scalars()
+            .unique()
+            .all()
         )
-        invoice = invoice_result.scalar_one_or_none()
-        
-        if not invoice:
-            raise ValueError("Invoice not found")
-        
-        # Get all payments for this invoice
-        payments_result = await self.db.execute(
-            select(ZZPPayment)
-            .join(ZZPPaymentAllocation)
-            .options(selectinload(ZZPPayment.allocations))
-            .where(
-                ZZPPaymentAllocation.invoice_id == invoice_id,
-                ZZPPayment.status == PaymentStatus.COMPLETED.value
-            )
-            .order_by(ZZPPayment.payment_date.desc())
+        paid = await self.get_invoice_paid_amount(invoice_id)
+        return dict(
+            invoice_id=invoice.id,
+            invoice_number=invoice.invoice_number,
+            invoice_total_cents=invoice.total_cents,
+            total_paid_cents=paid,
+            total_outstanding_cents=max(0, invoice.total_cents - paid),
+            is_fully_paid=paid >= invoice.total_cents,
+            payments=payments,
         )
-        payments = payments_result.scalars().unique().all()
-        
-        # Calculate totals
-        total_paid = await self.get_invoice_paid_amount(invoice_id)
-        outstanding = invoice.total_cents - total_paid
-        
-        return {
-            "invoice_id": invoice_id,
-            "invoice_number": invoice.invoice_number,
-            "invoice_total_cents": invoice.total_cents,
-            "total_paid_cents": total_paid,
-            "total_outstanding_cents": outstanding,
-            "is_fully_paid": total_paid >= invoice.total_cents,
-            "payments": payments,
-        }

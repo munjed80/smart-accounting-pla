@@ -32,7 +32,7 @@ from app.models.zzp import (
     BusinessProfile,
     InvoiceStatus,
 )
-from app.models.administration import Administration, AdministrationMember
+from app.models.administration import Administration
 from app.schemas.zzp import (
     InvoiceCreate, InvoicePreview,
     InvoiceUpdate,
@@ -52,7 +52,6 @@ from app.services.zzp_integrity import require_open_dates, sync_invoice
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
 
 
 @router.post('/invoices/preview')
@@ -513,6 +512,7 @@ async def update_invoice_status(
     
     administration = await get_user_administration(current_user.id, db)
     
+    await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
     result = await db.execute(
         select(ZZPInvoice)
         .options(selectinload(ZZPInvoice.lines))
@@ -558,20 +558,22 @@ async def update_invoice_status(
     
     if current_status == InvoiceStatus.DRAFT.value and new_status == InvoiceStatus.SENT.value:
         await refresh_seller_snapshot(invoice, administration.id, db)
-    invoice.status = new_status
-    
-    # Update paid_at timestamp based on status change
-    if new_status == InvoiceStatus.PAID.value:
-        # Mark as paid: set paid_at to current time (timezone-aware)
-        invoice.paid_at = datetime.now(timezone.utc)
-        invoice.amount_paid_cents = invoice.total_cents
-    elif current_status == InvoiceStatus.PAID.value and new_status != InvoiceStatus.PAID.value:
-        # Mark as unpaid (transitioning from paid to another status): clear paid_at
-        invoice.paid_at = None
-        invoice.amount_paid_cents = 0
-    
-    await db.flush()
-    await sync_invoice(db, administration.id, invoice)
+    # Route status-only payment requests through the same allocation service.
+    from app.services.payment_service import PaymentService
+    payment_service = PaymentService(db, administration.id)
+    if new_status == 'paid':
+        try:
+            await payment_service.mark_invoice_paid(invoice.id)
+        except ValueError as exc:
+            raise HTTPException(400, detail={'code': 'INVALID_REQUEST', 'message': str(exc)}) from exc
+    elif current_status == 'paid':
+        await payment_service.mark_invoice_unpaid(invoice.id)
+    else:
+        if new_status == 'cancelled' and invoice.amount_paid_cents > 0:
+            raise HTTPException(409, detail={'code': 'INVOICE_HAS_PAYMENTS', 'message': 'Maak de betalingen eerst ongedaan.'})
+        invoice.status = new_status
+        await db.flush()
+        await sync_invoice(db, administration.id, invoice)
     await db.commit()
 
     # Refresh invoice with lines eagerly loaded
@@ -600,6 +602,7 @@ async def delete_invoice(
     
     administration = await get_user_administration(current_user.id, db)
     
+    await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
     result = await db.execute(
         select(ZZPInvoice).where(
             ZZPInvoice.id == invoice_id,
@@ -701,6 +704,7 @@ async def send_invoice(
     administration = await get_user_administration(current_user.id, db)
     
     # Fetch invoice with lines and customer (need customer for email)
+    await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
     result = await db.execute(
         select(ZZPInvoice)
         .options(

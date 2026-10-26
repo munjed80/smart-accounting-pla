@@ -12,6 +12,8 @@ Metrics provided per quarter:
 - Net VAT to pay or reclaim
 - Validation warnings for missing or suspicious data
 """
+
+from app.services.zzp_administration import get_user_administration
 import logging
 import xml.etree.ElementTree as ET
 from datetime import datetime, date, timedelta, timezone
@@ -33,7 +35,7 @@ from app.models.zzp import (
     InvoiceStatus,
     BusinessProfile,
 )
-from app.models.administration import Administration, AdministrationMember
+from app.models.administration import Administration
 from app.api.v1.deps import CurrentUser, require_zzp
 
 logger = logging.getLogger(__name__)
@@ -164,29 +166,6 @@ class BTWAangifteResponse(BaseModel):
 # ============================================================================
 # Helper Functions
 # ============================================================================
-
-async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
-    """Get the primary administration for a ZZP user."""
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(AdministrationMember.user_id == user_id)
-        .where(Administration.is_active == True)
-        .order_by(Administration.created_at)
-        .limit(1)
-    )
-    administration = result.scalar_one_or_none()
-
-    if not administration:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "code": "NO_ADMINISTRATION",
-                "message": "Geen administratie gevonden. Voltooi eerst de onboarding."
-            }
-        )
-
-    return administration
 
 
 def get_quarter_info(target_date: date) -> tuple:

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ledger import AccountingPeriod, PeriodStatus
+from app.models.payment import ZZPPayment, ZZPPaymentAllocation
 from app.repositories.ledger_repository import LedgerRepository
 from app.services.ledger_service import LedgerPostingService, MissingLedgerAccountError
 
@@ -54,7 +55,11 @@ async def sync_invoice(db: AsyncSession, administration_id: UUID, invoice, *, de
                 await service.reverse_source('INVOICE', invoice.id)
             else:
                 await service.post_invoice(invoice.id)
-                if invoice.status == 'paid':
+                allocated = await db.scalar(select(ZZPPaymentAllocation.id).join(ZZPPayment).where(
+                    ZZPPaymentAllocation.invoice_id == invoice.id,
+                    ZZPPayment.administration_id == administration_id, ZZPPayment.status == 'completed',
+                ).limit(1))
+                if invoice.status == 'paid' and not allocated:
                     await service.post_invoice_payment(invoice.id)
                 else:
                     await service.reverse_source('INVOICE_PAYMENT', invoice.id)
@@ -63,3 +68,21 @@ async def sync_invoice(db: AsyncSession, administration_id: UUID, invoice, *, de
             await db.rollback()
             raise HTTPException(409, detail={'code': 'LEDGER_ACCOUNT_MISSING', 'message': str(exc)}) from exc
         logger.warning('Invoice saved without posting: %s', exc)
+
+
+async def sync_payment_allocation(db: AsyncSession, administration_id: UUID, invoice, payment, allocation, *, reverse=False):
+    """Post each receipt on its actual payment date; preserve immutable reversals."""
+    service = LedgerPostingService(LedgerRepository(db, administration_id))
+    active = (await service.repository.active_entries('INVOICE', invoice.id)
+              + await service.repository.active_entries('PAYMENT_ALLOCATION', allocation.id))
+    try:
+        async with db.begin_nested():
+            if reverse:
+                await service.reverse_source('PAYMENT_ALLOCATION', allocation.id)
+            else:
+                await service.post_payment_allocation(invoice, payment, allocation)
+    except MissingLedgerAccountError as exc:
+        if active:
+            await db.rollback()
+            raise HTTPException(409, detail={'code': 'LEDGER_ACCOUNT_MISSING', 'message': str(exc)}) from exc
+        logger.warning('Payment saved without posting: %s', exc)

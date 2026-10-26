@@ -3,6 +3,9 @@ ZZP Expenses API Endpoints
 
 CRUD operations for ZZP expenses with filtering by month/category.
 """
+
+from app.services.money import calculate_vat_amount
+from app.services.zzp_administration import get_user_administration
 from datetime import date
 from decimal import Decimal
 from typing import Annotated, Optional
@@ -14,9 +17,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.models.zzp import ZZPExpense
+from app.models.zzp import ZZPExpense, ZZPDocument, ZZPDocStatus
 from app.models.financial_commitment import CommitmentStatus, FinancialCommitment, RecurringFrequency
-from app.models.administration import Administration, AdministrationMember
+from app.models.administration import Administration
 from app.models.ledger import AccountingPeriod, PeriodStatus
 from app.schemas.zzp import (
     ExpenseCreate,
@@ -30,30 +33,21 @@ from app.services.zzp_integrity import require_open_dates, sync_expense
 router = APIRouter()
 
 
-async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
-    """
-    Get the primary administration for a ZZP user.
-    """
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(AdministrationMember.user_id == user_id)
-        .where(Administration.is_active == True)
-        .order_by(Administration.created_at)
-        .limit(1)
-    )
-    administration = result.scalar_one_or_none()
-    
-    if not administration:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "code": "NO_ADMINISTRATION",
-                "message": "Geen administratie gevonden. Voltooi eerst de onboarding."
-            }
-        )
-    
-    return administration
+async def _link_document(db, administration_id, document_id, expense_id=None):
+    if document_id is None:
+        return None
+    document = await db.scalar(select(ZZPDocument).where(
+        ZZPDocument.id == document_id, ZZPDocument.administration_id == administration_id,
+    ).with_for_update())
+    if document is None:
+        raise HTTPException(404, detail={'code': 'DOCUMENT_NOT_FOUND', 'message': 'Bonnetje niet gevonden.'})
+    query = select(ZZPExpense.id).where(ZZPExpense.document_id == document_id)
+    if expense_id is not None:
+        query = query.where(ZZPExpense.id != expense_id)
+    if await db.scalar(query.limit(1)):
+        raise HTTPException(409, detail={'code': 'DOCUMENT_HAS_EXPENSE', 'message': 'Dit bonnetje is al gekoppeld aan een uitgave.'})
+    document.status = ZZPDocStatus.PROCESSED
+    return document
 
 
 async def refresh_commitment_dates(db, administration_id, *ids):
@@ -67,17 +61,6 @@ async def refresh_commitment_dates(db, administration_id, *ids):
                 ZZPExpense.administration_id == administration_id,
                 ZZPExpense.commitment_id == commitment_id,
             ))
-
-
-def calculate_vat_amount(amount_cents: int, vat_rate: float) -> int:
-    """Calculate VAT amount from total amount (including VAT)."""
-    # Assuming amount_cents is including VAT, calculate the VAT portion
-    # amount_with_vat = amount_excl * (1 + vat_rate/100)
-    # vat = amount_with_vat - amount_excl = amount_with_vat * (vat_rate / (100 + vat_rate))
-    vat_amount = int(Decimal(str(amount_cents)) * Decimal(str(vat_rate)) / (Decimal('100') + Decimal(str(vat_rate))))
-    return vat_amount
-
-
 
 
 def get_period_key(expense_date: date, frequency: Optional[RecurringFrequency]) -> str:
@@ -101,6 +84,7 @@ def expense_to_response(expense: ZZPExpense) -> ExpenseResponse:
         category=expense.category,
         notes=expense.notes,
         attachment_url=expense.attachment_url,
+        document_id=expense.document_id,
         commitment_id=expense.commitment_id,
         created_at=expense.created_at,
         updated_at=expense.updated_at,
@@ -224,6 +208,7 @@ async def create_expense(
     else:
         period_key = None
 
+    document = await _link_document(db, administration.id, expense_in.document_id)
     # Calculate VAT amount
     vat_amount = calculate_vat_amount(expense_in.amount_cents, expense_in.vat_rate)
     
@@ -238,6 +223,7 @@ async def create_expense(
         category=expense_in.category,
         notes=expense_in.notes,
         attachment_url=expense_in.attachment_url,
+        document_id=document.id if document else None,
         commitment_id=expense_in.commitment_id,
         period_key=period_key,
     )
@@ -327,6 +313,8 @@ async def update_expense(
     # Update fields
     update_data = expense_in.model_dump(exclude_unset=True)
     
+    if 'document_id' in update_data:
+        await _link_document(db, administration.id, update_data['document_id'], expense.id)
     old_commitment_id = expense.commitment_id
     target_commitment_id = update_data.get('commitment_id', expense.commitment_id)
     target_date = date.fromisoformat(update_data['expense_date']) if update_data.get('expense_date') else expense.expense_date
@@ -424,54 +412,19 @@ async def list_expense_categories(
     return {"categories": EXPENSE_CATEGORIES}
 
 
-@router.post("/expenses/scan")
-async def scan_receipt(
-    current_user: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    file: UploadFile = File(...),
-):
-    """
-    Upload a receipt photo as an attachment to an expense.
-    
-    Accepts an image file (JPEG, PNG) and stores it for reference.
-    Returns empty extracted data — the user fills in the form manually.
-    """
+@router.post('/expenses/scan')
+async def scan_receipt(current_user: CurrentUser,
+                       db: Annotated[AsyncSession, Depends(get_db)], file: UploadFile = File(...)):
     require_zzp(current_user)
-    
-    # Verify user has administration
     administration = await get_user_administration(current_user.id, db)
-    
-    # Validate file type
-    if not file.content_type or not file.content_type.startswith('image/'):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Ongeldig bestandstype. Upload een afbeelding (JPEG, PNG, etc.)"
-        )
-    
-    try:
-        # Read file contents to validate it's a real image
-        contents = await file.read()
-        
-        from datetime import datetime
-        
-        # Return empty data for manual entry — no fake OCR
-        return {
-            "extracted_data": {
-                "vendor": "",
-                "description": "",
-                "amount_cents": 0,
-                "expense_date": datetime.now().date().isoformat(),
-                "category": "overig",
-                "vat_rate": 21.0,
-                "notes": f"Foto bijgevoegd: {file.filename}"
-            },
-            "status": "manual_entry",
-            "message": "Foto toegevoegd. Vul het formulier handmatig in."
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Kon het bestand niet verwerken: {str(e)}"
-        )
-    finally:
-        await file.close()
+    from app.services.receipt_storage import save_receipt
+    document = await save_receipt(db, administration.id, current_user.id, file)
+    return {
+        'extracted_data': {
+            'vendor': '', 'description': '', 'amount_cents': 0,
+            'expense_date': date.today().isoformat(), 'category': 'overig', 'vat_rate': 21,
+            'document_id': str(document.id),
+        },
+        'status': 'manual_entry',
+        'message': 'Bonnetje opgeslagen. Vul de gegevens handmatig in.',
+    }

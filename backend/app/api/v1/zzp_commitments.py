@@ -1,3 +1,6 @@
+
+from app.services.money import calculate_vat_amount as _calculate_vat_amount
+from app.services.zzp_administration import get_user_administration
 import calendar
 from datetime import date, timedelta
 from decimal import Decimal
@@ -12,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import CurrentUser, require_zzp
 from app.core.database import get_db
-from app.models.administration import Administration, AdministrationMember
+from app.models.administration import Administration
 from app.models.bank import BankTransaction
 from app.models.financial_commitment import CommitmentStatus, CommitmentType, FinancialCommitment, RecurringFrequency
 from app.models.ledger import AccountingPeriod, PeriodStatus
@@ -57,21 +60,6 @@ def add_years(base: date, years: int) -> date:
 def with_day(base: date, day: int) -> date:
     max_day = calendar.monthrange(base.year, base.month)[1]
     return date(base.year, base.month, min(day, max_day))
-
-
-async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(AdministrationMember.user_id == user_id)
-        .where(Administration.is_active == True)
-        .order_by(Administration.created_at)
-        .limit(1)
-    )
-    administration = result.scalar_one_or_none()
-    if not administration:
-        raise HTTPException(status_code=404, detail={"code": "NO_ADMINISTRATION", "message": "Geen administratie gevonden."})
-    return administration
 
 
 def _normalize_status(item: FinancialCommitment, today: date) -> CommitmentStatus:
@@ -507,8 +495,6 @@ async def patch_commitment(
     return to_response(item)
 
 
-
-
 def _compute_next_due_from_booked(item: FinancialCommitment, booked_date: date) -> Optional[date]:
     if _normalize_status(item, booked_date) != CommitmentStatus.ACTIVE:
         return None
@@ -537,12 +523,6 @@ def _period_key(expense_date: date, frequency: Optional[RecurringFrequency]) -> 
     if frequency == RecurringFrequency.QUARTERLY:
         return f'{expense_date.year}-Q{(expense_date.month - 1) // 3 + 1}'
     return expense_date.strftime('%Y-%m')
-
-
-def _calculate_vat_amount(amount_cents: int, vat_rate: int) -> int:
-    if vat_rate == 0:
-        return 0
-    return int(Decimal(str(amount_cents)) * Decimal(str(vat_rate)) / (Decimal('100') + Decimal(str(vat_rate))))
 
 
 @router.post('/{commitment_id}/create-expense', status_code=status.HTTP_201_CREATED)

@@ -1,4 +1,7 @@
 """Shared invoice numbering, snapshots, arithmetic and response conversion."""
+
+from app.services.money import calculate_line_totals
+from app.services.zzp_administration import get_user_administration
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID
@@ -7,7 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.administration import Administration, AdministrationMember
+from app.models.administration import Administration
 from app.models.zzp import (
     ZZPInvoice,
     ZZPInvoiceCounter, BusinessProfile,
@@ -16,30 +19,6 @@ from app.schemas.zzp import (
     InvoiceLineResponse,
     InvoiceResponse,
 )
-
-
-async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
-    """Get the primary administration for a ZZP user."""
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(AdministrationMember.user_id == user_id)
-        .where(Administration.is_active == True)
-        .order_by(Administration.created_at)
-        .limit(1)
-    )
-    administration = result.scalar_one_or_none()
-
-    if not administration:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "code": "NO_ADMINISTRATION",
-                "message": "Geen administratie gevonden. Voltooi eerst de onboarding."
-            }
-        )
-
-    return administration
 
 
 async def refresh_seller_snapshot(invoice, administration_id, db):
@@ -94,13 +73,6 @@ async def generate_invoice_number(admin_id: UUID, db: AsyncSession) -> str:
         if exists is None:
             return invoice_number
         counter.counter += 1
-
-
-def calculate_line_totals(quantity: float, unit_price_cents: int, vat_rate: float) -> tuple[int, int]:
-    """Calculate line total and VAT amount in cents."""
-    line_total = int((Decimal(str(quantity)) * Decimal(str(unit_price_cents))).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-    vat_amount = int((Decimal(str(line_total)) * Decimal(str(vat_rate)) / Decimal('100')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
-    return line_total, vat_amount
 
 
 def invoice_to_response(invoice: ZZPInvoice) -> InvoiceResponse:

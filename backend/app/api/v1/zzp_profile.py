@@ -4,6 +4,8 @@ ZZP Business Profile API Endpoints
 GET/PUT operations for business profile (1:1 with administration).
 Used for invoice seller details.
 """
+
+from app.services.zzp_administration import get_user_administration
 from typing import Annotated
 from uuid import UUID
 
@@ -13,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.zzp import BusinessProfile
-from app.models.administration import Administration, AdministrationMember
+from app.models.administration import Administration
 from app.schemas.zzp import (
     BusinessProfileCreate,
     BusinessProfileUpdate,
@@ -22,35 +24,6 @@ from app.schemas.zzp import (
 from app.api.v1.deps import CurrentUser, require_zzp
 
 router = APIRouter()
-
-
-async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
-    """
-    Get the primary administration for a ZZP user.
-    
-    ZZP users typically have one administration (their own business).
-    Returns the first active administration where the user is a member.
-    """
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(AdministrationMember.user_id == user_id)
-        .where(Administration.is_active == True)
-        .order_by(Administration.created_at)
-        .limit(1)
-    )
-    administration = result.scalar_one_or_none()
-    
-    if not administration:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "code": "NO_ADMINISTRATION",
-                "message": "Geen administratie gevonden. Voltooi eerst de onboarding."
-            }
-        )
-    
-    return administration
 
 
 @router.get("/profile", response_model=BusinessProfileResponse)

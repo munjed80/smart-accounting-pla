@@ -105,6 +105,26 @@ class LedgerPostingService:
             lines=[line.__dict__ for line in lines],
         )
 
+    async def post_payment_allocation(self, invoice, payment, allocation) -> None:
+        if any(item.administration_id != self.repository.administration_id for item in (invoice, payment)):
+            raise LedgerPostingError('Payment does not belong to this administration')
+        if allocation.invoice_id != invoice.id or allocation.payment_id != payment.id:
+            raise LedgerPostingError('Allocation does not match payment and invoice')
+        if await self.repository.has_posted_entry_for_reference('PAYMENT_ALLOCATION', allocation.id):
+            return
+        await self.post_invoice(invoice.id)
+        bank = await self._require_account('1100')
+        ar = await self._require_account('1300')
+        amount = self._cents_to_decimal(allocation.allocated_amount_cents)
+        if amount <= 0:
+            raise LedgerPostingError('Cannot post a non-positive payment')
+        await self.repository.create_journal_entry(
+            entry_date=payment.payment_date.date(), description=f'Betaling factuur {invoice.invoice_number}',
+            reference=payment.reference, source_type='PAYMENT_ALLOCATION', source_id=allocation.id,
+            lines=[dict(account_id=bank.id, debit_amount=amount),
+                   dict(account_id=ar.id, credit_amount=amount)],
+        )
+
     async def post_expense(self, expense_id: uuid.UUID) -> None:
         expense = await self.repository.get_expense(expense_id)
         if not expense:

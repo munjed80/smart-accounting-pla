@@ -6,6 +6,9 @@ Follows the same preview → confirm pattern:
   1. Upload CSV → preview first 5 rows, validate, report errors
   2. Confirm → actually create records, skip invalid rows
 """
+
+from app.services.money import calculate_vat_amount
+from app.services.zzp_administration import get_user_administration
 import csv
 import io
 import re
@@ -20,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.zzp import ZZPCustomer, ZZPInvoice, ZZPInvoiceLine, ZZPExpense
-from app.models.administration import Administration, AdministrationMember
+from app.models.administration import Administration
 from app.schemas.zzp import EXPENSE_CATEGORIES
 from app.schemas.zzp_import import (
     ImportRowError,
@@ -42,27 +45,6 @@ MAX_IMPORT_ROWS = 500
 # =============================================================================
 # Helper Functions (reuse bank-import patterns)
 # =============================================================================
-
-async def get_user_administration(user_id: uuid.UUID, db: AsyncSession) -> Administration:
-    """Get the primary administration for a ZZP user."""
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(AdministrationMember.user_id == user_id)
-        .where(Administration.is_active == True)
-        .order_by(Administration.created_at)
-        .limit(1)
-    )
-    administration = result.scalar_one_or_none()
-    if not administration:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "code": "NO_ADMINISTRATION",
-                "message": "Geen administratie gevonden. Voltooi eerst de onboarding.",
-            },
-        )
-    return administration
 
 
 def read_csv(file_bytes: bytes) -> Tuple[List[str], List[dict]]:
@@ -686,11 +668,6 @@ def validate_expense_row(row: dict, row_num: int) -> Tuple[dict, List[ImportRowE
         data["vendor"] = leverancier[:255]
 
     return data, errors
-
-
-def calculate_vat_amount(amount_cents: int, vat_rate: float) -> int:
-    """Calculate VAT amount from total amount (including VAT)."""
-    return int(Decimal(str(amount_cents)) * Decimal(str(vat_rate)) / (Decimal("100") + Decimal(str(vat_rate))))
 
 
 @router.post("/import/expenses", response_model=ExpenseImportPreviewResponse)

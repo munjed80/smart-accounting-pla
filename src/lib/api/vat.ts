@@ -76,7 +76,7 @@ export interface VATSubmission {
   created_at: string
   created_by: string
   method: 'PACKAGE' | 'DIGIPOORT'
-  status: 'DRAFT' | 'SUBMITTED' | 'CONFIRMED' | 'REJECTED'
+  status: 'DRAFT' | 'QUEUED' | 'SUBMITTED' | 'RECEIVED' | 'ACCEPTED' | 'CONFIRMED' | 'REJECTED' | 'FAILED'
   reference_text?: string
   attachment_url?: string
   submitted_at?: string
@@ -137,8 +137,8 @@ export const vatApi = {
     return response.data as Blob
   },
 
-  listSubmissions: async (clientId: string, periodId?: string): Promise<VATSubmissionListResponse> => {
-    const params = periodId ? { period_id: periodId } : {}
+  listSubmissions: async (clientId: string, periodId?: string, page = 1, pageSize = 20): Promise<VATSubmissionListResponse> => {
+    const params = { page, page_size: pageSize, ...(periodId ? { period_id: periodId } : {}) }
     const response = await api.get<VATSubmissionListResponse>(
       `/accountant/clients/${clientId}/vat/submissions`,
       { params }

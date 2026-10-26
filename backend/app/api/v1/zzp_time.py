@@ -1,3 +1,5 @@
+
+from app.services.zzp_administration import get_user_administration
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Annotated, Optional
@@ -10,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1._zzp_invoices_helpers import generate_invoice_number, refresh_seller_snapshot
 from app.api.v1.deps import CurrentUser, require_zzp
 from app.core.database import get_db
-from app.models.administration import Administration, AdministrationMember
+from app.models.administration import Administration
 from app.models.zzp import (
     BusinessProfile,
     InvoiceStatus,
@@ -61,24 +63,6 @@ def entry_to_response(entry: ZZPTimeEntry) -> TimeEntryOut:
         created_at=entry.created_at,
         updated_at=entry.updated_at,
     )
-
-
-async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(AdministrationMember.user_id == user_id)
-        .where(Administration.is_active.is_(True))
-        .order_by(Administration.created_at)
-        .limit(1)
-    )
-    administration = result.scalar_one_or_none()
-    if not administration:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "NO_ADMINISTRATION", "message": "Geen administratie gevonden."},
-        )
-    return administration
 
 
 @router.post("/time-entries", response_model=TimeEntryOut, status_code=201)

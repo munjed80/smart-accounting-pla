@@ -583,6 +583,7 @@ export interface ZZPExpense {
   vat_amount_cents: number
   category: string
   notes?: string
+  document_id?: string | null
   attachment_url?: string
   commitment_id?: string | null
   created_at: string
@@ -597,6 +598,7 @@ export interface ZZPExpenseCreate {
   vat_rate: number
   category: string
   notes?: string
+  document_id?: string | null
   attachment_url?: string
   commitment_id?: string
 }
@@ -1121,14 +1123,14 @@ export const zzpApi = {
         notes?: string 
       }
     ): Promise<void> => {
-      await api.post(`/zzp/payments/invoices/${invoiceId}/mark-paid`, data || {})
+      await api.post(`/zzp/invoices/${invoiceId}/mark-paid`, data || {})
     },
     
     /**
      * Mark an invoice as unpaid by removing payment allocations.
      */
     markUnpaid: async (invoiceId: string): Promise<void> => {
-      await api.post(`/zzp/payments/invoices/${invoiceId}/mark-unpaid`)
+      await api.post(`/zzp/invoices/${invoiceId}/mark-unpaid`)
     },
     
     /**
@@ -1229,6 +1231,9 @@ export const zzpApi = {
   documents: {
     page: async (options: { group: string; q?: string; limit: number; offset: number }): Promise<{ documents: ZZPDocument[]; total: number; counts: Record<string, number> }> => {
       return (await api.get('/zzp/documents/page', { params: options })).data
+    },
+    download: async (documentId: string): Promise<Blob> => {
+      return (await api.get(`/zzp/documents/${documentId}/file`, { responseType: 'blob' })).data
     },
     upload: async (files: File[]): Promise<ZZPDocumentUploadResponse> => {
       const formData = new FormData()

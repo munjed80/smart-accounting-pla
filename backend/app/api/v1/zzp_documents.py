@@ -13,6 +13,7 @@ from uuid import UUID
 
 import aiofiles
 from pydantic import BaseModel
+from fastapi.responses import FileResponse
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +21,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.administration import Administration, AdministrationMember
+from app.models.administration import Administration
 from app.models.zzp import ZZPDocument, ZZPDocStatus, ZZPDocType, ZZPExpense
 from app.schemas.zzp import (
     ZZPDocumentCreateExpenseResponse,
@@ -228,6 +229,20 @@ async def get_document(
     administration = await get_user_administration(current_user.id, db)
     doc = await _get_owned_document(document_id, administration, db)
     return _doc_to_response(doc)
+
+
+@router.get('/documents/{document_id}/file')
+async def download_document(document_id: UUID, current_user: CurrentUser,
+                            db: Annotated[AsyncSession, Depends(get_db)]):
+    require_zzp(current_user)
+    administration = await get_user_administration(current_user.id, db)
+    document = await _get_owned_document(document_id, administration, db)
+    path = Path(document.storage_ref).resolve()
+    root = (Path(settings.UPLOAD_DIR) / 'zzp' / str(administration.id)).resolve()
+    if not path.is_relative_to(root) or not path.is_file():
+        raise HTTPException(404, detail='Bestand niet gevonden.')
+    return FileResponse(path, media_type=document.mime_type, filename=Path(document.filename).name,
+                        headers={'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff'})
 
 
 @router.patch("/documents/{document_id}", response_model=ZZPDocumentResponse)

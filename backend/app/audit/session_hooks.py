@@ -25,6 +25,7 @@ ENTITY_TYPE_MAP: Dict[str, str] = {
     # ZZP Invoice & Expense
     "ZZPInvoice": "invoice",
     "ZZPExpense": "expense",
+    "ZZPVatPolicy": "vat_policy",
     
     # Ledger
     "JournalEntry": "journal_entry",

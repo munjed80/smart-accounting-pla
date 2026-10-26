@@ -184,7 +184,8 @@ async def test_signed_vat_matches_detail_including_undated_paid_history(
     await db_session.commit()
     summary = await get(async_client, auth_headers, "dashboard")
     detail = await get(async_client, auth_headers, "btw-aangifte")
-    assert summary["btw"]["basis"] == "kasstelsel"
+    assert summary["btw"]["basis"] == "unconfirmed"
+    assert summary["btw"]["review_required"]
     assert (
         summary["btw"]["vat_collected_cents"]
         == detail["current_quarter"]["output_vat_cents"]

@@ -395,7 +395,10 @@ class VatSubmissionService:
         """
         from app.core.config import settings
         from app.services.logging import accounting_logger
-        
+
+        if settings.is_production:
+            raise VatSubmissionError('Live Digipoort submission is not available. Prepare a reference package and file separately; sandbox simulation is disabled in production.')
+
         # Get submission
         result = await self.db.execute(
             select(VatSubmission)

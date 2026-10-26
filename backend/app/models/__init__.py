@@ -191,6 +191,7 @@ __all__ = [
     "WebhookEvent",
     "VatBoxLineage",
     "VatSubmission",
+    "ZZPVatPolicy",
     "Certificate",
     "AuditLog",
     "ContactMessage",
@@ -217,3 +218,5 @@ __all__ = [
     "EcommerceMapping",
     "MappingReviewStatus",
 ]
+
+from .zzp_vat_policy import ZZPVatPolicy

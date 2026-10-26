@@ -20,6 +20,8 @@ All backend queries resolve the user's primary active administration; the fronte
 
 ## VAT policy and compatibility
 
+Updated by the [VAT foundation](reviews/zzp-vat-foundation.md): the dashboard now follows the explicitly confirmed basis from its effective date. Unconfirmed periods retain the earlier estimate with a review warning. The description below records the original dashboard implementation, not a confirmed fiscal policy.
+
 This change aligns the dashboard with the existing self-service `kasstelsel` overview; it does not introduce a new tax-accounting policy. That overview currently recognizes VAT on fully paid invoices and recorded expense VAT. Partial receipts are included in cash figures, but are not newly introduced into the existing VAT calculation. The interface labels VAT as an estimate and directs the user to review open invoices and partial payments before preparing a return.
 
 The legacy unsigned `vat_payable_cents` field and invoice-cohort `paid_total` fields remain available to existing consumers. The new chart uses the separate `received_total` field and reports missing receipt data as an error rather than displaying a false zero.

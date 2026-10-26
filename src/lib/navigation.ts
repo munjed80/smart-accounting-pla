@@ -23,4 +23,8 @@ export const navigateTo = (path: string) => {
   
   // Also dispatch popstate for backwards compatibility with existing code
   window.dispatchEvent(new PopStateEvent('popstate'))
+
+  // A new page must not inherit the previous page's scroll position. Browser
+  // back/forward navigation still uses native restoration (no navigateTo call).
+  if (!window.location.hash) window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
 }

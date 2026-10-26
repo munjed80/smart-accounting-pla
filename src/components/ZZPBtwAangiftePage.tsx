@@ -8,7 +8,8 @@
  * Calm, simple, self-service oriented UI for non-accountants.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { VatPolicySetup } from '@/components/VatPolicySetup'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -179,13 +180,16 @@ const HeroCard = ({ overview, quarterMonths }: { overview: BTWQuarterOverview; q
                       variant="outline"
                       className="text-xs border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 cursor-help"
                     >
-                      Voorlopig · {overview.basis === 'kasstelsel' ? 'kasstelsel' : overview.basis}
+                      Voorlopig · {overview.basis === 'unconfirmed' ? 'stelsel niet bevestigd' : overview.basis}
                     </Badge>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs text-xs">
-                    Berekend op {overview.basis === 'kasstelsel' ? 'kasstelsel (cash basis)' : overview.basis}: alleen
-                    betaalde facturen tellen mee voor de af te dragen BTW. Het bedrag is voorlopig totdat je de
-                    aangifte indient bij de Belastingdienst.
+                    {overview.basis === 'factuurstelsel'
+                      ? 'Verstuurde facturen tellen mee op factuurdatum, ook als ze nog niet betaald zijn.'
+                      : overview.basis === 'kasstelsel'
+                        ? 'Gekoppelde ontvangsten tellen mee op betaaldatum, inclusief deelbetalingen.'
+                        : 'Historische schatting op betaalde facturen. Het juiste stelsel is nog niet bevestigd.'}
+                    {' '}Dit overzicht is geen ingediende aangifte.
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -197,7 +201,7 @@ const HeroCard = ({ overview, quarterMonths }: { overview: BTWQuarterOverview; q
           </div>
           <div className="text-sm text-muted-foreground space-y-1 sm:text-right">
             <p>
-              BTW ontvangen: <span className="font-medium text-foreground">{formatCurrency(overview.output_vat_cents)}</span>
+              Verkoop-btw: <span className="font-medium text-foreground">{formatCurrency(overview.output_vat_cents)}</span>
             </p>
             <p>
               Voorbelasting: <span className="font-medium text-emerald-600 dark:text-emerald-300">−{formatCurrencyAbs(overview.input_vat_cents)}</span>
@@ -377,12 +381,9 @@ const SourcesPanel = ({ overview }: { overview: BTWQuarterOverview }) => {
   }> = [
     {
       icon: <FileText size={16} weight="duotone" />,
-      title: 'Betaalde facturen',
-      detail:
-        overview.invoice_summary.paid_count > 0
-          ? `${overview.invoice_summary.paid_count} factuur${overview.invoice_summary.paid_count !== 1 ? 'en' : ''} · ${formatCurrency(overview.invoice_summary.total_omzet_cents)} omzet`
-          : 'Geen betaalde facturen in dit kwartaal',
-      route: '/zzp/invoices?status=paid',
+      title: 'Meegerekende verkoopbedragen',
+      detail: `${overview.recognized_invoice_count ?? overview.invoice_summary.paid_count} facturen · ${formatCurrency(overview.omzet_cents)} omzet volgens ${overview.basis === 'unconfirmed' ? 'historische schatting' : overview.basis}`,
+      route: '/zzp/invoices',
       cta: 'Bekijk facturen',
     },
     {
@@ -401,7 +402,7 @@ const SourcesPanel = ({ overview }: { overview: BTWQuarterOverview }) => {
     items.push({
       icon: <CurrencyEur size={16} weight="duotone" />,
       title: 'Openstaande facturen',
-      detail: `${overview.invoice_summary.sent_count} factuur${overview.invoice_summary.sent_count !== 1 ? 'en' : ''} · ${formatCurrency(overview.unpaid_vat_cents)} BTW (telt nog niet mee op kasstelsel)`,
+      detail: `${overview.invoice_summary.sent_count} factuur${overview.invoice_summary.sent_count !== 1 ? 'en' : ''} · ${formatCurrency(overview.unpaid_vat_cents)} BTW open (${overview.basis === 'factuurstelsel' ? 'meegerekend op factuurdatum' : 'controleer gekoppelde betalingen'})`,
       route: '/zzp/invoices?status=sent',
       cta: 'Bekijk openstaand',
     })
@@ -548,7 +549,7 @@ const QuarterDetail = ({
     setDownloadingXml(true)
     try {
       await zzpBtwApi.downloadXml(selectedYear, selectedQuarter)
-      toast.success('XML gedownload')
+      toast.success('Referentiebestand gedownload; er is geen aangifte verstuurd')
     } catch (err) {
       logApiError(err, 'BTW XML download')
       toast.error('Fout bij downloaden van XML')
@@ -564,11 +565,11 @@ const QuarterDetail = ({
         <StatCard
           label="Omzet (ex. BTW)"
           value={formatCurrency(overview.omzet_cents)}
-          subtitle={`${overview.invoice_summary.paid_count} betaalde facturen`}
+          subtitle={`${overview.recognized_invoice_count ?? overview.invoice_summary.paid_count} facturen meegerekend`}
           icon={<CurrencyEur size={18} weight="duotone" />}
           explainTitle={showExplanations ? 'Wat is dit?' : undefined}
-          explainDescription="Je totale omzet exclusief BTW, berekend uit betaalde facturen dit kwartaal."
-          explainSource="Betaalde facturen (subtotaal)"
+          explainDescription="Verkoopbedragen volgens het aangegeven BTW-stelsel en de gekozen periode."
+          explainSource={overview.basis === 'factuurstelsel' ? 'Verstuurde facturen op factuurdatum' : 'Betalingsverdeling op facturen'}
           explainCheck="Klopt het aantal facturen? Zijn alle betalingen bijgewerkt?"
         />
         <StatCard
@@ -583,7 +584,7 @@ const QuarterDetail = ({
           variant="negative"
           explainTitle={showExplanations ? 'Wat is dit?' : undefined}
           explainDescription="De BTW die je op facturen aan klanten hebt berekend. Dit bedrag moet je afdragen aan de Belastingdienst."
-          explainSource="BTW-bedrag op betaalde facturen"
+          explainSource="BTW op de meegerekende verkoopbedragen"
           explainCheck="Zijn alle facturen met het juiste BTW-tarief aangemaakt?"
         />
         <StatCard
@@ -593,7 +594,7 @@ const QuarterDetail = ({
           icon={<ArrowDown size={18} weight="bold" className="text-green-500" />}
           variant="positive"
           explainTitle={showExplanations ? 'Wat is dit?' : undefined}
-          explainDescription="De BTW die je zelf hebt betaald op zakelijke uitgaven. Dit mag je aftrekken van de af te dragen BTW."
+          explainDescription="Geregistreerde BTW op ontvangen inkoopfacturen. Controleer of deze BTW aftrekbaar is voor jouw onderneming."
           explainSource="BTW op geregistreerde uitgaven"
           explainCheck="Heb je alle bonnetjes en facturen van leveranciers ingevoerd?"
         />
@@ -724,7 +725,7 @@ const QuarterDetail = ({
             />
             <div className="flex-1 space-y-2">
               <h3 className="text-lg font-semibold">
-                {overview.is_ready ? 'Klaar om in te dienen' : 'Nog niet compleet'}
+                {overview.is_ready ? 'Beschikbaar voor controle' : 'Nog niet compleet'}
               </h3>
               <div className="space-y-1">
                 {overview.readiness_notes.map((note, i) => (
@@ -735,7 +736,7 @@ const QuarterDetail = ({
                 <div className="pt-3 space-y-2">
                   <ExplainBlock
                     title="Hoe dien je je BTW-aangifte in?"
-                    description="Log in op Mijn Belastingdienst (mijn.belastingdienst.nl) en vul de bedragen in bij je BTW-aangifte. Je kunt de samenvatting hieronder downloaden als referentie."
+                    description="Controleer de gegevens met je boekhouder en dien je aangifte apart in via Mijn Belastingdienst Zakelijk. Dit XML-bestand is alleen een referentie, geen officieel aangiftebestand. Er wordt vanuit dit overzicht niets verstuurd."
                   />
                   <div className="flex flex-wrap gap-2 pt-2">
                     <Button
@@ -745,7 +746,7 @@ const QuarterDetail = ({
                       disabled={downloadingXml}
                     >
                       <FileXls size={16} className="mr-1" />
-                      {downloadingXml ? 'Downloaden...' : 'Download XML voor Belastingdienst'}
+                      {downloadingXml ? 'Downloaden...' : 'Download referentie-XML'}
                     </Button>
                     <Button
                       variant="outline"
@@ -840,17 +841,23 @@ export const ZZPBtwAangiftePage = () => {
     return years
   }, [currentYear])
 
+  const requestVersion = useRef(0)
+  useEffect(() => () => { requestVersion.current += 1 }, [])
+
   const fetchData = useCallback(async (year: number, quarter: number) => {
+    const version = ++requestVersion.current
     setLoading(true)
     setError(null)
     try {
       const result = await zzpBtwApi.getOverview(year, quarter)
+      if (version !== requestVersion.current) return
       setData(result)
     } catch (err) {
+      if (version !== requestVersion.current) return
       logApiError(err, 'ZZPBtwOverzicht')
       setError('Er is een fout opgetreden bij het laden van je BTW-overzicht. Probeer het later opnieuw.')
     } finally {
-      setLoading(false)
+      if (version === requestVersion.current) setLoading(false)
     }
   }, [])
 
@@ -899,6 +906,10 @@ export const ZZPBtwAangiftePage = () => {
             </>
           }
         />
+
+        {!loading && !error && activeOverview?.policy_confirmed === false && (
+          <VatPolicySetup key={`${selectedYear}:${selectedQuarter}`} policy={data?.vat_policy} year={selectedYear} quarter={selectedQuarter} onSaved={() => fetchData(selectedYear, selectedQuarter)} />
+        )}
 
         {/* Deadline banner */}
         {activeOverview && activeOverview.days_until_deadline > 0 && activeOverview.days_until_deadline <= 30 && (

@@ -1,3 +1,4 @@
+import { STARTER_PRICE_NL } from '@/lib/billingCatalog'
 import { navigateTo } from '@/lib/navigation'
 import { useSeoMeta } from '@/hooks/useSeoMeta'
 import { Button } from '@/components/ui/button'
@@ -9,7 +10,7 @@ import { CookieBanner } from '@/components/marketing/CookieBanner'
 export const PrijzenPage = () => {
   useSeoMeta({
     title: "Pakketten en prijzen | ZZPers Hub",
-    description: "Bekijk de prijzen van ZZPers Hub. Start 1 jaar gratis en maak professionele facturen als zzp'er. Daarna slechts €4,99 per maand. Geen creditcard vereist.",
+    description: `Bekijk de prijzen van ZZPers Hub. Start 1 jaar gratis en maak professionele facturen als zzp'er. Daarna slechts ${STARTER_PRICE_NL} per maand. Geen creditcard vereist.`,
     canonical: 'https://zzpershub.nl/prijzen',
   })
 
@@ -43,7 +44,7 @@ export const PrijzenPage = () => {
                     <p className="text-3xl font-bold text-primary">Gratis</p>
                     <p className="text-sm text-muted-foreground">eerste jaar</p>
                   </div>
-                  <p className="text-lg font-semibold">Daarna €4,99 <span className="text-sm font-normal text-muted-foreground">/ maand</span></p>
+                  <p className="text-lg font-semibold">Daarna {STARTER_PRICE_NL} <span className="text-sm font-normal text-muted-foreground">/ maand</span></p>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2 text-sm lg:text-base">

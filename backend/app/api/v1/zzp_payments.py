@@ -8,6 +8,8 @@ Provides payment management endpoints for ZZP users:
 - Record partial payments
 - View payment history
 """
+
+from app.services.zzp_administration import get_user_administration_id
 from datetime import datetime, timezone
 from typing import Annotated, Optional
 from uuid import UUID
@@ -35,32 +37,6 @@ from app.api.v1.deps import CurrentUser, require_zzp
 
 
 router = APIRouter()
-
-
-async def get_user_administration_id(user_id: UUID, db: AsyncSession) -> UUID:
-    """Get the administration ID for a ZZP user."""
-    from app.models.administration import Administration, AdministrationMember
-    
-    result = await db.execute(
-        select(Administration.id)
-        .join(AdministrationMember)
-        .where(AdministrationMember.user_id == user_id)
-        .where(Administration.is_active == True)
-        .order_by(Administration.created_at)
-        .limit(1)
-    )
-    administration_id = result.scalar_one_or_none()
-    
-    if not administration_id:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "code": "NO_ADMINISTRATION",
-                "message": "Geen administratie gevonden."
-            }
-        )
-    
-    return administration_id
 
 
 def payment_to_response(payment: ZZPPayment) -> PaymentResponse:
@@ -111,6 +87,7 @@ async def list_payments(
     query = (
         select(ZZPPayment)
         .options(selectinload(ZZPPayment.allocations))
+        .execution_options(populate_existing=True)
         .where(ZZPPayment.administration_id == administration_id)
     )
     
@@ -165,6 +142,7 @@ async def create_payment(
     result = await db.execute(
         select(ZZPPayment)
         .options(selectinload(ZZPPayment.allocations))
+        .execution_options(populate_existing=True)
         .where(ZZPPayment.id == payment.id)
     )
     payment = result.scalar_one()
@@ -188,6 +166,7 @@ async def get_payment(
     result = await db.execute(
         select(ZZPPayment)
         .options(selectinload(ZZPPayment.allocations))
+        .execution_options(populate_existing=True)
         .where(
             ZZPPayment.id == payment_id,
             ZZPPayment.administration_id == administration_id
@@ -240,6 +219,7 @@ async def mark_invoice_paid(
         result = await db.execute(
             select(ZZPPayment)
             .options(selectinload(ZZPPayment.allocations))
+        .execution_options(populate_existing=True)
             .where(ZZPPayment.id == payment.id)
         )
         payment = result.scalar_one()
@@ -311,6 +291,7 @@ async def record_partial_payment(
         result = await db.execute(
             select(ZZPPayment)
             .options(selectinload(ZZPPayment.allocations))
+        .execution_options(populate_existing=True)
             .where(ZZPPayment.id == payment.id)
         )
         payment = result.scalar_one()

@@ -34,16 +34,8 @@ SUBSCRIPTION_CURRENCY = "EUR"
 SUBSCRIPTION_INTERVAL = "1 month"
 
 # Plan metadata for Mollie checkout
-PLAN_METADATA = {
-    "starter": {
-        "price": Decimal("4.95"),
-        "description": "Starter abonnement",
-    },
-    "zzp_pro": {
-        "price": Decimal("6.95"),
-        "description": "Pro abonnement",
-    },
-}
+from app.core.billing_catalog import PLAN_METADATA
+
 
 # Default plan for activation when no plan_code is specified
 DEFAULT_ACTIVATE_PLAN = "starter"

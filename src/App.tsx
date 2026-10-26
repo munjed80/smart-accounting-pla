@@ -1,3 +1,4 @@
+import { STARTER_PRICE_NL, PRO_PRICE_NL } from '@/lib/billingCatalog'
 import { isAccountantRole } from '@/lib/roles'
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -233,7 +234,7 @@ const TrialExpiredScreen = ({ onGoToSubscriptions, onLogout }: { onGoToSubscript
       </div>
       <div className="space-y-3 text-left">
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-          <p className="text-sm font-semibold text-blue-900 mb-1">Starter — €4,99/maand</p>
+          <p className="text-sm font-semibold text-blue-900 mb-1">Starter — {STARTER_PRICE_NL}/maand</p>
           <ul className="space-y-1 text-xs text-blue-800">
             <li>✓ Onbeperkt facturen</li>
             <li>✓ Urenregistratie & agenda</li>
@@ -242,7 +243,7 @@ const TrialExpiredScreen = ({ onGoToSubscriptions, onLogout }: { onGoToSubscript
         </div>
         <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
           <p className="text-sm font-semibold text-purple-900 mb-1">
-            Pro — €6,95/maand <span className="font-normal line-through text-purple-400">€11,99</span>
+            Pro — {PRO_PRICE_NL}/maand <span className="font-normal line-through text-purple-400">€11,99</span>
           </p>
           <ul className="space-y-1 text-xs text-purple-800">
             <li>✓ Alles van Starter</li>

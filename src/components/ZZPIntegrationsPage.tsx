@@ -1,3 +1,4 @@
+import { PRO_PRICE_NL } from '@/lib/billingCatalog'
 /**
  * ZZP E-commerce Integrations Page
  *
@@ -379,7 +380,7 @@ function ProUpgradePrompt() {
       <div className="rounded-lg border border-purple-200 bg-purple-50 p-6 max-w-sm w-full">
         <div className="flex items-center gap-2 mb-3">
           <Sparkle className="h-5 w-5 text-purple-600" weight="fill" />
-          <h3 className="font-semibold text-purple-900">Pro — €6,95/maand</h3>
+          <h3 className="font-semibold text-purple-900">Pro — {PRO_PRICE_NL}/maand</h3>
         </div>
         <ul className="space-y-1.5 text-sm text-purple-800 text-left mb-4">
           <li className="flex items-center gap-2"><span className="text-purple-600">✓</span>Shopify & WooCommerce koppeling</li>

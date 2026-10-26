@@ -198,7 +198,7 @@ const TableLoadingSkeleton = () => (
 )
 
 // Expense form dialog
-const ExpenseFormDialog = ({
+export const ExpenseFormDialog = ({
   open,
   onOpenChange,
   expense,
@@ -313,6 +313,7 @@ const ExpenseFormDialog = ({
         vat_rate: vatRate,
         category,
         notes: notes.trim() || undefined,
+        document_id: expense?.document_id || scannedData?.document_id || undefined,
       })
     } finally {
       setIsSubmitting(false)
@@ -514,6 +515,21 @@ const ExpenseFormDialog = ({
           </div>
         </div>
 
+        {(expense?.document_id || scannedData?.document_id) && (
+          <Button type="button" variant="outline" onClick={async () => {
+            try {
+              const blob = await zzpApi.documents.download((expense?.document_id || scannedData?.document_id)!)
+              const url = URL.createObjectURL(blob)
+              const link = document.createElement('a')
+              link.href = url
+              link.download = `bonnetje.${({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'application/pdf': 'pdf' } as Record<string, string>)[blob.type] || 'bin'}`
+              document.body.appendChild(link)
+              link.click()
+              link.remove()
+              window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+            } catch (error) { toast.error(parseApiError(error)) }
+          }}>Bonnetje downloaden</Button>
+        )}
         <DialogFooter className="pt-4 border-t border-border/50 gap-2 sm:gap-0">
           <Button 
             variant="outline" 

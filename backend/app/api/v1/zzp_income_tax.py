@@ -13,6 +13,8 @@ Metrics provided per year:
 - Preparation checklist state
 - Validation warnings for incomplete bookkeeping
 """
+
+from app.services.zzp_administration import get_user_administration
 from datetime import datetime, date, timezone
 from decimal import Decimal
 import logging
@@ -32,7 +34,7 @@ from app.models.zzp import (
     BusinessProfile,
     InvoiceStatus,
 )
-from app.models.administration import Administration, AdministrationMember
+from app.models.administration import Administration
 from app.api.v1.deps import CurrentUser, require_zzp
 
 router = APIRouter()
@@ -151,27 +153,6 @@ CATEGORY_LABELS = {
 # ============================================================================
 # Helper Functions
 # ============================================================================
-
-async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
-    """Get the primary administration for a ZZP user."""
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(AdministrationMember.user_id == user_id)
-        .where(Administration.is_active == True)
-        .order_by(Administration.created_at)
-        .limit(1)
-    )
-    administration = result.scalar_one_or_none()
-    if not administration:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "code": "NO_ADMINISTRATION",
-                "message": "Geen administratie gevonden. Voltooi eerst de onboarding.",
-            },
-        )
-    return administration
 
 
 async def build_year_overview(

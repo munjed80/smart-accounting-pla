@@ -1,3 +1,5 @@
+import { useServerPagination } from '@/hooks/useServerPagination'
+import { ServerPagination } from './ServerPagination'
 /**
  * VAT Submission History Component
  * 
@@ -7,7 +9,7 @@
  * - Reference text and attachments
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -62,7 +64,11 @@ const STATUS_CONFIG = {
 }
 
 export const VATSubmissionHistory = ({ clientId, periodId, onRefresh }: VATSubmissionHistoryProps) => {
-  const [submissions, setSubmissions] = useState<VATSubmission[]>([])
+  const pagination = useServerPagination(`${clientId}:${periodId || ''}`, 20)
+  const { beginRequest, page, pageSize, setTotal } = pagination
+  const requestKey = `${clientId}:${periodId || ''}:${page}`
+  const [result, setResult] = useState<{ key: string; rows: VATSubmission[] }>({ key: '', rows: [] })
+  const submissions = result.key === requestKey ? result.rows : []
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedSubmission, setSelectedSubmission] = useState<VATSubmission | null>(null)
@@ -70,23 +76,25 @@ export const VATSubmissionHistory = ({ clientId, periodId, onRefresh }: VATSubmi
   const [referenceText, setReferenceText] = useState('')
   const [attachmentUrl, setAttachmentUrl] = useState('')
 
-  const loadSubmissions = async () => {
+  const loadSubmissions = useCallback(async () => {
+    const isCurrent = beginRequest()
     try {
       setLoading(true)
       setError(null)
-      const response = await vatApi.listSubmissions(clientId, periodId)
-      setSubmissions(response.submissions)
+      const response = await vatApi.listSubmissions(clientId, periodId, page, pageSize)
+      if (!isCurrent()) return
+      setResult({ key: requestKey, rows: response.submissions })
+      setTotal(response.total_count)
     } catch (err) {
-      setError(getErrorMessage(err))
+      if (isCurrent()) setError(getErrorMessage(err))
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }
+  }, [clientId, periodId, page, pageSize, requestKey, beginRequest, setTotal])
 
   useEffect(() => {
     loadSubmissions()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, periodId])
+  }, [loadSubmissions])
 
   const handleMarkSubmitted = async () => {
     if (!selectedSubmission || !referenceText.trim()) return
@@ -127,6 +135,7 @@ export const VATSubmissionHistory = ({ clientId, periodId, onRefresh }: VATSubmi
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <ServerPagination {...pagination} total={result.key === requestKey ? pagination.total : 0} loading={loading} />
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertDescription>{error}</AlertDescription>
@@ -158,7 +167,10 @@ export const VATSubmissionHistory = ({ clientId, periodId, onRefresh }: VATSubmi
               </TableHeader>
               <TableBody>
                 {submissions.map((submission) => {
-                  const statusConfig = STATUS_CONFIG[submission.status as keyof typeof STATUS_CONFIG]
+                  const statusConfig = STATUS_CONFIG[submission.status as keyof typeof STATUS_CONFIG] || {
+                    label: ({ QUEUED: 'In wachtrij', RECEIVED: 'Ontvangen', ACCEPTED: 'Geaccepteerd', FAILED: 'Mislukt' } as Record<string, string>)[submission.status] || submission.status,
+                    icon: Clock, variant: 'secondary' as const, color: 'text-muted-foreground',
+                  }
                   const StatusIcon = statusConfig.icon
 
                   return (
@@ -192,7 +204,7 @@ export const VATSubmissionHistory = ({ clientId, periodId, onRefresh }: VATSubmi
                       </TableCell>
                       <TableCell className="text-right">
                         {submission.status === 'DRAFT' && (
-                          <Dialog>
+                          <Dialog open={selectedSubmission?.id === submission.id} onOpenChange={(open) => { if (!open) setSelectedSubmission(null) }}>
                             <DialogTrigger asChild>
                               <Button
                                 variant="outline"

@@ -4,6 +4,9 @@ ZZP Quotes (Offertes) API Endpoints
 CRUD operations for ZZP quotes with lines, status transitions,
 race-safe quote number generation, and conversion to invoice.
 """
+
+from app.services.zzp_administration import get_user_administration
+from app.services.money import calculate_line_totals
 from datetime import datetime, date
 from decimal import Decimal
 from typing import Annotated, List, Optional
@@ -26,7 +29,7 @@ from app.models.zzp import (
     QuoteStatus,
     InvoiceStatus,
 )
-from app.models.administration import Administration, AdministrationMember
+from app.models.administration import Administration
 from app.schemas.zzp import (
     QuoteCreate,
     QuoteUpdate,
@@ -41,30 +44,6 @@ from app.api.v1.deps import CurrentUser, require_zzp
 from app.services.invoice_pdf_reportlab import generate_quote_pdf_reportlab, get_quote_pdf_filename
 
 router = APIRouter()
-
-
-async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
-    """Get the primary administration for a ZZP user."""
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(AdministrationMember.user_id == user_id)
-        .where(Administration.is_active.is_(True))
-        .order_by(Administration.created_at)
-        .limit(1)
-    )
-    administration = result.scalar_one_or_none()
-    
-    if not administration:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "code": "NO_ADMINISTRATION",
-                "message": "Geen administratie gevonden. Voltooi eerst de onboarding."
-            }
-        )
-    
-    return administration
 
 
 async def generate_quote_number(admin_id: UUID, db: AsyncSession) -> str:
@@ -184,6 +163,7 @@ async def list_quotes(
         select(ZZPQuote)
         .where(ZZPQuote.administration_id == administration.id)
         .options(selectinload(ZZPQuote.lines))
+        .execution_options(populate_existing=True)
         .order_by(ZZPQuote.created_at.desc(), ZZPQuote.id)
     )
     
@@ -244,6 +224,7 @@ async def get_quote(
         .where(ZZPQuote.id == quote_id)
         .where(ZZPQuote.administration_id == administration.id)
         .options(selectinload(ZZPQuote.lines))
+        .execution_options(populate_existing=True)
     )
     quote = result.scalar_one_or_none()
     
@@ -302,8 +283,7 @@ async def create_quote(
     
     quote_lines = []
     for idx, line_data in enumerate(data.lines, start=1):
-        line_total = int(Decimal(str(line_data.quantity)) * line_data.unit_price_cents)
-        vat_amount = int(line_total * Decimal(str(line_data.vat_rate)) / 100)
+        line_total, vat_amount = calculate_line_totals(line_data.quantity, line_data.unit_price_cents, line_data.vat_rate)
         
         quote_lines.append({
             "line_number": idx,
@@ -375,6 +355,7 @@ async def create_quote(
         select(ZZPQuote)
         .where(ZZPQuote.id == quote.id)
         .options(selectinload(ZZPQuote.lines))
+        .execution_options(populate_existing=True)
     )
     quote = result.scalar_one()
     
@@ -402,6 +383,7 @@ async def update_quote(
         .where(ZZPQuote.id == quote_id)
         .where(ZZPQuote.administration_id == administration.id)
         .options(selectinload(ZZPQuote.lines))
+        .execution_options(populate_existing=True)
     )
     quote = result.scalar_one_or_none()
     
@@ -464,8 +446,7 @@ async def update_quote(
         vat_total_cents = 0
         
         for idx, line_data in enumerate(data.lines, start=1):
-            line_total = int(Decimal(str(line_data.quantity)) * line_data.unit_price_cents)
-            vat_amount = int(line_total * Decimal(str(line_data.vat_rate)) / 100)
+            line_total, vat_amount = calculate_line_totals(line_data.quantity, line_data.unit_price_cents, line_data.vat_rate)
             
             line = ZZPQuoteLine(
                 quote_id=quote.id,
@@ -493,6 +474,7 @@ async def update_quote(
         select(ZZPQuote)
         .where(ZZPQuote.id == quote.id)
         .options(selectinload(ZZPQuote.lines))
+        .execution_options(populate_existing=True)
     )
     quote = result.scalar_one()
     
@@ -520,6 +502,7 @@ async def update_quote_status(
         .where(ZZPQuote.id == quote_id)
         .where(ZZPQuote.administration_id == administration.id)
         .options(selectinload(ZZPQuote.lines))
+        .execution_options(populate_existing=True)
     )
     quote = result.scalar_one_or_none()
     
@@ -575,6 +558,7 @@ async def convert_quote_to_invoice(
         .where(ZZPQuote.id == quote_id)
         .where(ZZPQuote.administration_id == administration.id)
         .options(selectinload(ZZPQuote.lines))
+        .execution_options(populate_existing=True)
     )
     quote = result.scalar_one_or_none()
     
@@ -670,6 +654,7 @@ async def convert_quote_to_invoice(
         select(ZZPQuote)
         .where(ZZPQuote.id == quote.id)
         .options(selectinload(ZZPQuote.lines))
+        .execution_options(populate_existing=True)
     )
     quote = result.scalar_one()
     
@@ -742,6 +727,7 @@ async def get_quote_pdf(
         .where(ZZPQuote.id == quote_id)
         .where(ZZPQuote.administration_id == administration.id)
         .options(selectinload(ZZPQuote.lines))
+        .execution_options(populate_existing=True)
     )
     quote = result.scalar_one_or_none()
 

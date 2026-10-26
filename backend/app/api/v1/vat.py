@@ -793,74 +793,6 @@ async def download_evidence_pack(
 
 # VAT Submission Tracking Endpoints
 
-@router.get(
-    "/clients/{client_id}/vat/submissions",
-    response_model=VatSubmissionListResponse,
-    summary="List VAT Submissions",
-    description="""
-    List all VAT submission records for a client.
-    
-    Returns submission history including:
-    - Submission type (BTW or ICP)
-    - Status (DRAFT, SUBMITTED, CONFIRMED, REJECTED)
-    - Creation and submission timestamps
-    - Reference text and attachments
-    
-    **Security:** Enforces consent/active-client isolation.
-    Only accessible by accountants with ACTIVE assignment to the client.
-    """,
-)
-async def list_vat_submissions(
-    client_id: UUID,
-    current_user: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    period_id: Optional[UUID] = Query(None, description="Filter by period"),
-    submission_type: Optional[str] = Query(None, description="Filter by type (BTW or ICP)"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-):
-    """List VAT submissions for a client."""
-    from app.models.vat_submission import VatSubmission
-    
-    # Enforce consent/active-client isolation
-    await require_assigned_client(client_id, current_user, db)
-    
-    # Build query
-    query = select(VatSubmission).where(VatSubmission.administration_id == client_id)
-    
-    if period_id:
-        query = query.where(VatSubmission.period_id == period_id)
-    if submission_type:
-        query = query.where(VatSubmission.submission_type == submission_type)
-    if status:
-        query = query.where(VatSubmission.status == status)
-    
-    query = query.order_by(VatSubmission.created_at.desc())
-    
-    result = await db.execute(query)
-    submissions = list(result.scalars().all())
-    
-    return VatSubmissionListResponse(
-        submissions=[
-            VatSubmissionResponse(
-                id=s.id,
-                administration_id=s.administration_id,
-                period_id=s.period_id,
-                submission_type=s.submission_type,
-                created_at=s.created_at,
-                created_by=s.created_by,
-                method=s.method,
-                status=s.status,
-                reference_text=s.reference_text,
-                attachment_url=s.attachment_url,
-                submitted_at=s.submitted_at,
-                updated_at=s.updated_at,
-            )
-            for s in submissions
-        ],
-        total_count=len(submissions),
-    )
-
-
 @router.post(
     "/clients/{client_id}/vat/submissions",
     response_model=VatSubmissionResponse,
@@ -996,7 +928,6 @@ async def mark_submission_submitted(
         submitted_at=submission.submitted_at,
         updated_at=submission.updated_at,
     )
-
 
 
 @router.post(
@@ -1332,10 +1263,12 @@ async def queue_vat_submission(
 )
 async def list_vat_submissions(
     client_id: UUID,
-    current_user: Annotated[CurrentUser, Depends()],
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     period_id: Optional[UUID] = Query(None, description="Filter by period"),
     kind: Optional[str] = Query(None, description="Filter by submission type (VAT or ICP)"),
+    submission_type: Optional[str] = Query(None, pattern="^(BTW|VAT|ICP)$"),
+    status: Optional[str] = Query(None, max_length=30),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
 ):
@@ -1355,18 +1288,24 @@ async def list_vat_submissions(
     if period_id:
         query = query.where(VatSubmission.period_id == period_id)
     
-    if kind:
-        if kind not in ["VAT", "ICP"]:
-            raise HTTPException(status_code=400, detail="Invalid kind. Must be VAT or ICP")
-        query = query.where(VatSubmission.submission_type == kind)
-    
+    selected_kind = kind or submission_type
+    if kind and submission_type and kind.replace('VAT', 'BTW') != submission_type.replace('VAT', 'BTW'):
+        raise HTTPException(422, detail='Conflicting submission type filters')
+    if selected_kind:
+        if selected_kind not in ('VAT', 'BTW', 'ICP'):
+            raise HTTPException(422, detail='Invalid kind. Use VAT, BTW or ICP')
+        values = ['VAT', 'BTW'] if selected_kind in ('VAT', 'BTW') else ['ICP']
+        query = query.where(VatSubmission.submission_type.in_(values))
+    if status:
+        query = query.where(VatSubmission.status == status)
+
     # Count total
     count_query = select(func.count()).select_from(query.subquery())
     count_result = await db.execute(count_query)
     total_count = count_result.scalar()
     
     # Apply ordering and pagination
-    query = query.order_by(desc(VatSubmission.created_at))
+    query = query.order_by(desc(VatSubmission.created_at), desc(VatSubmission.id))
     query = query.offset((page - 1) * page_size).limit(page_size)
     
     # Execute query

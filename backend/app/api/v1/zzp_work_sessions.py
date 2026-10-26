@@ -4,6 +4,8 @@ ZZP Work Sessions API Endpoints (Clock-in/out functionality)
 Provides start/stop work session endpoints for daily clock-in workflow.
 On stop, automatically creates a time entry with calculated duration.
 """
+
+from app.services.zzp_administration import get_user_administration
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Annotated, Optional
@@ -15,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.zzp import WorkSession, ZZPTimeEntry
-from app.models.administration import Administration, AdministrationMember
+from app.models.administration import Administration
 from app.schemas.zzp import (
     WorkSessionStart,
     WorkSessionStop,
@@ -26,32 +28,6 @@ from app.schemas.zzp import (
 from app.api.v1.deps import CurrentUser, require_zzp
 
 router = APIRouter()
-
-
-async def get_user_administration(user_id: UUID, db: AsyncSession) -> Administration:
-    """
-    Get the primary administration for a ZZP user.
-    """
-    result = await db.execute(
-        select(Administration)
-        .join(AdministrationMember)
-        .where(AdministrationMember.user_id == user_id)
-        .where(Administration.is_active == True)
-        .order_by(Administration.created_at)
-        .limit(1)
-    )
-    administration = result.scalar_one_or_none()
-    
-    if not administration:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "code": "NO_ADMINISTRATION",
-                "message": "Geen administratie gevonden. Voltooi eerst de onboarding."
-            }
-        )
-    
-    return administration
 
 
 def round_to_5_minutes(hours: float) -> float:

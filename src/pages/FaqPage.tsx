@@ -1,3 +1,4 @@
+import { STARTER_PRICE_NL } from '@/lib/billingCatalog'
 import { useEffect } from 'react'
 import { navigateTo } from '@/lib/navigation'
 import { useSeoMeta } from '@/hooks/useSeoMeta'
@@ -45,7 +46,7 @@ export const FaqPage = () => {
             name: 'Wat kost het na de proefperiode?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'Het eerste jaar is volledig gratis — geen creditcard nodig bij aanmelding. Daarna is ZZPers Hub €4,99 per maand. Je kunt op elk moment opzeggen; er zijn geen opzegtermijnen of verborgen kosten.',
+              text: `Het eerste jaar is volledig gratis — geen creditcard nodig bij aanmelding. Daarna is ZZPers Hub ${STARTER_PRICE_NL} per maand. Je kunt op elk moment opzeggen; er zijn geen opzegtermijnen of verborgen kosten.`,
             },
           },
           {

@@ -169,13 +169,13 @@ describe('ZZPBtwAangiftePage', () => {
     })
   })
 
-  it('shows ready-to-submit card when ready', async () => {
+  it('shows review availability without claiming submission', async () => {
     vi.mocked(zzpBtwApi.getOverview).mockResolvedValue(mockOverviewResponse)
 
     render(<ZZPBtwAangiftePage />)
 
     await waitFor(() => {
-      expect(screen.getByText('Klaar om in te dienen')).toBeDefined()
+      expect(screen.getByText('Beschikbaar voor controle')).toBeDefined()
     })
   })
 

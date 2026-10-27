@@ -9,6 +9,7 @@ import { ZZPInvoicesPage } from '../../src/components/ZZPInvoicesPage'
 import { ZZPExpensesPage } from '../../src/components/ZZPExpensesPage'
 import { ZZPTimeTrackingPage } from '../../src/components/ZZPTimeTrackingPage'
 import { ZZPDocumentInboxPage } from '../../src/components/ZZPDocumentInboxPage'
+import { ZZPBtwAangiftePage } from '../../src/components/ZZPBtwAangiftePage'
 import '../../src/main.css'
 
 // Real pages, shell, and providers; only HTTP data is stubbed by Playwright.
@@ -23,7 +24,9 @@ function Workspace() {
       window.removeEventListener('popstate', sync)
     }
   }, [])
-  const page = path.startsWith('/zzp/invoices') ? (
+  const page = path.startsWith('/zzp/belastinghulp/btw') ? (
+    <ZZPBtwAangiftePage />
+  ) : path.startsWith('/zzp/invoices') ? (
     <ZZPInvoicesPage />
   ) : path.startsWith('/zzp/expenses') ? (
     <ZZPExpensesPage />

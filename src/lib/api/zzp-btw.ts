@@ -44,6 +44,9 @@ export interface BTWQuarterOverview {
   deadline: string
   days_until_deadline: number
   basis: string
+  policy_confirmed?: boolean
+  recognized_invoice_count?: number
+  submission_available?: boolean
   omzet_cents: number
   output_vat_cents: number
   input_vat_cents: number
@@ -65,9 +68,20 @@ export interface BTWAangifteResponse {
   previous_quarters: BTWQuarterOverview[]
   profile_complete: boolean
   btw_number: string | null
+  vat_policy?: VatPolicy | null
+}
+
+export interface VatPolicy {
+  basis: 'factuurstelsel' | 'kasstelsel'
+  effective_from: string
+  confirmed_at: string
 }
 
 export const zzpBtwApi = {
+  confirmPolicy: async (basis: VatPolicy['basis'], effectiveFrom: string): Promise<VatPolicy> => {
+    const response = await api.put<VatPolicy>('/zzp/btw-policy', { basis, effective_from: effectiveFrom, acknowledge: true })
+    return response.data
+  },
   getOverview: async (year?: number, quarter?: number): Promise<BTWAangifteResponse> => {
     const params: Record<string, string> = {}
     if (year) params.year = String(year)
@@ -87,7 +101,7 @@ export const zzpBtwApi = {
     const blob = new Blob([response.data as BlobPart], { type: 'application/xml' })
     const disposition = (response.headers as Record<string, string>)['content-disposition'] || ''
     const filenameMatch = disposition.match(/filename="?([^"]+)"?/)
-    const filename = filenameMatch ? filenameMatch[1] : `btw-overzicht.xml`
+    const filename = filenameMatch ? filenameMatch[1] : `btw-referentie.xml`
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

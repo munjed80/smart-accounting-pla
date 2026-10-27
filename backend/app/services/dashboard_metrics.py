@@ -73,20 +73,6 @@ async def receipt_months(db, administration_id, start: date, end: date):
 
 
 async def vat_overview_totals(db, administration_id, start: date, end: date):
-    """Reuse the existing self-service kasstelsel rule, including undated paid history."""
-    output = await db.scalar(
-        select(func.coalesce(func.sum(ZZPInvoice.vat_total_cents), 0)).where(
-            ZZPInvoice.administration_id == administration_id,
-            ZZPInvoice.status == "paid",
-            paid_invoice_day() >= start,
-            paid_invoice_day() <= end,
-        )
-    )
-    deductible = await db.scalar(
-        select(func.coalesce(func.sum(ZZPExpense.vat_amount_cents), 0)).where(
-            ZZPExpense.administration_id == administration_id,
-            ZZPExpense.expense_date >= start,
-            ZZPExpense.expense_date <= end,
-        )
-    )
-    return output, deductible
+    from app.services.zzp_vat_calculation import calculate_vat
+    calculation = await calculate_vat(db, administration_id, start, end)
+    return calculation.output_vat, calculation.input_vat

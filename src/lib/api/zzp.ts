@@ -430,6 +430,7 @@ export interface ZZPDashboardBTWStats {
   net_vat_cents?: number
   basis?: string
   review_required?: boolean
+  policy_confirmed?: boolean
 }
 
 export interface ZZPDashboardResponse {

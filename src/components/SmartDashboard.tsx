@@ -114,6 +114,7 @@ export const SmartDashboard = () => {
   const summary = useQuery({
     queryKey: ['zzp-dashboard', user?.id, activeAdmin?.id],
     enabled,
+    refetchOnMount: 'always',
     staleTime: 30000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -134,6 +135,7 @@ export const SmartDashboard = () => {
       'last_6_months',
     ],
     enabled,
+    refetchOnMount: 'always',
     staleTime: 30000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -461,7 +463,7 @@ export const SmartDashboard = () => {
                     </strong>
                     <dl>
                       <div>
-                        <dt>Btw op betaalde facturen</dt>
+                        <dt>Btw op verkoopbedragen</dt>
                         <dd>
                           {currencyOrUnknown(data.btw?.vat_collected_cents)}
                         </dd>
@@ -474,9 +476,9 @@ export const SmartDashboard = () => {
                       </div>
                     </dl>
                     <p className="ov-vat-note">
-                      Volgens je BTW-overzicht (kasstelsel). Controleer
-                      openstaande facturen en deelbetalingen bij het
-                      voorbereiden van je aangifte.
+                      {data.btw?.policy_confirmed
+                        ? `Volgens je BTW-overzicht (${data.btw.basis}). Controleer fiscale aandachtspunten voor je aangifte.`
+                        : 'Het BTW-stelsel is nog niet bevestigd. Dit is een historische schatting; open het BTW-overzicht om je stelsel te controleren.'}
                     </p>
                     <OverviewLink
                       href="/zzp/belastinghulp/btw"

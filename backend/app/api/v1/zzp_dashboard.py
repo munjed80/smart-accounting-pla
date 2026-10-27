@@ -16,7 +16,8 @@ Metrics provided:
 
 from app.services.zzp_administration import get_user_administration
 from app.services.money import round_cents
-from app.services.dashboard_metrics import outstanding_cents, receipt_rows, receipt_months, vat_overview_totals
+from app.services.zzp_vat_calculation import calculate_vat
+from app.services.dashboard_metrics import outstanding_cents, receipt_rows, receipt_months
 from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from typing import Annotated, List, Optional
@@ -99,7 +100,8 @@ class BTWStats(BaseModel):
     # Deductible VAT (from expenses)
     vat_deductible_cents: int = Field(0, description="VAT paid on expenses this quarter (deductible)")
     
-    basis: str = 'kasstelsel'
+    basis: str = 'unconfirmed'
+    policy_confirmed: bool = False
     net_vat_cents: int = 0
     review_required: bool = False
 
@@ -236,7 +238,8 @@ async def get_zzp_dashboard(
     received = receipts.get(month_start.strftime('%Y-%m'), {'amount': 0, 'count': 0})
     invoice_stats.paid_this_month_cents = received['amount']
     invoice_stats.paid_this_month_count = received['count']
-    vat_collected, vat_deductible = await vat_overview_totals(db, admin_id, quarter_start, quarter_end)
+    vat = await calculate_vat(db, admin_id, quarter_start, quarter_end)
+    vat_collected, vat_deductible = vat.output_vat, vat.input_vat
     month_expense = and_(ZZPExpense.expense_date >= month_start, ZZPExpense.expense_date <= today)
     expense_totals = (await db.execute(select(
         total_when(month_expense).label('this_month_count'),
@@ -282,7 +285,8 @@ async def get_zzp_dashboard(
         vat_deductible_cents=vat_deductible,
         vat_payable_cents=max(0, vat_collected - vat_deductible),
         net_vat_cents=vat_collected - vat_deductible,
-        review_required=bool(invoice_stats.open_count),
+        basis=vat.basis, policy_confirmed=vat.policy_confirmed,
+        review_required=bool(vat.issues),
     )
     
     # ========================================================================
@@ -421,7 +425,7 @@ async def get_zzp_dashboard(
         "this_month_range": f"{month_start.isoformat()} tot {today.isoformat()}",
         "this_week_range": f"{week_start.isoformat()} tot {min(week_end, today).isoformat()}",
         "this_quarter_range": f"{quarter_start.isoformat()} tot {quarter_end.isoformat()}",
-        "btw_calculation": "Schatting volgens BTW-overzicht (kasstelsel): betaalde facturen min voorbelasting.",
+        "btw_calculation": f"Schatting volgens BTW-overzicht: {vat.basis}; controleer de fiscale aandachtspunten.",
         "receipts_basis": "Geregistreerde betalingen op betaaldatum, met historische betaalregistraties; geen live banksaldo.",
         "overdue_definition": "Facturen met status 'verstuurd' waarvan de vervaldatum is verstreken",
     }

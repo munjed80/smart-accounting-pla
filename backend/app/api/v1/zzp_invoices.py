@@ -93,7 +93,7 @@ async def list_invoices(
     q: Optional[str] = Query(None, max_length=200),
     min_cents: Optional[int] = Query(None, ge=0),
     max_cents: Optional[int] = Query(None, ge=0),
-    status: Optional[str] = Query(None, pattern=r'^(draft|sent|paid|overdue|cancelled|open)$'),
+    status: Optional[str] = Query(None, pattern=r'^(draft|sent|paid|overdue|cancelled|open|refund_due)$'),
     customer_id: Optional[UUID] = Query(None),
     from_date: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
     to_date: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
@@ -118,7 +118,9 @@ async def list_invoices(
     if min_cents is not None: query = query.where(ZZPInvoice.total_cents >= min_cents)
     if max_cents is not None: query = query.where(ZZPInvoice.total_cents <= max_cents)
     # Apply filters
-    if status == 'open':
+    if status == 'refund_due':
+        query = query.where(ZZPInvoice.amount_paid_cents + ZZPInvoice.credited_cents - ZZPInvoice.total_cents - ZZPInvoice.refunded_cents > 0)
+    elif status == 'open':
         query = query.where(ZZPInvoice.status.in_(['sent','overdue']), outstanding_cents() > 0)
     elif status == 'overdue':
         query = query.where(ZZPInvoice.status.in_(['sent','overdue']), outstanding_cents() > 0,
@@ -135,7 +137,7 @@ async def list_invoices(
     query = query.order_by(ZZPInvoice.issue_date.desc(), ZZPInvoice.invoice_number.desc(), ZZPInvoice.id)
 
     rows = query.order_by(None).subquery()
-    remainder = rows.c.total_cents - func.coalesce(rows.c.amount_paid_cents, 0)
+    remainder = rows.c.total_cents - func.coalesce(rows.c.credited_cents, 0) - func.coalesce(rows.c.amount_paid_cents, 0) + func.coalesce(rows.c.refunded_cents, 0)
     remainder = case((remainder > 0, remainder), else_=0)
     stats = dict((await db.execute(select(
         func.count().label('total'),
@@ -145,7 +147,7 @@ async def list_invoices(
         func.coalesce(func.sum(case((rows.c.status == 'overdue', 1), else_=0)), 0).label('overdue'),
         func.coalesce(func.sum(case((rows.c.status == 'cancelled', 1), else_=0)), 0).label('cancelled'),
         func.coalesce(func.sum(rows.c.total_cents), 0).label('totalAmount'),
-        func.coalesce(func.sum(case((rows.c.status == 'paid', rows.c.total_cents), else_=0)), 0).label('paidAmount'),
+        func.coalesce(func.sum(case((rows.c.status == 'paid', case((rows.c.credited_cents > 0, rows.c.amount_paid_cents - rows.c.refunded_cents), else_=rows.c.total_cents)), else_=0)), 0).label('paidAmount'),
         func.coalesce(func.sum(case((rows.c.status.in_(['sent','overdue']), remainder), else_=0)), 0).label('openAmount')
     ))).mappings().one())
     total = stats['total']
@@ -377,6 +379,9 @@ async def update_invoice(
             detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
         )
     
+    if invoice.credited_cents:
+        raise HTTPException(409, detail={'code':'INVOICE_HAS_CREDITS','message':'De oorspronkelijke factuur blijft bewaard.'})
+
     if invoice.status not in (InvoiceStatus.DRAFT.value, InvoiceStatus.CANCELLED.value):
         raise HTTPException(
             status_code=400,
@@ -543,6 +548,11 @@ async def update_invoice_status(
     current_status = invoice.status
     new_status = status_in.status
     
+    if invoice.credited_cents and new_status in ('draft','cancelled'):
+        raise HTTPException(409,detail={'code':'INVOICE_HAS_CREDITS','message':'Een gecrediteerde factuur blijft bewaard.'})
+    if current_status in ('sent','overdue','paid') and new_status == 'cancelled':
+        raise HTTPException(409,detail={'code':'USE_CREDIT_NOTE','message':'Gebruik een creditnota om een verzonden factuur te corrigeren.'})
+
     # Validate status transition
     # Allow more flexible transitions for "Mark as Paid/Unpaid" functionality:
     # - paid -> sent (mark as unpaid)
@@ -625,6 +635,9 @@ async def delete_invoice(
             detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
         )
     
+    if invoice.credited_cents:
+        raise HTTPException(409, detail={'code':'INVOICE_HAS_CREDITS','message':'De oorspronkelijke factuur blijft bewaard.'})
+
     if invoice.status not in (InvoiceStatus.DRAFT.value, InvoiceStatus.CANCELLED.value):
         raise HTTPException(
             status_code=400,

@@ -566,7 +566,7 @@ async def list_bank_transactions(
                 # Get invoice number
                 invoice_result = await db.execute(
                     select(ZZPInvoice.invoice_number)
-                    .where(ZZPInvoice.id == match.invoice_id)
+                    .where(ZZPInvoice.id == match.invoice_id, ZZPInvoice.administration_id == administration.id)
                 )
                 row = invoice_result.first()
                 if row:
@@ -633,7 +633,7 @@ async def get_match_suggestions(
     # Get open invoices (sent or overdue status)
     open_invoices_result = await db.execute(
         select(ZZPInvoice)
-        .where(ZZPInvoice.administration_id == administration.id)
+        .where(ZZPInvoice.administration_id == administration.id, ZZPInvoice.credited_cents == 0, ZZPInvoice.refunded_cents == 0)
         .where(ZZPInvoice.status.in_([InvoiceStatus.SENT.value, InvoiceStatus.OVERDUE.value]))
     )
     open_invoices = open_invoices_result.scalars().all()
@@ -643,7 +643,7 @@ async def get_match_suggestions(
     invoice_numbers = extract_invoice_numbers(search_text)
     
     for inv in open_invoices:
-        open_amount_cents = inv.total_cents - inv.amount_paid_cents
+        open_amount_cents = inv.total_cents - inv.amount_paid_cents - (inv.credited_cents or 0) + (inv.refunded_cents or 0)
         if open_amount_cents <= 0:
             continue
         
@@ -712,6 +712,7 @@ async def match_transaction_to_invoice(
     """
     require_zzp(current_user)
     administration = await get_user_administration(current_user.id, db)
+    await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
     
     # Get transaction
     tx_result = await db.execute(
@@ -753,6 +754,9 @@ async def match_transaction_to_invoice(
             detail={"code": "INVALID_INVOICE_STATUS", "message": "Alleen verzonden, openstaande of betaalde facturen kunnen worden gematcht."}
         )
     
+    if invoice.credited_cents or invoice.refunded_cents:
+        raise HTTPException(409, detail={'code':'CREDIT_HISTORY_EXISTS','message':'Deze factuur heeft creditnota’s. Registreer betalingen via de factuur; laat de bankaansluiting controleren.'})
+
     # Determine amount to match
     transaction_amount_cents = int(transaction.amount * 100)
     amount_to_match = request.amount_cents if request.amount_cents else transaction_amount_cents
@@ -837,6 +841,7 @@ async def unmatch_transaction_from_invoice(
     """
     require_zzp(current_user)
     administration = await get_user_administration(current_user.id, db)
+    await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
     
     # Get transaction
     tx_result = await db.execute(
@@ -861,7 +866,7 @@ async def unmatch_transaction_from_invoice(
     # Get the match record
     match_result = await db.execute(
         select(ZZPBankTransactionMatch)
-        .where(ZZPBankTransactionMatch.bank_transaction_id == transaction.id)
+        .where(ZZPBankTransactionMatch.bank_transaction_id == transaction.id, ZZPBankTransactionMatch.administration_id == administration.id)
         .order_by(ZZPBankTransactionMatch.created_at.desc())
         .limit(1)
     )
@@ -876,7 +881,7 @@ async def unmatch_transaction_from_invoice(
     # Get invoice
     inv_result = await db.execute(
         select(ZZPInvoice)
-        .where(ZZPInvoice.id == match.invoice_id)
+        .where(ZZPInvoice.id == match.invoice_id, ZZPInvoice.administration_id == administration.id)
     )
     invoice = inv_result.scalar_one_or_none()
     
@@ -886,6 +891,9 @@ async def unmatch_transaction_from_invoice(
             detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
         )
     
+    if invoice.credited_cents or invoice.refunded_cents:
+        raise HTTPException(409, detail={'code':'CREDIT_HISTORY_EXISTS','message':'Deze factuur heeft credit- of terugbetalingshistorie. Laat de bankcorrectie aansluiten door je boekhouder.'})
+
     amount_unmatched = match.amount_cents
     
     # Reverse the payment

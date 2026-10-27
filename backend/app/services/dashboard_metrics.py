@@ -7,7 +7,7 @@ from app.models.payment import ZZPPayment, ZZPPaymentAllocation
 
 
 def outstanding_cents():
-    remaining = ZZPInvoice.total_cents - func.coalesce(ZZPInvoice.amount_paid_cents, 0)
+    remaining = ZZPInvoice.total_cents - func.coalesce(ZZPInvoice.credited_cents, 0) - func.coalesce(ZZPInvoice.amount_paid_cents, 0) + func.coalesce(ZZPInvoice.refunded_cents, 0)
     return case((remaining > 0, remaining), else_=0)
 
 

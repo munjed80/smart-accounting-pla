@@ -16,5 +16,9 @@ def invoice_view(invoice, *, escape_text=False):
             result[column.name] = value
         return SimpleNamespace(**result)
     result = copy_fields(invoice, ZZPInvoice)
+    references = getattr(result, 'credit_references', None)
+    if references and result.status != 'credit_note':
+        suffix = f'Bijbehorende creditnota’s: {references}'
+        result.notes = ((result.notes + ('<br/>' if escape_text else '\n')) if result.notes else '') + suffix
     result.lines = [copy_fields(line, ZZPInvoiceLine) for line in invoice.lines]
     return result

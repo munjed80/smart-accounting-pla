@@ -351,6 +351,10 @@ class InvoiceResponse(BaseModel):
     subtotal_cents: int
     vat_total_cents: int
     total_cents: int
+    credited_cents: int = 0
+    refunded_cents: int = 0
+    outstanding_cents: int = 0
+    refund_due_cents: int = 0
     amount_paid_cents: int
     paid_at: Optional[datetime]
     

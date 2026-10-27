@@ -1,3 +1,4 @@
+import { InvoiceCorrections } from './InvoiceCorrections'
 import { useQuickCreate } from '@/hooks/useQuickCreate'
 import { invoiceDecimal, invoicePriceCents, invoiceLineAmounts } from '@/lib/invoiceMoney'
 import { saveInvoicePdf } from '@/lib/invoicePdf'
@@ -318,6 +319,7 @@ export const InvoiceFormDialog = ({
   onSave,
   isReadOnly = false,
   preSelectedCustomerId,
+  onCorrectionsChanged,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -326,6 +328,7 @@ export const InvoiceFormDialog = ({
   businessProfile: ZZPBusinessProfile | null
   onSave: (data: ZZPInvoiceCreate, isEdit: boolean, creationKey?: string) => Promise<void>
   isReadOnly?: boolean
+  onCorrectionsChanged?: () => Promise<void>
   preSelectedCustomerId?: string | null
 }) => {
   const isEdit = !!invoice
@@ -1060,6 +1063,8 @@ export const InvoiceFormDialog = ({
             </div>
           )}
 
+          {isReadOnly && invoice && ['sent', 'paid', 'overdue'].includes(invoice.status) && <InvoiceCorrections key={invoice.id} invoiceId={invoice.id} onChanged={onCorrectionsChanged} />}
+
           {/* Notes field */}
           <div className="space-y-2">
             <Label htmlFor="invoice-notes" className="text-sm font-medium flex items-center gap-2">
@@ -1386,7 +1391,7 @@ const InvoiceCard = ({
                     <DropdownMenuItem onClick={(event) => {
                       event.stopPropagation()
                       onMarkUnpaid()
-                    }} disabled={isUpdatingStatus}>
+                    }} disabled={isUpdatingStatus || !!invoice.credited_cents}>
                       {isUpdatingStatus ? (
                         <SpinnerGap size={16} className="mr-2 animate-spin" />
                       ) : (
@@ -1398,7 +1403,7 @@ const InvoiceCard = ({
                     <DropdownMenuItem onClick={(event) => {
                       event.stopPropagation()
                       onMarkPaid()
-                    }} disabled={isUpdatingStatus}>
+                    }} disabled={isUpdatingStatus || (invoice.outstanding_cents !== undefined && invoice.outstanding_cents <= 0)}>
                       {isUpdatingStatus ? (
                         <SpinnerGap size={16} className="mr-2 animate-spin" />
                       ) : (
@@ -1761,7 +1766,7 @@ const ZZPInvoicesPageContent = () => {
     const overdue = invoices.filter(i => i.status === 'overdue').length
     const totalAmount = invoices.reduce((sum, i) => sum + i.total_cents, 0)
     const paidAmount = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.total_cents, 0)
-    const openAmount = invoices.filter(i => i.status === 'sent' || i.status === 'overdue').reduce((sum, i) => sum + Math.max(0, i.total_cents - (i.amount_paid_cents || 0)), 0)
+    const openAmount = invoices.filter(i => i.status === 'sent' || i.status === 'overdue').reduce((sum, i) => sum + Math.max(0, i.total_cents - (i.amount_paid_cents || 0) - (i.credited_cents || 0) + (i.refunded_cents || 0)), 0)
     return { total, draft, sent, paid, overdue, totalAmount, paidAmount, openAmount }
   }, [invoices, serverStats])
 
@@ -2293,6 +2298,7 @@ const ZZPInvoicesPageContent = () => {
                   <CardDescription>
                     {filteredInvoices.length} {filteredInvoices.length === 1 ? 'factuur' : 'facturen'}
                     {filters.status !== 'all' && ` (${
+                      filters.status === 'refund_due' ? 'Terug te betalen' :
                       filters.status === 'open' ? 'Openstaand' :
                       filters.status === 'draft' ? t('zzpInvoices.filterDraft') :
                       filters.status === 'sent' ? t('zzpInvoices.filterSent') :
@@ -2316,6 +2322,7 @@ const ZZPInvoicesPageContent = () => {
                   <SelectContent>
                     <SelectItem value="all">{t('zzpInvoices.filterAll')}</SelectItem>
                     <SelectItem value="open">Openstaand</SelectItem>
+                    <SelectItem value="refund_due">Terug te betalen</SelectItem>
                     <SelectItem value="draft">{t('zzpInvoices.filterDraft')}</SelectItem>
                     <SelectItem value="sent">{t('zzpInvoices.filterSent')}</SelectItem>
                     <SelectItem value="paid">{t('zzpInvoices.filterPaid')}</SelectItem>
@@ -2439,7 +2446,7 @@ const ZZPInvoicesPageContent = () => {
                                 <Select
                                   value={invoice.status}
                                   onValueChange={(value) => handleStatusChange(invoice, value as 'sent' | 'paid' | 'cancelled')}
-                                  disabled={updatingStatusInvoiceId === invoice.id}
+                                  disabled={updatingStatusInvoiceId === invoice.id || !!invoice.credited_cents}
                                 >
                                   <SelectTrigger
                                     aria-label={t('zzpInvoices.changeStatus')}
@@ -2453,7 +2460,7 @@ const ZZPInvoicesPageContent = () => {
                                   <SelectContent>
                                     <SelectItem value="sent">{t('zzpInvoices.statusSent')}</SelectItem>
                                     <SelectItem value="paid">{t('zzpInvoices.statusPaid')}</SelectItem>
-                                    <SelectItem value="cancelled">{t('zzpInvoices.statusCancelled')}</SelectItem>
+
                                   </SelectContent>
                                 </Select>
                               )}
@@ -2516,7 +2523,7 @@ const ZZPInvoicesPageContent = () => {
                                     {invoice.status === 'draft' && (
                                       <DropdownMenuItem 
                                         onSelect={() => handleSendInvoice(invoice)}
-                                        disabled={updatingStatusInvoiceId === invoice.id}
+                                        disabled={updatingStatusInvoiceId === invoice.id || !!invoice.credited_cents}
                                       >
                                         {updatingStatusInvoiceId === invoice.id ? (
                                           <SpinnerGap size={16} className="mr-2 animate-spin" />
@@ -2531,7 +2538,7 @@ const ZZPInvoicesPageContent = () => {
                                     {invoice.status === 'draft' && (
                                       <DropdownMenuItem
                                         onSelect={() => handleStatusChange(invoice, 'cancelled')}
-                                        disabled={updatingStatusInvoiceId === invoice.id}
+                                        disabled={updatingStatusInvoiceId === invoice.id || !!invoice.credited_cents}
                                         className="text-destructive focus:text-destructive"
                                       >
                                         {updatingStatusInvoiceId === invoice.id ? (
@@ -2549,7 +2556,7 @@ const ZZPInvoicesPageContent = () => {
                                         {invoice.status === 'paid' ? (
                                           <DropdownMenuItem 
                                             onSelect={() => handleMarkUnpaid(invoice)}
-                                            disabled={updatingStatusInvoiceId === invoice.id}
+                                            disabled={updatingStatusInvoiceId === invoice.id || !!invoice.credited_cents}
                                           >
                                             {updatingStatusInvoiceId === invoice.id ? (
                                               <SpinnerGap size={16} className="mr-2 animate-spin" />
@@ -2561,7 +2568,7 @@ const ZZPInvoicesPageContent = () => {
                                         ) : (
                                           <DropdownMenuItem 
                                             onSelect={() => handleMarkPaid(invoice)}
-                                            disabled={updatingStatusInvoiceId === invoice.id}
+                                            disabled={updatingStatusInvoiceId === invoice.id || (invoice.outstanding_cents !== undefined && invoice.outstanding_cents <= 0)}
                                           >
                                             {updatingStatusInvoiceId === invoice.id ? (
                                               <SpinnerGap size={16} className="mr-2 animate-spin" />
@@ -2578,7 +2585,7 @@ const ZZPInvoicesPageContent = () => {
                                     {invoice.status === 'cancelled' && (
                                       <DropdownMenuItem
                                         onSelect={() => handleRestoreToConcept(invoice)}
-                                        disabled={updatingStatusInvoiceId === invoice.id}
+                                        disabled={updatingStatusInvoiceId === invoice.id || !!invoice.credited_cents}
                                       >
                                         {updatingStatusInvoiceId === invoice.id ? (
                                           <SpinnerGap size={16} className="mr-2 animate-spin" />
@@ -2663,6 +2670,7 @@ const ZZPInvoicesPageContent = () => {
         businessProfile={businessProfile}
         onSave={handleSaveInvoice}
         isReadOnly={!!viewingInvoice}
+        onCorrectionsChanged={async () => { await loadData(); if (viewingInvoice) setViewingInvoice(await zzpApi.invoices.get(viewingInvoice.id)) }}
         preSelectedCustomerId={dialogCustomerId}
       />
 

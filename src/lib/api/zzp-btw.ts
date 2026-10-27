@@ -44,6 +44,8 @@ export interface BTWQuarterOverview {
   deadline: string
   days_until_deadline: number
   basis: string
+  credit_note_count?: number
+  credit_vat_cents?: number
   policy_confirmed?: boolean
   recognized_invoice_count?: number
   submission_available?: boolean

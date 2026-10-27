@@ -218,7 +218,9 @@ class DeploymentTests(unittest.TestCase):
         def backup(candidate):
             candidate.events.append(("backup",))
 
-        with patch.object(ops, "backup", side_effect=backup):
+        with patch.object(ops, "backup", side_effect=backup), patch.object(
+            ops, "verify_backup_repository"
+        ):
             with self.assertRaises(subprocess.CalledProcessError):
                 ops.deploy(stack)
         self.assertLess(
@@ -300,12 +302,23 @@ class DeploymentTests(unittest.TestCase):
             return Response(json.dumps(body).encode())
 
         with patch.object(ops, "backup"), patch.object(
-            ops, "urlopen", side_effect=public
-        ):
+            ops, "verify_backup_repository"
+        ), patch.object(ops, "urlopen", side_effect=public):
             with self.assertRaisesRegex(ValueError, "different release"):
                 ops.deploy(stack)
         self.assertFalse((stack.config / "current.json").exists())
         self.assertEqual(stack.events[-1], ("maintenance", True))
+
+    def test_missing_offsite_repository_fails_before_stopping_writers(self):
+        stack = self.fake_stack()
+        with patch.object(
+            ops,
+            "verify_backup_repository",
+            side_effect=ValueError("Offsite unavailable"),
+        ):
+            with self.assertRaisesRegex(ValueError, "Offsite unavailable"):
+                ops.deploy(stack)
+        self.assertNotIn(("quiesce",), stack.events)
 
 
 if __name__ == "__main__":

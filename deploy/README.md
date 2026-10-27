@@ -19,7 +19,8 @@ migration/API/worker/backup/restore smoke test. After successful **main push CI*
 `Release images` checks out that exact main commit, publishes amd64 images to
 GHCR, and attaches a `zzpershub-COMMIT_SHA` artifact to its workflow run. The
 artifact contains runtime files and `release.json` with immutable image digests
-and its expected Alembic revision. No production SSH or auto-deploy is configured.
+and its expected Alembic revision. No production SSH or auto-deploy is configured. Container CI also renders a
+real PDF with the production WeasyPrint system libraries.
 
 Set repository variable `PUBLIC_API_URL` if the API origin differs from
 `https://api.zzpershub.nl`. Vite embeds this value at build time; changing runtime

@@ -78,7 +78,7 @@ try:
         "python",
         "backend",
         "-c",
-        "from app.services.invoice_pdf_reportlab import generate_invoice_pdf_reportlab; from app.services.invoice_pdf import generate_invoice_pdf; print('PDF runtime imports OK')",
+        "from weasyprint import HTML; assert HTML(string='<p>Invoice PDF smoke</p>').write_pdf().startswith(b'%PDF-'); print('PDF rendering OK')",
     )
     stack.compose(
         "run",

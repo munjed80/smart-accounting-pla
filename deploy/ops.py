@@ -358,6 +358,14 @@ def backup_environment(stack):
     return env
 
 
+def verify_backup_repository(stack):
+    run(
+        ["restic", "snapshots", "--json"],
+        env=backup_environment(stack),
+        stdout=subprocess.DEVNULL,
+    )
+
+
 def upload_snapshot(stack, target):
     run(
         ["restic", "backup", str(target), "--tag", "zzpershub"],
@@ -543,6 +551,7 @@ def deploy(stack, fresh=False, rollback=False):
         ).stdout.strip()
         if count != "0":
             raise ValueError("Fresh installation requires an empty database")
+    verify_backup_repository(stack)
     stack.quiesce()
     backup(stack)
     # Any failure after quiescing leaves maintenance enabled for operator recovery.

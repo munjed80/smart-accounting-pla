@@ -108,6 +108,8 @@ class BTWQuarterOverview(BaseModel):
         description="Confirmed factuurstelsel/kasstelsel, or unconfirmed historical estimate.",
     )
 
+    credit_note_count: int = 0
+    credit_vat_cents: int = 0
     policy_confirmed: bool = False
     recognized_invoice_count: int = 0
     submission_available: bool = False
@@ -221,6 +223,8 @@ def get_quarter_info(target_date: date) -> tuple:
 
 
 ISSUE_MESSAGES = {
+    'CREDIT_CASH_RECONCILIATION_REQUIRED': ('Creditnota of terugbetaling aansluiten', 'Laat je boekhouder de creditnota, behouden ontvangsten en terugbetalingen aansluiten. De historische ontvangsten zijn geen automatische berekening van de btw-teruggaaf.'),
+    'CREDIT_ORIGIN_REQUIRES_REVIEW': ('Oorspronkelijke aangifte controleren', 'De oorspronkelijke factuur valt vóór de bevestigde BTW-basis. Controleer eerder aangegeven btw voordat je een vermindering toepast.'),
     "LATE_INVOICE_REQUIRES_REVIEW": (
         "Late facturering vraagt beoordeling",
         "De factuurdatum ligt na de vijftiende dag na de leveringsmaand. Controleer het juiste aangiftetijdvak.",
@@ -333,9 +337,7 @@ async def build_quarter_overview(
                 related_route="/zzp/invoices",
             )
         )
-    has_sales, has_expenses = bool(calculation.invoice_ids), bool(
-        calculation.expense_count
-    )
+    has_sales, has_expenses = bool(calculation.invoice_ids or calculation.credit_note_count), bool(calculation.expense_count)
     if has_sales and has_expenses:
         status, reason = (
             "COMPLETE",
@@ -376,6 +378,7 @@ async def build_quarter_overview(
         quarter_end=quarter_end.isoformat(),
         deadline=btw_deadline.isoformat(),
         days_until_deadline=max(0, (btw_deadline - today).days),
+        credit_note_count=calculation.credit_note_count, credit_vat_cents=calculation.credit_vat_cents,
         basis=calculation.basis,
         policy_confirmed=calculation.policy_confirmed,
         recognized_invoice_count=len(calculation.invoice_ids),

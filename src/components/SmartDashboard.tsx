@@ -348,8 +348,8 @@ export const SmartDashboard = () => {
                     </OverviewLink>
                   </div>
                   <p className="ov-money-note">
-                    Ontvangsten zijn gebaseerd op je registraties. Dit is geen
-                    live banksaldo.
+                    Ontvangsten zijn gebaseerd op je registraties. Terugbetalingen
+                    staan apart bij de creditnota’s. Dit is geen live banksaldo.
                     {summary.isError &&
                       ' Je ziet de laatst opgehaalde bedragen.'}
                   </p>

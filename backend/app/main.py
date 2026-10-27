@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import configure_mappers
 from datetime import datetime, timezone
 
+from app.api.v1 import zzp_credit_notes
 from app.core.config import settings
 from app.core.database import engine
 from app.api.v1 import auth, administrations, documents, transactions, dashboard, accountant, decisions, periods, vat, review_queue, observability, accountant_dashboard, work_queue, admin, zzp, bank, meta, zzp_customers, zzp_profile, zzp_invoices, zzp_expenses, zzp_time, zzp_calendar, zzp_work_sessions, zzp_bank, zzp_insights, zzp_quotes, zzp_dashboard, bookkeeping, client_data, zzp_payments, zzp_ledger, zzp_commitments, certificates, subscriptions, webhooks, contact_messages, zzp_documents, push, zzp_btw, zzp_income_tax, invoice_sharing, zzp_import, zzp_integrations, zzp_ecommerce_review
@@ -334,6 +335,7 @@ _zzp_paywall_deps = [Depends(require_force_paywall)]
 api_v1_router.include_router(zzp.router, prefix="/zzp", tags=["zzp-client-consent"], dependencies=_zzp_paywall_deps)
 api_v1_router.include_router(zzp_customers.router, prefix="/zzp", tags=["zzp-customers"], dependencies=_zzp_paywall_deps)
 api_v1_router.include_router(zzp_profile.router, prefix="/zzp", tags=["zzp-business-profile"], dependencies=_zzp_paywall_deps)
+api_v1_router.include_router(zzp_credit_notes.router, prefix="/zzp", tags=["zzp-credit-notes"], dependencies=_zzp_paywall_deps)
 api_v1_router.include_router(zzp_invoices.router, prefix="/zzp", tags=["zzp-invoices"], dependencies=_zzp_paywall_deps)
 api_v1_router.include_router(zzp_expenses.router, prefix="/zzp", tags=["zzp-expenses"], dependencies=_zzp_paywall_deps)
 api_v1_router.include_router(zzp_time.router, prefix="/zzp", tags=["zzp-time-tracking"], dependencies=_zzp_paywall_deps)

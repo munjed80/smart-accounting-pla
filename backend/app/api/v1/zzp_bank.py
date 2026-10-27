@@ -22,7 +22,7 @@ from datetime import datetime, date
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Optional, List, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, UploadFile, File, Form
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -32,6 +32,7 @@ from app.core.config import settings
 from app.models.bank import BankAccount, BankTransaction, BankTransactionStatus
 from app.models.zzp import ZZPInvoice, InvoiceStatus, ZZPBankTransactionMatch
 from app.models.administration import Administration
+from app.services.zzp_bank_receipts import BankReceiptService
 from app.schemas.zzp import (
     ZZPBankAccountResponse,
     ZZPBankAccountListResponse,
@@ -479,8 +480,8 @@ async def list_bank_transactions(
     db: Annotated[AsyncSession, Depends(get_db)],
     status: Optional[str] = Query(None, pattern=r'^(NEW|MATCHED|IGNORED|NEEDS_REVIEW)$'),
     bank_account_id: Optional[uuid.UUID] = Query(None),
-    date_from: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
-    date_to: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    date_from: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    date_to: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
     q: Optional[str] = Query(None, description="Search in description/counterparty"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
@@ -513,12 +514,12 @@ async def list_bank_transactions(
         count_query = count_query.where(BankTransaction.bank_account_id == bank_account_id)
     
     if date_from:
-        from_date = date.fromisoformat(date_from)
+        from_date = date_from
         query = query.where(BankTransaction.booking_date >= from_date)
         count_query = count_query.where(BankTransaction.booking_date >= from_date)
     
     if date_to:
-        to_date = date.fromisoformat(date_to)
+        to_date = date_to
         query = query.where(BankTransaction.booking_date <= to_date)
         count_query = count_query.where(BankTransaction.booking_date <= to_date)
     
@@ -546,36 +547,44 @@ async def list_bank_transactions(
     result = await db.execute(query)
     transactions = result.scalars().all()
     
-    # Get matched invoice info for each transaction
-    response_transactions = []
-    for t in transactions:
-        matched_invoice_id = None
-        matched_invoice_number = None
-        
-        if t.status == BankTransactionStatus.MATCHED:
-            # Get the match record
-            match_result = await db.execute(
-                select(ZZPBankTransactionMatch)
-                .where(ZZPBankTransactionMatch.bank_transaction_id == t.id)
-                .order_by(ZZPBankTransactionMatch.created_at.desc())
-                .limit(1)
-            )
-            match = match_result.scalar_one_or_none()
-            if match:
-                matched_invoice_id = match.invoice_id
-                # Get invoice number
-                invoice_result = await db.execute(
-                    select(ZZPInvoice.invoice_number)
-                    .where(ZZPInvoice.id == match.invoice_id)
+    # Fetch only the current page's active matches and invoice names in one query.
+    matched = (
+        (
+            await db.execute(
+                select(ZZPBankTransactionMatch, ZZPInvoice.invoice_number)
+                .join(ZZPInvoice, ZZPInvoice.id == ZZPBankTransactionMatch.invoice_id)
+                .where(
+                    ZZPBankTransactionMatch.administration_id == administration.id,
+                    ZZPInvoice.administration_id == administration.id,
+                    ZZPBankTransactionMatch.bank_transaction_id.in_(
+                        [t.id for t in transactions]
+                    ),
+                    ZZPBankTransactionMatch.active.is_(True),
                 )
-                row = invoice_result.first()
-                if row:
-                    matched_invoice_number = row[0]
-        
-        response_transactions.append(
-            transaction_to_response(t, matched_invoice_id, matched_invoice_number)
+                .order_by(
+                    ZZPBankTransactionMatch.created_at.desc(),
+                    ZZPBankTransactionMatch.id.desc(),
+                )
+            )
+        ).all()
+        if transactions
+        else []
+    )
+    by_transaction = {}
+    for match, number in matched:
+        by_transaction.setdefault(match.bank_transaction_id, (match, number))
+    response_transactions = []
+    for transaction in transactions:
+        pair = (
+            by_transaction.get(transaction.id)
+            if transaction.status == BankTransactionStatus.MATCHED
+            else None
         )
-    
+        response = transaction_to_response(
+            transaction, pair[0].invoice_id if pair else None, pair[1] if pair else None
+        )
+        response.match_id = pair[0].id if pair else None
+        response_transactions.append(response)
     return ZZPBankTransactionListResponse(
         transactions=response_transactions,
         total=total,
@@ -643,8 +652,8 @@ async def get_match_suggestions(
     invoice_numbers = extract_invoice_numbers(search_text)
     
     for inv in open_invoices:
-        open_amount_cents = inv.total_cents - inv.amount_paid_cents
-        if open_amount_cents <= 0:
+        open_amount_cents = inv.total_cents - inv.amount_paid_cents - (inv.credited_cents or 0) + (inv.refunded_cents or 0)
+        if open_amount_cents <= 0 or transaction_amount_cents > open_amount_cents or transaction.currency != 'EUR':
             continue
         
         confidence = 0
@@ -695,288 +704,155 @@ async def get_match_suggestions(
 # Match / Unmatch Endpoints
 # =============================================================================
 
-@router.post("/bank/transactions/{transaction_id}/match", response_model=ZZPMatchInvoiceResponse)
+def match_response(match, invoice):
+    return ZZPMatchInvoiceResponse(
+        match_id=match.id,
+        active=match.active,
+        transaction_id=match.bank_transaction_id,
+        invoice_id=invoice.id,
+        invoice_number=invoice.invoice_number,
+        amount_matched_cents=match.amount_cents,
+        invoice_new_status=invoice.status,
+        invoice_amount_paid_cents=invoice.amount_paid_cents,
+        invoice_total_cents=invoice.total_cents,
+        message=(
+            "Bankontvangst gekoppeld."
+            if match.active
+            else "Deze koppeling is eerder ongedaan gemaakt."
+        ),
+    )
+
+
+@router.post(
+    "/bank/transactions/{transaction_id}/match", response_model=ZZPMatchInvoiceResponse
+)
 async def match_transaction_to_invoice(
     transaction_id: uuid.UUID,
     request: ZZPMatchInvoiceRequest,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    key: uuid.UUID = Header(alias="Idempotency-Key"),
 ):
-    """
-    Match a bank transaction to an invoice.
-    
-    - Updates invoice amount_paid_cents
-    - Auto-marks invoice as Paid if fully paid
-    - Handles partial payments (invoice stays Sent/Overdue if partially paid)
-    - Handles overpayments (amount_paid can exceed total)
-    """
     require_zzp(current_user)
-    administration = await get_user_administration(current_user.id, db)
-    
-    # Get transaction
-    tx_result = await db.execute(
-        select(BankTransaction)
-        .where(BankTransaction.id == transaction_id)
-        .where(BankTransaction.administration_id == administration.id)
-    )
-    transaction = tx_result.scalar_one_or_none()
-    
-    if not transaction:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "TRANSACTION_NOT_FOUND", "message": "Transactie niet gevonden."}
-        )
-    
-    if transaction.amount <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail={"code": "INVALID_TRANSACTION", "message": "Alleen inkomende betalingen kunnen worden gematcht."}
-        )
-    
-    # Get invoice
-    inv_result = await db.execute(
-        select(ZZPInvoice)
-        .where(ZZPInvoice.id == request.invoice_id)
-        .where(ZZPInvoice.administration_id == administration.id)
-    )
-    invoice = inv_result.scalar_one_or_none()
-    
-    if not invoice:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
-        )
-    
-    if invoice.status not in [InvoiceStatus.SENT.value, InvoiceStatus.OVERDUE.value, InvoiceStatus.PAID.value]:
-        raise HTTPException(
-            status_code=400,
-            detail={"code": "INVALID_INVOICE_STATUS", "message": "Alleen verzonden, openstaande of betaalde facturen kunnen worden gematcht."}
-        )
-    
-    # Determine amount to match
-    transaction_amount_cents = int(transaction.amount * 100)
-    amount_to_match = request.amount_cents if request.amount_cents else transaction_amount_cents
-    
-    if amount_to_match <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail={"code": "INVALID_AMOUNT", "message": "Bedrag moet positief zijn."}
-        )
-    
-    # Create match record
-    match = ZZPBankTransactionMatch(
-        administration_id=administration.id,
-        bank_transaction_id=transaction.id,
-        invoice_id=invoice.id,
-        user_id=current_user.id,
-        amount_cents=amount_to_match,
-        match_type="manual",
-        notes=request.notes,
-    )
-    db.add(match)
-    
-    # Update transaction status
-    transaction.status = BankTransactionStatus.MATCHED
-    transaction.matched_entity_type = "INVOICE"
-    transaction.matched_entity_id = invoice.id
-    
-    # Update invoice amount_paid_cents
-    invoice.amount_paid_cents += amount_to_match
-    
-    # Auto-update invoice status based on payment
-    if invoice.amount_paid_cents >= invoice.total_cents:
-        invoice.status = InvoiceStatus.PAID.value
-    
-    await db.commit()
-
+    admin = await get_user_administration(current_user.id, db)
     try:
-        ledger_service = LedgerPostingService(LedgerRepository(db, administration.id))
-        await ledger_service.post_bank_transaction(transaction.id)
-        if invoice.status == InvoiceStatus.PAID.value:
-            await ledger_service.post_invoice_payment(invoice.id)
+        match, invoice = await BankReceiptService(db, admin.id).match(
+            transaction_id, request, key, current_user.id
+        )
+        result = match_response(match, invoice)
         await db.commit()
-    except LedgerPostingError:
-        pass
-
-    await db.refresh(invoice)
-    
-    # Build message
-    if invoice.status == InvoiceStatus.PAID.value:
-        if invoice.amount_paid_cents > invoice.total_cents:
-            overpaid = (invoice.amount_paid_cents - invoice.total_cents) / 100
-            message = f"Factuur {invoice.invoice_number} gemarkeerd als betaald. Overbetaling: €{overpaid:.2f}"
-        else:
-            message = f"Factuur {invoice.invoice_number} gemarkeerd als betaald."
-    else:
-        remaining = (invoice.total_cents - invoice.amount_paid_cents) / 100
-        message = f"Betaling €{amount_to_match/100:.2f} gekoppeld aan factuur {invoice.invoice_number}. Nog te ontvangen: €{remaining:.2f}"
-    
-    return ZZPMatchInvoiceResponse(
-        transaction_id=transaction.id,
-        invoice_id=invoice.id,
-        invoice_number=invoice.invoice_number,
-        amount_matched_cents=amount_to_match,
-        invoice_new_status=invoice.status,
-        invoice_amount_paid_cents=invoice.amount_paid_cents,
-        invoice_total_cents=invoice.total_cents,
-        message=message,
-    )
+        return result
+    except (ValueError, LedgerPostingError) as error:
+        await db.rollback()
+        raise HTTPException(
+            409, detail={"code": "BANK_RECONCILIATION_FAILED", "message": str(error)}
+        ) from error
+    except Exception:
+        await db.rollback()
+        raise
 
 
-@router.post("/bank/transactions/{transaction_id}/unmatch", response_model=ZZPUnmatchResponse)
+@router.post(
+    "/bank/transactions/{transaction_id}/unmatch", response_model=ZZPUnmatchResponse
+)
 async def unmatch_transaction_from_invoice(
     transaction_id: uuid.UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    match_id: uuid.UUID = Query(...),
 ):
-    """
-    Unmatch a bank transaction from its matched invoice.
-    
-    - Reverses the payment tracking on the invoice
-    - Updates invoice status if needed (paid → sent if no longer fully paid)
-    """
     require_zzp(current_user)
-    administration = await get_user_administration(current_user.id, db)
-    
-    # Get transaction
-    tx_result = await db.execute(
-        select(BankTransaction)
-        .where(BankTransaction.id == transaction_id)
-        .where(BankTransaction.administration_id == administration.id)
-    )
-    transaction = tx_result.scalar_one_or_none()
-    
-    if not transaction:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "TRANSACTION_NOT_FOUND", "message": "Transactie niet gevonden."}
+    admin = await get_user_administration(current_user.id, db)
+    try:
+        match, invoice = await BankReceiptService(db, admin.id).unmatch(
+            transaction_id, match_id, current_user.id
         )
-    
-    if transaction.status != BankTransactionStatus.MATCHED:
-        raise HTTPException(
-            status_code=400,
-            detail={"code": "NOT_MATCHED", "message": "Deze transactie is niet gematcht aan een factuur."}
+        result = ZZPUnmatchResponse(
+            match_id=match.id,
+            transaction_id=transaction_id,
+            invoice_id=invoice.id,
+            invoice_number=invoice.invoice_number,
+            amount_unmatched_cents=match.amount_cents,
+            invoice_new_status=invoice.status,
+            invoice_amount_paid_cents=invoice.amount_paid_cents,
+            message="Koppeling ongedaan gemaakt. De bankontvangst en historie blijven bewaard.",
         )
-    
-    # Get the match record
-    match_result = await db.execute(
-        select(ZZPBankTransactionMatch)
-        .where(ZZPBankTransactionMatch.bank_transaction_id == transaction.id)
-        .order_by(ZZPBankTransactionMatch.created_at.desc())
-        .limit(1)
-    )
-    match = match_result.scalar_one_or_none()
-    
-    if not match:
+        await db.commit()
+        return result
+    except (ValueError, LedgerPostingError) as error:
+        await db.rollback()
         raise HTTPException(
-            status_code=400,
-            detail={"code": "MATCH_NOT_FOUND", "message": "Match record niet gevonden."}
-        )
-    
-    # Get invoice
-    inv_result = await db.execute(
-        select(ZZPInvoice)
-        .where(ZZPInvoice.id == match.invoice_id)
-    )
-    invoice = inv_result.scalar_one_or_none()
-    
-    if not invoice:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "INVOICE_NOT_FOUND", "message": "Factuur niet gevonden."}
-        )
-    
-    amount_unmatched = match.amount_cents
-    
-    # Reverse the payment
-    invoice.amount_paid_cents = max(0, invoice.amount_paid_cents - amount_unmatched)
-    
-    # Update invoice status if no longer fully paid
-    if invoice.status == InvoiceStatus.PAID.value and invoice.amount_paid_cents < invoice.total_cents:
-        # Check if overdue
-        if invoice.due_date and invoice.due_date < date.today():
-            invoice.status = InvoiceStatus.OVERDUE.value
-        else:
-            invoice.status = InvoiceStatus.SENT.value
-    
-    # Delete match record
-    await db.delete(match)
-    
-    # Update transaction status
-    transaction.status = BankTransactionStatus.NEW
-    transaction.matched_entity_type = None
-    transaction.matched_entity_id = None
-    
-    await db.commit()
-    await db.refresh(invoice)
-    
-    message = f"Match ongedaan gemaakt. €{amount_unmatched/100:.2f} verwijderd van factuur {invoice.invoice_number}."
-    
-    return ZZPUnmatchResponse(
-        transaction_id=transaction.id,
-        invoice_id=invoice.id,
-        invoice_number=invoice.invoice_number,
-        amount_unmatched_cents=amount_unmatched,
-        invoice_new_status=invoice.status,
-        invoice_amount_paid_cents=invoice.amount_paid_cents,
-        message=message,
-    )
+            409, detail={"code": "BANK_RECONCILIATION_FAILED", "message": str(error)}
+        ) from error
+    except Exception:
+        await db.rollback()
+        raise
 
 
 # =============================================================================
 # Match History Endpoint
 # =============================================================================
 
+
 @router.get("/bank/matches", response_model=ZZPBankTransactionMatchListResponse)
 async def list_matches(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     invoice_id: Optional[uuid.UUID] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ):
     """
     List all bank transaction matches for audit purposes.
     """
     require_zzp(current_user)
     administration = await get_user_administration(current_user.id, db)
-    
-    query = (
-        select(ZZPBankTransactionMatch)
-        .where(ZZPBankTransactionMatch.administration_id == administration.id)
-        .order_by(ZZPBankTransactionMatch.created_at.desc())
-    )
-    
+
+    scope = [
+        ZZPBankTransactionMatch.administration_id == administration.id,
+        ZZPInvoice.administration_id == administration.id,
+    ]
     if invoice_id:
-        query = query.where(ZZPBankTransactionMatch.invoice_id == invoice_id)
-    
-    result = await db.execute(query)
-    matches = result.scalars().all()
-    
-    # Get invoice numbers for each match
-    response_matches = []
-    for m in matches:
-        inv_result = await db.execute(
-            select(ZZPInvoice.invoice_number)
-            .where(ZZPInvoice.id == m.invoice_id)
+        scope.append(ZZPBankTransactionMatch.invoice_id == invoice_id)
+    query = (
+        select(ZZPBankTransactionMatch, ZZPInvoice.invoice_number)
+        .join(ZZPInvoice, ZZPInvoice.id == ZZPBankTransactionMatch.invoice_id)
+        .where(*scope)
+    )
+    total = await db.scalar(select(func.count()).select_from(query.subquery()))
+    rows = (
+        await db.execute(
+            query.order_by(
+                ZZPBankTransactionMatch.created_at.desc(),
+                ZZPBankTransactionMatch.id.desc(),
+            )
+            .limit(limit)
+            .offset(offset)
         )
-        row = inv_result.first()
-        invoice_number = row[0] if row else "N/A"
-        
-        response_matches.append(ZZPBankTransactionMatchResponse(
-            id=m.id,
-            bank_transaction_id=m.bank_transaction_id,
-            invoice_id=m.invoice_id,
-            invoice_number=invoice_number,
-            amount_cents=m.amount_cents,
-            match_type=m.match_type,
-            confidence_score=m.confidence_score,
-            notes=m.notes,
-            created_at=m.created_at,
-            user_id=m.user_id,
-        ))
-    
+    ).all()
     return ZZPBankTransactionMatchListResponse(
-        matches=response_matches,
-        total=len(response_matches),
+        matches=[
+            ZZPBankTransactionMatchResponse(
+                id=m.id,
+                administration_id=m.administration_id,
+                bank_transaction_id=m.bank_transaction_id,
+                invoice_id=m.invoice_id,
+                invoice_number=number,
+                amount_cents=m.amount_cents,
+                match_type=m.match_type,
+                confidence_score=m.confidence_score,
+                notes=m.notes,
+                created_at=m.created_at,
+                user_id=m.user_id,
+                payment_id=m.payment_id,
+                allocation_id=m.allocation_id,
+                active=m.active,
+                reversed_at=m.reversed_at,
+                reversed_by_id=m.reversed_by_id,
+            )
+            for m, number in rows
+        ],
+        total=total,
     )
 
 

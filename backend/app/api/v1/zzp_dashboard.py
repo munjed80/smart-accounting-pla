@@ -315,6 +315,14 @@ async def get_zzp_dashboard(
     
     actions: List[ActionItem] = []
     
+    refund_balance = ZZPInvoice.amount_paid_cents + ZZPInvoice.credited_cents - ZZPInvoice.total_cents - ZZPInvoice.refunded_cents
+    refund_count, refund_amount = (await db.execute(select(func.count(),func.coalesce(func.sum(refund_balance),0)).where(
+        ZZPInvoice.administration_id == admin_id, refund_balance > 0))).one()
+    if refund_count:
+        actions.append(ActionItem(id='customer-refunds',type='customer_refund',severity='warning',
+            title='Terugbetalingen aan klanten',description='Bekijk de creditnota’s en registreer uitgevoerde terugbetalingen.',
+            count=refund_count,amount_cents=refund_amount,route='/zzp/invoices?status=refund_due'))
+
     # Missing profile action
     if not profile:
         actions.append(ActionItem(
@@ -576,7 +584,7 @@ async def get_monthly_invoices(
     issued = await db.execute(select(extract('year', ZZPInvoice.issue_date).label('year'),
         extract('month', ZZPInvoice.issue_date).label('month'), func.sum(ZZPInvoice.total_cents).label('sent_total'),
         func.count().label('sent_count'),
-        func.sum(case((ZZPInvoice.status == 'paid', ZZPInvoice.total_cents), else_=0)).label('paid_total'),
+        func.sum(case((ZZPInvoice.status == 'paid', case((ZZPInvoice.credited_cents > 0, ZZPInvoice.amount_paid_cents - ZZPInvoice.refunded_cents), else_=ZZPInvoice.total_cents)), else_=0)).label('paid_total'),
         func.sum(case((ZZPInvoice.status == 'paid', 1), else_=0)).label('paid_count'),
         func.sum(case((ZZPInvoice.status.in_(['sent','overdue']), net_open), else_=0)).label('open_total'),
         func.sum(case((and_(ZZPInvoice.status.in_(['sent','overdue']), net_open > 0), 1), else_=0)).label('open_count'),

@@ -351,6 +351,10 @@ class InvoiceResponse(BaseModel):
     subtotal_cents: int
     vat_total_cents: int
     total_cents: int
+    credited_cents: int = 0
+    refunded_cents: int = 0
+    outstanding_cents: int = 0
+    refund_due_cents: int = 0
     amount_paid_cents: int
     paid_at: Optional[datetime]
     
@@ -871,118 +875,125 @@ class WeeklyInvoiceCreateResponse(BaseModel):
 # ============================================================================
 
 class ZZPBankAccountResponse(BaseModel):
-    """Bank account response."""
     id: UUID
     administration_id: UUID
-    account_name: str
     iban: str
-    balance_cents: int
+    bank_name: Optional[str] = None
+    currency: str
     created_at: datetime
-    updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 class ZZPBankAccountListResponse(BaseModel):
-    """List of bank accounts."""
     accounts: List[ZZPBankAccountResponse]
     total: int
 
 
 class ZZPBankTransactionResponse(BaseModel):
-    """Bank transaction response."""
     id: UUID
     bank_account_id: UUID
     administration_id: UUID
-    transaction_date: date
+    booking_date: date
     amount_cents: int
+    currency: str
     description: str
-    counterparty_name: Optional[str]
-    counterparty_account: Optional[str]
-    reference: Optional[str]
-    is_matched: bool
+    counterparty_name: Optional[str] = None
+    counterparty_iban: Optional[str] = None
+    reference: Optional[str] = None
+    status: str
+    matched_invoice_id: Optional[UUID] = None
+    matched_invoice_number: Optional[str] = None
+    match_id: Optional[UUID] = None
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class ZZPBankTransactionListResponse(BaseModel):
-    """List of bank transactions."""
     transactions: List[ZZPBankTransactionResponse]
     total: int
+    page: int
+    page_size: int
 
 
 class ZZPBankImportResponse(BaseModel):
-    """Response after importing bank transactions."""
     imported_count: int
-    skipped_count: int
-    total_count: int
+    skipped_duplicates_count: int
+    total_in_file: int
+    errors: List[str]
+    message: str
+    bank_account_id: Optional[UUID] = None
 
 
 class ZZPInvoiceMatchSuggestion(BaseModel):
-    """Invoice match suggestion."""
     invoice_id: UUID
     invoice_number: str
-    customer_name: Optional[str]
-    total_cents: int
-    amount_due_cents: int
+    customer_name: Optional[str] = None
+    invoice_total_cents: int
+    invoice_open_cents: int
+    invoice_date: date
     confidence_score: int
     match_reason: str
 
 
 class ZZPMatchSuggestionsResponse(BaseModel):
-    """List of invoice match suggestions."""
+    transaction_id: UUID
     suggestions: List[ZZPInvoiceMatchSuggestion]
+    message: str
 
 
 class ZZPMatchInvoiceRequest(BaseModel):
-    """Request to match a transaction to an invoice."""
     invoice_id: UUID
-    amount_cents: Optional[int] = None  # For partial payments
-    notes: Optional[str] = None
+    amount_cents: Optional[int] = Field(None, gt=0, strict=True)
+    notes: Optional[str] = Field(None, max_length=1000)
 
 
 class ZZPMatchInvoiceResponse(BaseModel):
-    """Response after matching."""
     match_id: UUID
+    active: bool
     transaction_id: UUID
     invoice_id: UUID
-    amount_cents: int
+    invoice_number: str
+    amount_matched_cents: int
+    invoice_new_status: str
+    invoice_amount_paid_cents: int
+    invoice_total_cents: int
     message: str
 
 
 class ZZPUnmatchResponse(BaseModel):
-    """Response after unmatching."""
+    match_id: UUID
     transaction_id: UUID
     invoice_id: UUID
+    invoice_number: str
+    amount_unmatched_cents: int
+    invoice_new_status: str
+    invoice_amount_paid_cents: int
     message: str
 
 
 class ZZPBankTransactionMatchResponse(BaseModel):
-    """Bank transaction match response."""
     id: UUID
     administration_id: UUID
     bank_transaction_id: UUID
     invoice_id: UUID
-    user_id: Optional[UUID]
+    invoice_number: str
+    user_id: Optional[UUID] = None
     amount_cents: int
     match_type: str
-    confidence_score: Optional[int]
-    notes: Optional[str]
+    confidence_score: Optional[int] = None
+    notes: Optional[str] = None
+    payment_id: Optional[UUID] = None
+    allocation_id: Optional[UUID] = None
+    active: bool
+    reversed_at: Optional[datetime] = None
+    reversed_by_id: Optional[UUID] = None
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class ZZPBankTransactionMatchListResponse(BaseModel):
-    """List of bank transaction matches."""
     matches: List[ZZPBankTransactionMatchResponse]
     total: int
-
-
 # ============================================================================
 # PSD2 Bank Connection Schemas (GoCardless)
 # ============================================================================

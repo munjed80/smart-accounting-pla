@@ -63,3 +63,10 @@ uploads/
 # Browser style regression outputs
 playwright-report/
 test-results/
+
+# Live independent-deployment configuration and snapshots
+deploy/config/*
+!deploy/config/.gitkeep
+*.dump
+
+runtime-export.json

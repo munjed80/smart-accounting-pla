@@ -1,0 +1,7 @@
+{
+    email {$ACME_EMAIL}
+}
+{$APP_DOMAIN}, {$API_DOMAIN} {
+    header Retry-After 120
+    respond "Onderhoud. Probeer het over enkele minuten opnieuw." 503
+}

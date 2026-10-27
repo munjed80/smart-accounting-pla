@@ -1,0 +1,92 @@
+name: zzpershub
+x-common: &common
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: {max-size: '10m', max-file: '5'}
+  networks: [app]
+services:
+  db:
+    <<: *common
+    image: ${POSTGRES_IMAGE:-postgres:15-alpine}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+    volumes: ['${DATA_DIR:?required}/postgres:/var/lib/postgresql/data']
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  redis:
+    <<: *common
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    command: [redis-server, --appendonly, '${REDIS_APPENDONLY:-yes}', --appendfsync, everysec]
+    volumes: ['${DATA_DIR}/redis:/data']
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  backend:
+    <<: *common
+    image: ${BACKEND_IMAGE:?release required}
+    env_file:
+      - path: ${CONFIG_DIR:?required}/backend.env
+        format: raw
+    # Release operations run migrations explicitly before starting writers.
+    entrypoint: [uvicorn]
+    command: [app.main:app, --host, 0.0.0.0, --port, '8000', --proxy-headers, --forwarded-allow-ips, '*']
+    volumes:
+      - ${DATA_DIR}/uploads:${UPLOAD_DIR:-/data/uploads}
+      - ${DATA_DIR}/evidence:${EVIDENCE_STORAGE_PATH:-/data/evidence}
+      - ${CONFIG_DIR}/secrets:/secrets:ro
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import json,urllib.request; d=json.load(urllib.request.urlopen('http://localhost:8000/health',timeout=5)); assert d['status']=='healthy' and d['components']['redis']['status']=='healthy'"]
+      interval: 10s
+      timeout: 8s
+      retries: 12
+      start_period: 30s
+  worker:
+    <<: *common
+    image: ${WORKER_IMAGE:?release required}
+    env_file:
+      - path: ${CONFIG_DIR}/worker.env
+        format: raw
+    volumes: ['${DATA_DIR}/uploads:${UPLOAD_DIR:-/data/uploads}']
+    depends_on:
+      backend: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, healthcheck.py]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+  frontend:
+    <<: *common
+    image: ${FRONTEND_IMAGE:?release required}
+    healthcheck:
+      test: [CMD, wget, -qO-, http://127.0.0.1/healthz]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+  caddy:
+    <<: *common
+    image: ${CADDY_IMAGE:-caddy:2-alpine}
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?required}
+      API_DOMAIN: ${API_DOMAIN:?required}
+      ACME_EMAIL: ${ACME_EMAIL:?required}
+    ports: ['80:80', '443:443', '443:443/udp']
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile.maintenance:/etc/caddy/Caddyfile.maintenance:ro
+      - ${DATA_DIR}/caddy:/data
+      - ${DATA_DIR}/caddy-config:/config
+networks:
+  # Unpublished services remain private while retaining outbound integration access.
+  app: {}

@@ -667,6 +667,7 @@ class Worker:
         
         while True:
             try:
+                Path('/tmp/worker-heartbeat').touch()
                 # Read from stream
                 messages = self.redis_client.xreadgroup(
                     self.consumer_group,

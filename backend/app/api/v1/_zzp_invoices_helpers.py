@@ -108,6 +108,10 @@ def invoice_to_response(invoice: ZZPInvoice) -> InvoiceResponse:
         vat_total_cents=invoice.vat_total_cents,
         total_cents=invoice.total_cents,
         amount_paid_cents=invoice.amount_paid_cents,
+        credited_cents=invoice.credited_cents or 0,
+        refunded_cents=invoice.refunded_cents or 0,
+        outstanding_cents=max(0,invoice.total_cents-(invoice.credited_cents or 0)-invoice.amount_paid_cents+(invoice.refunded_cents or 0)),
+        refund_due_cents=max(0,invoice.amount_paid_cents+(invoice.credited_cents or 0)-invoice.total_cents-(invoice.refunded_cents or 0)),
         paid_at=invoice.paid_at,
         notes=invoice.notes,
         lines=[

@@ -318,6 +318,9 @@ class ZZPInvoice(Base):
     total_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     
     # Payment tracking for bank reconciliation
+    credited_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default='0')
+    refunded_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default='0')
+    credit_references: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     amount_paid_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     
     # Payment timestamp - set when invoice is marked as paid
@@ -772,6 +775,16 @@ class ZZPBankTransactionMatch(Base):
     confidence_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 0-100
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
+    # Durable receipt identity; allocation_id remains as an audit reference after unlinking.
+    payment_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("zzp_payments.id", ondelete="RESTRICT"), nullable=True, index=True)
+    allocation_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    reversed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    reversed_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    creation_key: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    payload_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    __table_args__ = (UniqueConstraint("administration_id", "creation_key", name="uq_zzp_bank_match_creation"),)
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -780,7 +793,7 @@ class ZZPBankTransactionMatch(Base):
     # Relationships
     administration = relationship("Administration")
     invoice = relationship("ZZPInvoice")
-    user = relationship("User")
+    user = relationship("User", foreign_keys=[user_id])
 
 
 # ============================================================================

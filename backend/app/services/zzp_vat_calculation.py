@@ -20,6 +20,8 @@ from app.services.money import round_cents
 class VatCalculation:
     basis: str
     policy_confirmed: bool
+    credit_note_count: int = 0
+    credit_vat_cents: int = 0
     output_vat: int = 0
     omzet: int = 0
     input_vat: int = 0
@@ -367,4 +369,6 @@ async def calculate_vat(
             or (expense.vat_amount_cents or 0) > expense.amount_cents
         ):
             result.issues.add("EXPENSE_VAT_REQUIRES_REVIEW")
+    from app.services.credit_vat import apply_credit_vat
+    await apply_credit_vat(db, administration_id, start, end, result, policy)
     return result

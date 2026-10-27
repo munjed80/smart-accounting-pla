@@ -159,6 +159,10 @@ export interface ZZPInvoice {
   vat_total_cents: number
   total_cents: number
   amount_paid_cents: number
+  credited_cents?: number
+  refunded_cents?: number
+  outstanding_cents?: number
+  refund_due_cents?: number
   // Payment timestamp
   paid_at?: string
   notes?: string | null
@@ -220,6 +224,7 @@ export interface ZZPBankTransaction {
   description: string
   reference?: string
   status: 'NEW' | 'MATCHED' | 'IGNORED' | 'NEEDS_REVIEW'
+  match_id?: string
   matched_invoice_id?: string
   matched_invoice_number?: string
   created_at: string
@@ -265,6 +270,8 @@ export interface ZZPMatchInvoiceRequest {
 }
 
 export interface ZZPMatchInvoiceResponse {
+  match_id: string
+  active: boolean
   transaction_id: string
   invoice_id: string
   invoice_number: string
@@ -276,6 +283,7 @@ export interface ZZPMatchInvoiceResponse {
 }
 
 export interface ZZPUnmatchResponse {
+  match_id: string
   transaction_id: string
   invoice_id: string
   invoice_number: string
@@ -286,6 +294,11 @@ export interface ZZPUnmatchResponse {
 }
 
 export interface ZZPBankTransactionMatch {
+  payment_id?: string
+  allocation_id?: string
+  active: boolean
+  reversed_at?: string
+  reversed_by_id?: string
   id: string
   bank_transaction_id: string
   invoice_id: string
@@ -1544,27 +1557,30 @@ export const zzpApi = {
     /** Match a transaction to an invoice */
     matchToInvoice: async (
       transactionId: string,
-      data: ZZPMatchInvoiceRequest
+      data: ZZPMatchInvoiceRequest,
+      idempotencyKey: string = crypto.randomUUID()
     ): Promise<ZZPMatchInvoiceResponse> => {
       const response = await api.post<ZZPMatchInvoiceResponse>(
         `/zzp/bank/transactions/${transactionId}/match`,
-        data
+        data, { headers: { 'Idempotency-Key': idempotencyKey } }
       )
       return response.data
     },
 
     /** Unmatch a transaction from its invoice */
-    unmatch: async (transactionId: string): Promise<ZZPUnmatchResponse> => {
+    unmatch: async (transactionId: string, matchId: string): Promise<ZZPUnmatchResponse> => {
       const response = await api.post<ZZPUnmatchResponse>(
-        `/zzp/bank/transactions/${transactionId}/unmatch`
+        `/zzp/bank/transactions/${transactionId}/unmatch`, undefined, { params: { match_id: matchId } }
       )
       return response.data
     },
 
     /** List all matches (audit trail) */
-    listMatches: async (invoiceId?: string): Promise<ZZPBankTransactionMatchListResponse> => {
+    listMatches: async (invoiceId?: string, offset = 0, limit = 50): Promise<ZZPBankTransactionMatchListResponse> => {
       const params: Record<string, string> = {}
       if (invoiceId) params.invoice_id = invoiceId
+      params.offset = String(offset)
+      params.limit = String(limit)
       
       const response = await api.get<ZZPBankTransactionMatchListResponse>('/zzp/bank/matches', { params })
       return response.data

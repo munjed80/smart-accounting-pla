@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.administration import Administration
 from app.models.payment import ZZPPayment, ZZPPaymentAllocation, PaymentStatus
 from app.models.zzp import ZZPInvoice, ZZPCustomer
+from app.repositories.ledger_repository import LedgerRepository
 from app.services.zzp_integrity import (
     require_open_dates,
     sync_invoice,
@@ -56,6 +57,36 @@ class PaymentService:
             value.replace(tzinfo=timezone.utc)
             if value.tzinfo is None
             else value.astimezone(timezone.utc)
+        )
+
+    async def require_receipt_period(self, invoice, payment_date):
+        paid = await self.db.scalar(
+            select(
+                func.coalesce(func.sum(ZZPPaymentAllocation.allocated_amount_cents), 0)
+            )
+            .join(ZZPPayment)
+            .where(
+                ZZPPaymentAllocation.invoice_id == invoice.id,
+                ZZPPayment.administration_id == self.administration_id,
+                ZZPPayment.status == "completed",
+            )
+        )
+        if paid != (invoice.amount_paid_cents or 0):
+            raise HTTPException(
+                409,
+                detail={
+                    "code": "ORIGINAL_RECEIPTS_UNRECONCILED",
+                    "message": "De historische ontvangsten sluiten niet aan op de factuur. Laat deze eerst controleren.",
+                },
+            )
+        posted = await LedgerRepository(
+            self.db, self.administration_id
+        ).has_posted_entry_for_reference("INVOICE", invoice.id)
+        await require_open_dates(
+            self.db,
+            self.administration_id,
+            payment_date,
+            None if posted else invoice.issue_date,
         )
 
     async def create_payment(
@@ -128,12 +159,7 @@ class PaymentService:
         )
         if payment is None or payment.status != PaymentStatus.COMPLETED.value:
             raise ValueError("Betaling niet gevonden of niet actief.")
-        await require_open_dates(
-            self.db,
-            self.administration_id,
-            invoice.issue_date,
-            payment.payment_date.date(),
-        )
+        await self.require_receipt_period(invoice, payment.payment_date.date())
         if payment.customer_id and payment.customer_id != invoice.customer_id:
             raise ValueError("De betaling hoort bij een andere klant.")
         used = await self.db.scalar(
@@ -141,7 +167,7 @@ class PaymentService:
                 func.coalesce(func.sum(ZZPPaymentAllocation.allocated_amount_cents), 0)
             ).where(ZZPPaymentAllocation.payment_id == payment.id)
         )
-        outstanding = invoice.total_cents - await self.get_invoice_paid_amount(
+        outstanding = invoice.total_cents - (invoice.credited_cents or 0) + (invoice.refunded_cents or 0) - await self.get_invoice_paid_amount(
             invoice_id
         )
         if allocated_amount_cents <= 0 or allocated_amount_cents > min(
@@ -193,7 +219,7 @@ class PaymentService:
         invoice = await self._invoice(invoice_id)
         paid = await self.get_invoice_paid_amount(invoice_id)
         invoice.amount_paid_cents = paid
-        if paid >= invoice.total_cents and invoice.total_cents > 0:
+        if paid > 0 and paid + (invoice.credited_cents or 0) - (invoice.refunded_cents or 0) >= invoice.total_cents and invoice.total_cents > 0:
             invoice.status = "paid"
             latest = await self.db.scalar(
                 select(func.max(ZZPPayment.payment_date))
@@ -221,7 +247,7 @@ class PaymentService:
         notes: Optional[str] = None,
     ):
         invoice = await self._invoice(invoice_id, lock=True)
-        outstanding = invoice.total_cents - await self.get_invoice_paid_amount(
+        outstanding = invoice.total_cents - (invoice.credited_cents or 0) + (invoice.refunded_cents or 0) - await self.get_invoice_paid_amount(
             invoice_id
         )
         if outstanding <= 0:
@@ -245,10 +271,8 @@ class PaymentService:
                 "Alleen een verzonden of vervallen factuur kan worden betaald."
             )
         payment_date = self._date(payment_date)
-        await require_open_dates(
-            self.db, self.administration_id, invoice.issue_date, payment_date.date()
-        )
-        outstanding = invoice.total_cents - await self.get_invoice_paid_amount(
+        await self.require_receipt_period(invoice, payment_date.date())
+        outstanding = invoice.total_cents - (invoice.credited_cents or 0) + (invoice.refunded_cents or 0) - await self.get_invoice_paid_amount(
             invoice_id
         )
         if amount_cents <= 0 or amount_cents > outstanding:
@@ -268,6 +292,8 @@ class PaymentService:
 
     async def mark_invoice_unpaid(self, invoice_id: UUID) -> None:
         invoice = await self._invoice(invoice_id, lock=True)
+        if invoice.credited_cents or invoice.refunded_cents:
+            raise HTTPException(409,detail={'code':'CREDIT_HISTORY_EXISTS','message':'Deze factuur heeft credit- of terugbetalingshistorie. Laat betalingscorrecties door je boekhouder aansluiten.'})
         result = await self.db.execute(
             select(ZZPPaymentAllocation, ZZPPayment)
             .join(ZZPPayment)
@@ -279,6 +305,8 @@ class PaymentService:
             .with_for_update()
         )
         rows = result.all()
+        if any(payment.bank_transaction_id for _, payment in rows):
+            raise HTTPException(409, detail={"code":"BANK_MATCH_EXISTS", "message":"Maak de bankkoppeling ongedaan vanuit de bankhistorie. De ontvangst blijft bewaard."})
         await require_open_dates(
             self.db,
             self.administration_id,
@@ -337,7 +365,7 @@ class PaymentService:
             invoice_number=invoice.invoice_number,
             invoice_total_cents=invoice.total_cents,
             total_paid_cents=paid,
-            total_outstanding_cents=max(0, invoice.total_cents - paid),
-            is_fully_paid=paid >= invoice.total_cents,
+            total_outstanding_cents=max(0, invoice.total_cents - (invoice.credited_cents or 0) - paid + (invoice.refunded_cents or 0)),
+            is_fully_paid=paid + (invoice.credited_cents or 0) - (invoice.refunded_cents or 0) >= invoice.total_cents,
             payments=payments,
         )

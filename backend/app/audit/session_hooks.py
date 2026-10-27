@@ -24,6 +24,9 @@ logger = logging.getLogger(__name__)
 ENTITY_TYPE_MAP: Dict[str, str] = {
     # ZZP Invoice & Expense
     "ZZPInvoice": "invoice",
+    "ZZPCreditNote": "credit_note",
+    "ZZPCustomerRefund": "customer_refund",
+    "ZZPBankTransactionMatch": "bank_match",
     "ZZPExpense": "expense",
     "ZZPVatPolicy": "vat_policy",
     

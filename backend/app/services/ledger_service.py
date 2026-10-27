@@ -113,7 +113,12 @@ class LedgerPostingService:
         if await self.repository.has_posted_entry_for_reference('PAYMENT_ALLOCATION', allocation.id):
             return
         await self.post_invoice(invoice.id)
-        bank = await self._require_account('1100')
+        if payment.bank_transaction_id:
+            if not await self.repository.has_posted_entry_for_reference('BANK', payment.bank_transaction_id):
+                raise LedgerPostingError('Bank receipt must be posted before allocation')
+            bank = await self._require_account('9999')
+        else:
+            bank = await self._require_account('1100')
         ar = await self._require_account('1300')
         amount = self._cents_to_decimal(allocation.allocated_amount_cents)
         if amount <= 0:

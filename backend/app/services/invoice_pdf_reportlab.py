@@ -265,9 +265,9 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
 
         # Right inner table: FACTUUR title + meta table
         meta_rows = [
-            [Paragraph("Factuurdatum",  s_meta_label), Paragraph(issue_date_str,          s_meta_value)],
+            [Paragraph("Creditdatum" if invoice.status == "credit_note" else "Factuurdatum",  s_meta_label), Paragraph(issue_date_str,          s_meta_value)],
             [Paragraph("Vervaldatum",   s_meta_label), Paragraph(due_date_str,             s_meta_value)],
-            [Paragraph("Factuurnummer", s_meta_label), Paragraph(invoice.invoice_number,   s_meta_value)],
+            [Paragraph("Creditnotanummer" if invoice.status == "credit_note" else "Factuurnummer", s_meta_label), Paragraph(invoice.invoice_number,   s_meta_value)],
         ]
         meta_tbl = Table(meta_rows, colWidths=[38 * mm, 32 * mm])
         meta_tbl.setStyle(TableStyle([
@@ -282,7 +282,7 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
         ]))
 
         right_inner = Table(
-            [[Paragraph({"draft": "CONCEPT", "cancelled": "GEANNULEERD", "paid": "BETAALD"}.get(invoice.status, "FACTUUR"), s_factuur_title)], [meta_tbl]],
+            [[Paragraph({"credit_note": "CREDITNOTA", "draft": "CONCEPT", "cancelled": "GEANNULEERD", "paid": "BETAALD"}.get(invoice.status, "FACTUUR"), s_factuur_title)], [meta_tbl]],
             colWidths=[_RIGHT_COL],
         )
         right_inner.setStyle(TableStyle([
@@ -320,7 +320,7 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
 
         if invoice.delivery_date:
             elements.append(Paragraph(f"Leverdatum: {format_date_nl(invoice.delivery_date)}", s_customer_addr))
-        elements.append(Paragraph("FACTUUR VOOR", s_section_label))
+        elements.append(Paragraph("CREDITNOTA VOOR" if invoice.status == "credit_note" else "FACTUUR VOOR", s_section_label))
         elements.append(Paragraph(invoice.customer_name or "\u2014", s_customer_name))
         if cust_addr_lines:
             elements.append(Paragraph("<br/>".join(cust_addr_lines), s_customer_addr))
@@ -333,8 +333,7 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
 
         # ── Intro line ────────────────────────────────────────────────────────
         elements.append(Paragraph(
-            "Bedankt voor uw vertrouwen. "
-            "Hieronder vindt u de factuur voor de geleverde diensten.",
+            "Hieronder vindt u de overeengekomen correctie op uw oorspronkelijke factuur." if invoice.status == "credit_note" else "Bedankt voor uw vertrouwen. Hieronder vindt u de factuur voor de geleverde diensten.",
             s_intro,
         ))
         elements.append(Spacer(1, 6 * mm))
@@ -460,6 +459,9 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
             pay_instruction_parts.append(f"o.v.v. {invoice.invoice_number}.")
         pay_instruction = " ".join(pay_instruction_parts) if pay_instruction_parts else None
 
+        if invoice.status == 'credit_note':
+            pay_instruction = None
+            payment_rows = [[Paragraph('Creditnota',s_pay_lbl),Paragraph('Geen betaalverzoek. Een eventuele terugbetaling wordt apart uitgevoerd en geregistreerd.',s_pay_val)]]
         if payment_rows:
             pay_inner = Table(payment_rows, colWidths=[30 * mm, 116 * mm])
             pay_inner.setStyle(TableStyle([
@@ -470,7 +472,7 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
                 ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
             ]))
 
-            pay_box_rows = [[Paragraph("BETAALGEGEVENS", s_pay_title)], [pay_inner]]
+            pay_box_rows = [[Paragraph("VERREKENING" if invoice.status == "credit_note" else "BETAALGEGEVENS", s_pay_title)], [pay_inner]]
             if pay_instruction:
                 pay_box_rows.append([Paragraph(pay_instruction, s_pay_lbl)])
 

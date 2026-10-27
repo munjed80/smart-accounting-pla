@@ -1,6 +1,6 @@
 import { ZZPInvoice, ZZPTimeEntry } from '@/lib/api'
 
-export type InvoiceStatusFilter = 'all' | 'open' | ZZPInvoice['status']
+export type InvoiceStatusFilter = 'all' | 'open' | 'refund_due' | ZZPInvoice['status']
 export type TimeBillableFilter = 'all' | 'billable' | 'non_billable'
 export type TimeInvoicedFilter = 'all' | 'invoiced' | 'not_invoiced'
 
@@ -46,8 +46,10 @@ export const filterInvoices = (invoices: ZZPInvoice[], filters: InvoiceFilters):
   const query = filters.q.trim().toLowerCase()
 
   return invoices.filter((invoice) => {
-    if (filters.status === 'open') {
-      if (!['sent', 'overdue'].includes(invoice.status) || invoice.total_cents - (invoice.amount_paid_cents || 0) <= 0) return false
+    if (filters.status === 'refund_due') {
+      if ((invoice.amount_paid_cents || 0) + (invoice.credited_cents || 0) - invoice.total_cents - (invoice.refunded_cents || 0) <= 0) return false
+    } else if (filters.status === 'open') {
+      if (!['sent', 'overdue'].includes(invoice.status) || invoice.total_cents - (invoice.amount_paid_cents || 0) - (invoice.credited_cents || 0) + (invoice.refunded_cents || 0) <= 0) return false
     } else if (filters.status !== 'all' && invoice.status !== filters.status) return false
     if (filters.customer_id && invoice.customer_id !== filters.customer_id) return false
 

@@ -82,16 +82,16 @@ class TestInvoiceStatusTransitions:
         test_invoice_sent: ZZPInvoice,
         auth_headers: dict
     ):
-        """Sent invoice can be cancelled."""
+        """Issued invoices require a credit note, preserving the original."""
         response = await async_client.patch(
             f"/api/v1/zzp/invoices/{test_invoice_sent.id}/status",
             json={"status": "cancelled"},
             headers=auth_headers
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 409
         data = response.json()
-        assert data["status"] == "cancelled"
+        assert data["detail"]["code"] == "USE_CREDIT_NOTE"
 
     @pytest.mark.asyncio
     async def test_status_draft_to_cancelled(

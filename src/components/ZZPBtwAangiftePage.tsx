@@ -560,6 +560,7 @@ const QuarterDetail = ({
 
   return (
     <div className="space-y-6">
+      {!!overview.credit_note_count && <p className="rounded-lg border p-3 text-sm">{overview.credit_note_count} creditnota’s in deze periode · btw op creditnota’s {formatCurrency(overview.credit_vat_cents || 0)}. {overview.basis === 'factuurstelsel' ? 'Verwerkt als vermindering in de bovenstaande verkoopbedragen.' : 'Laat de fiscale verwerking aansluiten door je boekhouder; terugbetalingen verlagen de schatting niet automatisch.'}</p>}
       {/* Key metric cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard

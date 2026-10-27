@@ -318,6 +318,9 @@ class ZZPInvoice(Base):
     total_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     
     # Payment tracking for bank reconciliation
+    credited_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default='0')
+    refunded_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default='0')
+    credit_references: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     amount_paid_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     
     # Payment timestamp - set when invoice is marked as paid

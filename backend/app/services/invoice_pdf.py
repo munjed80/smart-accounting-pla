@@ -29,7 +29,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
         HTML string for the invoice
     """
     invoice = invoice_view(invoice, escape_text=True)
-    status_label = {'draft': 'CONCEPT', 'cancelled': 'GEANNULEERD', 'paid': 'BETAALD'}.get(invoice.status, 'FACTUUR')
+    status_label = {'credit_note': 'CREDITNOTA', 'draft': 'CONCEPT', 'cancelled': 'GEANNULEERD', 'paid': 'BETAALD'}.get(invoice.status, 'FACTUUR')
     # ── Company / seller details ───────────────────────────────────────────────
     company_name = invoice.seller_company_name or invoice.seller_trading_name
     company_missing = not company_name
@@ -112,6 +112,9 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
     if invoice.seller_btw_number:
         payment_rows_html += f'<div class="pd-row"><span class="pd-lbl">BTW-nummer</span><span class="pd-val">{invoice.seller_btw_number}</span></div>'
 
+    if invoice.status == 'credit_note':
+        payment_rows_html = '<p>Geen betaalverzoek. Een eventuele terugbetaling wordt afzonderlijk uitgevoerd en geregistreerd.</p>'
+
     # ── Notes block ────────────────────────────────────────────────────────────
     notes_html = ""
     if invoice.notes:
@@ -126,7 +129,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <title>Factuur {invoice.invoice_number}</title>
+    <title>{"Creditnota" if invoice.status == "credit_note" else "Factuur"} {invoice.invoice_number}</title>
     <style>
         @page {{
             size: A4;
@@ -420,7 +423,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                 <div class="factuur-title">{status_label}</div>
                 <table class="meta-table">
                     <tr>
-                        <td class="ml">Factuurdatum</td>
+                        <td class="ml">{'Creditdatum' if invoice.status == 'credit_note' else 'Factuurdatum'}</td>
                         <td class="mv">{issue_date_str}</td>
                     </tr>
                     <tr class="meta-sep">
@@ -428,7 +431,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
                         <td class="mv">{due_date_str}</td>
                     </tr>
                     <tr class="meta-below-sep">
-                        <td class="ml">Factuurnummer</td>
+                        <td class="ml">{'Creditnotanummer' if invoice.status == 'credit_note' else 'Factuurnummer'}</td>
                         <td class="mv">{invoice.invoice_number}</td>
                     </tr>
                 </table>
@@ -438,7 +441,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
         {f'<p class="section-label">Leverdatum: {delivery_date_str}</p>' if delivery_date_str else ''}
         <!-- ── CUSTOMER ── -->
         <div class="customer-section">
-            <div class="section-label">Factuur voor</div>
+            <div class="section-label">{'Creditnota voor' if invoice.status == 'credit_note' else 'Factuur voor'}</div>
             {f'<div class="customer-name">{invoice.customer_name}</div>' if invoice.customer_name else ''}
             {f'<div class="customer-address">{customer_addr_html}</div>' if customer_addr_html else ''}
             {f'<div class="customer-address">KvK: {invoice.customer_kvk_number}</div>' if invoice.customer_kvk_number else ''}
@@ -446,7 +449,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
         </div>
 
         <!-- ── INTRO LINE ── -->
-        <p class="intro-text">Bedankt voor uw vertrouwen. Hieronder vindt u de factuur voor de geleverde diensten.</p>
+        <p class="intro-text">{'Hieronder vindt u de overeengekomen correctie op uw oorspronkelijke factuur.' if invoice.status == 'credit_note' else 'Bedankt voor uw vertrouwen. Hieronder vindt u de factuur voor de geleverde diensten.'}</p>
 
         <!-- ── INVOICE TABLE ── -->
         <table class="lines-table">
@@ -485,7 +488,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
 
         <!-- ── PAYMENT DETAILS ── -->
         <div class="payment-box">
-            <div class="payment-title">Betaalgegevens</div>
+            <div class="payment-title">{"Verrekening" if invoice.status == "credit_note" else "Betaalgegevens"}</div>
             {payment_rows_html}
         </div>
 

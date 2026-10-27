@@ -220,3 +220,5 @@ __all__ = [
 ]
 
 from .zzp_vat_policy import ZZPVatPolicy
+
+from .credit_note import ZZPCreditNote, ZZPCreditLine, ZZPCustomerRefund, ZZPCreditCounter

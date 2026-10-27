@@ -159,6 +159,10 @@ export interface ZZPInvoice {
   vat_total_cents: number
   total_cents: number
   amount_paid_cents: number
+  credited_cents?: number
+  refunded_cents?: number
+  outstanding_cents?: number
+  refund_due_cents?: number
   // Payment timestamp
   paid_at?: string
   notes?: string | null

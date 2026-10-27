@@ -1330,3 +1330,5 @@ export * from './api/vat'
 export * from './api/document-review'
 export * from './api/observability'
 export * from './api/accountant'
+
+export * from './api/credits'

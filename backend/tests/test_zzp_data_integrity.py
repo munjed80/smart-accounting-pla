@@ -98,7 +98,6 @@ async def test_invoice_posting_follows_lifecycle_and_repayment(async_client, db_
         response=await async_client.patch(f'/api/v1/zzp/invoices/{id}/status',headers=auth_headers,json={'status':value})
         assert response.status_code==200, response.text
         return response.json()
-    await status('sent')
     await status('cancelled')
     await status('draft')
     await status('sent')

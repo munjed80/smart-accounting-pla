@@ -141,7 +141,7 @@ class PaymentService:
                 func.coalesce(func.sum(ZZPPaymentAllocation.allocated_amount_cents), 0)
             ).where(ZZPPaymentAllocation.payment_id == payment.id)
         )
-        outstanding = invoice.total_cents - await self.get_invoice_paid_amount(
+        outstanding = invoice.total_cents - (invoice.credited_cents or 0) + (invoice.refunded_cents or 0) - await self.get_invoice_paid_amount(
             invoice_id
         )
         if allocated_amount_cents <= 0 or allocated_amount_cents > min(
@@ -193,7 +193,7 @@ class PaymentService:
         invoice = await self._invoice(invoice_id)
         paid = await self.get_invoice_paid_amount(invoice_id)
         invoice.amount_paid_cents = paid
-        if paid >= invoice.total_cents and invoice.total_cents > 0:
+        if paid > 0 and paid + (invoice.credited_cents or 0) - (invoice.refunded_cents or 0) >= invoice.total_cents and invoice.total_cents > 0:
             invoice.status = "paid"
             latest = await self.db.scalar(
                 select(func.max(ZZPPayment.payment_date))
@@ -221,7 +221,7 @@ class PaymentService:
         notes: Optional[str] = None,
     ):
         invoice = await self._invoice(invoice_id, lock=True)
-        outstanding = invoice.total_cents - await self.get_invoice_paid_amount(
+        outstanding = invoice.total_cents - (invoice.credited_cents or 0) + (invoice.refunded_cents or 0) - await self.get_invoice_paid_amount(
             invoice_id
         )
         if outstanding <= 0:
@@ -248,7 +248,7 @@ class PaymentService:
         await require_open_dates(
             self.db, self.administration_id, invoice.issue_date, payment_date.date()
         )
-        outstanding = invoice.total_cents - await self.get_invoice_paid_amount(
+        outstanding = invoice.total_cents - (invoice.credited_cents or 0) + (invoice.refunded_cents or 0) - await self.get_invoice_paid_amount(
             invoice_id
         )
         if amount_cents <= 0 or amount_cents > outstanding:
@@ -268,6 +268,8 @@ class PaymentService:
 
     async def mark_invoice_unpaid(self, invoice_id: UUID) -> None:
         invoice = await self._invoice(invoice_id, lock=True)
+        if invoice.credited_cents or invoice.refunded_cents:
+            raise HTTPException(409,detail={'code':'CREDIT_HISTORY_EXISTS','message':'Deze factuur heeft credit- of terugbetalingshistorie. Laat betalingscorrecties door je boekhouder aansluiten.'})
         result = await self.db.execute(
             select(ZZPPaymentAllocation, ZZPPayment)
             .join(ZZPPayment)
@@ -337,7 +339,7 @@ class PaymentService:
             invoice_number=invoice.invoice_number,
             invoice_total_cents=invoice.total_cents,
             total_paid_cents=paid,
-            total_outstanding_cents=max(0, invoice.total_cents - paid),
-            is_fully_paid=paid >= invoice.total_cents,
+            total_outstanding_cents=max(0, invoice.total_cents - (invoice.credited_cents or 0) - paid + (invoice.refunded_cents or 0)),
+            is_fully_paid=paid + (invoice.credited_cents or 0) - (invoice.refunded_cents or 0) >= invoice.total_cents,
             payments=payments,
         )

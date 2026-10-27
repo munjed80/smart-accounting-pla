@@ -109,6 +109,8 @@ try:
     )
     (stack.data / "uploads").mkdir(parents=True, exist_ok=True)
     (stack.data / "uploads/probe.txt").write_text("original uploaded bytes")
+    (stack.data / "evidence").mkdir(parents=True, exist_ok=True)
+    (stack.data / "evidence/probe.txt").write_text("original evidence bytes")
     stack.compose(
         "exec", "-T", "redis", "redis-cli", "SET", "deployment-probe", "retained"
     )
@@ -122,43 +124,71 @@ try:
     )
     stack.release = clean_release
     saved = ops.backup(stack, offsite=False)
-    # Explicitly disposable: erase this test database and fixture uploads to exercise EMPTY-target restore.
-    stack.database(
-        'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"'
-    )
-    (stack.data / "uploads/probe.txt").unlink()
-    stack.compose(
-        "exec", "-T", "redis", "redis-cli", "SET", "deployment-probe", "changed"
-    )
-    ops.restore(stack, saved)
-    assert (
+    for mode in ["aof", "rdb"]:
+        if mode == "rdb":
+            import io
+            import tarfile
+
+            with tarfile.open(saved / "redis.tar.gz") as archive:
+                rdb = archive.extractfile("redis/dump.rdb").read()
+            with tarfile.open(saved / "redis.tar.gz", "w:gz") as archive:
+                entry = tarfile.TarInfo("redis/dump.rdb")
+                entry.size = len(rdb)
+                archive.addfile(entry, io.BytesIO(rdb))
+            manifest = json.loads((saved / "manifest.json").read_text())
+            manifest["files"]["redis.tar.gz"] = ops.checksum(saved / "redis.tar.gz")
+            (saved / "manifest.json").write_text(json.dumps(manifest))
+        # Explicitly disposable: erase this test database and fixture uploads to exercise EMPTY-target restore.
         stack.database(
-            'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atqc "SELECT value FROM deployment_probe"',
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-        == "retained"
-    )
-    assert (stack.data / "uploads/probe.txt").read_text() == "original uploaded bytes"
-    assert (
+            'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"'
+        )
+        (stack.data / "uploads/probe.txt").unlink()
+        (stack.data / "evidence/probe.txt").unlink()
         stack.compose(
-            "exec",
-            "-T",
-            "redis",
-            "redis-cli",
-            "GET",
-            "deployment-probe",
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-        == "retained"
-    )
+            "exec", "-T", "redis", "redis-cli", "SET", "deployment-probe", "changed"
+        )
+        ops.restore(stack, saved)
+        assert (
+            stack.database(
+                'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atqc "SELECT value FROM deployment_probe"',
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            == "retained"
+        )
+        assert (
+            stack.data / "uploads/probe.txt"
+        ).read_text() == "original uploaded bytes"
+        assert (
+            stack.compose(
+                "exec",
+                "-T",
+                "redis",
+                "redis-cli",
+                "GET",
+                "deployment-probe",
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            == "retained"
+        )
     stack.resume()
     print(
         "Container smoke: migrations, API, frontend, worker, Caddy validation and DB/upload/Redis restore PASS"
     )
 except Exception:
     stack.compose("logs", "--tail", "100")
+    ids = stack.compose("ps", "-q", capture_output=True, text=True).stdout.split()
+    for container in ids:
+        ops.run(
+            [
+                "docker",
+                "inspect",
+                "--format",
+                "{{.Name}} {{json .State.Health}}",
+                container,
+            ]
+        )
     raise
 finally:
     stack.compose("down")

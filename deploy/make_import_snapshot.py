@@ -10,6 +10,7 @@ from ops import checksum
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--database", type=Path, required=True)
 parser.add_argument("--uploads", type=Path, required=True)
+parser.add_argument("--evidence", type=Path, required=True)
 parser.add_argument("--redis", type=Path, required=True)
 parser.add_argument("--output", type=Path, required=True)
 parser.add_argument("--source-writers-stopped", action="store_true", required=True)
@@ -23,6 +24,7 @@ args.output.mkdir(parents=True, mode=0o700)
 for source, name in [
     (args.database, "database.dump"),
     (args.uploads, "uploads.tar.gz"),
+    (args.evidence, "evidence.tar.gz"),
     (args.redis, "redis.tar.gz"),
 ]:
     shutil.copyfile(source, args.output / name)

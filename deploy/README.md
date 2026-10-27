@@ -60,8 +60,8 @@ sudo python3 ops.py init --config /etc/zzpershub \
 
 This writes `server.env`, `backend.env`, `worker.env`, `backup.env` (0600). It
 creates a new database password/connection while preserving the old application
-key and recognized application/integration settings. Literal `$`, quotes and
-backslashes survive in raw backend/worker env files. Upload mount paths are
+key and application/integration settings, including custom certificate environment references. Literal `$`, quotes and
+backslashes survive in raw backend/worker env files. Upload and evidence-pack mount paths are
 preserved too. Review missing integration settings privately. `--fresh-install`
 exists for **empty test installations only**; never substitute it for an export
 when migrating existing users, invoices or encrypted credentials. The generator
@@ -69,6 +69,20 @@ refuses overwriting existing configuration. No real secret file is committed.
 
 If the old backend cannot be inspected, recover the key from an existing secure
 backup or reconnect integrations after a separately planned key rotation.
+
+### Certificates and other mounted secrets
+
+Runtime environment exports do not contain file-mounted certificate bytes.
+Inventory certificate storage/passphrase references in the DB and backend mounts.
+Copy required certificate/key files privately into `/etc/zzpershub/secrets` (the
+base stack mounts this at `/secrets`, read-only). If a certificate reference uses
+another absolute path, add `/etc/zzpershub/compose.override.yml` with a read-only
+bind at that same container path. `Stack` automatically includes this local
+Compose override. Keep source files inside the config's secrets directory so
+its encrypted backup captures them. Retain custom environment aliases referenced
+by `$NAME` or `coolify://name`; the generator preserves application environment
+variables while excluding OS/build metadata. Do not delete the source before
+checking encrypted integrations, mounted certificates and existing evidence files.
 
 ## 3. Offsite backup setup
 
@@ -110,20 +124,26 @@ docker exec "$SOURCE_DB" sh -ceu \
   > /root/zzp-transfer/database.dump
 ```
 
-Copy the **actual** upload mount path from the stopped backend (the default is
-`/data/uploads`) and name the resulting directory `uploads`. Stop the old Redis
+Copy the **actual** upload directory from the stopped backend (default
+`/data/uploads`) as `uploads`, and its evidence-pack directory (default
+`/data/evidence`) as `evidence`. If there are no evidence files, verify that no
+evidence-pack records need them before creating an empty `evidence` directory. Stop the old Redis
 cleanly and verify its logs show successful persistence; copy its complete `/data`
 directory as `redis`. `docker cp` works on stopped containers:
 
 ```sh
 docker cp "$SOURCE_BACKEND":/data/uploads /root/zzp-transfer/uploads
+# When evidence exists, substitute its actual source mount path:
+docker cp "$SOURCE_BACKEND":/data/evidence /root/zzp-transfer/evidence
 docker stop -t 120 "$SOURCE_REDIS"
 docker cp "$SOURCE_REDIS":/data /root/zzp-transfer/redis
 sudo tar -C /root/zzp-transfer -czf /root/zzp-transfer/uploads.tar.gz uploads
+sudo tar -C /root/zzp-transfer -czf /root/zzp-transfer/evidence.tar.gz evidence
 sudo tar -C /root/zzp-transfer -czf /root/zzp-transfer/redis.tar.gz redis
 sudo python3 make_import_snapshot.py \
   --database /root/zzp-transfer/database.dump \
   --uploads /root/zzp-transfer/uploads.tar.gz \
+  --evidence /root/zzp-transfer/evidence.tar.gz \
   --redis /root/zzp-transfer/redis.tar.gz \
   --output /root/zzp-import --source-writers-stopped
 ```
@@ -131,7 +151,11 @@ sudo python3 make_import_snapshot.py \
 Take an encrypted offsite copy of this transfer and runtime export before
 switching. The flag is an operator acknowledgement, not proof that unrelated
 writers/cron jobs have stopped. Packaging checksums alone do not prove DB/file
-consistency. RDB-only Redis exports are loaded first without AOF, then Redis
+consistency. Copy evidence packs from their original path (`/data/evidence` by default)
+into `/root/zzp-transfer/evidence`; if no packs exist, create an empty directory
+after checking the evidence-pack records. Do not silently omit existing files.
+
+RDB-only Redis exports are loaded first without AOF, then Redis
 creates a new AOF before normal startup; existing AOF exports are preserved.
 
 On the target, use the release's Compose file with its image refs: operations are
@@ -166,7 +190,7 @@ sudo python3 ops.py backup --config /etc/zzpershub
 Deployment pulls app images by digest, validates production config, checks public
 ports, stops writers behind a maintenance page, backs up DB/uploads/Redis/config,
 uploads the backup offsite, runs migrations exactly once, verifies revision and
-service health, then enables routing and checks both public origins. There is a
+service health, then enables routing and checks both public origins and the public backend commit identity. There is a
 maintenance window; this is not a zero-downtime strategy. On migration failure,
 maintenance stays enabled. Inspect logs and the revision before recovery. Never
 blindly retry an unknown partially-applied migration or stamp a revision to hide it.

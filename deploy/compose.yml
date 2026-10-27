@@ -38,7 +38,10 @@ services:
     # Release operations run migrations explicitly before starting writers.
     entrypoint: [uvicorn]
     command: [app.main:app, --host, 0.0.0.0, --port, '8000', --proxy-headers, --forwarded-allow-ips, '*']
-    volumes: ['${DATA_DIR}/uploads:${UPLOAD_DIR:-/data/uploads}']
+    volumes:
+      - ${DATA_DIR}/uploads:${UPLOAD_DIR:-/data/uploads}
+      - ${DATA_DIR}/evidence:${EVIDENCE_STORAGE_PATH:-/data/evidence}
+      - ${CONFIG_DIR}/secrets:/secrets:ro
     depends_on:
       db: {condition: service_healthy}
       redis: {condition: service_healthy}
@@ -67,7 +70,7 @@ services:
     <<: *common
     image: ${FRONTEND_IMAGE:?release required}
     healthcheck:
-      test: [CMD, wget, -qO-, http://localhost/healthz]
+      test: [CMD, wget, -qO-, http://127.0.0.1/healthz]
       interval: 10s
       timeout: 3s
       retries: 12

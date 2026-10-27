@@ -52,14 +52,40 @@ def read_env(path):
     return result
 
 
+RUNTIME_KEYS = {
+    "PATH",
+    "HOME",
+    "HOSTNAME",
+    "LANG",
+    "LC_ALL",
+    "TERM",
+    "USER",
+    "SHELL",
+    "GPG_KEY",
+    "GIT_SHA",
+    "BUILD_TIME",
+    "BASH_ENV",
+    "ENV_FILE",
+}
+RUNTIME_PREFIXES = ("PYTHON", "PIP_", "UV_", "NPM_", "NODE_", "VITE_", "LD_")
+
+
+def application_environment(values):
+    # Certificate references may name arbitrary environment variables, including
+    # old COOLIFY_* secret aliases. Preserve them without retaining image/OS metadata.
+    return {
+        k: v
+        for k, v in values.items()
+        if k in KEYS or (k not in RUNTIME_KEYS and not k.startswith(RUNTIME_PREFIXES))
+    }
+
+
 def export_runtime(container, output):
     # Capture rather than printing docker inspect: it contains live credentials.
     result = run(["docker", "inspect", container], capture_output=True, text=True)
     data = json.loads(result.stdout)[0]["Config"]["Env"]
     env = dict(item.split("=", 1) for item in data)
-    private_write(
-        output, json.dumps({k: v for k, v in env.items() if k in KEYS}, indent=2) + "\n"
-    )
+    private_write(output, json.dumps(application_environment(env), indent=2) + "\n")
 
 
 def initialize(args):
@@ -89,7 +115,7 @@ def initialize(args):
         )
     password = secrets.token_hex(32)
     db = f'postgresql://zzpershub:{quote(password,safe="")}@db:5432/zzpershub'
-    backend = {k: v for k, v in imported.items() if k in KEYS}
+    backend = application_environment(imported)
     backend.update(
         ENV="production",
         DEBUG="false",
@@ -99,6 +125,7 @@ def initialize(args):
         DATABASE_URL_SYNC=db,
         REDIS_URL="redis://redis:6379/0",
         UPLOAD_DIR=imported.get("UPLOAD_DIR", "/data/uploads"),
+        EVIDENCE_STORAGE_PATH=imported.get("EVIDENCE_STORAGE_PATH", "/data/evidence"),
         APP_URL=f"https://{args.api_domain}",
         APP_PUBLIC_URL=f"https://{args.api_domain}",
         FRONTEND_URL=f"https://{args.app_domain}",
@@ -116,6 +143,7 @@ def initialize(args):
         POSTGRES_IMAGE=f"postgres:{args.postgres_major}-alpine",
         DATA_DIR=str(args.data.resolve()),
         UPLOAD_DIR=backend["UPLOAD_DIR"],
+        EVIDENCE_STORAGE_PATH=backend["EVIDENCE_STORAGE_PATH"],
     )
     if any(c.isspace() or c in "$\"'" for c in server["DATA_DIR"]):
         raise ValueError("Data path must not contain whitespace, quotes or dollars")
@@ -127,7 +155,14 @@ def initialize(args):
         raise ValueError(
             "Upload mount path must be absolute without interpolation characters"
         )
+    if not server["EVIDENCE_STORAGE_PATH"].startswith("/") or any(
+        c.isspace() or c in "$\"'" for c in server["EVIDENCE_STORAGE_PATH"]
+    ):
+        raise ValueError(
+            "Evidence mount path must be absolute without interpolation characters"
+        )
     args.config.mkdir(parents=True, mode=0o700)
+    (args.config / "secrets").mkdir(mode=0o700)
     private_write(args.config / "server.env", raw_env(server))
     private_write(args.config / "backend.env", backend_text)
     private_write(
@@ -191,6 +226,11 @@ class Stack:
         )
 
     def compose(self, *args, **kwargs):
+        overrides = (
+            ["-f", str(self.config / "compose.override.yml")]
+            if (self.config / "compose.override.yml").exists()
+            else []
+        )
         return run(
             [
                 "docker",
@@ -201,6 +241,7 @@ class Stack:
                 str(self.config / "server.env"),
                 "-f",
                 str(self.release / "compose.yml"),
+                *overrides,
                 *args,
             ],
             env=self.env,
@@ -284,7 +325,7 @@ def backup(stack, offsite=True):
     stack.compose("exec", "-T", "redis", "redis-cli", "SAVE")
     stack.compose("stop", "redis")
     try:
-        for name in ["uploads", "redis"]:
+        for name in ["uploads", "evidence", "redis"]:
             (stack.data / name).mkdir(parents=True, exist_ok=True)
             with tarfile.open(target / f"{name}.tar.gz", "w:gz") as archive:
                 archive.add(stack.data / name, arcname=name)
@@ -335,7 +376,12 @@ def restore(stack, snapshot):
             or checksum(path) != digest
         ):
             raise ValueError("Backup checksum/path validation failed")
-    for required in ["database.dump", "uploads.tar.gz", "redis.tar.gz"]:
+    for required in [
+        "database.dump",
+        "uploads.tar.gz",
+        "evidence.tar.gz",
+        "redis.tar.gz",
+    ]:
         if required not in manifest["files"]:
             raise ValueError("Backup is incomplete")
     if stack.compose(
@@ -354,14 +400,18 @@ def restore(stack, snapshot):
         capture_output=True,
         text=True,
     ).stdout.strip()
-    if count != "0" or any((stack.data / "uploads").glob("*")):
+    if (
+        count != "0"
+        or any((stack.data / "uploads").glob("*"))
+        or any((stack.data / "evidence").glob("*"))
+    ):
         raise ValueError(
             "Restore requires an EMPTY database and upload directory; existing data is never deleted"
         )
     # Validate archives before touching the database; reject links and special files.
     with tempfile.TemporaryDirectory(dir=stack.data.parent) as temporary:
         destination = Path(temporary)
-        for name in ["uploads", "redis"]:
+        for name in ["uploads", "evidence", "redis"]:
             with tarfile.open(snapshot / f"{name}.tar.gz") as archive:
                 for item in archive.getmembers():
                     if (
@@ -376,7 +426,7 @@ def restore(stack, snapshot):
                 stdin=handle,
             )
         stack.compose("stop", "redis")
-        for name in ["uploads", "redis"]:
+        for name in ["uploads", "evidence", "redis"]:
             current = stack.data / name
             if current.exists():
                 current.rename(
@@ -524,6 +574,18 @@ def deploy(stack, fresh=False, rollback=False):
             with urlopen(url, timeout=20) as response:
                 if response.status != 200:
                     raise ValueError("Public health check failed")
+        with urlopen(
+            f"https://{stack.settings['API_DOMAIN']}/health", timeout=20
+        ) as response:
+            if json.load(response).get("status") != "healthy":
+                raise ValueError("Public API reports unhealthy dependencies")
+        with urlopen(
+            f"https://{stack.settings['API_DOMAIN']}/api/v1/meta/version", timeout=20
+        ) as response:
+            if json.load(response).get("git_sha") != stack.metadata["commit"]:
+                raise ValueError(
+                    "Public API is serving a different release; check DNS and proxy routing"
+                )
         current = stack.config / "current.json"
         if current.exists():
             shutil.copyfile(current, stack.config / "previous.json")

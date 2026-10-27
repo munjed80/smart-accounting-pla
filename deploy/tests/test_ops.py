@@ -62,6 +62,8 @@ class DeploymentTests(unittest.TestCase):
             dict(
                 SECRET_KEY=secret,
                 MOLLIE_API_KEY="live_$test",
+                CUSTOM_CERT_PASSWORD="literal-$pass",
+                EVIDENCE_STORAGE_PATH="/app/evidence",
                 MOLLIE_WEBHOOK_SECRET="webhook",
                 UPLOAD_DIR="/app/uploads",
                 PATH="/untrusted/path",
@@ -73,6 +75,8 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(values["SECRET_KEY"], secret)
         self.assertEqual(values["MOLLIE_API_KEY"], "live_$test")
         self.assertEqual(values["UPLOAD_DIR"], "/app/uploads")
+        self.assertEqual(values["CUSTOM_CERT_PASSWORD"], "literal-$pass")
+        self.assertEqual(values["EVIDENCE_STORAGE_PATH"], "/app/evidence")
         self.assertNotIn("PATH", values)
         self.assertNotIn(secret, str(output.call_args_list))
         self.assertEqual((args.config / "backend.env").stat().st_mode & 0o777, 0o600)
@@ -258,10 +262,10 @@ class DeploymentTests(unittest.TestCase):
         snapshot = self.root / "snapshot"
         snapshot.mkdir()
         (snapshot / "database.dump").write_bytes(b"dump")
-        for name in ["uploads", "redis"]:
+        for name in ["uploads", "evidence", "redis"]:
             with tarfile.open(snapshot / f"{name}.tar.gz", "w:gz") as archive:
                 item = tarfile.TarInfo(
-                    "uploads/../../escaped" if name == "uploads" else "redis"
+                    "uploads/../../escaped" if name == "uploads" else name
                 )
                 item.type = tarfile.DIRTYPE
                 archive.addfile(item)
@@ -270,6 +274,38 @@ class DeploymentTests(unittest.TestCase):
         with self.assertRaises(tarfile.FilterError):
             ops.restore(stack, snapshot)
         self.assertFalse((self.root / "escaped").exists())
+
+    def test_public_wrong_release_cannot_be_recorded_as_success(self):
+        import io
+
+        stack = self.fake_stack(revision="new_revision")
+
+        def compose(*args, **kw):
+            stack.events.append(args)
+            return subprocess.CompletedProcess(
+                [], 0, "id" if args[:1] == ("ps",) else "", ""
+            )
+
+        stack.compose = compose
+
+        class Response(io.BytesIO):
+            status = 200
+
+        def public(url, timeout):
+            body = (
+                {"git_sha": "wrong-release"}
+                if url.endswith("/version")
+                else {"status": "healthy"}
+            )
+            return Response(json.dumps(body).encode())
+
+        with patch.object(ops, "backup"), patch.object(
+            ops, "urlopen", side_effect=public
+        ):
+            with self.assertRaisesRegex(ValueError, "different release"):
+                ops.deploy(stack)
+        self.assertFalse((stack.config / "current.json").exists())
+        self.assertEqual(stack.events[-1], ("maintenance", True))
 
 
 if __name__ == "__main__":

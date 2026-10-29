@@ -1,5 +1,5 @@
 [Unit]
-Description=ZZPersHub consistent offsite backup
+Description=ZZPersHub consistent backup using configured storage mode
 After=docker.service network-online.target
 Wants=network-online.target
 Requires=docker.service

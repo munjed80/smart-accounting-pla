@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Standalone VPS operations. Python 3.12+, Docker Compose 2.30+, restic."""
+"""Standalone VPS operations. Python 3.12+, Compose 2.30+; restic for offsite mode."""
 
 import argparse
 import fcntl
@@ -173,6 +173,7 @@ def initialize(args):
         args.config / "backup.env",
         raw_env(
             dict(
+                BACKUP_MODE="local",
                 RESTIC_REPOSITORY="REPLACE_WITH_OFFSITE_REPOSITORY",
                 RESTIC_PASSWORD=secrets.token_hex(32),
                 AWS_ACCESS_KEY_ID="",
@@ -181,7 +182,7 @@ def initialize(args):
         ),
     )
     print(
-        "Configuration created. Secret values were not printed. Configure backup.env before production deployment."
+        "Configuration created. Secret values were not printed. Local backups enabled; stored on this VPS only."
     )
 
 
@@ -297,7 +298,7 @@ def checksum(path):
         return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
-def backup(stack, offsite=True):
+def backup(stack, offsite=None):
     if stack.compose(
         "ps",
         "--status",
@@ -309,6 +310,8 @@ def backup(stack, offsite=True):
         text=True,
     ).stdout.strip():
         raise ValueError("Writers must be stopped before a consistent backup")
+    if offsite is None:
+        offsite = backup_mode(stack) == "offsite"
     if offsite:
         backup_environment(stack)
     target = (
@@ -347,6 +350,14 @@ def backup(stack, offsite=True):
     return target
 
 
+def backup_mode(stack):
+    # Preserve existing installations' offsite requirement until explicitly changed.
+    mode = read_env(stack.config / "backup.env").get("BACKUP_MODE", "offsite")
+    if mode not in ("local", "offsite"):
+        raise ValueError("BACKUP_MODE must be local or offsite")
+    return mode
+
+
 def backup_environment(stack):
     env = dict(os.environ, **read_env(stack.config / "backup.env"))
     if not env["RESTIC_REPOSITORY"].startswith(
@@ -359,6 +370,16 @@ def backup_environment(stack):
 
 
 def verify_backup_repository(stack):
+    if backup_mode(stack) == "local":
+        directory = stack.data.parent / "backups"
+        directory.mkdir(parents=True, mode=0o700, exist_ok=True)
+        # Fail before maintenance if the local destination cannot be written.
+        with tempfile.TemporaryFile(dir=directory) as probe:
+            probe.write(b"backup readiness check")
+            probe.flush()
+            os.fsync(probe.fileno())
+        print(f"Local backups: {directory}. Copies remain on this VPS only.")
+        return
     run(
         ["restic", "snapshots", "--json"],
         env=backup_environment(stack),
@@ -371,6 +392,19 @@ def upload_snapshot(stack, target):
         ["restic", "backup", str(target), "--tag", "zzpershub"],
         env=backup_environment(stack),
     )
+
+
+def scheduled_backup(stack):
+    verify_backup_repository(stack)
+    offsite = backup_mode(stack) == "offsite"
+    stack.quiesce()
+    try:
+        snapshot = backup(stack, offsite=False)
+    finally:
+        stack.resume()
+    if offsite:
+        upload_snapshot(stack, snapshot)
+    return snapshot
 
 
 def restore(stack, snapshot):
@@ -671,13 +705,7 @@ def main():
             return restore(stack, args.snapshot)
         if args.command == "status":
             return stack.compose("ps")
-        backup_environment(stack)
-        stack.quiesce()
-        try:
-            snapshot = backup(stack, offsite=False)
-        finally:
-            stack.resume()
-        upload_snapshot(stack, snapshot)
+        return scheduled_backup(stack)
 
 
 if __name__ == "__main__":

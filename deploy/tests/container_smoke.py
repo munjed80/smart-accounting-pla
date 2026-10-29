@@ -123,7 +123,8 @@ try:
         ignore=shutil.ignore_patterns("tests", "config", "__pycache__"),
     )
     stack.release = clean_release
-    saved = ops.backup(stack, offsite=False)
+    ops.verify_backup_repository(stack)
+    saved = ops.backup(stack)
     for mode in ["aof", "rdb"]:
         if mode == "rdb":
             import io

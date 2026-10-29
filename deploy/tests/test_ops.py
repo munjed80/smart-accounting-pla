@@ -103,6 +103,118 @@ class DeploymentTests(unittest.TestCase):
         server = ops.read_env(args.config / "server.env")
         self.assertNotEqual(backend["SECRET_KEY"], server["POSTGRES_PASSWORD"])
         self.assertEqual(len(server["POSTGRES_PASSWORD"]), 64)
+        self.assertEqual(
+            ops.read_env(args.config / "backup.env")["BACKUP_MODE"], "local"
+        )
+
+    def set_backup_mode(self, stack, mode):
+        (stack.config / "backup.env").write_text(ops.raw_env(dict(BACKUP_MODE=mode)))
+
+    def test_local_backup_needs_no_restic_and_contains_recovery_files(self):
+        stack = self.fake_stack()
+        self.set_backup_mode(stack, "local")
+        stack.compose = lambda *a, **kw: subprocess.CompletedProcess([], 0, "", "")
+
+        def dump(*args, **kwargs):
+            kwargs["stdout"].write(b"PGDMP-test-backup")
+
+        stack.database = dump
+        (stack.config / "backend.env").write_text("SECRET_KEY=preserved\n")
+        for name in ("uploads", "evidence", "redis"):
+            (stack.data / name).mkdir()
+            (stack.data / name / "probe").write_text(f"{name} bytes")
+        with patch.object(
+            ops, "run", side_effect=AssertionError("External command")
+        ), patch.object(
+            ops.shutil, "which", side_effect=AssertionError("Restic lookup")
+        ):
+            ops.verify_backup_repository(stack)
+            saved = ops.backup(stack)
+        self.assertEqual(saved.stat().st_mode & 0o777, 0o700)
+        self.assertEqual((saved / "database.dump").read_bytes(), b"PGDMP-test-backup")
+        manifest = json.loads((saved / "manifest.json").read_text())
+        self.assertEqual(manifest["revision"], "old_revision")
+        for path, digest in manifest["files"].items():
+            self.assertEqual(ops.checksum(saved / path), digest)
+        self.assertIn("configuration/backend.env", manifest["files"])
+        for name in ("uploads", "evidence", "redis"):
+            with tarfile.open(saved / f"{name}.tar.gz") as archive:
+                self.assertEqual(
+                    archive.extractfile(f"{name}/probe").read(),
+                    f"{name} bytes".encode(),
+                )
+
+    def test_local_destination_failure_prevents_maintenance(self):
+        stack = self.fake_stack()
+        self.set_backup_mode(stack, "local")
+        with patch.object(
+            ops.tempfile, "TemporaryFile", side_effect=OSError("Read only")
+        ):
+            with self.assertRaises(OSError):
+                ops.deploy(stack)
+        self.assertNotIn(("quiesce",), stack.events)
+
+    def test_unknown_mode_cannot_silently_disable_offsite_backup(self):
+        stack = self.fake_stack()
+        self.set_backup_mode(stack, "offsit")
+        with self.assertRaisesRegex(ValueError, "BACKUP_MODE"):
+            ops.deploy(stack)
+        self.assertNotIn(("quiesce",), stack.events)
+
+    def test_old_environment_keeps_offsite_requirement(self):
+        stack = self.fake_stack()
+        (stack.config / "backup.env").write_text(
+            "RESTIC_REPOSITORY=REPLACE_WITH_OFFSITE_REPOSITORY\n"
+        )
+        self.assertEqual(ops.backup_mode(stack), "offsite")
+        with self.assertRaisesRegex(ValueError, "OFF-SERVER"):
+            ops.deploy(stack)
+        self.assertNotIn(("quiesce",), stack.events)
+
+    def test_local_scheduled_backup_resumes_without_external_upload(self):
+        stack = self.fake_stack()
+        self.set_backup_mode(stack, "local")
+        stack.resume = lambda: stack.events.append(("resume",))
+        with patch.object(
+            ops, "backup", return_value=self.root / "saved"
+        ) as save, patch.object(
+            ops, "upload_snapshot", side_effect=AssertionError("External upload")
+        ):
+            ops.scheduled_backup(stack)
+        save.assert_called_once_with(stack, offsite=False)
+        self.assertEqual(stack.events, [("quiesce",), ("resume",)])
+
+    def test_failed_local_snapshot_resumes_scheduled_service_and_propagates(self):
+        stack = self.fake_stack()
+        self.set_backup_mode(stack, "local")
+        stack.resume = lambda: stack.events.append(("resume",))
+        with patch.object(ops, "backup", side_effect=OSError("Disk full")):
+            with self.assertRaises(OSError):
+                ops.scheduled_backup(stack)
+        self.assertEqual(stack.events[-1], ("resume",))
+
+    def test_failed_local_deploy_backup_prevents_schema_upgrade(self):
+        stack = self.fake_stack()
+        self.set_backup_mode(stack, "local")
+        with patch.object(ops, "backup", side_effect=OSError("Disk full")):
+            with self.assertRaises(OSError):
+                ops.deploy(stack)
+        self.assertIn(("quiesce",), stack.events)
+        self.assertFalse(any("upgrade" in event for event in stack.events))
+
+    def test_offsite_scheduled_backup_uploads_only_after_resume(self):
+        stack = self.fake_stack()
+        self.set_backup_mode(stack, "offsite")
+        stack.resume = lambda: stack.events.append(("resume",))
+        with patch.object(ops, "verify_backup_repository"), patch.object(
+            ops, "backup", return_value=self.root
+        ), patch.object(
+            ops,
+            "upload_snapshot",
+            side_effect=lambda *a: stack.events.append(("upload",)),
+        ):
+            ops.scheduled_backup(stack)
+        self.assertEqual(stack.events, [("quiesce",), ("resume",), ("upload",)])
 
     def test_backend_settings_allowlist_stays_complete(self):
         module = ast.parse(

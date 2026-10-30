@@ -17,6 +17,7 @@ import tempfile
 import time
 from datetime import datetime, timezone
 from urllib.parse import quote
+from urllib.error import URLError
 from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parent
@@ -542,6 +543,33 @@ def restore(stack, snapshot):
     )
 
 
+def wait_for_public_health(stack, timeout=120):
+    """Allow Caddy to finish initial certificate issuance before accepting a release."""
+    urls = [
+        f"https://{stack.settings['APP_DOMAIN']}/healthz",
+        f"https://{stack.settings['API_DOMAIN']}/health",
+    ]
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            for url in urls:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError()
+                with urlopen(url, timeout=min(20, remaining)) as response:
+                    if response.status != 200:
+                        raise ValueError("Public health check failed")
+            return
+        except (URLError, TimeoutError):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ValueError(
+                    "Public HTTPS did not become ready within 120 seconds; check DNS and Caddy logs"
+                ) from None
+            print("Waiting for public HTTPS and certificates...", flush=True)
+            time.sleep(min(5, remaining))
+
+
 def deploy(stack, fresh=False, rollback=False):
     stack.compose("config", "--quiet")
     if not stack.compose(
@@ -610,13 +638,7 @@ def deploy(stack, fresh=False, rollback=False):
     stack.compose("up", "-d", "caddy")
     stack.maintenance(False)
     try:
-        for url in [
-            f"https://{stack.settings['APP_DOMAIN']}/healthz",
-            f"https://{stack.settings['API_DOMAIN']}/health",
-        ]:
-            with urlopen(url, timeout=20) as response:
-                if response.status != 200:
-                    raise ValueError("Public health check failed")
+        wait_for_public_health(stack)
         with urlopen(
             f"https://{stack.settings['API_DOMAIN']}/health", timeout=20
         ) as response:

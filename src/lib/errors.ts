@@ -1,3 +1,5 @@
+import { isAxiosError } from 'axios'
+
 /**
  * Custom Error Classes
  * 
@@ -164,3 +166,9 @@ export const ErrorMessages = {
   CHECK_AGAIN: 'Opnieuw controleren',
   CHECK_AGAIN_BUSY: 'Controleren...',
 } as const
+
+/** HTTP status survives the API interceptor's conversion to domain errors. */
+export const getHttpStatus = (error: unknown): number | undefined => {
+  if (error instanceof ApiHttpError) return error.statusCode
+  return isAxiosError(error) ? error.response?.status : undefined
+}

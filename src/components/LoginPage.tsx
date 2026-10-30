@@ -9,7 +9,7 @@ import { Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning, CircleNotch
 import { BrandLockup } from '@/components/BrandLockup'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason, getErrorMessage, getValidationErrors } from '@/lib/api'
-import { AxiosError } from 'axios'
+import { getHttpStatus } from '@/lib/errors'
 import { t } from '@/i18n'
 import { useSeoMeta } from '@/hooks/useSeoMeta'
 
@@ -139,11 +139,11 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
       startCooldownTimer(60)
     } catch (error) {
       // Handle 429 rate limit error - start cooldown
-      if (error instanceof AxiosError && error.response?.status === 429) {
+      if (getHttpStatus(error) === 429) {
         // Start cooldown timer on rate limit
         startCooldownTimer(60)
       }
-      setResendFeedback(error instanceof AxiosError && error.response?.status === 429
+      setResendFeedback(getHttpStatus(error) === 429
         ? 'Je hebt te vaak een link aangevraagd. Probeer het over een minuut opnieuw.'
         : 'Verzenden is niet gelukt. Probeer het opnieuw.')
       // Other errors are handled in AuthContext
@@ -170,7 +170,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
         role: 'zzp',
       })
     } catch (error) {
-      if (error instanceof AxiosError && error.response?.status === 409) {
+      if (getHttpStatus(error) === 409) {
         setRegisterConflictEmail(registerForm.email.trim())
         return
       }

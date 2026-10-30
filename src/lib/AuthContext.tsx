@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react'
 import { authApi, User, LoginRequest, RegisterRequest, getErrorMessage, RegisterResponse } from '@/lib/api'
 import { toast } from 'sonner'
+import { ApiHttpError, getHttpStatus } from '@/lib/errors'
 import { AxiosError, isAxiosError } from 'axios'
 
 // Custom error type for email not verified
@@ -37,7 +38,10 @@ export const useAuth = () => {
 }
 
 // Helper to check if error is EMAIL_NOT_VERIFIED
-export const isEmailNotVerifiedError = (error: unknown): error is AxiosError => {
+export const isEmailNotVerifiedError = (error: unknown): error is AxiosError | ApiHttpError => {
+  if (error instanceof ApiHttpError) {
+    return error.statusCode === 403 && error.errorCode === 'EMAIL_NOT_VERIFIED'
+  }
   if (isAxiosError<{ detail?: { code?: string } }>(error) && error.response?.status === 403) {
     const detail = error.response?.data?.detail
     if (typeof detail === 'object' && detail?.code === 'EMAIL_NOT_VERIFIED') {
@@ -47,7 +51,11 @@ export const isEmailNotVerifiedError = (error: unknown): error is AxiosError => 
   return false
 }
 
-export const getEmailNotVerifiedMessage = (error: AxiosError): { message: string; hint: string } => {
+export const getEmailNotVerifiedMessage = (error: AxiosError | ApiHttpError): { message: string; hint: string } => {
+  if (error instanceof ApiHttpError) return {
+    message: 'Bevestig je e-mailadres voordat je inlogt.',
+    hint: 'Controleer je inbox of vraag een nieuwe verificatielink aan.',
+  }
   const detail = (error.response?.data as { detail?: { message?: string; hint?: string } } | undefined)?.detail
   return {
     message: detail?.message || 'Please verify your email before logging in',
@@ -137,7 +145,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       return response
     } catch (error) {
       const message = getErrorMessage(error)
-      if (isAxiosError(error) && error.response?.status === 409) throw error
+      if (getHttpStatus(error) === 409) throw error
       toast.error('Registreren niet gelukt: ' + message)
       throw error
     } finally {

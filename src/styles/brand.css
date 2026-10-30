@@ -77,3 +77,11 @@
 .workspace-footer-action { min-height: 44px; min-width: 0; gap: 7px; padding: 10px 4px; font-size: 12px; font-weight: 500; border-radius: 9px; }
 .workspace-footer-action[aria-current='page'] { background: #315548; }
 .workspace-nav-item:focus-visible, .workspace-footer-action:focus-visible { outline: 2px solid #d9e8aa; outline-offset: 2px; }
+
+@media (max-width: 480px) {
+  .workspace-profile { padding: 12px 16px; }
+  .workspace-nav-caption { display: none; }
+  .workspace-sidebar nav { padding-top: 12px; padding-bottom: 12px; }
+  .workspace-nav-item { min-height: 44px; padding: 6px 10px; }
+  .workspace-more { margin-top: 8px; padding-top: 8px; }
+}

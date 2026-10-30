@@ -207,3 +207,20 @@ test('existing registration offers an explicit verification request with cooldow
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('brand-verification-recovery.png'), fullPage: true })
 })
+
+
+test('unverified login can request a new activation link after API error conversion', async ({ page }) => {
+  await page.route('**/api/v1/auth/token', route => route.fulfill({
+    status: 403, json: { detail: { code: 'EMAIL_NOT_VERIFIED', message: 'Please verify your email' } },
+  }))
+  await page.route('**/api/v1/auth/resend-verification', route => route.fulfill({
+    status: 429, json: { detail: 'Too many requests' },
+  }))
+  await page.goto('/login')
+  await page.getByLabel('E-mailadres', { exact: true }).fill('sam@example.com')
+  await page.getByLabel('Wachtwoord', { exact: true }).fill('StrongPassword123')
+  await page.getByRole('button', { name: 'Inloggen', exact: true }).click()
+  await page.getByRole('button', { name: 'Verificatie-e-mail opnieuw verzenden', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('Je hebt te vaak een link aangevraagd')
+  await expect(page.getByText(/Wacht.*opnieuw/)).toBeVisible()
+})

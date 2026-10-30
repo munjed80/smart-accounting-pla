@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { AxiosError, type InternalAxiosRequestConfig } from 'axios'
+import { ApiHttpError, UnauthorizedError } from '@/lib/errors'
 import { LoginPage } from '@/components/LoginPage'
 import { useAuth } from '@/lib/AuthContext'
 
@@ -27,7 +28,7 @@ beforeEach(() => {
 
 describe('verification recovery', () => {
   it('offers a verification request for an existing registration without creating another account', async () => {
-    register.mockRejectedValue(apiError(409, 'Email already registered'))
+    register.mockRejectedValue(new ApiHttpError('Email already registered', { statusCode: 409 }))
     render(<LoginPage />)
     fireEvent.change(screen.getByLabelText('Volledige naam'), { target: { value: 'Sam Example' } })
     fireEvent.change(screen.getByLabelText('E-mailadres'), { target: { value: 'sam@example.com' } })
@@ -46,7 +47,7 @@ describe('verification recovery', () => {
 
   it('keeps a failed verification request retryable without claiming it was sent', async () => {
     window.history.replaceState({}, '', '/login')
-    login.mockRejectedValue(apiError(403, { code: 'EMAIL_NOT_VERIFIED' }))
+    login.mockRejectedValue(new UnauthorizedError('Verify email', { statusCode: 403, errorCode: 'EMAIL_NOT_VERIFIED' }))
     resendVerification.mockRejectedValueOnce(apiError(500, 'Unavailable'))
     render(<LoginPage />)
     fireEvent.change(screen.getByLabelText('E-mailadres'), { target: { value: 'sam@example.com' } })
@@ -61,7 +62,7 @@ describe('verification recovery', () => {
 
   it('offers verification again after valid credentials for an unverified account', async () => {
     window.history.replaceState({}, '', '/login')
-    login.mockRejectedValue(apiError(403, { code: 'EMAIL_NOT_VERIFIED' }))
+    login.mockRejectedValue(new UnauthorizedError('Verify email', { statusCode: 403, errorCode: 'EMAIL_NOT_VERIFIED' }))
     render(<LoginPage />)
     fireEvent.change(screen.getByLabelText('E-mailadres'), { target: { value: 'sam@example.com' } })
     fireEvent.change(screen.getByLabelText('Wachtwoord'), { target: { value: 'StrongPassword123' } })

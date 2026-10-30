@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 import { AppShell } from '../components/AppShell'
@@ -30,6 +30,7 @@ vi.mock('../i18n', () => ({
       'sidebar.overzicht': 'Overzicht',
       'sidebar.klanten': 'Klanten',
       'sidebar.facturen': 'Facturen',
+      'sidebar.offertes': 'Offertes',
       'sidebar.uitgaven': 'Uitgaven',
       'sidebar.uren': 'Uren',
       'sidebar.agenda': 'Agenda',
@@ -142,24 +143,32 @@ describe('AppShell - ZZP Menu', () => {
     expect(overzichtButtons.length).toBeGreaterThan(0)
   })
 
-  it('includes all ZZP menu items in the correct order', () => {
-    render(
-      <AppShell activeTab="dashboard">
-        <div>Test Content</div>
-      </AppShell>,
-      { wrapper: createWrapper() }
-    )
+  it('shows seven daily destinations and keeps additional tools behind disclosure', () => {
+    const onTabChange = vi.fn()
+    render(<AppShell activeTab="dashboard" onTabChange={onTabChange}><div>Content</div></AppShell>, { wrapper: createWrapper() })
+    const navigation = screen.getByRole('navigation', { name: 'Main navigation' })
+    expect(within(navigation).getAllByRole('menuitem').map(item => item.textContent)).toEqual([
+      'Overzicht', 'Klanten', 'Facturen', 'Offertes', 'Uitgaven', 'Uren', 'Agenda',
+    ])
+    expect(within(navigation).queryByText('Boekhouder')).not.toBeInTheDocument()
+    const more = within(navigation).getByRole('button', { name: 'Meer opties' })
+    expect(more).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(more)
+    expect(more).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(within(navigation).getByRole('menuitem', { name: 'Boekhouder' }))
+    expect(onTabChange).toHaveBeenCalledWith('boekhouder')
+    expect(within(navigation).queryByText('Boekhouder')).not.toBeInTheDocument()
+  })
 
-    // Check that all menu items are present
-    expect(screen.getAllByText('Overzicht').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Klanten').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Facturen').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Uitgaven').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Uren').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Agenda').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Boekhouder').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Documenten').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Boekingen').length).toBeGreaterThan(0)
+  it('places settings next to logout outside the navigation', () => {
+    const onTabChange = vi.fn()
+    render(<AppShell activeTab="settings" onTabChange={onTabChange}><div>Content</div></AppShell>, { wrapper: createWrapper() })
+    const settings = screen.getByRole('button', { name: 'Instellingen' })
+    const footer = settings.parentElement!
+    expect(within(footer).getByRole('button', { name: 'Uitloggen' })).toBeInTheDocument()
+    expect(settings).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(settings)
+    expect(onTabChange).toHaveBeenCalledWith('settings')
   })
 
   it('does not show accountant-only menu items to ZZP users', () => {

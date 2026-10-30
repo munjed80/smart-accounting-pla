@@ -7,7 +7,7 @@ import { useCloseOverlayOnRouteChange } from '@/hooks/useCloseOverlayOnRouteChan
 import { usePreventBodyScrollLock } from '@/hooks/usePreventBodyScrollLock'
 import { useEntitlements } from '@/hooks/useEntitlements'
 import { navigateTo } from '@/lib/navigation'
-import { getApiBaseUrl, salesReviewApi } from '@/lib/api'
+import { salesReviewApi } from '@/lib/api'
 import { TourHelpButton } from '@/components/OnboardingTour'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +20,9 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet'
 import { 
+  CaretDown,
+  DotsThreeOutline,
+  NotePencil,
   Database, 
   SignOut, 
   House, 
@@ -83,6 +86,8 @@ interface MenuItem {
 }
 
 // Define menu items for both roles
+const dailyZzpTabs = ['dashboard', 'customers', 'invoices', 'offertes', 'expenses', 'time', 'agenda']
+
 const menuItems: MenuItem[] = [
   // === WORKFLOW (Daily Tasks) ===
   {
@@ -200,7 +205,7 @@ const menuItems: MenuItem[] = [
   {
     label: t('sidebar.offertes'),
     tabValue: 'offertes',
-    icon: <FileText size={20} weight="duotone" />,
+    icon: <NotePencil size={20} weight="duotone" />,
     rolesAllowed: ['zzp'],
     section: 'main',
   },
@@ -384,7 +389,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
   const { user, logout } = useAuth()
   const { activeClient, pendingCount } = useActiveClient()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const isDev = import.meta.env.DEV
+  const [moreNavigationOpen, setMoreNavigationOpen] = useState(false)
 
   const isAccountant = isAccountantRole(user?.role)
   const isSuperAdmin = user?.role === 'super_admin'
@@ -507,6 +512,8 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
     // Close mobile menu BEFORE navigation
     setSidebarOpen(false)
     
+    setMoreNavigationOpen(false)
+
     // Trigger navigation
     if (item.tabValue && onTabChange) {
       onTabChange(item.tabValue)
@@ -533,8 +540,24 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
     }
   }
 
+  const renderWorkspaceMenuItem = (item: MenuItem) => {
+    const isActive = activeTab === item.tabValue
+    return (
+      <li key={item.tabValue} role="none">
+        <button role="menuitem" onClick={() => handleMenuClick(item)}
+          aria-current={isActive ? 'page' : undefined}
+          className={`workspace-nav-item ${isActive ? 'is-active' : ''}`}>
+          <span className="workspace-nav-icon">{item.icon}</span>
+          <span className="flex-1 text-left">{item.label}</span>
+          {!!item.badgeCount && <Badge variant="secondary">{item.badgeCount}</Badge>}
+          {isActive && <span className="workspace-active-dot" aria-hidden="true" />}
+        </button>
+      </li>
+    )
+  }
+
   // Render sidebar/drawer content
-  const renderSidebarContent = () => (
+  const renderSidebarContent = (surface: 'drawer' | 'desktop') => (
     <div className="workspace-sidebar flex flex-col h-full">
       {/* Sidebar Header */}
       <div className="p-4 border-b border-border">
@@ -544,18 +567,19 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
       </div>
 
       {/* User Info */}
-      <div className="p-4 border-b border-border">
-        <div className="text-sm">
+      <div className="workspace-profile">
+        <span className="workspace-avatar" aria-hidden="true">{user?.full_name?.split(/\s+/).slice(0, 2).map(name => name[0]).join('').toUpperCase()}</span>
+        <div className="text-sm min-w-0 flex-1">
           <p className="font-medium truncate">{user?.full_name}</p>
           <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-        </div>
         <Badge variant="outline" className="mt-2 capitalize">
           {user?.role === 'zzp' ? t('roles.zzp') : user?.role === 'accountant' ? t('roles.accountant') : user?.role}
         </Badge>
+        </div>
       </div>
 
       {/* Navigation Menu - Main Items */}
-      <nav className="flex-1 overflow-y-auto p-2" aria-label="Main navigation">
+      <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-4" aria-label="Main navigation">
         {/* Accountant: Show grouped sections by accounting concept */}
         {isAccountant && accountingSections.length > 0 ? (
           <div className="space-y-4">
@@ -600,91 +624,41 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
             ))}
           </div>
         ) : (
-          /* ZZP users: Show flat list with optional section grouping */
-          <div className="space-y-1">
-            {/* Items without a zzpSection (default flat list) */}
+          <div className="space-y-3">
+            <p className="workspace-nav-caption">Dagelijks werk</p>
             <ul className="space-y-1" role="menu">
-              {visibleMenuItems.filter(item => item.section !== 'secondary' && !item.zzpSection).map((item) => {
-                const isActive = item.tabValue && activeTab === item.tabValue
-                return (
-                  <li key={item.label} role="none">
-                    <button
-                      role="menuitem"
-                      onClick={() => handleMenuClick(item)}
-                      aria-current={isActive ? 'page' : undefined}
-                      className={`
-                        w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm
-                        transition-colors duration-150
-                        ${isActive 
-                          ? 'bg-primary text-primary-foreground' 
-                          : 'hover:bg-secondary text-foreground'
-                        }
-                      `}
-                      style={{ minHeight: '44px' }}
-                    >
-                      {item.icon}
-                      <span className="flex-1 text-left">{item.label}</span>
-                      {item.badgeCount != null && item.badgeCount > 0 && (
-                        <Badge variant="secondary" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px] font-semibold bg-primary/15 text-primary">
-                          {item.badgeCount}
-                        </Badge>
-                      )}
-                    </button>
-                  </li>
-                )
-              })}
+              {visibleMenuItems.filter(item => item.section !== 'secondary' &&
+                (!isZZP || dailyZzpTabs.includes(item.tabValue))).map(renderWorkspaceMenuItem)}
             </ul>
-
-            {/* Belastinghulp section */}
-            {(() => {
-              const belastinghulpItems = visibleMenuItems.filter(item => item.zzpSection === 'belastinghulp' && item.section !== 'secondary')
-              if (belastinghulpItems.length === 0) return null
-              return (
-                <div className="mt-4">
-                  <h3 className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    {t('sidebar.sectionBelastinghulp')}
-                  </h3>
-                  <ul className="space-y-1" role="menu">
-                    {belastinghulpItems.map((item) => {
-                      const isActive = item.tabValue && activeTab === item.tabValue
-                      return (
-                        <li key={item.label} role="none">
-                          <button
-                            role="menuitem"
-                            onClick={() => handleMenuClick(item)}
-                            aria-current={isActive ? 'page' : undefined}
-                            className={`
-                              w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm
-                              transition-colors duration-150
-                              ${isActive 
-                                ? 'bg-primary text-primary-foreground' 
-                                : 'hover:bg-secondary text-foreground'
-                              }
-                            `}
-                            style={{ minHeight: '44px' }}
-                          >
-                            {item.icon}
-                            <span className="flex-1 text-left">{item.label}</span>
-                            {item.badgeCount != null && item.badgeCount > 0 && (
-                              <Badge variant="secondary" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px] font-semibold bg-primary/15 text-primary">
-                                {item.badgeCount}
-                              </Badge>
-                            )}
-                          </button>
-                        </li>
-                      )
-                    })}
+            {isZZP && (
+              <div className="workspace-more">
+                <button
+                  type="button"
+                  className="workspace-nav-item workspace-more-toggle"
+                  aria-expanded={moreNavigationOpen}
+                  aria-controls={`${surface}-extra-navigation`}
+                  onClick={() => setMoreNavigationOpen(open => !open)}
+                >
+                  <span className="workspace-nav-icon"><DotsThreeOutline size={21} weight="duotone" /></span>
+                  <span className="flex-1 text-left">Meer opties</span>
+                  <CaretDown size={15} className={moreNavigationOpen ? 'rotate-180' : ''} />
+                </button>
+                {moreNavigationOpen && (
+                  <ul id={`${surface}-extra-navigation`}
+                    className="space-y-1 pt-2" role="menu" aria-label="Meer opties">
+                    {visibleMenuItems.filter(item => item.tabValue !== 'settings' &&
+                      !dailyZzpTabs.includes(item.tabValue)).map(renderWorkspaceMenuItem)}
                   </ul>
-                </div>
-              )
-            })()}
+                )}
+              </div>
+            )}
           </div>
         )}
         
         {/* Secondary Navigation - Settings & Support */}
-        <Separator className="my-3" />
+        {!isZZP && <Separator className="my-3" />}
         <ul className="space-y-1" role="menu">
-          {visibleMenuItems.filter(item => item.section === 'secondary').map((item) => {
+          {visibleMenuItems.filter(item => !isZZP && item.section === 'secondary' && item.tabValue !== 'settings').map((item) => {
             const isActive = item.tabValue && activeTab === item.tabValue
             return (
               <li key={item.label} role="none">
@@ -713,7 +687,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
       </nav>
 
       {/* Back to Home Link - only render if onTabChange is available */}
-      {onTabChange && (
+      {onTabChange && !isZZP && (
         <div className="p-2 border-t border-border">
           <button
             onClick={handleBackToHome}
@@ -726,31 +700,19 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
         </div>
       )}
 
-      {/* Dev Mode Debug Indicator */}
-      {isDev && (
-        <div className="p-3 mx-2 mb-2 rounded-md bg-secondary/50 border border-border text-xs">
-          <p className="font-mono text-muted-foreground">
-            <span className="font-semibold text-accent">DEV MODE</span>
-          </p>
-          <p className="font-mono text-muted-foreground truncate">
-            Role: <span className="text-foreground">{user?.role}</span>
-          </p>
-          <p className="font-mono text-muted-foreground truncate" title={getApiBaseUrl()}>
-            API: <span className="text-foreground">{getApiBaseUrl().replace('/api/v1', '')}</span>
-          </p>
-        </div>
-      )}
-
-      {/* Sidebar Footer - Logout */}
-      <div className="p-4 border-t border-border">
-        <Button 
-          onClick={handleLogout} 
-          variant="ghost"
-          className="w-full"
-          size="default"
-        >
-          <SignOut size={18} className="mr-2" />
-          {t('common.logout')}
+      <div className="workspace-sidebar-footer">
+        {visibleMenuItems.some(item => item.tabValue === 'settings') && (
+          <Button variant="ghost" className="workspace-footer-action"
+            aria-current={activeTab === 'settings' ? 'page' : undefined}
+            data-onboarding="settings-menu"
+            onClick={() => handleMenuClick(visibleMenuItems.find(item => item.tabValue === 'settings')!)}>
+            <Gear size={20} weight="duotone" />
+            <span>{t('sidebar.settings')}</span>
+          </Button>
+        )}
+        <Button onClick={handleLogout} variant="ghost" className="workspace-footer-action">
+          <SignOut size={20} weight="duotone" />
+          <span>{t('common.logout')}</span>
         </Button>
       </div>
     </div>
@@ -902,7 +864,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
             <SheetTitle>{t('sidebar.navigationMenu')}</SheetTitle>
             <SheetDescription>{t('sidebar.navigateApp')}</SheetDescription>
           </SheetHeader>
-          {renderSidebarContent()}
+          {renderSidebarContent('drawer')}
         </SheetContent>
       </Sheet>
 
@@ -916,7 +878,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
             top: 'calc(4rem + env(safe-area-inset-top, 0px))' // 4rem = h-16 header height
           }}
         >
-          {renderSidebarContent()}
+          {renderSidebarContent('desktop')}
         </aside>
 
       </div>

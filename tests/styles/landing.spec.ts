@@ -183,3 +183,27 @@ test('public account pages use one legible brand and the shared green palette', 
     await page.screenshot({ path: testInfo.outputPath(`brand-${path.slice(1)}.png`), fullPage: true })
   }
 })
+
+
+test('existing registration offers an explicit verification request with cooldown', async ({ page }, testInfo) => {
+  await page.route('**/api/v1/auth/register', route => route.fulfill({
+    status: 409, json: { detail: 'Email already registered' },
+  }))
+  const requests: string[] = []
+  await page.route('**/api/v1/auth/resend-verification', route => {
+    requests.push(route.request().postDataJSON().email)
+    return route.fulfill({ json: { message: 'If eligible, an email has been sent.' } })
+  })
+  await page.goto('/register')
+  await page.getByLabel('Volledige naam', { exact: true }).fill('Sam Example')
+  await page.getByLabel('E-mailadres', { exact: true }).fill('sam@example.com')
+  await page.getByLabel('Wachtwoord', { exact: true }).fill('StrongPassword123')
+  await page.getByRole('button', { name: 'Maak je gratis account aan', exact: true }).click()
+  await expect(page.getByText('Dit e-mailadres is al geregistreerd')).toBeVisible()
+  await page.getByRole('button', { name: 'Verificatie-e-mail opnieuw verzenden', exact: true }).click()
+  await expect(page.getByRole('button', { name: /Opnieuw verzenden over/ })).toBeDisabled()
+  expect(requests).toEqual(['sam@example.com'])
+  await expect(page.getByRole('status').filter({ hasText: 'Dit e-mailadres' })).toContainText('Controleer ook je spammap')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('brand-verification-recovery.png'), fullPage: true })
+})

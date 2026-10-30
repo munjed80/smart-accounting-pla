@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useAuth, isEmailNotVerifiedError, getEmailNotVerifiedMessage } from '@/lib/AuthContext'
+import { useAuth, isEmailNotVerifiedError } from '@/lib/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -56,6 +56,8 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   // State for visible error messages (in addition to toasts)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [registerError, setRegisterError] = useState<string | null>(null)
+  const [registerConflictEmail, setRegisterConflictEmail] = useState('')
+  const [resendFeedback, setResendFeedback] = useState('')
   
   // State for field-level validation errors (for 422 responses)
   const [registerFieldErrors, setRegisterFieldErrors] = useState<Record<string, string>>({})
@@ -122,14 +124,17 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   }
 
   const handleResendVerification = async () => {
-    const email = showEmailNotVerified ? unverifiedEmail : registeredEmail
+    const email = activeTab === 'register' && registerConflictEmail
+      ? registerConflictEmail : showEmailNotVerified ? unverifiedEmail : registeredEmail
     if (!email || isResending || resendCooldown > 0) {
       return
     }
     
     setIsResending(true)
+    setResendFeedback('')
     try {
       await resendVerification(email)
+      setResendFeedback('Als je account nog niet is bevestigd, ontvang je een nieuwe verificatielink. Controleer ook je spammap.')
       // Start cooldown after successful resend
       startCooldownTimer(60)
     } catch (error) {
@@ -138,6 +143,9 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
         // Start cooldown timer on rate limit
         startCooldownTimer(60)
       }
+      setResendFeedback(error instanceof AxiosError && error.response?.status === 429
+        ? 'Je hebt te vaak een link aangevraagd. Probeer het over een minuut opnieuw.'
+        : 'Verzenden is niet gelukt. Probeer het opnieuw.')
       // Other errors are handled in AuthContext
     } finally {
       setIsResending(false)
@@ -147,6 +155,8 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setRegisterError(null)
+    setRegisterConflictEmail('')
+    setResendFeedback('')
     setRegisterFieldErrors({})
     
     try {
@@ -160,6 +170,10 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
         role: 'zzp',
       })
     } catch (error) {
+      if (error instanceof AxiosError && error.response?.status === 409) {
+        setRegisterConflictEmail(registerForm.email.trim())
+        return
+      }
       // Extract field-level validation errors for inline display
       const fieldErrors = getValidationErrors(error)
       if (Object.keys(fieldErrors).length > 0) {
@@ -304,6 +318,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         <p className="text-yellow-600 dark:text-yellow-500 text-sm mt-1">
                           {t('auth.emailNotVerifiedDescription')}
                         </p>
+                        {resendFeedback && <p role="status" className="text-sm mt-2">{resendFeedback}</p>}
                         {resendCooldown > 0 ? (
                           <p className="text-yellow-600 dark:text-yellow-500 text-sm mt-2 flex items-center gap-1">
                             <Clock size={14} />
@@ -359,7 +374,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         type="email"
                         autoComplete="email"
                         value={loginForm.username}
-                        onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                        onChange={(e) => { setLoginForm({ ...loginForm, username: e.target.value }); setShowEmailNotVerified(false); setResendFeedback('') }}
                         className="h-11 pl-10 bg-card border-border text-foreground placeholder:text-muted-foreground hover:border-primary/40 focus-visible:border-primary/60 focus-visible:ring-primary/30"
                         required
                       />
@@ -443,6 +458,22 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                 <CardDescription className="text-muted-foreground">{t('auth.registerDescription')}</CardDescription>
               </CardHeader>
               <CardContent className="px-6 pb-6 sm:px-7 sm:pb-7">
+                {registerConflictEmail && (
+                  <div className="mb-5 rounded-xl border border-primary/20 bg-primary/5 p-4" role="status">
+                    <p className="text-sm font-semibold">Dit e-mailadres is al geregistreerd</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Heb je je account nog niet bevestigd? Vraag een nieuwe verificatielink aan voor {registerConflictEmail}.
+                      Heb je het al bevestigd? Log dan in.
+                    </p>
+                    <Button type="button" variant="outline" className="mt-3 w-full whitespace-normal h-auto min-h-11"
+                      onClick={handleResendVerification} disabled={isResending || resendCooldown > 0}>
+                      <PaperPlaneTilt size={18} className="mr-2 shrink-0" />
+                      {isResending ? t('common.sending') : resendCooldown > 0
+                        ? `${t('auth.resendIn')} ${resendCooldown}s` : t('auth.resendVerificationEmail')}
+                    </Button>
+                    {resendFeedback && <p className="mt-3 text-sm text-muted-foreground">{resendFeedback}</p>}
+                  </div>
+                )}
                 {/* Register Error Message - shown even if toast fails */}
                 {registerError && (
                   <div role="alert" aria-live="polite" className="mb-4 p-4 bg-red-500/10 rounded-lg border border-red-500/30">
@@ -495,7 +526,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         type="email"
                         autoComplete="email"
                         value={registerForm.email}
-                        onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                        onChange={(e) => { setRegisterForm({ ...registerForm, email: e.target.value }); setRegisterConflictEmail(''); setResendFeedback('') }}
                         className={`h-11 pl-10 bg-card border-border text-foreground placeholder:text-muted-foreground hover:border-primary/40 focus-visible:border-primary/60 focus-visible:ring-primary/30 ${registerFieldErrors.email ? 'border-red-500/60 focus-visible:border-red-500/60' : ''}`}
                         aria-invalid={!!registerFieldErrors.email}
                         aria-describedby={registerFieldErrors.email ? 'register-email-error' : undefined}

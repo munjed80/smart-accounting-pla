@@ -109,7 +109,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (version !== sessionVersion.current) throw new Error('Sessie gewijzigd. Log opnieuw in.')
       setUser(userData)
       
-      toast.success(`Welcome back, ${userData.full_name}!`)
+      toast.success(`Welkom terug, ${userData.full_name}!`)
       return userData
     } catch (error) {
       if (version === sessionVersion.current) localStorage.removeItem('access_token')
@@ -120,7 +120,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         throw error  // Re-throw so component can handle it
       }
       const message = getErrorMessage(error)
-      toast.error('Login failed: ' + message)
+      toast.error('Inloggen niet gelukt: ' + message)
       throw error
     } finally {
       if (version === sessionVersion.current) setIsLoading(false)
@@ -132,12 +132,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setIsLoading(true)
       const response = await authApi.register(data)
       
-      toast.success('Registration successful! Check your email to verify your account.')
+      toast.success('Je account is aangemaakt. Controleer je e-mail om het te bevestigen.')
       
       return response
     } catch (error) {
       const message = getErrorMessage(error)
-      toast.error('Registration failed: ' + message)
+      if (isAxiosError(error) && error.response?.status === 409) throw error
+      toast.error('Registreren niet gelukt: ' + message)
       throw error
     } finally {
       setIsLoading(false)
@@ -148,10 +149,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       setIsLoading(true)
       await authApi.resendVerification(email)
-      toast.success('If your email exists and is not verified, a verification email has been sent.')
+      toast.success('Als je account nog niet is bevestigd, ontvang je een nieuwe verificatielink.')
     } catch (error) {
       const message = getErrorMessage(error)
-      toast.error('Failed to resend verification: ' + message)
+      toast.error('Verificatielink verzenden niet gelukt: ' + message)
       throw error
     } finally {
       setIsLoading(false)

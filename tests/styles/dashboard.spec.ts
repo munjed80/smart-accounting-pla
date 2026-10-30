@@ -214,6 +214,21 @@ test('workspace and navigation share the homepage identity at mobile and desktop
   await expect(drawer.locator('.workspace-sidebar')).toHaveCSS('background-color', 'rgb(28, 61, 52)')
   await expect(drawer.locator('.brand-wordmark')).toHaveCSS('color', 'rgb(241, 245, 236)')
   await expect.poll(async () => (await drawer.boundingBox())?.x).toBeCloseTo(0, 1)
+  const navigation = drawer.getByRole('navigation', { name: 'Main navigation' })
+  await expect(navigation.getByRole('menuitem')).toHaveText([
+    'Overzicht', 'Klanten', 'Facturen', 'Offertes', 'Uitgaven', 'Uren', 'Agenda',
+  ])
+  const more = drawer.getByRole('button', { name: 'Meer opties', exact: true })
+  await expect(more).toHaveAttribute('aria-expanded', 'false')
+  await expect(navigation.getByRole('menuitem', { name: 'Documenten', exact: true })).toHaveCount(0)
+  await more.click()
+  await expect(navigation.getByRole('menuitem', { name: 'Documenten', exact: true })).toBeVisible()
+  await more.click()
+  const settings = drawer.getByRole('button', { name: 'Instellingen', exact: true })
+  const logout = drawer.getByRole('button', { name: 'Uitloggen', exact: true })
+  await expect(settings).toBeInViewport()
+  await expect(logout).toBeInViewport()
+  expect((await settings.boundingBox())!.y).toBeCloseTo((await logout.boundingBox())!.y, 0)
   const box = (await drawer.boundingBox())!
   expect(box.width).toBeLessThanOrEqual(page.viewportSize()!.width - 39)
   expect(box.y).toBe(0)

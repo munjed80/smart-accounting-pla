@@ -59,3 +59,21 @@
 }
 
 .cookie-banner { max-height: 45dvh; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* The daily workspace keeps seven destinations in view, with tools behind disclosure. */
+.workspace-profile { display: flex; align-items: center; gap: 12px; padding: 22px 20px; border-bottom: 1px solid var(--border); }
+.workspace-avatar { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; background: #315548; color: #d9e8aa; font-size: 13px; font-weight: 600; letter-spacing: .03em; }
+.workspace-nav-caption { padding: 0 12px 8px; font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted-foreground); }
+.workspace-nav-item { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 8px 12px; border: 1px solid transparent; border-radius: 11px; color: var(--foreground); font-size: 14px; font-weight: 500; transition: background-color .15s, color .15s; }
+.workspace-nav-item:hover { background: #294b40; }
+.workspace-nav-icon { display: grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px; background: #ffffff09; color: #b8d0bd; }
+.workspace-nav-item.is-active { background: #d9e8aa; color: #1c3d34; border-color: #e5efc7; }
+.workspace-nav-item.is-active .workspace-nav-icon { background: #1c3d340c; color: #245c4e; }
+.workspace-active-dot { width: 5px; height: 5px; border-radius: 50%; background: #245c4e; }
+.workspace-more { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 16px; }
+.workspace-more-toggle { color: var(--muted-foreground); }
+.workspace-more-toggle > svg { transition: transform .15s; }
+.workspace-sidebar-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex-shrink: 0; padding: 14px 12px max(14px, env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
+.workspace-footer-action { min-height: 44px; min-width: 0; gap: 7px; padding: 10px 4px; font-size: 12px; font-weight: 500; border-radius: 9px; }
+.workspace-footer-action[aria-current='page'] { background: #315548; }
+.workspace-nav-item:focus-visible, .workspace-footer-action:focus-visible { outline: 2px solid #d9e8aa; outline-offset: 2px; }

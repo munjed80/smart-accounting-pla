@@ -50,7 +50,7 @@ export const AboutVersionCard = () => (
       <Alert>
         <Info size={16} />
         <AlertDescription className="text-xs">
-          <strong>Smart Accounting Platform</strong> — Professioneel boekhoudplatform voor ZZP'ers en accountants.
+          <strong>ZZPers Hub</strong> — Professioneel boekhoudplatform voor ZZP'ers en accountants.
           {' '}Versie: <code className="text-xs bg-muted px-1 py-0.5 rounded">{PACKAGE_VERSION_ONLY}</code>
         </AlertDescription>
       </Alert>

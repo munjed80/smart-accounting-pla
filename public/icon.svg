@@ -1,11 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <rect width="512" height="512" fill="#0F172A"/>
-  <g transform="translate(128, 128)">
-    <!-- Database icon in duotone style -->
-    <ellipse cx="128" cy="64" rx="96" ry="32" fill="#60A5FA" opacity="0.3"/>
-    <ellipse cx="128" cy="64" rx="96" ry="32" fill="none" stroke="#60A5FA" stroke-width="8"/>
-    <path d="M 32 64 L 32 192 Q 32 224 128 224 Q 224 224 224 192 L 224 64" fill="#60A5FA" opacity="0.3"/>
-    <path d="M 32 64 L 32 192 Q 32 224 128 224 Q 224 224 224 192 L 224 64" fill="none" stroke="#60A5FA" stroke-width="8"/>
-    <ellipse cx="128" cy="192" rx="96" ry="32" fill="none" stroke="#60A5FA" stroke-width="8"/>
-  </g>
+  <path d="M112 0h288c62 0 112 50 112 112v368c0 18-14 32-32 32H112C50 512 0 462 0 400V112C0 50 50 0 112 0Z" fill="#245c4e"/>
+  <path d="M136 142h216v48L214 322h138v48H136v-47l138-133H136Z" fill="#fff"/>
+  <circle cx="375" cy="346" r="27" fill="#d9e8aa"/>
 </svg>

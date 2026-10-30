@@ -78,10 +78,10 @@ export const CookieBanner = () => {
   return (
     <>
       {/* Cookie banner */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/98 backdrop-blur shadow-lg">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+      <div className="cookie-banner fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/98 backdrop-blur shadow-lg">
+        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground max-w-2xl">
+            <p className="text-[13px] leading-relaxed text-muted-foreground max-w-2xl">
               Wij gebruiken cookies om de website goed te laten werken en, met uw toestemming, voor analyses. Lees meer in ons{' '}
               <a href="/cookies" className="underline hover:text-foreground transition-colors">cookiebeleid</a>.
             </p>

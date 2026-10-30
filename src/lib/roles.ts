@@ -1,3 +1,4 @@
+import { BRAND_NAME } from './brand'
 /**
  * Role Constants Module
  * 
@@ -88,10 +89,10 @@ export function isZzpRole(role: string | undefined): boolean {
 /**
  * Get the brand display name based on the user's role.
  *
- * ZZP users see "ZZPers Hub"; all other roles see "Smart Accounting".
+ * All roles share the same public product name.
  */
-export const BRAND_NAME_ZZP = 'ZZPers Hub'
-export const BRAND_NAME_DEFAULT = 'ZZPers Hub'
+export const BRAND_NAME_ZZP = BRAND_NAME
+export const BRAND_NAME_DEFAULT = BRAND_NAME
 
 export function getBrandName(role?: string): string {
   return isZzpRole(role) ? BRAND_NAME_ZZP : BRAND_NAME_DEFAULT

@@ -1,10 +1,10 @@
 .zzp-overview {
-  --ov-bg: #f6f7f2;
+  --ov-bg: var(--brand-paper);
   --ov-card: #fff;
-  --ov-ink: #213e34;
+  --ov-ink: var(--brand-ink);
   --ov-muted: #63746a;
-  --ov-line: #dce4d9;
-  --ov-green: #245c4e;
+  --ov-line: var(--brand-line);
+  --ov-green: var(--brand-green);
   --ov-soft: #edf3e7;
   --ov-warning: #9a4b37;
   --ov-billed: #adbfb0;
@@ -75,9 +75,9 @@
 }
 .zzp-overview h1 {
   font:
-    52px/1.08 'ZZP Editorial',
-    Georgia,
-    serif;
+    600 44px/1.14 'ZZP Sans',
+    system-ui,
+    sans-serif;
   letter-spacing: -1px;
   margin-block: 10px 8px;
 }
@@ -254,9 +254,9 @@
 }
 .zzp-overview .ov-panel h2 {
   font:
-    28px/1.2 'ZZP Editorial',
-    Georgia,
-    serif;
+    600 26px/1.2 'ZZP Sans',
+    system-ui,
+    sans-serif;
   letter-spacing: -0.4px;
   margin-top: 5px;
 }

@@ -161,3 +161,66 @@ test('layout remains within narrow, tablet and wide viewports', async ({
     expect(brand.x + brand.width).toBeLessThan(login.x)
   }
 })
+
+test('public account pages use one legible brand and the shared green palette', async ({ page }, testInfo) => {
+  for (const [path, selector] of [
+    ['/login', '#login-email'],
+    ['/register', '#register-name'],
+    ['/forgot-password', 'input[type="email"]'],
+    ['/reset-password', '.brand-lockup'],
+  ]) {
+    await page.goto(path)
+    await expect(page.locator(selector).first()).toBeVisible()
+    await expect(page.locator('.brand-lockup')).toBeVisible()
+    await expect(page.locator('body')).not.toContainText('Smart Accounting')
+    if (path === '/reset-password') {
+      await expect(page.getByLabel('Nieuw wachtwoord', { exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Wachtwoord wijzigen', exact: true })).toBeVisible()
+    }
+    await expect(page.locator('.brand-wordmark')).toHaveCSS('-webkit-text-fill-color', 'rgb(25, 46, 43)')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.evaluate(() => document.fonts.ready)
+    await page.screenshot({ path: testInfo.outputPath(`brand-${path.slice(1)}.png`), fullPage: true })
+  }
+})
+
+
+test('existing registration offers an explicit verification request with cooldown', async ({ page }, testInfo) => {
+  await page.route('**/api/v1/auth/register', route => route.fulfill({
+    status: 409, json: { detail: 'Email already registered' },
+  }))
+  const requests: string[] = []
+  await page.route('**/api/v1/auth/resend-verification', route => {
+    requests.push(route.request().postDataJSON().email)
+    return route.fulfill({ json: { message: 'If eligible, an email has been sent.' } })
+  })
+  await page.goto('/register')
+  await page.getByLabel('Volledige naam', { exact: true }).fill('Sam Example')
+  await page.getByLabel('E-mailadres', { exact: true }).fill('sam@example.com')
+  await page.getByLabel('Wachtwoord', { exact: true }).fill('StrongPassword123')
+  await page.getByRole('button', { name: 'Maak je gratis account aan', exact: true }).click()
+  await expect(page.getByText('Dit e-mailadres is al geregistreerd')).toBeVisible()
+  await page.getByRole('button', { name: 'Verificatie-e-mail opnieuw verzenden', exact: true }).click()
+  await expect(page.getByRole('button', { name: /Opnieuw verzenden over/ })).toBeDisabled()
+  expect(requests).toEqual(['sam@example.com'])
+  await expect(page.getByRole('status').filter({ hasText: 'Dit e-mailadres' })).toContainText('Controleer ook je spammap')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('brand-verification-recovery.png'), fullPage: true })
+})
+
+
+test('unverified login can request a new activation link after API error conversion', async ({ page }) => {
+  await page.route('**/api/v1/auth/token', route => route.fulfill({
+    status: 403, json: { detail: { code: 'EMAIL_NOT_VERIFIED', message: 'Please verify your email' } },
+  }))
+  await page.route('**/api/v1/auth/resend-verification', route => route.fulfill({
+    status: 429, json: { detail: 'Too many requests' },
+  }))
+  await page.goto('/login')
+  await page.getByLabel('E-mailadres', { exact: true }).fill('sam@example.com')
+  await page.getByLabel('Wachtwoord', { exact: true }).fill('StrongPassword123')
+  await page.getByRole('button', { name: 'Inloggen', exact: true }).click()
+  await page.getByRole('button', { name: 'Verificatie-e-mail opnieuw verzenden', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('Je hebt te vaak een link aangevraagd')
+  await expect(page.getByText(/Wacht.*opnieuw/)).toBeVisible()
+})

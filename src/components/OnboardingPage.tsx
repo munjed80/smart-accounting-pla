@@ -1,10 +1,10 @@
+import { BrandLockup } from '@/components/BrandLockup'
 import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { 
-  Database, 
   Buildings, 
   CheckCircle, 
   ArrowRight,
@@ -247,17 +247,13 @@ export const OnboardingPage = ({ userName, onComplete }: OnboardingPageProps) =>
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
-      
+    <div className="auth-page min-h-screen bg-background flex items-center justify-center p-4">
+
       <div className="relative w-full max-w-4xl">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <Database size={48} weight="duotone" className="text-primary" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-              ZZPers Hub
-            </h1>
+            <BrandLockup size="lg" />
           </div>
           
           <p className="text-lg text-muted-foreground mb-2">

@@ -11,6 +11,7 @@ import {
   Clock3,
   X,
 } from 'lucide-react'
+import { BrandLockup } from '@/components/BrandLockup'
 import { useSeoMeta } from '@/hooks/useSeoMeta'
 import { CookieBanner } from '@/components/marketing/CookieBanner'
 import {
@@ -88,12 +89,7 @@ const questions = [
 function Brand() {
   return (
     <a className="lp-brand" href="/" aria-label="ZZPers Hub — naar de homepage">
-      <span className="lp-brand-mark" aria-hidden="true">
-        z<span>.</span>
-      </span>
-      <span>
-        ZZPers<span className="lp-brand-hub"> Hub</span>
-      </span>
+      <BrandLockup size="md" />
     </a>
   )
 }

@@ -148,6 +148,15 @@ class Settings(BaseSettings):
     DIGIPOORT_CLIENT_SECRET: Optional[str] = None  # Client secret for Digipoort
     DIGIPOORT_CERT_PATH: Optional[str] = None  # Path to client certificate (if required)
 
+    @field_validator("APP_NAME", mode="before")
+    @classmethod
+    def _normalize_legacy_product_name(cls, value):
+        # Old VPS environment files survive deployments by design.
+        name = str(value or "").strip()
+        if name.casefold() in {"", "smart accounting", "smart accounting platform", "zzpershub", "zzpers hub"}:
+            return "ZZPers Hub"
+        return name
+
     @field_validator("DIGIPOORT_ENABLED", "DIGIPOORT_SANDBOX_MODE", mode="before")
     @classmethod
     def _coerce_optional_bool(cls, value):

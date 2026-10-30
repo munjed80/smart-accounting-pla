@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useAuth, isEmailNotVerifiedError, getEmailNotVerifiedMessage } from '@/lib/AuthContext'
+import { useAuth, isEmailNotVerifiedError } from '@/lib/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ import { Lock, User, Envelope, CheckCircle, PaperPlaneTilt, Warning, CircleNotch
 import { BrandLockup } from '@/components/BrandLockup'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getApiBaseUrl, isApiMisconfigured, getApiMisconfigurationReason, getErrorMessage, getValidationErrors } from '@/lib/api'
-import { AxiosError } from 'axios'
+import { getHttpStatus } from '@/lib/errors'
 import { t } from '@/i18n'
 import { useSeoMeta } from '@/hooks/useSeoMeta'
 
@@ -56,6 +56,8 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   // State for visible error messages (in addition to toasts)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [registerError, setRegisterError] = useState<string | null>(null)
+  const [registerConflictEmail, setRegisterConflictEmail] = useState('')
+  const [resendFeedback, setResendFeedback] = useState('')
   
   // State for field-level validation errors (for 422 responses)
   const [registerFieldErrors, setRegisterFieldErrors] = useState<Record<string, string>>({})
@@ -122,22 +124,28 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   }
 
   const handleResendVerification = async () => {
-    const email = showEmailNotVerified ? unverifiedEmail : registeredEmail
+    const email = activeTab === 'register' && registerConflictEmail
+      ? registerConflictEmail : showEmailNotVerified ? unverifiedEmail : registeredEmail
     if (!email || isResending || resendCooldown > 0) {
       return
     }
     
     setIsResending(true)
+    setResendFeedback('')
     try {
       await resendVerification(email)
+      setResendFeedback('Als je account nog niet is bevestigd, ontvang je een nieuwe verificatielink. Controleer ook je spammap.')
       // Start cooldown after successful resend
       startCooldownTimer(60)
     } catch (error) {
       // Handle 429 rate limit error - start cooldown
-      if (error instanceof AxiosError && error.response?.status === 429) {
+      if (getHttpStatus(error) === 429) {
         // Start cooldown timer on rate limit
         startCooldownTimer(60)
       }
+      setResendFeedback(getHttpStatus(error) === 429
+        ? 'Je hebt te vaak een link aangevraagd. Probeer het over een minuut opnieuw.'
+        : 'Verzenden is niet gelukt. Probeer het opnieuw.')
       // Other errors are handled in AuthContext
     } finally {
       setIsResending(false)
@@ -147,6 +155,8 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setRegisterError(null)
+    setRegisterConflictEmail('')
+    setResendFeedback('')
     setRegisterFieldErrors({})
     
     try {
@@ -160,6 +170,10 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
         role: 'zzp',
       })
     } catch (error) {
+      if (getHttpStatus(error) === 409) {
+        setRegisterConflictEmail(registerForm.email.trim())
+        return
+      }
       // Extract field-level validation errors for inline display
       const fieldErrors = getValidationErrors(error)
       if (Object.keys(fieldErrors).length > 0) {
@@ -178,9 +192,8 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   // Show registration success screen
   if (registrationSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
-        
+      <div className="auth-page min-h-screen bg-background flex items-center justify-center p-4">
+
         <div className="relative w-full max-w-md">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
@@ -188,7 +201,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
             </div>
           </div>
 
-          <Card className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
+          <Card className="bg-card border border-border rounded-2xl">
             <CardHeader className="text-center">
               <div className="flex justify-center mb-4">
                 <CheckCircle size={48} weight="fill" className="text-green-500" />
@@ -244,12 +257,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#0b0d12] text-foreground flex items-center justify-center px-4 py-10 sm:py-16">
-      {/* Premium ambient backdrop */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#0b0d12] via-[#0d1018] to-[#0b0d12]" />
-      <div className="pointer-events-none absolute -top-32 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(120,119,198,0.22),rgba(11,13,18,0))] blur-2xl" />
-      <div className="pointer-events-none absolute bottom-[-15%] right-[-10%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.16),rgba(11,13,18,0))] blur-3xl" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.035] [background-image:linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] [background-size:48px_48px]" />
+    <div className="auth-page relative min-h-screen overflow-hidden bg-background text-foreground flex items-center justify-center px-4 py-10 sm:py-16">
 
       {/* API Misconfiguration Warning Banner */}
       {isMisconfigured && (
@@ -271,31 +279,31 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
         {/* Header / brand */}
         <div className="text-center mb-8 sm:mb-10">
           <BrandLockup size="lg" className="mb-4" />
-          <p className="text-sm text-white/55">{t('brand.tagline')}</p>
+          <p className="text-sm text-muted-foreground">{t('brand.tagline')}</p>
         </div>
 
         {/* Tab switcher — segmented pill */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'register')} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 h-11 p-1 bg-white/[0.04] border border-white/10 rounded-xl backdrop-blur-md mb-5">
+          <TabsList className="grid w-full grid-cols-2 h-11 p-1 bg-card border border-border rounded-xl mb-5">
             <TabsTrigger
               value="login"
-              className="h-full rounded-lg text-sm font-medium text-white/60 data-[state=active]:bg-white/[0.08] data-[state=active]:text-white data-[state=active]:shadow-[0_1px_0_0_rgba(255,255,255,0.06)_inset] dark:data-[state=active]:bg-white/[0.08] dark:data-[state=active]:border-transparent transition-colors"
+              className="h-full rounded-lg text-sm font-medium text-muted-foreground data-[state=active]:bg-secondary data-[state=active]:text-foreground data-[state=active]:shadow-[0_1px_0_0_rgba(255,255,255,0.06)_inset] dark:data-[state=active]:bg-secondary dark:data-[state=active]:border-transparent transition-colors"
             >
               {t('auth.login')}
             </TabsTrigger>
             <TabsTrigger
               value="register"
-              className="h-full rounded-lg text-sm font-medium text-white/60 data-[state=active]:bg-white/[0.08] data-[state=active]:text-white data-[state=active]:shadow-[0_1px_0_0_rgba(255,255,255,0.06)_inset] dark:data-[state=active]:bg-white/[0.08] dark:data-[state=active]:border-transparent transition-colors"
+              className="h-full rounded-lg text-sm font-medium text-muted-foreground data-[state=active]:bg-secondary data-[state=active]:text-foreground data-[state=active]:shadow-[0_1px_0_0_rgba(255,255,255,0.06)_inset] dark:data-[state=active]:bg-secondary dark:data-[state=active]:border-transparent transition-colors"
             >
               {t('auth.register')}
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="login">
-            <Card className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_30px_80px_-30px_rgba(0,0,0,0.6)]">
+            <Card className="bg-card border border-border rounded-2xl shadow-sm">
               <CardHeader className="pb-3 sm:pb-4 px-6 pt-6 sm:px-7 sm:pt-7">
-                <CardTitle className="text-xl font-semibold tracking-tight text-white">{t('auth.welcomeBack')}</CardTitle>
-                <CardDescription className="text-white/55">{t('auth.loginDescription')}</CardDescription>
+                <CardTitle className="text-xl font-semibold tracking-tight text-foreground">{t('auth.welcomeBack')}</CardTitle>
+                <CardDescription className="text-muted-foreground">{t('auth.loginDescription')}</CardDescription>
               </CardHeader>
               <CardContent className="px-6 pb-6 sm:px-7 sm:pb-7">
                 {/* Email Not Verified Warning */}
@@ -310,6 +318,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         <p className="text-yellow-600 dark:text-yellow-500 text-sm mt-1">
                           {t('auth.emailNotVerifiedDescription')}
                         </p>
+                        {resendFeedback && <p role="status" className="text-sm mt-2">{resendFeedback}</p>}
                         {resendCooldown > 0 ? (
                           <p className="text-yellow-600 dark:text-yellow-500 text-sm mt-2 flex items-center gap-1">
                             <Clock size={14} />
@@ -342,10 +351,10 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                     <div className="flex items-start gap-3">
                       <Warning size={20} className="text-red-400 mt-0.5" weight="fill" aria-hidden="true" />
                       <div className="flex-1">
-                        <p className="text-red-300 font-medium text-sm">
+                        <p className="text-destructive font-medium text-sm">
                           {t('auth.loginFailed')}
                         </p>
-                        <p className="text-red-300/80 text-sm mt-1">
+                        <p className="text-destructive/80 text-sm mt-1">
                           {loginError}
                         </p>
                       </div>
@@ -355,18 +364,18 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
 
                 <form onSubmit={handleLogin} className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                    <Label htmlFor="login-email" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       {t('auth.email')}
                     </Label>
                     <div className="relative">
-                      <Envelope className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} aria-hidden="true" />
+                      <Envelope className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} aria-hidden="true" />
                       <Input
                         id="login-email"
                         type="email"
                         autoComplete="email"
                         value={loginForm.username}
-                        onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-                        className="h-11 pl-10 bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 hover:border-white/20 focus-visible:border-primary/60 focus-visible:ring-primary/30"
+                        onChange={(e) => { setLoginForm({ ...loginForm, username: e.target.value }); setShowEmailNotVerified(false); setResendFeedback('') }}
+                        className="h-11 pl-10 bg-card border-border text-foreground placeholder:text-muted-foreground hover:border-primary/40 focus-visible:border-primary/60 focus-visible:ring-primary/30"
                         required
                       />
                     </div>
@@ -374,13 +383,13 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
 
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <Label htmlFor="login-password" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                      <Label htmlFor="login-password" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                         {t('auth.password')}
                       </Label>
                       {onForgotPassword && (
                         <button
                           type="button"
-                          className="text-xs text-white/55 hover:text-white focus:text-white focus:outline-none transition-colors"
+                          className="text-xs text-muted-foreground hover:text-foreground focus:text-foreground focus:outline-none transition-colors"
                           onClick={onForgotPassword}
                         >
                           {t('auth.forgotPassword')}
@@ -388,14 +397,14 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                       )}
                     </div>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} aria-hidden="true" />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} aria-hidden="true" />
                       <Input
                         id="login-password"
                         type={showLoginPassword ? 'text' : 'password'}
                         autoComplete="current-password"
                         value={loginForm.password}
                         onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                        className="h-11 pl-10 pr-11 bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 hover:border-white/20 focus-visible:border-primary/60 focus-visible:ring-primary/30"
+                        className="h-11 pl-10 pr-11 bg-card border-border text-foreground placeholder:text-muted-foreground hover:border-primary/40 focus-visible:border-primary/60 focus-visible:ring-primary/30"
                         required
                       />
                       <button
@@ -403,7 +412,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         onClick={() => setShowLoginPassword((v) => !v)}
                         aria-label={showLoginPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                         aria-pressed={showLoginPassword}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-md text-white/50 hover:text-white hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
                       >
                         {showLoginPassword ? <EyeSlash size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
                       </button>
@@ -412,7 +421,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
 
                   <Button
                     type="submit"
-                    className="w-full h-11 text-sm font-semibold rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_8px_24px_-8px_rgba(120,119,198,0.55)] transition-all"
+                    className="w-full h-11 text-sm font-semibold rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all"
                     disabled={isLoading}
                   >
                     {isLoading ? (
@@ -427,11 +436,11 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                 </form>
 
                 <div className="mt-6 text-center">
-                  <p className="text-sm text-white/55">
+                  <p className="text-sm text-muted-foreground">
                     {t('auth.noAccount')}{' '}
                     <button
                       type="button"
-                      className="text-white font-medium hover:text-primary focus:text-primary focus:outline-none transition-colors"
+                      className="text-foreground font-medium hover:text-primary focus:text-primary focus:outline-none transition-colors"
                       onClick={() => setActiveTab('register')}
                     >
                       {t('auth.createAccountCta')}
@@ -443,22 +452,38 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
           </TabsContent>
 
           <TabsContent value="register">
-            <Card className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_30px_80px_-30px_rgba(0,0,0,0.6)]">
+            <Card className="bg-card border border-border rounded-2xl shadow-sm">
               <CardHeader className="pb-3 sm:pb-4 px-6 pt-6 sm:px-7 sm:pt-7">
-                <CardTitle className="text-xl font-semibold tracking-tight text-white">{t('auth.createAccount')}</CardTitle>
-                <CardDescription className="text-white/55">{t('auth.registerDescription')}</CardDescription>
+                <CardTitle className="text-xl font-semibold tracking-tight text-foreground">{t('auth.createAccount')}</CardTitle>
+                <CardDescription className="text-muted-foreground">{t('auth.registerDescription')}</CardDescription>
               </CardHeader>
               <CardContent className="px-6 pb-6 sm:px-7 sm:pb-7">
+                {registerConflictEmail && (
+                  <div className="mb-5 rounded-xl border border-primary/20 bg-primary/5 p-4" role="status">
+                    <p className="text-sm font-semibold">Dit e-mailadres is al geregistreerd</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Heb je je account nog niet bevestigd? Vraag een nieuwe verificatielink aan voor {registerConflictEmail}.
+                      Heb je het al bevestigd? Log dan in.
+                    </p>
+                    <Button type="button" variant="outline" className="mt-3 w-full whitespace-normal h-auto min-h-11"
+                      onClick={handleResendVerification} disabled={isResending || resendCooldown > 0}>
+                      <PaperPlaneTilt size={18} className="mr-2 shrink-0" />
+                      {isResending ? t('common.sending') : resendCooldown > 0
+                        ? `${t('auth.resendIn')} ${resendCooldown}s` : t('auth.resendVerificationEmail')}
+                    </Button>
+                    {resendFeedback && <p className="mt-3 text-sm text-muted-foreground">{resendFeedback}</p>}
+                  </div>
+                )}
                 {/* Register Error Message - shown even if toast fails */}
                 {registerError && (
                   <div role="alert" aria-live="polite" className="mb-4 p-4 bg-red-500/10 rounded-lg border border-red-500/30">
                     <div className="flex items-start gap-3">
                       <Warning size={20} className="text-red-400 mt-0.5" weight="fill" aria-hidden="true" />
                       <div className="flex-1">
-                        <p className="text-red-300 font-medium text-sm">
+                        <p className="text-destructive font-medium text-sm">
                           {t('auth.registrationFailed')}
                         </p>
-                        <p className="text-red-300/80 text-sm mt-1">
+                        <p className="text-destructive/80 text-sm mt-1">
                           {registerError}
                         </p>
                       </div>
@@ -468,18 +493,18 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
 
                 <form onSubmit={handleRegister} className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="register-name" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                    <Label htmlFor="register-name" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       {t('auth.fullName')}
                     </Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} aria-hidden="true" />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} aria-hidden="true" />
                       <Input
                         id="register-name"
                         type="text"
                         autoComplete="name"
                         value={registerForm.full_name}
                         onChange={(e) => setRegisterForm({ ...registerForm, full_name: e.target.value })}
-                        className={`h-11 pl-10 bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 hover:border-white/20 focus-visible:border-primary/60 focus-visible:ring-primary/30 ${registerFieldErrors.full_name ? 'border-red-500/60 focus-visible:border-red-500/60' : ''}`}
+                        className={`h-11 pl-10 bg-card border-border text-foreground placeholder:text-muted-foreground hover:border-primary/40 focus-visible:border-primary/60 focus-visible:ring-primary/30 ${registerFieldErrors.full_name ? 'border-red-500/60 focus-visible:border-red-500/60' : ''}`}
                         aria-invalid={!!registerFieldErrors.full_name}
                         aria-describedby={registerFieldErrors.full_name ? 'register-name-error' : undefined}
                         required
@@ -491,18 +516,18 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-email" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                    <Label htmlFor="register-email" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       {t('auth.email')}
                     </Label>
                     <div className="relative">
-                      <Envelope className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} aria-hidden="true" />
+                      <Envelope className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} aria-hidden="true" />
                       <Input
                         id="register-email"
                         type="email"
                         autoComplete="email"
                         value={registerForm.email}
-                        onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                        className={`h-11 pl-10 bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 hover:border-white/20 focus-visible:border-primary/60 focus-visible:ring-primary/30 ${registerFieldErrors.email ? 'border-red-500/60 focus-visible:border-red-500/60' : ''}`}
+                        onChange={(e) => { setRegisterForm({ ...registerForm, email: e.target.value }); setRegisterConflictEmail(''); setResendFeedback('') }}
+                        className={`h-11 pl-10 bg-card border-border text-foreground placeholder:text-muted-foreground hover:border-primary/40 focus-visible:border-primary/60 focus-visible:ring-primary/30 ${registerFieldErrors.email ? 'border-red-500/60 focus-visible:border-red-500/60' : ''}`}
                         aria-invalid={!!registerFieldErrors.email}
                         aria-describedby={registerFieldErrors.email ? 'register-email-error' : undefined}
                         required
@@ -514,18 +539,18 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-password" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                    <Label htmlFor="register-password" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       {t('auth.password')}
                     </Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} aria-hidden="true" />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} aria-hidden="true" />
                       <Input
                         id="register-password"
                         type={showRegisterPassword ? 'text' : 'password'}
                         autoComplete="new-password"
                         value={registerForm.password}
                         onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                        className={`h-11 pl-10 pr-11 bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 hover:border-white/20 focus-visible:border-primary/60 focus-visible:ring-primary/30 ${registerFieldErrors.password ? 'border-red-500/60 focus-visible:border-red-500/60' : ''}`}
+                        className={`h-11 pl-10 pr-11 bg-card border-border text-foreground placeholder:text-muted-foreground hover:border-primary/40 focus-visible:border-primary/60 focus-visible:ring-primary/30 ${registerFieldErrors.password ? 'border-red-500/60 focus-visible:border-red-500/60' : ''}`}
                         aria-invalid={!!registerFieldErrors.password}
                         aria-describedby={registerFieldErrors.password ? 'register-password-error' : 'register-password-hint'}
                         required
@@ -536,7 +561,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                         onClick={() => setShowRegisterPassword((v) => !v)}
                         aria-label={showRegisterPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                         aria-pressed={showRegisterPassword}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-md text-white/50 hover:text-white hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
                       >
                         {showRegisterPassword ? <EyeSlash size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
                       </button>
@@ -544,12 +569,12 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                     {registerFieldErrors.password ? (
                       <p id="register-password-error" className="text-xs text-red-400" role="alert">{registerFieldErrors.password}</p>
                     ) : (
-                      <p id="register-password-hint" className="text-xs text-white/45">{t('auth.passwordHint')}</p>
+                      <p id="register-password-hint" className="text-xs text-muted-foreground">{t('auth.passwordHint')}</p>
                     )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-role" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                    <Label htmlFor="register-role" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       {t('auth.role')}
                     </Label>
                     <Select
@@ -560,7 +585,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                     >
                       <SelectTrigger
                         id="register-role"
-                        className="h-11 bg-white/[0.04] border-white/10 text-white hover:border-white/20 focus-visible:border-primary/60 focus-visible:ring-primary/30"
+                        className="h-11 bg-card border-border text-foreground hover:border-primary/40 focus-visible:border-primary/60 focus-visible:ring-primary/30"
                         aria-describedby={registerFieldErrors.role ? 'register-role-error' : undefined}
                       >
                         <SelectValue />
@@ -579,7 +604,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
 
                   <Button
                     type="submit"
-                    className="w-full h-11 text-sm font-semibold rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_8px_24px_-8px_rgba(120,119,198,0.55)] transition-all"
+                    className="w-full h-11 text-sm font-semibold rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all"
                     disabled={isLoading}
                   >
                     {isLoading ? (
@@ -592,15 +617,15 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
                     )}
                   </Button>
 
-                  <p className="text-xs text-white/45 text-center leading-relaxed">{t('auth.trialInfo')}</p>
+                  <p className="text-xs text-muted-foreground text-center leading-relaxed">{t('auth.trialInfo')}</p>
                 </form>
 
                 <div className="mt-6 text-center">
-                  <p className="text-sm text-white/55">
+                  <p className="text-sm text-muted-foreground">
                     {t('auth.haveAccount')}{' '}
                     <button
                       type="button"
-                      className="text-white font-medium hover:text-primary focus:text-primary focus:outline-none transition-colors"
+                      className="text-foreground font-medium hover:text-primary focus:text-primary focus:outline-none transition-colors"
                       onClick={() => setActiveTab('login')}
                     >
                       {t('auth.loginCta')}
@@ -613,7 +638,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
         </Tabs>
 
         {/* Trust footer */}
-        <div className="mt-6 flex items-center justify-center gap-1.5 text-xs text-white/40">
+        <div className="mt-6 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
           <ShieldCheck size={14} weight="duotone" aria-hidden="true" />
           <span>{t('auth.secureLogin')}</span>
         </div>

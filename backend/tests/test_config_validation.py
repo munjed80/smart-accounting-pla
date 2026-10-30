@@ -205,3 +205,12 @@ def test_legacy_validate_production_secrets_raises_in_prod_for_bad_secret():
     s = _prod_settings(SECRET_KEY="x")
     with pytest.raises(ValueError):
         s.validate_production_secrets()
+
+
+@pytest.mark.parametrize("name", ["Smart Accounting", "Smart Accounting Platform", " smart accounting platform ", "ZZPersHub"])
+def test_legacy_product_name_from_preserved_environment_uses_public_brand(name):
+    assert Settings(APP_NAME=name).APP_NAME == "ZZPers Hub"
+
+
+def test_explicit_custom_app_name_is_preserved():
+    assert Settings(APP_NAME="Custom tenant").APP_NAME == "Custom tenant"

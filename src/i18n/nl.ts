@@ -1,3 +1,4 @@
+import { BRAND_NAME } from '@/lib/brand'
 import { STARTER_PRICE_NL } from '@/lib/billingCatalog'
 /**
  * Dutch (nl-NL) translations for ZZP-HUB Smart Accounting Platform
@@ -66,7 +67,7 @@ export const nl = {
 
   // Brand
   brand: {
-    name: "Smart Accounting",
+    name: BRAND_NAME,
     tagline: "Professioneel boekhoudplatform",
   },
 
@@ -1673,7 +1674,7 @@ export const nl = {
     // ZZP onboarding (Dutch-first)
     welcomeZzp: "Welkom",
     zzpDescription: "Laten we je administratie instellen zodat je direct aan de slag kunt.",
-    howWillYouUse: "Hoe ga je Smart Accounting gebruiken?",
+    howWillYouUse: "Hoe ga je ZZPers Hub gebruiken?",
     accountTypeZzp: "ZZP / Zelfstandige",
     accountTypeZzpBadge: "Zelfstandig",
     accountTypeZzpDescription: "Ik ben zelfstandige en wil mijn eigen boekhouding en BTW-aangiftes beheren.",
@@ -1702,7 +1703,7 @@ export const nl = {
     adminCreatedSuccess: "Administratie succesvol aangemaakt!",
     adminCreatedError: "Kon administratie niet aanmaken. Probeer opnieuw.",
     allSetTitle: "Je bent klaar!",
-    allSetDescription: "Je account is ingesteld. Je kunt nu Smart Accounting gebruiken.",
+    allSetDescription: "Je account is ingesteld. Je kunt nu ZZPers Hub gebruiken.",
     whatYouCanDo: "Wat je nu kunt doen:",
     uploadInvoicesReceipts: "Upload facturen en bonnetjes voor automatische verwerking",
     reviewAiTransactions: "Bekijk en keur AI-gegenereerde transacties goed",

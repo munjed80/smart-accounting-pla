@@ -285,7 +285,7 @@ self.addEventListener('push', (event) => {
     }
   }
 
-  const title = data.title || 'Smart Accounting'
+  const title = data.title || 'ZZPers Hub'
   const options = {
     body: data.body || 'U heeft een nieuwe melding',
     icon: '/icon-192x192.png',

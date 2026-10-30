@@ -256,7 +256,7 @@ export const OnboardingPage = ({ userName, onComplete }: OnboardingPageProps) =>
           <div className="flex items-center justify-center gap-3 mb-4">
             <Database size={48} weight="duotone" className="text-primary" />
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-              Smart Accounting
+              ZZPers Hub
             </h1>
           </div>
           

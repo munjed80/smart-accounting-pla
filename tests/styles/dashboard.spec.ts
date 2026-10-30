@@ -213,8 +213,11 @@ test('workspace and navigation share the homepage identity at mobile and desktop
   await expect(drawer.locator('.brand-lockup')).toBeVisible()
   await expect(drawer.locator('.workspace-sidebar')).toHaveCSS('background-color', 'rgb(28, 61, 52)')
   await expect(drawer.locator('.brand-wordmark')).toHaveCSS('color', 'rgb(241, 245, 236)')
+  await expect.poll(async () => (await drawer.boundingBox())?.x).toBeCloseTo(0, 1)
   const box = (await drawer.boundingBox())!
   expect(box.width).toBeLessThanOrEqual(page.viewportSize()!.width - 39)
+  expect(box.y).toBe(0)
+  expect(box.height).toBe(page.viewportSize()!.height)
   await page.screenshot({ path: testInfo.outputPath('brand-navigation.png') })
   await page.keyboard.press('Escape')
   await expect(drawer).not.toBeVisible()

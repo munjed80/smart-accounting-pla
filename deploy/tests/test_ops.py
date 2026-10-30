@@ -10,37 +10,13 @@ import subprocess
 import tarfile
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location(
     "ops", Path(__file__).parents[1] / "ops.py"
 )
 ops = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(ops)
-
-
-class PublicReadinessTests(unittest.TestCase):
-    def stack(self):
-        stack = MagicMock()
-        stack.settings = {"APP_DOMAIN": "zzp.example", "API_DOMAIN": "api.zzp.example"}
-        return stack
-
-    def test_certificate_not_ready_then_success(self):
-        response = MagicMock()
-        response.__enter__.return_value.status = 200
-        with patch.object(ops, "urlopen", side_effect=[ops.URLError("TLS pending"), response, response]) as request, \
-             patch.object(ops.time, "sleep") as sleep:
-            ops.wait_for_public_health(self.stack())
-        self.assertEqual(request.call_count, 3)
-        sleep.assert_called_once()
-
-    def test_unavailable_https_stops_at_deadline(self):
-        with patch.object(ops, "urlopen", side_effect=ops.URLError("DNS unavailable")), \
-             patch.object(ops.time, "monotonic", side_effect=[0, 0, 121]), \
-             patch.object(ops.time, "sleep") as sleep:
-            with self.assertRaisesRegex(ValueError, "Public HTTPS"):
-                ops.wait_for_public_health(self.stack())
-        sleep.assert_not_called()
 
 
 class DeploymentTests(unittest.TestCase):

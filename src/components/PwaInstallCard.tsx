@@ -19,7 +19,7 @@ export const PwaInstallCard = ({ canInstall, onInstall, onDismiss }: PwaInstallC
         <DownloadSimple size={18} className="mt-0.5 shrink-0 text-primary" />
         <AlertDescription className="flex-1">
           <div className="space-y-2">
-            <p className="text-sm font-semibold">Installeer Smart Accounting</p>
+            <p className="text-sm font-semibold">Installeer ZZPers Hub</p>
             <p className="text-xs text-muted-foreground">Snellere toegang en beter offline gebruik op dit apparaat.</p>
             <Button size="sm" className="h-8 text-xs" onClick={onInstall}>Installeren</Button>
           </div>

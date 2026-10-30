@@ -81,7 +81,7 @@ class EmailService:
             return False
         
         verify_url = self._build_verify_url(token)
-        greeting = f"Hi {user_name}," if user_name else "Hi,"
+        greeting = f"Hallo {user_name}," if user_name else "Hallo,"
         brand_html = _safe_brand(settings.APP_NAME)
         brand_text = " ".join((settings.APP_NAME or "ZZPers Hub").split())
         
@@ -98,15 +98,15 @@ class EmailService:
             </div>
             <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
                 <p style="margin-top: 0;">{greeting}</p>
-                <p>Thank you for registering with {brand_html}. Please verify your email address to complete your registration.</p>
+                <p>Welkom bij {brand_html}. Bevestig je e-mailadres om je account te activeren.</p>
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="{verify_url}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Verify Email Address</a>
+                    <a href="{verify_url}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">E-mailadres bevestigen</a>
                 </div>
-                <p style="color: #666; font-size: 14px;">This link will expire in {settings.EMAIL_VERIFY_TOKEN_EXPIRE_HOURS} hours.</p>
-                <p style="color: #666; font-size: 14px;">If you didn't create an account, you can safely ignore this email.</p>
+                <p style="color: #666; font-size: 14px;">Deze link is {settings.EMAIL_VERIFY_TOKEN_EXPIRE_HOURS} uur geldig.</p>
+                <p style="color: #666; font-size: 14px;">Heb je geen account aangemaakt? Dan kun je deze e-mail veilig negeren.</p>
                 <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
                 <p style="color: #888; font-size: 12px; margin-bottom: 0;">
-                    Need help? Contact us at <a href="mailto:{settings.SUPPORT_EMAIL}" style="color: #667eea;">{settings.SUPPORT_EMAIL}</a>
+                    Hulp nodig? Neem contact op via <a href="mailto:{settings.SUPPORT_EMAIL}" style="color: #667eea;">{settings.SUPPORT_EMAIL}</a>
                 </p>
             </div>
         </body>
@@ -116,23 +116,23 @@ class EmailService:
         text_content = f"""
 {greeting}
 
-Thank you for registering with {brand_text}. Please verify your email address to complete your registration.
+Welkom bij {brand_text}. Bevestig je e-mailadres om je account te activeren.
 
-Click this link to verify your email:
+Bevestig je e-mailadres via deze link:
 {verify_url}
 
-This link will expire in {settings.EMAIL_VERIFY_TOKEN_EXPIRE_HOURS} hours.
+Deze link is {settings.EMAIL_VERIFY_TOKEN_EXPIRE_HOURS} uur geldig.
 
-If you didn't create an account, you can safely ignore this email.
+Heb je geen account aangemaakt? Dan kun je deze e-mail veilig negeren.
 
-Need help? Contact us at {settings.SUPPORT_EMAIL}
+Hulp nodig? Neem contact op via {settings.SUPPORT_EMAIL}
         """
         
         try:
             self.client.Emails.send({
-                "from": settings.RESEND_FROM_EMAIL,
+                "from": f"ZZPers Hub <{settings.RESEND_FROM_EMAIL}>",
                 "to": [to_email],
-                "subject": f"Verify your email - {brand_text}",
+                "subject": f"Bevestig je e-mailadres - {brand_text}",
                 "html": html_content,
                 "text": text_content,
             })
@@ -186,7 +186,7 @@ Need help? Contact us at {settings.SUPPORT_EMAIL}
             return False
         
         reset_url = self._build_reset_url(token)
-        greeting = f"Hi {user_name}," if user_name else "Hi,"
+        greeting = f"Hallo {user_name}," if user_name else "Hallo,"
         brand_html = _safe_brand(settings.APP_NAME)
         brand_text = " ".join((settings.APP_NAME or "ZZPers Hub").split())
         
@@ -203,15 +203,15 @@ Need help? Contact us at {settings.SUPPORT_EMAIL}
             </div>
             <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
                 <p style="margin-top: 0;">{greeting}</p>
-                <p>We received a request to reset your password. Click the button below to create a new password.</p>
+                <p>We hebben een verzoek ontvangen om je wachtwoord opnieuw in te stellen. Klik hieronder om een nieuw wachtwoord te kiezen.</p>
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="{reset_url}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Reset Password</a>
+                    <a href="{reset_url}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Wachtwoord opnieuw instellen</a>
                 </div>
-                <p style="color: #666; font-size: 14px;"><strong>This link will expire in {settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS} hour(s).</strong></p>
-                <p style="color: #666; font-size: 14px;">If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.</p>
+                <p style="color: #666; font-size: 14px;"><strong>Deze link is {settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS} uur geldig.</strong></p>
+                <p style="color: #666; font-size: 14px;">Heb je dit niet aangevraagd? Dan kun je deze e-mail veilig negeren. Je wachtwoord blijft ongewijzigd.</p>
                 <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
                 <p style="color: #888; font-size: 12px; margin-bottom: 0;">
-                    Need help? Contact us at <a href="mailto:{settings.SUPPORT_EMAIL}" style="color: #667eea;">{settings.SUPPORT_EMAIL}</a>
+                    Hulp nodig? Neem contact op via <a href="mailto:{settings.SUPPORT_EMAIL}" style="color: #667eea;">{settings.SUPPORT_EMAIL}</a>
                 </p>
             </div>
         </body>
@@ -221,22 +221,22 @@ Need help? Contact us at {settings.SUPPORT_EMAIL}
         text_content = f"""
 {greeting}
 
-We received a request to reset your password. Click the link below to create a new password:
+We hebben een verzoek ontvangen om je wachtwoord opnieuw in te stellen. Gebruik deze link:
 
 {reset_url}
 
-This link will expire in {settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS} hour(s).
+Deze link is {settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS} uur geldig.
 
-If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.
+Heb je dit niet aangevraagd? Dan kun je deze e-mail veilig negeren. Je wachtwoord blijft ongewijzigd.
 
-Need help? Contact us at {settings.SUPPORT_EMAIL}
+Hulp nodig? Neem contact op via {settings.SUPPORT_EMAIL}
         """
         
         try:
             self.client.Emails.send({
-                "from": settings.RESEND_FROM_EMAIL,
+                "from": f"ZZPers Hub <{settings.RESEND_FROM_EMAIL}>",
                 "to": [to_email],
-                "subject": f"Reset your password - {brand_text}",
+                "subject": f"Stel je wachtwoord opnieuw in - {brand_text}",
                 "html": html_content,
                 "text": text_content,
             })

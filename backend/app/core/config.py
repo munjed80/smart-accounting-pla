@@ -58,7 +58,7 @@ def _running_in_production() -> bool:
 
 class Settings(BaseSettings):
     # Application
-    APP_NAME: str = "Smart Accounting Platform"
+    APP_NAME: str = "ZZPers Hub"
     DEBUG: bool = False
     ENV: str = "production"
     

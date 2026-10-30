@@ -5,6 +5,7 @@ Tests comprehensive subscription activation and webhook processing scenarios
 including idempotency, customer creation, status transitions, and error handling.
 """
 import pytest
+import pytest_asyncio
 import json
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime, timedelta, timezone, date
@@ -21,6 +22,14 @@ from app.core.config import settings
 TEST_WEBHOOK_SECRET = "test_webhook_secret_12345"
 
 
+@pytest_asyncio.fixture
+async def public_month_plan(db_session):
+    plan = Plan(code='zzp_1m', name='ZZPers Hub 1m', price_monthly=6, trial_days=0)
+    db_session.add(plan)
+    await db_session.commit()
+    return plan
+
+
 @pytest.mark.asyncio
 async def test_activate_endpoint_creates_customer_and_immediate_checkout(
     async_client: AsyncClient,
@@ -29,6 +38,7 @@ async def test_activate_endpoint_creates_customer_and_immediate_checkout(
     test_administration: Administration,
     test_zzp_plan: Plan,
     db_session,
+    public_month_plan,
 ):
     """Test that activate endpoint always creates Mollie customer and immediate checkout"""
     # Mock Mollie client responses
@@ -41,8 +51,8 @@ async def test_activate_endpoint_creates_customer_and_immediate_checkout(
     mock_payment = {
         "id": "tr_test123",
         "status": "open",
-        "amount": {"value": "4.95", "currency": "EUR"},
-        "description": "Starter abonnement",
+        "amount": {"value": "6.00", "currency": "EUR"},
+        "description": "ZZPers Hub — 1 maand",
         "_links": {
             "checkout": {"href": "https://www.mollie.com/checkout/test123"}
         },
@@ -70,7 +80,7 @@ async def test_activate_endpoint_creates_customer_and_immediate_checkout(
         assert data["in_trial"] is True
         assert data["scheduled"] is False
         assert data["checkout_url"] == "https://www.mollie.com/checkout/test123"
-        assert data["message_nl"] == "Betaling starten. Je wordt doorgestuurd naar de betaalpagina."
+        assert "Eenmalig betalen" in data["message_nl"]
         
         # Verify customer was created
         mock_create_customer.assert_called_once()
@@ -79,15 +89,15 @@ async def test_activate_endpoint_creates_customer_and_immediate_checkout(
         mock_create_payment.assert_called_once()
         call_kwargs = mock_create_payment.call_args.kwargs
         assert call_kwargs["customer_id"] == "cst_test123"
-        assert call_kwargs["amount"] == Decimal("4.95")
+        assert call_kwargs["amount"] == Decimal("6.00")
         assert call_kwargs["currency"] == "EUR"
-        assert call_kwargs["sequence_type"] == "first"
+        assert call_kwargs["sequence_type"] == "oneoff"
         # Webhook URL should include secret
         assert "?secret=" in call_kwargs["webhook_url"]
 
 
 @pytest.mark.asyncio
-async def test_activate_endpoint_is_idempotent_for_active(
+async def test_prepaid_checkout_requires_legacy_recurring_cancellation(
     async_client: AsyncClient,
     auth_headers: dict,
     test_user: User,
@@ -96,7 +106,7 @@ async def test_activate_endpoint_is_idempotent_for_active(
     db_session,
     clean_subscriptions,
 ):
-    """Test that activate endpoint is idempotent for already-ACTIVE subscriptions"""
+    """A new prepaid purchase must not create overlapping recurring charges."""
     # Create existing ACTIVE subscription (already paid)
     now = datetime.now(timezone.utc)
     subscription = Subscription(
@@ -126,37 +136,32 @@ async def test_activate_endpoint_is_idempotent_for_active(
             headers=auth_headers,
         )
         
-        # Assertions
-        assert response.status_code == 200
-        data = response.json()
-        
-        assert data["status"] == "ACTIVE"
-        assert data["in_trial"] is False
-        assert data["scheduled"] is False
-        assert data["checkout_url"] is None
-        
+        assert response.status_code == 400
+        assert "bestaande automatische abonnement" in response.json()["detail"]["message"]
+
         # Verify no new customer/payment created
         mock_create_customer.assert_not_called()
         mock_create_payment.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_activate_endpoint_returns_active_subscription(
+async def test_prepaid_active_customer_can_buy_another_period(
     async_client: AsyncClient,
     auth_headers: dict,
     test_user: User,
     test_administration: Administration,
     test_zzp_plan: Plan,
     db_session,
+    public_month_plan,
     clean_subscriptions,
 ):
-    """Test that activate endpoint returns correct message for active subscription"""
+    """An active prepaid customer can check out a renewal without losing current access."""
     # Create active subscription
     now = datetime.now(timezone.utc)
     subscription = Subscription(
         administration_id=test_administration.id,
-        plan_id=test_zzp_plan.id,
-        plan_code=test_zzp_plan.code,
+        plan_id=public_month_plan.id,
+        plan_code=public_month_plan.code,
         status=SubscriptionStatus.ACTIVE,
         trial_start_at=now - timedelta(days=60),
         trial_end_at=now - timedelta(days=30),
@@ -165,25 +170,20 @@ async def test_activate_endpoint_returns_active_subscription(
         starts_at=now - timedelta(days=60),
         provider="mollie",
         provider_customer_id="cst_active",
-        provider_subscription_id="sub_active",
+        provider_subscription_id=None,
     )
     db_session.add(subscription)
     await db_session.commit()
     
-    # Call activate endpoint
-    response = await async_client.post(
-        "/api/v1/me/subscription/activate",
-        headers=auth_headers,
-    )
-    
-    # Assertions
+    original_end = subscription.current_period_end
+    checkout = {"id": "tr_renewal", "_links": {"checkout": {"href": "https://www.mollie.com/checkout/renewal"}}}
+    with patch("app.integrations.mollie.client.MollieClient.create_payment", return_value=checkout):
+        response = await async_client.post("/api/v1/me/subscription/activate", headers=auth_headers)
     assert response.status_code == 200
-    data = response.json()
-    
-    assert data["status"] == "ACTIVE"
-    assert data["in_trial"] is False
-    assert data["scheduled"] is False
-    assert data["message_nl"] == "Abonnement is actief."
+    assert response.json()["status"] == "ACTIVE"
+    assert response.json()["checkout_url"] == checkout["_links"]["checkout"]["href"]
+    await db_session.refresh(subscription)
+    assert subscription.current_period_end.replace(tzinfo=timezone.utc) == original_end
 
 
 @pytest.mark.asyncio

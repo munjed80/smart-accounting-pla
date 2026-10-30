@@ -142,3 +142,17 @@ async def test_prepaid_expiry_is_enforced_without_provider_callback(db_session, 
     assert not result.can_use_pro_features
     assert not result.is_paid
     assert result.status == 'EXPIRED'
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('code', sorted(PREPAID_PLAN_CODES))
+async def test_each_prepaid_plan_includes_store_import_and_review(db_session, prepaid_setup, code):
+    from types import SimpleNamespace
+    from app.api.v1 import zzp_integrations, zzp_ecommerce_review
+    user, administration, _ = prepaid_setup
+    entitlements = SimpleNamespace(is_paid=True, in_trial=False, can_use_pro_features=True, plan_code=code)
+    for module in [zzp_integrations, zzp_ecommerce_review]:
+        with patch.object(module, '_get_administration', return_value=administration), patch.object(
+            subscription_service, 'compute_entitlements', return_value=entitlements
+        ):
+            assert await module._require_pro_plan(user, db_session) is administration

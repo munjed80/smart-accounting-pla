@@ -296,6 +296,11 @@ describe('SettingsPage', () => {
     vi.mocked(api.administrationApi.list).mockResolvedValue([{ id: 'admin-1', name: 'Test' }] as any)
     vi.mocked(api.zzpApi.profile.get).mockResolvedValue({} as any)
 
+    vi.mocked(api.subscriptionApi.getSubscriptionMe).mockResolvedValue({
+      status: 'active', planCode: 'starter', planName: 'Starter',
+      startDate: '2026-01-01T00:00:00Z', endDate: '2026-02-01T00:00:00Z', daysRemaining: 10,
+    })
+
     renderWithClient(<SettingsPage />)
 
     await waitFor(() => {

@@ -1213,9 +1213,11 @@ export const SettingsPage = () => {
                       <h3 className="font-semibold">Kies je looptijd</h3>
                       <p className="text-sm text-muted-foreground">Je betaalt één keer. Geen automatische verlenging. Je betaalde periode sluit aan op je resterende gratis of betaalde toegang.</p>
                       <PrepaidPlanCards onChoose={handlePurchasePeriod} disabled={isActivating} />
-                      <Button variant="outline" onClick={handleCancelSubscription} disabled={isCanceling}>
-                        Beheer bestaand abonnement
-                      </Button>
+                      {['starter', 'zzp_pro'].includes(subscriptionMe.planCode || '') && (
+                        <Button variant="outline" onClick={handleCancelSubscription} disabled={isCanceling}>
+                          Beheer bestaand abonnement
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ) : (

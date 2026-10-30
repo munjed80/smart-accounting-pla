@@ -495,7 +495,7 @@ async def update_administration_subscription(
 
         # Set the real source-of-truth date fields based on status.
         # Trialing subscriptions should inherit the selected plan duration
-        # (free ZZP plan = 365 days) instead of the legacy hard-coded month.
+        # (new free ZZP plan = three calendar months) instead of the legacy hard-coded month.
         if target_status == SubscriptionStatus.TRIALING:
             subscription.trial_start_at = payload.starts_at or now
             subscription.trial_end_at = payload.ends_at or (now + (relativedelta(months=3) if plan.code == "free" and plan.trial_days == 90 else timedelta(days=plan.trial_days)))

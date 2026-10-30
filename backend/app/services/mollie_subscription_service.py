@@ -141,7 +141,7 @@ class MollieSubscriptionService:
         
         return customer_data["id"]
 
-    async def _activate_prepaid(self, db, user, administration_id, plan_code):
+    async def _activate_prepaid(self, db: AsyncSession, user: User, administration_id: UUID, plan_code: str) -> Dict[str, Any]:
         """Charge once; grant the selected calendar period only after a verified paid webhook."""
         subscription = await subscription_service.ensure_trial_started(db, administration_id)
         if subscription.provider_subscription_id and not (subscription.cancel_at_period_end or subscription.status == SubscriptionStatus.CANCELED):
@@ -174,7 +174,7 @@ class MollieSubscriptionService:
                 'scheduled': False, 'provider_subscription_id': None, 'checkout_url': checkout_url,
                 'message_nl': 'Eenmalig betalen. Je looptijd sluit aan op je proefperiode of betaalde toegang.'}
 
-    async def _apply_prepaid_payment(self, db, subscription, payment):
+    async def _apply_prepaid_payment(self, db: AsyncSession, subscription: Subscription, payment: Dict[str, Any]) -> None:
         """Pending and failed purchases never remove existing access or restart a trial."""
         if payment.get('status') != 'paid':
             return
@@ -849,6 +849,9 @@ class MollieSubscriptionService:
         
         # Open/pending callbacks are not final; allow the later paid callback through.
         if payment_id and resource_data.get('status') in ('open', 'pending', 'authorized'):
+            if (resource_data.get('metadata') or {}).get('payment_type') != 'prepaid':
+                await self._process_payment_webhook(db, resource_data)
+                await db.commit()
             return {'status': 'pending', 'event_id': event_id}
         if payment_id and (resource_data.get('metadata') or {}).get('payment_type') == 'prepaid':
             internal_id = (resource_data.get('metadata') or {}).get('subscription_id')

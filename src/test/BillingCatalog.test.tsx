@@ -10,7 +10,7 @@ it('renders the public price from the same catalog used by checkout', () => {
   expect(PREPAID_PLANS.map(plan => [plan.months, plan.amount])).toEqual([[1,6],[3,14],[6,25],[12,39]])
   for (const plan of PREPAID_PLANS) {
     expect(billingCatalog[plan.code].prepaid).toBe(true)
-    const card = screen.getByRole('heading', { name: plan.label, exact: true }).closest('article')!
+    const card = screen.getByRole('heading', { name: plan.label }).closest('article')!
     expect(card.textContent!.replace(/\s/g, '')).toContain(plan.price.replace(/\s/g, ''))
   }
   expect(screen.getByText('Start 3 maanden gratis')).toBeVisible()

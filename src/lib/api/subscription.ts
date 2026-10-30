@@ -119,10 +119,10 @@ export const subscriptionApi = {
   },
 
   /**
-   * Activate Mollie subscription (Upgrade to Pro).
-   * Creates a Mollie first-payment checkout and returns checkout_url.
+   * Purchase a prepaid access period.
+   * Creates a one-off Mollie checkout and returns checkout_url.
    * The caller must redirect `window.location.href = result.checkout_url`.
-   * Idempotent for already-ACTIVE subscriptions (returns existing status).
+   * Purchases append access after any remaining trial or paid period.
    */
   activateSubscription: async (planCode?: string): Promise<ActivateSubscriptionResponse> => {
     const response = await api.post('/me/subscription/activate', { plan_code: planCode || 'zzp_1m' })

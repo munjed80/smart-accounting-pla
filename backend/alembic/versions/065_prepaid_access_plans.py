@@ -2,6 +2,7 @@
 from alembic import op
 import sqlalchemy as sa
 import uuid
+from decimal import Decimal
 
 revision = '065_prepaid_access_plans'
 down_revision = '064_zzp_bank_receipts'
@@ -17,7 +18,7 @@ def upgrade():
             INSERT INTO plans (id, code, name, price_monthly, trial_days, max_invoices, max_storage_mb, max_users)
             VALUES (:id, :code, :name, :price, 0, 999999, 10240, 3)
             ON CONFLICT (code) DO NOTHING
-        """), {'id': uuid.uuid4(), 'code': f'zzp_{months}m', 'name': f'ZZPers Hub {months}m', 'price': monthly})
+        """), {'id': uuid.uuid4(), 'code': f'zzp_{months}m', 'name': f'ZZPers Hub {months}m', 'price': Decimal(monthly)})
 
 
 def downgrade():

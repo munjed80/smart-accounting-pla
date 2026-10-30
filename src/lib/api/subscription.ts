@@ -58,6 +58,7 @@ export interface ActivateSubscriptionResponse {
   scheduled: boolean
   provider_subscription_id: string | null
   checkout_url: string | null
+  message_nl?: string
 }
 
 export interface CancelSubscriptionResponse {
@@ -124,7 +125,7 @@ export const subscriptionApi = {
    * Idempotent for already-ACTIVE subscriptions (returns existing status).
    */
   activateSubscription: async (planCode?: string): Promise<ActivateSubscriptionResponse> => {
-    const response = await api.post('/me/subscription/activate', { plan_code: planCode ?? null })
+    const response = await api.post('/me/subscription/activate', { plan_code: planCode || 'zzp_1m' })
     return response.data
   },
 

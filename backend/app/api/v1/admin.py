@@ -1,4 +1,5 @@
 import json
+from dateutil.relativedelta import relativedelta
 import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -497,7 +498,7 @@ async def update_administration_subscription(
         # (free ZZP plan = 365 days) instead of the legacy hard-coded month.
         if target_status == SubscriptionStatus.TRIALING:
             subscription.trial_start_at = payload.starts_at or now
-            subscription.trial_end_at = payload.ends_at or (now + timedelta(days=plan.trial_days))
+            subscription.trial_end_at = payload.ends_at or (now + (relativedelta(months=3) if plan.code == "free" and plan.trial_days == 90 else timedelta(days=plan.trial_days)))
         elif target_status == SubscriptionStatus.ACTIVE:
             subscription.current_period_start = payload.starts_at or now
             subscription.current_period_end = payload.ends_at
@@ -528,8 +529,8 @@ async def update_administration_subscription(
                     subscription.trial_start_at = now
                 if not subscription.trial_end_at or subscription.trial_end_at <= now:
                     trial_plan = (await db.execute(select(Plan).where(Plan.id == subscription.plan_id))).scalar_one_or_none()
-                    trial_days = trial_plan.trial_days if trial_plan else 365
-                    subscription.trial_end_at = now + timedelta(days=trial_days)
+                    trial_days = trial_plan.trial_days if trial_plan else 90
+                    subscription.trial_end_at = now + (relativedelta(months=3) if trial_days == 90 else timedelta(days=trial_days))
             elif parsed_status == SubscriptionStatus.ACTIVE:
                 # Ensure billing period dates are set
                 if not subscription.current_period_start:

@@ -1,4 +1,38 @@
 {
-  "starter": { "price_monthly": "4.95", "description": "Starter abonnement" },
-  "zzp_pro": { "price_monthly": "6.95", "description": "Pro abonnement" }
+  "starter": {
+    "price_monthly": "4.95",
+    "description": "Starter abonnement"
+  },
+  "zzp_pro": {
+    "price_monthly": "6.95",
+    "description": "Pro abonnement"
+  },
+  "zzp_1m": {
+    "price_monthly": "6.0",
+    "amount": "6.00",
+    "months": 1,
+    "description": "ZZPers Hub — 1 maand",
+    "prepaid": true
+  },
+  "zzp_3m": {
+    "price_monthly": "4.67",
+    "amount": "14.00",
+    "months": 3,
+    "description": "ZZPers Hub — 3 maanden",
+    "prepaid": true
+  },
+  "zzp_6m": {
+    "price_monthly": "4.17",
+    "amount": "25.00",
+    "months": 6,
+    "description": "ZZPers Hub — 6 maanden",
+    "prepaid": true
+  },
+  "zzp_12m": {
+    "price_monthly": "3.25",
+    "amount": "39.00",
+    "months": 12,
+    "description": "ZZPers Hub — 12 maanden",
+    "prepaid": true
+  }
 }

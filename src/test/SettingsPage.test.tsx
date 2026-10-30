@@ -262,7 +262,7 @@ describe('SettingsPage', () => {
     expect(screen.getByText('Profielinformatie')).toBeInTheDocument()
   })
 
-  it('renders Starter button for ZZP trial users and wires onClick', async () => {
+  it('renders prepaid durations for trial users and sends the selected period', async () => {
     vi.mocked(api.administrationApi.list).mockResolvedValue([{ id: 'admin-1', name: 'Test' }] as any)
     vi.mocked(api.zzpApi.profile.get).mockResolvedValue({} as any)
     vi.mocked(api.subscriptionApi.activateSubscription).mockResolvedValue({
@@ -278,17 +278,17 @@ describe('SettingsPage', () => {
 
     // Wait for subscription data to load
     await waitFor(() => {
-      expect(screen.getByText(/Starter/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '3 maanden kopen' })).toBeInTheDocument()
     })
 
-    const upgradeButton = screen.getByText(/Starter/).closest('button')
+    const upgradeButton = screen.getByRole('button', { name: '3 maanden kopen' })
     expect(upgradeButton).not.toBeNull()
     expect(upgradeButton).toHaveAttribute('type', 'button')
     
     // Clicking should call activateSubscription
     upgradeButton!.click()
     await waitFor(() => {
-      expect(api.subscriptionApi.activateSubscription).toHaveBeenCalledTimes(1)
+      expect(api.subscriptionApi.activateSubscription).toHaveBeenCalledWith('zzp_3m')
     })
   })
 
@@ -299,10 +299,10 @@ describe('SettingsPage', () => {
     renderWithClient(<SettingsPage />)
 
     await waitFor(() => {
-      expect(screen.getByText('Annuleer proefperiode')).toBeInTheDocument()
+      expect(screen.getByText('Beheer bestaand abonnement')).toBeInTheDocument()
     })
 
-    const cancelButton = screen.getByText('Annuleer proefperiode').closest('button')
+    const cancelButton = screen.getByText('Beheer bestaand abonnement').closest('button')
     expect(cancelButton).not.toBeNull()
     expect(cancelButton).toHaveAttribute('type', 'button')
 

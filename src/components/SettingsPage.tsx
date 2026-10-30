@@ -1,4 +1,5 @@
-import { STARTER_PRICE_NL, PRO_PRICE_NL } from '@/lib/billingCatalog'
+import { PrepaidPlanCards } from '@/components/PrepaidPlanCards'
+import { type PrepaidPlanCode } from '@/lib/billingCatalog'
 /**
  * Settings Page
  * 
@@ -434,55 +435,13 @@ export const SettingsPage = () => {
     }
   }
 
-  const handleActivateSubscription = async () => {
+  const handlePurchasePeriod = async (planCode: PrepaidPlanCode) => {
     setIsActivating(true)
     try {
-      const result = await subscriptionApi.activateSubscription('starter')
-      if (result.checkout_url) {
-        // Redirect to Mollie checkout for immediate payment
-        window.location.href = result.checkout_url
-        return
-      }
-      if (result.scheduled) {
-        toast.success('Abonnement gepland', {
-          description: `Je abonnement start automatisch na de proefperiode${result.trial_end_at ? ` op ${new Date(result.trial_end_at).toLocaleDateString('nl-NL')}` : ''}.`,
-        })
-      } else {
-        toast.success('Abonnement actief', {
-          description: 'Je abonnement is nu actief.',
-        })
-      }
-      await refetchSubscription()
-      await refetchSubscriptionMe()
+      const result = await subscriptionApi.activateSubscription(planCode)
+      if (result.checkout_url) window.location.href = result.checkout_url
+      else toast.info(result.message_nl || 'Controleer je abonnementsstatus.')
     } catch (error) {
-      console.error('Failed to activate subscription:', error)
-      toast.error(parseApiError(error))
-    } finally {
-      setIsActivating(false)
-    }
-  }
-
-  const handleActivateSubscriptionPro = async () => {
-    setIsActivating(true)
-    try {
-      const result = await subscriptionApi.activateSubscription('zzp_pro')
-      if (result.checkout_url) {
-        window.location.href = result.checkout_url
-        return
-      }
-      if (result.scheduled) {
-        toast.success('Pro abonnement gepland', {
-          description: `Je Pro abonnement start automatisch na de proefperiode${result.trial_end_at ? ` op ${new Date(result.trial_end_at).toLocaleDateString('nl-NL')}` : ''}.`,
-        })
-      } else {
-        toast.success('Pro abonnement actief', {
-          description: 'Je Pro abonnement is nu actief.',
-        })
-      }
-      await refetchSubscription()
-      await refetchSubscriptionMe()
-    } catch (error) {
-      console.error('Failed to activate Pro subscription:', error)
       toast.error(parseApiError(error))
     } finally {
       setIsActivating(false)
@@ -1250,72 +1209,13 @@ export const SettingsPage = () => {
 
                     <Separator />
 
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-2">
-                      {subscriptionMe.status === 'trial' && (
-                        <>
-                          <Button
-                            onClick={handleActivateSubscription}
-                            disabled={isActivating}
-                          >
-                            {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Starter ({STARTER_PRICE_NL}/mnd)
-                          </Button>
-                          <Button
-                            onClick={handleActivateSubscriptionPro}
-                            disabled={isActivating}
-                            className="bg-purple-600 hover:bg-purple-700"
-                          >
-                            {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Pro ({PRO_PRICE_NL}/mnd)
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={handleCancelSubscription}
-                            disabled={isCanceling}
-                          >
-                            {isCanceling && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Annuleer proefperiode
-                          </Button>
-                        </>
-                      )}
-                      {subscriptionMe.status === 'active' && (
-                        <>
-                          <Button
-                            variant="outline"
-                            onClick={() => toast.info('Abonnementsbeheer is nog niet beschikbaar.')}
-                          >
-                            Abonnement beheren
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={handleCancelSubscription}
-                            disabled={isCanceling}
-                          >
-                            {isCanceling && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Abonnement opzeggen
-                          </Button>
-                        </>
-                      )}
-                      {subscriptionMe.status === 'expired' && (
-                        <>
-                          <Button
-                            onClick={handleActivateSubscription}
-                            disabled={isActivating}
-                          >
-                            {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Starter ({STARTER_PRICE_NL}/mnd)
-                          </Button>
-                          <Button
-                            onClick={handleActivateSubscriptionPro}
-                            disabled={isActivating}
-                            className="bg-purple-600 hover:bg-purple-700"
-                          >
-                            {isActivating && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
-                            Pro ({PRO_PRICE_NL}/mnd)
-                          </Button>
-                        </>
-                      )}
+                    <div className="space-y-4">
+                      <h3 className="font-semibold">Kies je looptijd</h3>
+                      <p className="text-sm text-muted-foreground">Je betaalt één keer. Geen automatische verlenging. Je betaalde periode sluit aan op je resterende gratis of betaalde toegang.</p>
+                      <PrepaidPlanCards onChoose={handlePurchasePeriod} disabled={isActivating} />
+                      <Button variant="outline" onClick={handleCancelSubscription} disabled={isCanceling}>
+                        Beheer bestaand abonnement
+                      </Button>
                     </div>
                   </div>
                 ) : (

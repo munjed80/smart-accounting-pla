@@ -66,9 +66,13 @@ CHART_OF_ACCOUNTS_TEMPLATE = [
 
 DEFAULT_PLANS = [
     # ZZP plans – source of truth for SaaS pricing
-    {"code": "free", "name": "Free", "price_monthly": Decimal("0.00"), "trial_days": 365, "max_invoices": 999999, "max_storage_mb": 5120, "max_users": 1},
+    {"code": "free", "name": "Free", "price_monthly": Decimal("0.00"), "trial_days": 90, "max_invoices": 999999, "max_storage_mb": 5120, "max_users": 1},
     {"code": "starter", "name": "Starter", "price_monthly": Decimal("4.95"), "trial_days": 0, "max_invoices": 999999, "max_storage_mb": 5120, "max_users": 1},
     {"code": "zzp_pro", "name": "Pro", "price_monthly": Decimal("6.95"), "trial_days": 0, "max_invoices": 999999, "max_storage_mb": 10240, "max_users": 3},
+    {"code": "zzp_1m", "name": "ZZPers Hub 1m", "price_monthly": Decimal("6.00"), "trial_days": 0, "max_invoices": 999999, "max_storage_mb": 10240, "max_users": 3},
+    {"code": "zzp_3m", "name": "ZZPers Hub 3m", "price_monthly": Decimal("4.67"), "trial_days": 0, "max_invoices": 999999, "max_storage_mb": 10240, "max_users": 3},
+    {"code": "zzp_6m", "name": "ZZPers Hub 6m", "price_monthly": Decimal("4.17"), "trial_days": 0, "max_invoices": 999999, "max_storage_mb": 10240, "max_users": 3},
+    {"code": "zzp_12m", "name": "ZZPers Hub 12m", "price_monthly": Decimal("3.25"), "trial_days": 0, "max_invoices": 999999, "max_storage_mb": 10240, "max_users": 3},
     # Accountant / enterprise plans (unchanged)
     {"code": "basic", "name": "BASIC", "price_monthly": Decimal("19.00"), "trial_days": 365, "max_invoices": 500, "max_storage_mb": 2048, "max_users": 3},
     {"code": "pro", "name": "PRO", "price_monthly": Decimal("49.00"), "trial_days": 365, "max_invoices": 5000, "max_storage_mb": 10240, "max_users": 15},

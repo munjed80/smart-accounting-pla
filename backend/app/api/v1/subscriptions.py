@@ -127,7 +127,7 @@ async def start_trial(
     Start a trial subscription for the current user.
     
     Idempotent: Returns existing subscription if already started.
-    Auto-starts the configured free trial for the ZZP free plan (365 days by default).
+    Auto-starts the configured free trial for the ZZP free plan (three calendar months by default).
     """
     # Get user's primary administration (ZZP users have one)
     result = await db.execute(
@@ -244,7 +244,7 @@ async def activate_subscription(
             db=db,
             user=current_user,
             administration_id=member.administration_id,
-            plan_code=body.plan_code,
+            plan_code=body.plan_code or "zzp_1m",
         )
         
         return ActivateSubscriptionResponse(**result)
@@ -436,6 +436,7 @@ async def get_subscription_me(
             detail={"code": "NO_ADMINISTRATION", "message": "User has no administration"},
         )
 
+    await subscription_service.compute_entitlements(db, member.administration_id)
     subscription = await subscription_service.get_subscription(db, member.administration_id)
 
     if not subscription:
@@ -481,6 +482,10 @@ async def get_subscription_me(
         "free": "Gratis proefperiode",
         "starter": "Starter",
         "zzp_pro": "Pro",
+        "zzp_1m": "ZZPers Hub — 1 maand",
+        "zzp_3m": "ZZPers Hub — 3 maanden",
+        "zzp_6m": "ZZPers Hub — 6 maanden",
+        "zzp_12m": "ZZPers Hub — 12 maanden",
     }
     plan_name = plan_name_map.get(plan_code, plan_code)
 

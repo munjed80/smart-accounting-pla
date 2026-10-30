@@ -34,7 +34,7 @@ test('homepage fits the viewport, has real destinations and an isolated light pa
     expect(await page.locator(target!).count()).toBe(1)
   }
   await expect(
-    page.getByRole('link', { name: 'Begin je gratis jaar' }).first(),
+    page.getByRole('link', { name: 'Start 3 maanden gratis' }).first(),
   ).toHaveAttribute('href', '/register')
   await expect(page.locator('.lp-login')).toHaveAttribute('href', '/login')
   const background = await page
@@ -136,7 +136,7 @@ test('public root renders the homepage without an authenticated session', async 
     page.getByRole('tab', { name: 'Facturen', exact: true }),
   ).toBeVisible()
   expect(errors).toEqual([])
-  await page.getByRole('link', { name: 'Begin je gratis jaar' }).first().click()
+  await page.getByRole('link', { name: 'Start 3 maanden gratis' }).first().click()
   await expect(page).toHaveURL(/\/register$/)
   await expect(page.locator('#register-name')).toBeVisible()
   await page.goBack()
@@ -223,4 +223,22 @@ test('unverified login can request a new activation link after API error convers
   await page.getByRole('button', { name: 'Verificatie-e-mail opnieuw verzenden', exact: true }).click()
   await expect(page.getByRole('status')).toContainText('Je hebt te vaak een link aangevraagd')
   await expect(page.getByText(/Wacht.*opnieuw/)).toBeVisible()
+})
+
+
+test('public pricing and product coverage match the prepaid catalog', async ({ page }, testInfo) => {
+  await page.goto('/')
+  for (const label of ['Overzicht','Klanten','Facturen','Offertes','Uitgaven','Uren','Agenda']) {
+    await expect(page.locator('#werkplek').getByRole('heading', { name: label, exact: true })).toBeVisible()
+  }
+  await expect(page.locator('#uren').getByText('Van urenoverzicht naar factuurregels')).toBeVisible()
+  for (const provider of ['Shopify','WooCommerce']) await expect(page.locator('#koppelingen').getByRole('heading', { name: provider })).toBeVisible()
+  await expect(page.locator('footer')).not.toContainText(/KvK/i)
+  await page.locator('#koppelingen').screenshot({ path: testInfo.outputPath('brand-store-integrations.png') })
+  await page.locator('.lp-paid-periods').screenshot({ path: testInfo.outputPath('brand-prepaid-home.png') })
+  await page.goto('/prijzen')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Eerst drie maanden gratis')
+  for (const amount of ['€ 6','€ 14','€ 25','€ 39']) await expect(page.locator('.prepaid-plan-price').filter({ hasText: amount })).toHaveCount(1)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('brand-prepaid-pricing.png'), fullPage: true })
 })

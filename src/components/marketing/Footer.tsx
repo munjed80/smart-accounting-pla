@@ -90,7 +90,7 @@ export const MarketingFooter = () => {
             <address className="not-italic text-xs text-muted-foreground leading-relaxed">
               Europaboulevard 371<br />
               1825 RL Alkmaar<br />
-              KvK: 69779716
+
             </address>
 
           </div>

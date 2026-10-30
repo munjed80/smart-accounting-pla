@@ -1,4 +1,4 @@
-import { PRO_PRICE_NL } from '@/lib/billingCatalog'
+import { MONTHLY_PRICE_NL, isPrepaidPlan } from '@/lib/billingCatalog'
 /**
  * ZZP E-commerce Integrations Page
  *
@@ -73,7 +73,7 @@ export const ZZPIntegrationsPage = () => {
 
   // Determine access
   const canUseIntegrations = entitlements?.can_use_pro_features ?? false
-  const isPro = subscription?.plan_code === 'zzp_pro' || subscription?.plan_code === 'pro'
+  const isPro = subscription?.plan_code === 'zzp_pro' || subscription?.plan_code === 'pro' || isPrepaidPlan(subscription?.plan_code)
   const inTrial = entitlements?.in_trial ?? false
   const hasAccess = canUseIntegrations && (inTrial || isPro)
 
@@ -351,7 +351,7 @@ function ProUpgradePrompt() {
   const handleUpgrade = async () => {
     setActivating(true)
     try {
-      const result = await subscriptionApi.activateSubscription('zzp_pro')
+      const result = await subscriptionApi.activateSubscription('zzp_1m')
       if (result.checkout_url) {
         window.location.href = result.checkout_url
         return
@@ -372,28 +372,28 @@ function ProUpgradePrompt() {
         <LockSimple className="h-8 w-8 text-purple-600" weight="fill" />
       </div>
       <div className="space-y-2 max-w-md">
-        <h2 className="text-xl font-semibold">{t('integrations.proRequired')}</h2>
+        <h2 className="text-xl font-semibold">Webshops verbinden</h2>
         <p className="text-muted-foreground text-sm">
-          {t('integrations.proRequiredDescription')}
+          Shopify- en WooCommerce-koppelingen zijn inbegrepen tijdens je proefperiode en bij alle nieuwe looptijden. Kies toegang om verder te gaan.
         </p>
       </div>
       <div className="rounded-lg border border-purple-200 bg-purple-50 p-6 max-w-sm w-full">
         <div className="flex items-center gap-2 mb-3">
           <Sparkle className="h-5 w-5 text-purple-600" weight="fill" />
-          <h3 className="font-semibold text-purple-900">Pro — {PRO_PRICE_NL}/maand</h3>
+          <h3 className="font-semibold text-purple-900">ZZPers Hub — {MONTHLY_PRICE_NL} voor 1 maand</h3>
         </div>
         <ul className="space-y-1.5 text-sm text-purple-800 text-left mb-4">
           <li className="flex items-center gap-2"><span className="text-purple-600">✓</span>Shopify & WooCommerce koppeling</li>
           <li className="flex items-center gap-2"><span className="text-purple-600">✓</span>Automatische orderimport</li>
-          <li className="flex items-center gap-2"><span className="text-purple-600">✓</span>BTW-aangifte via Digipoort</li>
-          <li className="flex items-center gap-2"><span className="text-purple-600">✓</span>Bankrekening koppeling & Exports</li>
+          <li className="flex items-center gap-2"><span className="text-purple-600">✓</span>Uren, facturen en btw-overzicht</li>
+          <li className="flex items-center gap-2"><span className="text-purple-600">✓</span>Bestellingen beoordelen vóór het boeken</li>
         </ul>
         <Button
           className="w-full bg-purple-600 hover:bg-purple-700"
           onClick={handleUpgrade}
           disabled={activating}
         >
-          {activating ? 'Bezig...' : 'Upgraden naar Pro'}
+          {activating ? 'Bezig...' : 'Kies toegang'}
         </Button>
       </div>
     </div>

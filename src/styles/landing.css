@@ -213,19 +213,20 @@
 }
 .landing-page h1,
 .landing-page h2 {
-  font-family: 'ZZP Editorial', Georgia, serif;
-  font-weight: 400;
-  letter-spacing: -2.5px;
-  line-height: 1.08;
+  font-family: 'ZZP Sans', system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1.12;
   text-wrap: balance;
 }
 .landing-page h1 {
-  font-size: clamp(52px, 5.8vw, 78px);
+  font-size: clamp(46px, 5.2vw, 70px);
   margin-top: 26px;
 }
 .landing-page h1 em,
 .landing-page h2 em {
-  font-weight: 400;
+  font-style: normal;
+  font-weight: inherit;
   color: var(--lp-green);
 }
 .lp-hero-description {
@@ -646,9 +647,9 @@
   color: #71816a;
 }
 .lp-feature-copy h3 {
-  font-family: 'ZZP Editorial', Georgia, serif;
-  font-weight: 400;
-  font-size: 33px;
+  font-family: 'ZZP Sans', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 30px;
   line-height: 1.2;
   letter-spacing: -0.8px;
   margin-top: 20px;
@@ -708,10 +709,10 @@
   margin-top: 26px;
 }
 .lp-document-title h3 {
-  font:
-    28px 'ZZP Editorial',
-    Georgia,
-    serif;
+  font-family: 'ZZP Sans', system-ui, sans-serif;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
 }
 .lp-document-title > span {
   font-size: 9px;
@@ -1301,7 +1302,7 @@
     padding-top: 55px;
   }
   .landing-page h1 {
-    font-size: 64px;
+    font-size: 58px;
   }
   .lp-hero-copy {
     max-width: 630px;
@@ -1418,7 +1419,7 @@
     letter-spacing: 1.2px;
   }
   .landing-page h1 {
-    font-size: clamp(42px, 11.7vw, 64px);
+    font-size: clamp(38px, 10.5vw, 58px);
     letter-spacing: -1.8px;
     line-height: 1.12;
     margin-top: 22px;

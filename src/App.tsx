@@ -1,3 +1,4 @@
+import { BrandLockup } from '@/components/BrandLockup'
 import { STARTER_PRICE_NL, PRO_PRICE_NL } from '@/lib/billingCatalog'
 import { isAccountantRole } from '@/lib/roles'
 import { useState, useEffect, lazy, Suspense } from 'react'
@@ -15,7 +16,7 @@ import { cleanupOverlayPortals } from '@/hooks/useCloseOverlayOnRouteChange'
 import { useOnboardingTour } from '@/hooks/useOnboardingTour'
 import { useEntitlements } from '@/hooks/useEntitlements'
 import { OnboardingTour } from '@/components/OnboardingTour'
-import { Database, LockSimple } from '@phosphor-icons/react'
+import { LockSimple } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 
@@ -608,7 +609,7 @@ const AppContent = () => {
       return (
         <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center">
           <div className="text-center">
-            <Database size={64} className="mx-auto mb-4 text-primary animate-pulse" weight="duotone" />
+            <BrandLockup size="lg" className="mb-4" />
             <p className="text-muted-foreground">Laden...</p>
           </div>
           <BootDiagnosticsBanner stage={bootStage} isLoading={isLoading} isCheckingOnboarding={isCheckingOnboarding} />
@@ -623,7 +624,7 @@ const AppContent = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center">
         <div className="text-center">
-          <Database size={64} className="mx-auto mb-4 text-primary animate-pulse" weight="duotone" />
+          <BrandLockup size="lg" className="mb-4" />
           <p className="text-muted-foreground">Laden...</p>
         </div>
         <BootDiagnosticsBanner stage={bootStage} isLoading={isLoading} isCheckingOnboarding={isCheckingOnboarding} />

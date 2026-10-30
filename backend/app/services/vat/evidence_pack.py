@@ -269,7 +269,7 @@ class VatEvidencePackService:
             f"• Administratie ID: {self.administration_id}",
             f"• Gegenereerd op: {datetime.now(timezone.utc).isoformat()}",
             "",
-            "Dit document is gegenereerd vanuit het Smart Accounting Platform.",
+            "Dit document is gegenereerd vanuit ZZPers Hub.",
         ]
         
         for line in audit_info:

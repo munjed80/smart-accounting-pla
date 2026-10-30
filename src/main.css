@@ -5,6 +5,7 @@
 @import './styles/theme.css';
 @import './styles/tokens.css';
 @import './styles/brand-fonts.css';
+@import './styles/brand.css';
 @import './index.css';
 @import "tw-animate-css";
 /*
@@ -27,7 +28,7 @@ html {
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) * 3);
   --radius-full: 9999px;
-  --font-sans: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --font-sans: 'ZZP Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -114,7 +115,7 @@ html {
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
   }
 
 }
@@ -133,20 +134,9 @@ html {
 
 /* Animated shimmer wordmark */
 .brand-shimmer {
-  background: linear-gradient(
-    90deg,
-    oklch(0.65 0.25 265) 0%,
-    oklch(0.75 0.22 150) 25%,
-    oklch(0.88 0.12 200) 45%,
-    oklch(0.75 0.22 150) 55%,
-    oklch(0.65 0.25 265) 80%,
-    oklch(0.75 0.22 150) 100%
-  );
-  background-size: 250% auto;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: brand-shimmer 5s linear infinite;
+  color: var(--foreground);
+  background: none;
+  -webkit-text-fill-color: currentColor;
 }
 
 /* Gradient text for hero headline accent */

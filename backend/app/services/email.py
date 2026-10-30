@@ -25,6 +25,28 @@ def _safe_brand(value: str) -> str:
     return html.escape(cleaned.strip(), quote=True) or "ZZPers Hub"
 
 
+def _auth_email(*, brand: str, title: str, greeting: str, body: str,
+                action: str, url: str, expiry: int, notice: str) -> str:
+    """Email-safe shared layout with inline styles and a plain-link fallback."""
+    safe_url = html.escape(url, quote=True)
+    support = html.escape(settings.SUPPORT_EMAIL, quote=True)
+    return f'''<!DOCTYPE html>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:24px 12px;background:#f7f6f0;color:#192e2b;font-family:Arial,Helvetica,sans-serif;line-height:1.65;">
+<table role="presentation" style="width:100%;max-width:560px;margin:0 auto;border-collapse:collapse;"><tr><td style="padding:20px 0;">
+<span style="display:inline-block;background:#245c4e;color:#ffffff;border-radius:9px;padding:2px 12px;font-size:30px;font-weight:bold;vertical-align:middle;">z<span style="color:#d9e8aa;">.</span></span>
+<span style="font-size:23px;font-weight:bold;margin-left:10px;vertical-align:middle;">{brand}</span>
+</td></tr><tr><td style="background:#ffffff;border:1px solid #dcded5;border-radius:12px;padding:28px;">
+<h1 style="margin:0 0 24px;font-size:26px;line-height:1.25;color:#192e2b;">{title}</h1>
+<p>{html.escape(greeting)}</p><p>{body}</p>
+<p style="margin:28px 0;"><a href="{safe_url}" style="display:inline-block;background:#245c4e;color:#ffffff;padding:13px 22px;border-radius:7px;font-weight:bold;text-decoration:none;">{action}</a></p>
+<p style="color:#60716b;font-size:14px;">Deze link is {expiry} uur geldig.</p>
+<p style="color:#60716b;font-size:14px;">{notice}</p>
+<hr style="border:0;border-top:1px solid #dcded5;margin:24px 0;">
+<p style="font-size:12px;color:#60716b;">Werkt de knop niet? Open deze link:<br><a href="{safe_url}" style="color:#245c4e;word-break:break-all;">{safe_url}</a></p>
+</td></tr><tr><td style="padding:20px 0;font-size:12px;color:#60716b;">{brand} · Je administratie op één plek.<br>Hulp nodig? <a href="mailto:{support}" style="color:#245c4e;">{support}</a></td></tr></table></body></html>'''
+
+
 class EmailService:
     """Service for sending authentication-related emails via Resend."""
     
@@ -85,34 +107,14 @@ class EmailService:
         brand_html = _safe_brand(settings.APP_NAME)
         brand_text = " ".join((settings.APP_NAME or "ZZPers Hub").split())
         
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-                <h1 style="color: white; margin: 0; font-size: 24px;">{brand_html}</h1>
-            </div>
-            <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-                <p style="margin-top: 0;">{greeting}</p>
-                <p>Welkom bij {brand_html}. Bevestig je e-mailadres om je account te activeren.</p>
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="{verify_url}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">E-mailadres bevestigen</a>
-                </div>
-                <p style="color: #666; font-size: 14px;">Deze link is {settings.EMAIL_VERIFY_TOKEN_EXPIRE_HOURS} uur geldig.</p>
-                <p style="color: #666; font-size: 14px;">Heb je geen account aangemaakt? Dan kun je deze e-mail veilig negeren.</p>
-                <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
-                <p style="color: #888; font-size: 12px; margin-bottom: 0;">
-                    Hulp nodig? Neem contact op via <a href="mailto:{settings.SUPPORT_EMAIL}" style="color: #667eea;">{settings.SUPPORT_EMAIL}</a>
-                </p>
-            </div>
-        </body>
-        </html>
-        """
-        
+        html_content = _auth_email(
+            brand=brand_html, title="Welkom bij ZZPers Hub", greeting=greeting,
+            body=f"Welkom bij {brand_html}. Bevestig je e-mailadres om je account te activeren.",
+            action="E-mailadres bevestigen", url=verify_url,
+            expiry=settings.EMAIL_VERIFY_TOKEN_EXPIRE_HOURS,
+            notice="Heb je geen account aangemaakt? Dan kun je deze e-mail veilig negeren.",
+        )
+
         text_content = f"""
 {greeting}
 
@@ -190,34 +192,14 @@ Hulp nodig? Neem contact op via {settings.SUPPORT_EMAIL}
         brand_html = _safe_brand(settings.APP_NAME)
         brand_text = " ".join((settings.APP_NAME or "ZZPers Hub").split())
         
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-                <h1 style="color: white; margin: 0; font-size: 24px;">{brand_html}</h1>
-            </div>
-            <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-                <p style="margin-top: 0;">{greeting}</p>
-                <p>We hebben een verzoek ontvangen om je wachtwoord opnieuw in te stellen. Klik hieronder om een nieuw wachtwoord te kiezen.</p>
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="{reset_url}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Wachtwoord opnieuw instellen</a>
-                </div>
-                <p style="color: #666; font-size: 14px;"><strong>Deze link is {settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS} uur geldig.</strong></p>
-                <p style="color: #666; font-size: 14px;">Heb je dit niet aangevraagd? Dan kun je deze e-mail veilig negeren. Je wachtwoord blijft ongewijzigd.</p>
-                <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
-                <p style="color: #888; font-size: 12px; margin-bottom: 0;">
-                    Hulp nodig? Neem contact op via <a href="mailto:{settings.SUPPORT_EMAIL}" style="color: #667eea;">{settings.SUPPORT_EMAIL}</a>
-                </p>
-            </div>
-        </body>
-        </html>
-        """
-        
+        html_content = _auth_email(
+            brand=brand_html, title="Een nieuw wachtwoord kiezen", greeting=greeting,
+            body="We hebben een verzoek ontvangen om je wachtwoord opnieuw in te stellen. Kies hieronder een nieuw wachtwoord.",
+            action="Wachtwoord opnieuw instellen", url=reset_url,
+            expiry=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS,
+            notice="Heb je dit niet aangevraagd? Negeer deze e-mail. Je wachtwoord blijft ongewijzigd.",
+        )
+
         text_content = f"""
 {greeting}
 

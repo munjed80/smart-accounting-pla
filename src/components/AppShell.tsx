@@ -57,7 +57,7 @@ import {
   ShoppingCart,
 } from '@phosphor-icons/react'
 import { t } from '@/i18n'
-import { getBrandName } from '@/lib/roles'
+import { BrandLockup } from '@/components/BrandLockup'
 import { PwaInstallCard } from '@/components/PwaInstallCard'
 import { IOSInstallModal } from '@/components/IOSInstallModal'
 import { SwUpdateBanner } from '@/components/SwUpdateBanner'
@@ -535,14 +535,11 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
 
   // Render sidebar/drawer content
   const renderSidebarContent = () => (
-    <div className="flex flex-col h-full">
+    <div className="workspace-sidebar flex flex-col h-full">
       {/* Sidebar Header */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <Database size={28} weight="duotone" className="text-primary" />
-          <span className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            {getBrandName(user?.role)}
-          </span>
+          <BrandLockup size="md" />
         </div>
       </div>
 
@@ -590,7 +587,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
                           {item.icon}
                           <span className="flex-1 text-left">{item.label}</span>
                           {item.badgeCount != null && item.badgeCount > 0 && (
-                            <Badge variant="secondary" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                            <Badge variant="secondary" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px] font-semibold bg-primary/15 text-primary">
                               {item.badgeCount}
                             </Badge>
                           )}
@@ -628,7 +625,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
                       {item.icon}
                       <span className="flex-1 text-left">{item.label}</span>
                       {item.badgeCount != null && item.badgeCount > 0 && (
-                        <Badge variant="secondary" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                        <Badge variant="secondary" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px] font-semibold bg-primary/15 text-primary">
                           {item.badgeCount}
                         </Badge>
                       )}
@@ -669,7 +666,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
                             {item.icon}
                             <span className="flex-1 text-left">{item.label}</span>
                             {item.badgeCount != null && item.badgeCount > 0 && (
-                              <Badge variant="secondary" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                              <Badge variant="secondary" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px] font-semibold bg-primary/15 text-primary">
                                 {item.badgeCount}
                               </Badge>
                             )}
@@ -748,7 +745,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
       <div className="p-4 border-t border-border">
         <Button 
           onClick={handleLogout} 
-          variant="destructive" 
+          variant="ghost"
           className="w-full"
           size="default"
         >
@@ -760,7 +757,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
   )
 
   return (
-    <div className="min-h-screen bg-background overflow-x-clip">
+    <div className="workspace min-h-screen bg-background overflow-x-clip">
       {/* Top Header - Always visible */}
       <header className="app-shell-header sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-sm" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
@@ -778,10 +775,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
               </Button>
               
               <div className="flex items-center gap-2">
-                <Database size={28} weight="duotone" className="text-primary hidden sm:block" />
-                <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  {getBrandName(user?.role)}
-                </h1>
+                <BrandLockup size="md" />
               </div>
             </div>
             
@@ -803,7 +797,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
                   )}
                 </div>
                 <Button 
-                  variant="ghost" 
+                  variant="ghost"
                   size="sm" 
                   className="h-6 px-2 text-xs"
                   onClick={handleChangeClient}
@@ -824,7 +818,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
               </Badge>
               <Button 
                 onClick={handleLogout} 
-                variant="ghost" 
+                variant="ghost"
                 size="sm"
                 className="hidden sm:flex"
               >
@@ -834,7 +828,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
               {/* Mobile Logout - Icon only */}
               <Button 
                 onClick={handleLogout} 
-                variant="ghost" 
+                variant="ghost"
                 size="icon"
                 className="sm:hidden"
                 aria-label={t('common.logout')}
@@ -862,7 +856,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
                 )}
               </div>
               <Button 
-                variant="ghost" 
+                variant="ghost"
                 size="sm" 
                 className="h-6 px-2 text-xs"
                 onClick={handleChangeClient}
@@ -901,7 +895,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent 
           side="left" 
-          className="w-full max-w-[320px] p-0 overflow-hidden"
+          className="workspace-drawer p-0 overflow-hidden"
           style={{ zIndex: 100 }}
         >
           <SheetHeader className="sr-only">

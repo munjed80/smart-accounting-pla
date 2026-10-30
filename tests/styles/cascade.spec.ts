@@ -14,7 +14,7 @@ test('spacing, width, radii and palettes resolve at the document root', async ({
   expect(values).toEqual({ padding: '16px', width: '256px', radius: '10px' })
   await expect(page.getByTestId('gap')).toHaveCSS('gap', '16px')
   expect(await page.getByTestId('accent').evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)')
-  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim())).toBe('oklch(0.205 0 0)')
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim())).toBe('#245c4e')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
 
@@ -49,7 +49,7 @@ test('the document scrolls while its header stays sticky', async ({ page }) => {
 test('dark tokens and utilities use the same switch', async ({ page }) => {
   const lightBorder = await page.getByTestId('dark').evaluate(el => getComputedStyle(el).borderTopColor)
   await page.evaluate(() => document.documentElement.classList.add('dark'))
-  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim())).toBe('oklch(0.922 0 0)')
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim())).toBe('#c6dda8')
   await expect.poll(() => page.getByTestId('dark').evaluate(el => getComputedStyle(el).borderTopColor)).not.toBe(lightBorder)
 })
 

@@ -161,3 +161,21 @@ test('layout remains within narrow, tablet and wide viewports', async ({
     expect(brand.x + brand.width).toBeLessThan(login.x)
   }
 })
+
+test('public account pages use one legible brand and the shared green palette', async ({ page }, testInfo) => {
+  for (const [path, selector] of [
+    ['/login', '#login-email'],
+    ['/register', '#register-name'],
+    ['/forgot-password', 'input[type="email"]'],
+    ['/reset-password', '.brand-lockup'],
+  ]) {
+    await page.goto(path)
+    await expect(page.locator(selector).first()).toBeVisible()
+    await expect(page.locator('.brand-lockup')).toBeVisible()
+    await expect(page.locator('body')).not.toContainText('Smart Accounting')
+    await expect(page.locator('.brand-wordmark')).toHaveCSS('-webkit-text-fill-color', 'rgb(25, 46, 43)')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.evaluate(() => document.fonts.ready)
+    await page.screenshot({ path: testInfo.outputPath(`brand-${path.slice(1)}.png`), fullPage: true })
+  }
+})

@@ -1,0 +1,61 @@
+/* Shared identity: loaded globally so dialogs, sheets and select portals inherit it. */
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--foreground);
+  font-family: 'ZZP Sans', system-ui, sans-serif;
+  white-space: nowrap;
+  vertical-align: middle;
+  line-height: 1;
+}
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 38px;
+  border-radius: 9px 9px 2px 9px;
+  background: var(--brand-green);
+  color: white;
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -4px;
+  padding-right: 5px;
+}
+.brand-mark > span { color: #d9e8aa; }
+.brand-wordmark { font-size: 21px; font-weight: 700; letter-spacing: -0.8px; }
+.brand-wordmark > span { font-weight: 400; }
+.brand-lockup--lg .brand-mark { width: 44px; height: 46px; font-size: 44px; }
+.brand-lockup--lg .brand-wordmark { font-size: 28px; }
+.auth-page { font-family: 'ZZP Sans', system-ui, sans-serif; }
+.auth-page [data-slot='card'] { background: var(--card); border-color: var(--border); }
+.workspace-sidebar {
+  --background: var(--sidebar);
+  --card: var(--sidebar);
+  --foreground: var(--sidebar-foreground);
+  --muted-foreground: #b6cabc;
+  --primary: var(--sidebar-primary);
+  --primary-foreground: var(--sidebar-primary-foreground);
+  --secondary: var(--sidebar-accent);
+  --secondary-foreground: var(--sidebar-accent-foreground);
+  --accent: var(--sidebar-accent);
+  --accent-foreground: var(--sidebar-accent-foreground);
+  --border: var(--sidebar-border);
+  background: var(--sidebar);
+  color: var(--sidebar-foreground);
+}
+.workspace-sidebar nav { scrollbar-color: #6c8a7c transparent; }
+.workspace-sidebar nav::-webkit-scrollbar-track { background: transparent; }
+.workspace-sidebar nav::-webkit-scrollbar-thumb { background: #6c8a7c; border: 0; }
+.workspace-drawer { width: min(340px, calc(100vw - 40px)); max-width: none; }
+.workspace-drawer > button { color: var(--sidebar-foreground); }
+.workspace h1, .workspace h2, .workspace h3 { letter-spacing: -0.025em; }
+@media (max-width: 480px) {
+  .app-shell-header .brand-mark { width: 30px; height: 32px; font-size: 32px; }
+  .app-shell-header .brand-wordmark { font-size: 18px; }
+  .app-shell-header .brand-lockup { gap: 7px; }
+}
+
+.cookie-banner { max-height: 45dvh; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom, 0px); }

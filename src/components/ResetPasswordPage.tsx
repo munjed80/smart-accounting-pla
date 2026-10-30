@@ -68,9 +68,8 @@ export const ResetPasswordPage = ({ token, onNavigateToLogin }: ResetPasswordPag
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
-        
+      <div className="auth-page min-h-screen bg-background flex items-center justify-center p-4">
+
         <div className="relative w-full max-w-md">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
@@ -100,9 +99,8 @@ export const ResetPasswordPage = ({ token, onNavigateToLogin }: ResetPasswordPag
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
-      
+    <div className="auth-page min-h-screen bg-background flex items-center justify-center p-4">
+
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">

@@ -26,7 +26,7 @@ vi.mock('../lib/ActiveClientContext', () => ({
 vi.mock('../i18n', () => ({
   t: (key: string) => {
     const translations: Record<string, string> = {
-      'brand.name': 'Smart Accounting',
+      'brand.name': 'ZZPers Hub',
       'sidebar.overzicht': 'Overzicht',
       'sidebar.klanten': 'Klanten',
       'sidebar.facturen': 'Facturen',

@@ -1,21 +1,21 @@
 /* The public homepage has its own light palette; app and auth themes stay independent. */
 .landing-page {
-  --lp-paper: #f7f6f0;
-  --lp-ink: #192e2b;
-  --lp-green: #245c4e;
-  --lp-muted: #60716b;
-  --lp-line: #dcded5;
+  --lp-paper: var(--brand-paper);
+  --lp-ink: var(--brand-ink);
+  --lp-green: var(--brand-green);
+  --lp-muted: var(--brand-muted);
+  --lp-line: var(--brand-line);
   --background: #fff;
-  --foreground: #192e2b;
+  --foreground: var(--brand-ink);
   --muted: #eff1ea;
   --muted-foreground: #53665d;
-  --border: #dcded5;
-  --primary: #245c4e;
+  --border: var(--brand-line);
+  --primary: var(--brand-green);
   --primary-foreground: #fff;
   --secondary: #eff1ea;
-  --secondary-foreground: #192e2b;
+  --secondary-foreground: var(--brand-ink);
   --accent: #e8eee5;
-  --accent-foreground: #192e2b;
+  --accent-foreground: var(--brand-ink);
   color-scheme: light;
   background: var(--lp-paper);
   color: var(--lp-ink);
@@ -92,26 +92,6 @@
   font-weight: 700;
   letter-spacing: -0.8px;
   color: var(--lp-ink);
-}
-.lp-brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 38px;
-  background: var(--lp-green);
-  color: white;
-  font-size: 38px;
-  line-height: 1;
-  letter-spacing: -4px;
-  padding-right: 5px;
-  border-radius: 9px 9px 2px 9px;
-}
-.lp-brand-mark span {
-  color: #d9e8aa;
-}
-.lp-brand-hub {
-  font-weight: 400;
 }
 .lp-desktop-nav,
 .lp-header-actions {
@@ -416,7 +396,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  color: #245c4e;
+  color: var(--brand-green);
   font-size: 8px;
 }
 .lp-metrics small.lp-muted {
@@ -774,7 +754,7 @@
   border-top: 1px solid #dde4d5;
   padding-top: 10px;
   font-weight: 600;
-  color: #245c4e;
+  color: var(--brand-green);
 }
 .lp-document-footer {
   font-size: 7px;
@@ -821,7 +801,7 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  color: #245c4e;
+  color: var(--brand-green);
   font-size: 8px;
   margin-top: 20px;
 }
@@ -874,7 +854,7 @@
   border-radius: 3px;
 }
 .lp-week > div:nth-child(2) > span {
-  background: #245c4e;
+  background: var(--brand-green);
 }
 .lp-week small {
   font-size: 9px;
@@ -1152,7 +1132,7 @@
 }
 .lp-footer {
   padding-top: 60px;
-  background: #f7f6f0;
+  background: var(--brand-paper);
 }
 .lp-footer-top {
   display: grid;

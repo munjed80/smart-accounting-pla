@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2'
+const CACHE_VERSION = 'v3-brand'
 const APP_SHELL_CACHE = `smart-accounting-shell-${CACHE_VERSION}`
 const STATIC_CACHE = `smart-accounting-static-${CACHE_VERSION}`
 const OFFLINE_URL = '/offline.html'

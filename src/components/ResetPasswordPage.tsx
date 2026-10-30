@@ -23,13 +23,13 @@ export const ResetPasswordPage = ({ token, onNavigateToLogin }: ResetPasswordPag
   const validatePassword = (pwd: string): string[] => {
     const errors: string[] = []
     if (pwd.length < 10) {
-      errors.push('Password must be at least 10 characters')
+      errors.push('Gebruik minimaal 10 tekens')
     }
     if (!/[A-Za-z]/.test(pwd)) {
-      errors.push('Password must contain at least one letter')
+      errors.push('Gebruik minimaal één letter')
     }
     if (!/[0-9]/.test(pwd)) {
-      errors.push('Password must contain at least one number')
+      errors.push('Gebruik minimaal één cijfer')
     }
     return errors
   }
@@ -48,12 +48,12 @@ export const ResetPasswordPage = ({ token, onNavigateToLogin }: ResetPasswordPag
 
     // Check passwords match
     if (password !== confirmPassword) {
-      setErrors(['Passwords do not match'])
+      setErrors(['De wachtwoorden komen niet overeen'])
       return
     }
 
     if (!token) {
-      setErrors(['No reset token provided'])
+      setErrors(['De resetlink ontbreekt'])
       return
     }
 
@@ -62,7 +62,7 @@ export const ResetPasswordPage = ({ token, onNavigateToLogin }: ResetPasswordPag
       setSuccess(true)
     } catch {
       setFailed(true)
-      setErrors(['Invalid or expired reset link. Please request a new one.'])
+      setErrors(['Deze resetlink is ongeldig of verlopen. Vraag een nieuwe link aan.'])
     }
   }
 
@@ -77,19 +77,19 @@ export const ResetPasswordPage = ({ token, onNavigateToLogin }: ResetPasswordPag
             </div>
           </div>
 
-          <Card className="bg-card/80 backdrop-blur-sm border-2 border-primary/20">
+          <Card className="bg-card border-border">
             <CardHeader className="text-center">
               <div className="flex justify-center mb-4">
                 <CheckCircle size={48} weight="fill" className="text-green-500" />
               </div>
-              <CardTitle className="text-green-600">Password Reset!</CardTitle>
+              <CardTitle className="text-green-600">Je wachtwoord is gewijzigd</CardTitle>
               <CardDescription>
-                Your password has been reset successfully. You can now log in with your new password.
+                Je kunt nu inloggen met je nieuwe wachtwoord.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button onClick={onNavigateToLogin} className="w-full">
-                Go to Login
+                Naar inloggen
               </Button>
             </CardContent>
           </Card>
@@ -108,23 +108,23 @@ export const ResetPasswordPage = ({ token, onNavigateToLogin }: ResetPasswordPag
           </div>
         </div>
 
-        <Card className="bg-card/80 backdrop-blur-sm border-2 border-primary/20">
+        <Card className="bg-card border-border">
           <CardHeader>
             {failed ? (
               <>
                 <div className="flex justify-center mb-4">
                   <XCircle size={48} weight="fill" className="text-red-500" />
                 </div>
-                <CardTitle className="text-red-600 text-center">Reset Failed</CardTitle>
+                <CardTitle className="text-red-600 text-center">Wachtwoord wijzigen niet gelukt</CardTitle>
                 <CardDescription className="text-center">
-                  The reset link is invalid or has expired.
+                  Deze resetlink is ongeldig of verlopen.
                 </CardDescription>
               </>
             ) : (
               <>
-                <CardTitle>Reset Password</CardTitle>
+                <CardTitle>Wachtwoord wijzigen</CardTitle>
                 <CardDescription>
-                  Enter your new password below.
+                  Kies hieronder je nieuwe wachtwoord.
                 </CardDescription>
               </>
             )}
@@ -135,11 +135,11 @@ export const ResetPasswordPage = ({ token, onNavigateToLogin }: ResetPasswordPag
                 <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
                   <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400 text-sm">
                     <Warning size={16} />
-                    <span>Please request a new password reset link.</span>
+                    <span>Vraag een nieuwe link aan om je wachtwoord te wijzigen.</span>
                   </div>
                 </div>
                 <Button onClick={onNavigateToLogin} variant="outline" className="w-full">
-                  Back to Login
+                  Terug naar inloggen
                 </Button>
               </div>
             ) : (
@@ -155,7 +155,7 @@ export const ResetPasswordPage = ({ token, onNavigateToLogin }: ResetPasswordPag
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="password">New Password</Label>
+                  <Label htmlFor="password">Nieuw wachtwoord</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 text-muted-foreground" size={18} />
                     <Input
@@ -170,12 +170,12 @@ export const ResetPasswordPage = ({ token, onNavigateToLogin }: ResetPasswordPag
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    At least 10 characters with letters and numbers
+                    Minimaal 10 tekens met letters en cijfers
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Label htmlFor="confirmPassword">Herhaal je wachtwoord</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 text-muted-foreground" size={18} />
                     <Input
@@ -191,7 +191,7 @@ export const ResetPasswordPage = ({ token, onNavigateToLogin }: ResetPasswordPag
                 </div>
 
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Resetting...' : 'Reset Password'}
+                  {isLoading ? 'Bezig met wijzigen...' : 'Wachtwoord wijzigen'}
                 </Button>
               </form>
             )}

@@ -173,6 +173,10 @@ test('public account pages use one legible brand and the shared green palette', 
     await expect(page.locator(selector).first()).toBeVisible()
     await expect(page.locator('.brand-lockup')).toBeVisible()
     await expect(page.locator('body')).not.toContainText('Smart Accounting')
+    if (path === '/reset-password') {
+      await expect(page.getByLabel('Nieuw wachtwoord', { exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Wachtwoord wijzigen', exact: true })).toBeVisible()
+    }
     await expect(page.locator('.brand-wordmark')).toHaveCSS('-webkit-text-fill-color', 'rgb(25, 46, 43)')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.evaluate(() => document.fonts.ready)

@@ -216,7 +216,7 @@ test('workspace and navigation share the homepage identity at mobile and desktop
   await page.evaluate(() => document.fonts.ready)
   await page.screenshot({ path: testInfo.outputPath('brand-workspace.png'), fullPage: true })
   if (!desktop) await page.getByRole('button', { name: 'Open navigation menu' }).click()
-  const drawer = desktop ? page.locator('aside') : page.getByRole('dialog')
+  const drawer = desktop ? page.locator('aside').filter({ has: page.locator('.workspace-sidebar') }) : page.getByRole('dialog')
   await expect(drawer.locator('.brand-lockup')).toBeVisible()
   await expect(drawer.locator('.workspace-sidebar')).toHaveCSS('background-color', 'rgb(28, 61, 52)')
   await expect(drawer.locator('.brand-wordmark')).toHaveCSS('color', 'rgb(241, 245, 236)')

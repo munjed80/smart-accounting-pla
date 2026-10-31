@@ -41,19 +41,19 @@ export interface ZZPCustomer {
 
 export interface ZZPCustomerCreate {
   name: string
-  email?: string
-  phone?: string
-  contact_person?: string
-  address_street?: string
-  address_line2?: string
-  address_postal_code?: string
-  address_city?: string
-  address_country?: string
-  kvk_number?: string
-  btw_number?: string
-  iban?: string
-  bank_bic?: string
-  notes?: string
+  email?: string | null
+  phone?: string | null
+  contact_person?: string | null
+  address_street?: string | null
+  address_line2?: string | null
+  address_postal_code?: string | null
+  address_city?: string | null
+  address_country?: string | null
+  kvk_number?: string | null
+  btw_number?: string | null
+  iban?: string | null
+  bank_bic?: string | null
+  notes?: string | null
   status?: 'active' | 'inactive'
 }
 
@@ -569,20 +569,20 @@ export interface ZZPQuote {
 export interface ZZPQuoteCreate {
   customer_id: string
   issue_date: string
-  valid_until?: string
-  title?: string
-  notes?: string
-  terms?: string
+  valid_until?: string | null
+  title?: string | null
+  notes?: string | null
+  terms?: string | null
   lines: ZZPQuoteLineCreate[]
 }
 
 export interface ZZPQuoteUpdate {
   customer_id?: string
   issue_date?: string
-  valid_until?: string
-  title?: string
-  notes?: string
-  terms?: string
+  valid_until?: string | null
+  title?: string | null
+  notes?: string | null
+  terms?: string | null
   lines?: ZZPQuoteLineCreate[]
 }
 
@@ -627,12 +627,12 @@ export interface ZZPExpense {
 
 export interface ZZPExpenseCreate {
   vendor: string
-  description?: string
+  description?: string | null
   expense_date: string
   amount_cents: number
   vat_rate: number
   category: string
-  notes?: string
+  notes?: string | null
   document_id?: string | null
   attachment_url?: string
   commitment_id?: string
@@ -711,10 +711,10 @@ export interface ZZPTimeEntryCreate {
   entry_date: string
   description: string
   hours: number | string
-  project_name?: string
-  customer_id?: string
+  project_name?: string | null
+  customer_id?: string | null
   project_id?: string
-  hourly_rate?: number | string
+  hourly_rate?: number | string | null
   billable: boolean
 }
 

@@ -843,72 +843,19 @@ async def send_invoice(
 
         subject = f"Uw factuur {invoice_number} van {seller_name}"
 
-        html_content = f"""<!DOCTYPE html>
-<html lang="nl">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Factuur {invoice_number}</title>
-</head>
-<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f4f4f4;">
-    <tr>
-      <td align="center" style="padding:30px 0;">
-        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-
-          <!-- Header -->
-          <tr>
-            <td style="background-color:#1a56db;padding:28px 32px;">
-              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;letter-spacing:-0.3px;">ZZPers Hub</h1>
-              <p style="margin:4px 0 0;color:#bfdbfe;font-size:13px;">Facturatie</p>
-            </td>
-          </tr>
-
-          <!-- Body -->
-          <tr>
-            <td style="padding:32px 32px 24px;">
-              <p style="margin:0 0 16px;font-size:15px;color:#111827;">Beste {customer_name},</p>
-              <p style="margin:0 0 16px;font-size:15px;color:#374151;">
-                Hierbij ontvangt u factuur <strong>{invoice_number}</strong> van <strong>{seller_name}</strong> voor een totaalbedrag van <strong>{total_amount}</strong> (incl. btw).
-              </p>
-              <p style="margin:0 0 24px;font-size:15px;color:#374151;">
-                De factuur is als PDF bijgevoegd aan dit bericht.
-              </p>
-              <p style="margin:0;font-size:15px;color:#374151;">
-                Met vriendelijke groet,<br>
-                <strong>{seller_name}</strong>
-              </p>
-            </td>
-          </tr>
-
-          <!-- Divider -->
-          <tr>
-            <td style="padding:0 32px;">
-              <hr style="border:none;border-top:1px solid #e5e7eb;margin:0;">
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding:20px 32px 28px;">
-              <p style="margin:0 0 4px;font-size:12px;color:#6b7280;">
-                <strong style="color:#374151;">ZZPers Hub</strong>
-              </p>
-              <p style="margin:0 0 2px;font-size:12px;color:#6b7280;">
-                <a href="https://zzpershub.nl" style="color:#1a56db;text-decoration:none;">www.zzpershub.nl</a>
-              </p>
-              <p style="margin:0;font-size:12px;color:#6b7280;">
-                <a href="mailto:info@zzpershub.nl" style="color:#1a56db;text-decoration:none;">info@zzpershub.nl</a>
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>"""
+        from html import escape
+        from app.services.email import render_email
+        html_content = render_email(
+            title=f"Factuur {invoice_number}",
+            preheader=f"Je factuur van {seller_name} is bijgevoegd als PDF.",
+            support=reply_to_address,
+            content=f"""<p>Beste {escape(customer_name)},</p>
+<p>Hierbij ontvangt u factuur <strong>{escape(invoice_number)}</strong> van <strong>{escape(seller_name)}</strong>
+voor een totaalbedrag van <strong>{escape(total_amount)}</strong> (incl. btw).</p>
+<p>De factuur is als PDF bijgevoegd aan dit bericht. De betaalgegevens en vervaldatum staan op de factuur.</p>
+<p>Heeft u vragen? Beantwoord deze e-mail om contact op te nemen met de afzender.</p>
+<p>Met vriendelijke groet,<br><strong>{escape(seller_name)}</strong></p>""",
+        )
 
         text_content = f"""Beste {customer_name},
 
@@ -968,6 +915,8 @@ info@zzpershub.nl
         })
 
         message_id = result.get("id") if isinstance(result, dict) else None
+        if not message_id:
+            raise RuntimeError("Resend did not return a message ID")
         logger.info(
             "Invoice email sent successfully",
             extra={

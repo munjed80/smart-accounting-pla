@@ -478,10 +478,10 @@ const QuoteFormDialog = ({
       const quoteData: ZZPQuoteCreate = {
         customer_id: customerId,
         issue_date: issueDate,
-        valid_until: validUntil || undefined,
-        title: title.trim() || undefined,
-        notes: notes.trim() || undefined,
-        terms: terms.trim() || undefined,
+        valid_until: validUntil || null,
+        title: title.trim() || null,
+        notes: notes.trim() || null,
+        terms: terms.trim() || null,
         lines: validLines,
       }
       await onSave(quoteData, isEdit)

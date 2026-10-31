@@ -77,7 +77,7 @@ async def register(
             )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Email already registered"
+                detail="Dit e-mailadres is al geregistreerd."
             )
         
         # Create user with email_verified_at = None
@@ -122,7 +122,7 @@ async def register(
         )
         
         return RegisterResponse(
-            message="Check your email to verify your account",
+            message="Controleer je e-mail om je account te activeren.",
             user_id=user.id,
         )
     except HTTPException:
@@ -139,7 +139,7 @@ async def register(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred during registration. Please try again."
+            detail="Registreren is niet gelukt. Probeer het opnieuw."
         )
 
 
@@ -165,7 +165,7 @@ async def resend_verification(
     
     # Always return same response to prevent email enumeration
     response = GenericMessageResponse(
-        message="If an account with this email exists and is not yet verified, a verification email has been sent."
+        message="Als er een nog niet geactiveerd account met dit e-mailadres bestaat, ontvang je een verificatie-e-mail."
     )
     
     user = await get_user_by_email(db, email_request.email)
@@ -233,13 +233,13 @@ async def verify_email(
     if not is_valid or not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error or "Invalid or expired token",
+            detail="Deze link is ongeldig of verlopen. Vraag een nieuwe link aan.",
         )
     
     # Check if already verified
     if user.is_email_verified:
         return VerifyEmailResponse(
-            message="Email is already verified",
+            message="Je e-mailadres is al bevestigd.",
             verified=True,
         )
     
@@ -256,7 +256,7 @@ async def verify_email(
     )
     
     return VerifyEmailResponse(
-        message="Email verified successfully",
+        message="Je e-mailadres is bevestigd.",
         verified=True,
     )
 
@@ -294,7 +294,7 @@ async def login(
             )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password",
+                detail="Onjuist e-mailadres of wachtwoord.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
@@ -307,7 +307,7 @@ async def login(
                     "request_id": request_id,
                 }
             )
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is inactive")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Dit account is niet actief.")
         
         # Check if email is verified
         if not user.is_email_verified:
@@ -322,9 +322,9 @@ async def login(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
-                    "message": "Please verify your email before logging in",
+                    "message": "Bevestig je e-mailadres voordat je inlogt.",
                     "code": "EMAIL_NOT_VERIFIED",
-                    "hint": "Check your inbox for a verification email or request a new one",
+                    "hint": "Controleer je inbox op de verificatie-e-mail of vraag een nieuwe aan.",
                 },
             )
         
@@ -344,9 +344,9 @@ async def login(
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail={
-                        "message": "Privileged access is restricted",
+                        "message": "Toegang tot het beheer is beperkt.",
                         "code": "ADMIN_NOT_WHITELISTED",
-                        "hint": "Contact your system administrator if you need admin access",
+                        "hint": "Neem contact op met de systeembeheerder voor toegang.",
                     },
                 )
         
@@ -383,7 +383,7 @@ async def login(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred during login. Please try again."
+            detail="Inloggen is niet gelukt. Probeer het opnieuw."
         )
 
 
@@ -403,7 +403,7 @@ async def forgot_password(
     
     # Always return same response to prevent email enumeration
     response = GenericMessageResponse(
-        message="If an account with this email exists, a password reset email has been sent."
+        message="Als er een account met dit e-mailadres bestaat, ontvang je een e-mail om je wachtwoord opnieuw in te stellen."
     )
     
     user = await get_user_by_email(db, email_request.email)
@@ -462,7 +462,7 @@ async def reset_password(
     if not is_valid or not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error or "Invalid or expired token",
+            detail="Deze link is ongeldig of verlopen. Vraag een nieuwe link aan.",
         )
     
     # Update password
@@ -477,7 +477,7 @@ async def reset_password(
         }
     )
     
-    return ResetPasswordResponse(message="Password reset successfully")
+    return ResetPasswordResponse(message="Je wachtwoord is opnieuw ingesteld.")
 
 
 @router.post("/change-password", response_model=GenericMessageResponse)

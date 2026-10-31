@@ -87,3 +87,21 @@ async def test_post_creates_balanced_idempotent_ledger_and_rejects_foreign_curre
     assert await db_session.scalar(select(func.count()).select_from(JournalLine)) == 3
     foreign=SimpleNamespace(id=__import__('uuid').uuid4(), administration_id=conn.administration_id, currency='USD')
     with pytest.raises(HTTPException): await post_mapping(db_session,foreign)
+
+@pytest.mark.asyncio
+async def test_changed_source_requires_reapproval_without_rewriting_posted_amounts(db_session,test_administration):
+    from app.services.ecommerce_review_refresh import refresh_reviews
+    conn=EcommerceConnection(administration_id=test_administration.id,provider=EcommerceProvider.SHOPIFY,status=ConnectionStatus.CONNECTED)
+    db_session.add(conn); await db_session.flush()
+    order=EcommerceOrder(connection_id=conn.id,administration_id=conn.administration_id,external_order_id='review',total_amount_cents=24200,subtotal_cents=20000,tax_cents=4200,currency='EUR')
+    db_session.add(order); await db_session.flush()
+    mapping=EcommerceMapping(administration_id=conn.administration_id,connection_id=conn.id,order_id=order.id,provider='shopify',record_type='order',review_status=MappingReviewStatus.APPROVED,net_amount_cents=12100,tax_cents=2100,vat_amount_cents=2100,vat_status='auto',vat_rate=21,currency='EUR')
+    db_session.add(mapping); await db_session.flush()
+    await refresh_reviews(db_session,conn)
+    assert mapping.net_amount_cents == 24200
+    assert mapping.review_status == MappingReviewStatus.NEEDS_REVIEW and mapping.vat_rate is None
+    mapping.posted_entity_id=__import__('uuid').uuid4()
+    order.total_amount_cents=36300
+    await refresh_reviews(db_session,conn)
+    assert mapping.net_amount_cents == 24200
+    assert 'Bron gewijzigd' in mapping.notes

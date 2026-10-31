@@ -273,8 +273,16 @@ class MappingActionRequest(BaseModel):
         description="Action: approve, post, skip, mark_duplicate, reset, needs_review",
     )
     notes: Optional[str] = Field(None, description="Optional notes")
-    vat_rate: Optional[float] = Field(None, description="Override VAT rate")
+    vat_rate: Optional[float] = Field(None, ge=0, le=100, allow_inf_nan=False, description="Override VAT rate")
     accounting_date: Optional[str] = Field(None, description="Override accounting date (YYYY-MM-DD)")
+
+    @field_validator('accounting_date')
+    @classmethod
+    def validate_accounting_date(cls, value):
+        if value is not None:
+            from datetime import date
+            date.fromisoformat(value)
+        return value
 
 
 class BulkMappingActionRequest(BaseModel):

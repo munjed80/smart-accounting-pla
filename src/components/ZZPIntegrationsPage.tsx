@@ -765,14 +765,16 @@ function ConnectionDetailPanel({
   setDetailTab: (t: DetailTab) => void
 }) {
   const providerName = connection.provider === 'shopify' ? 'Shopify' : 'WooCommerce'
+  const [ordersPage, setOrdersPage] = useState(1)
+  useEffect(() => setOrdersPage(1), [connection.id])
 
-  const { data: ordersData, isLoading: ordersLoading } = useQuery({
-    queryKey: ['ecommerce-orders', connection.id],
-    queryFn: () => integrationsApi.listOrders(connection.id),
+  const { data: ordersData, isLoading: ordersLoading, isError: ordersError, refetch: retryOrders } = useQuery({
+    queryKey: ['ecommerce-orders', connection.id, ordersPage],
+    queryFn: () => integrationsApi.listOrders(connection.id, ordersPage),
     enabled: detailTab === 'orders',
   })
 
-  const { data: logsData, isLoading: logsLoading } = useQuery({
+  const { data: logsData, isLoading: logsLoading, isError: logsError, refetch: retryLogs } = useQuery({
     queryKey: ['ecommerce-sync-logs', connection.id],
     queryFn: () => integrationsApi.listSyncLogs(connection.id),
     enabled: detailTab === 'sync-logs',
@@ -808,6 +810,8 @@ function ConnectionDetailPanel({
         <div>
           {ordersLoading ? (
             <p className="text-sm text-muted-foreground py-4">Laden...</p>
+          ) : ordersError ? (
+            <div role="alert" className="py-4 space-y-3"><p>Bestellingen konden niet worden geladen.</p><Button variant="outline" onClick={() => void retryOrders()}>Opnieuw proberen</Button></div>
           ) : !ordersData?.orders?.length ? (
             <p className="text-sm text-muted-foreground py-4">Nog geen bestellingen geïmporteerd. Klik op &quot;Sync nu&quot; om te starten.</p>
           ) : (
@@ -831,8 +835,8 @@ function ConnectionDetailPanel({
                       <td className="py-2 pr-3">
                         <OrderStatusBadge status={order.status} />
                       </td>
-                      <td className="py-2 pr-3 text-right font-medium">€{(order.total_amount_cents / 100).toFixed(2)}</td>
-                      <td className="py-2 pr-3 text-right text-muted-foreground">€{(order.tax_cents / 100).toFixed(2)}</td>
+                      <td className="py-2 pr-3 text-right font-medium">{new Intl.NumberFormat('nl-NL', { style: 'currency', currency: order.currency }).format(order.total_amount_cents / 100)}</td>
+                      <td className="py-2 pr-3 text-right text-muted-foreground">{new Intl.NumberFormat('nl-NL', { style: 'currency', currency: order.currency }).format(order.tax_cents / 100)}</td>
                       <td className="py-2 text-muted-foreground">
                         {order.ordered_at ? new Date(order.ordered_at).toLocaleDateString('nl-NL') : '-'}
                       </td>
@@ -841,8 +845,12 @@ function ConnectionDetailPanel({
                 </tbody>
               </table>
               <p className="text-xs text-muted-foreground mt-2">
-                {ordersData.total} bestelling{ordersData.total !== 1 ? 'en' : ''} totaal
+                {ordersData.total} bestelling{ordersData.total !== 1 ? 'en' : ''} totaal · Pagina {ordersPage}
               </p>
+              <div className="flex gap-2 pt-3" aria-label="Bestellingen pagina's">
+                <Button variant="outline" size="sm" disabled={ordersPage === 1} onClick={() => setOrdersPage(p => p - 1)}>Vorige</Button>
+                <Button variant="outline" size="sm" disabled={ordersPage * ordersData.per_page >= ordersData.total} onClick={() => setOrdersPage(p => p + 1)}>Volgende</Button>
+              </div>
             </div>
           )}
         </div>
@@ -853,6 +861,8 @@ function ConnectionDetailPanel({
         <div>
           {logsLoading ? (
             <p className="text-sm text-muted-foreground py-4">Laden...</p>
+          ) : logsError ? (
+            <div role="alert" className="py-4 space-y-3"><p>Synchronisaties konden niet worden geladen.</p><Button variant="outline" onClick={() => void retryLogs()}>Opnieuw proberen</Button></div>
           ) : !logsData?.logs?.length ? (
             <p className="text-sm text-muted-foreground py-4">Nog geen synchronisaties uitgevoerd.</p>
           ) : (

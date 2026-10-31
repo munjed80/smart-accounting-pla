@@ -133,7 +133,7 @@
   .workspace .workspace-stat { padding-block: 0; gap: 0; }
   .workspace-stat > [data-slot='card-content'] { padding: 16px; }
   .workspace [data-slot='page-header'] { padding-bottom: 16px; }
-  [data-slot='dialog-content'] { border-radius: 0; padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+  [data-slot='dialog-content'] { border-radius: 0; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
   [data-slot='dialog-footer'] { position: sticky; bottom: -16px; background: var(--card); padding-bottom: 16px; z-index: 1; }
   .ov-header { padding: 20px; border-radius: 14px; }
 }
@@ -143,3 +143,5 @@
 .invoice-advanced-filters { border-top: 1px solid var(--border); padding-top: 12px; }
 .invoice-advanced-filters summary { cursor: pointer; color: var(--primary); font-size: 13px; font-weight: 600; padding: 8px 0; }
 .invoice-advanced-filters summary span { color: var(--muted-foreground); font-weight: 400; padding-left: 12px; }
+.workspace-page > .relative > :first-child h1 { font-weight: 600; line-height: 1.2; }
+.workspace-page > .relative > :first-child { padding-bottom: 20px; border-bottom: 1px solid var(--border); }

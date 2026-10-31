@@ -5,7 +5,7 @@ import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import select, update, func
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.core.rate_limit import check_rate_limit, get_client_ip
 from app.models.user import User
-from app.models.auth_token import TokenType, AuthToken
+from app.models.auth_token import TokenType
 from app.schemas.user import (
     UserCreate, 
     UserResponse, 
@@ -192,14 +192,12 @@ async def resend_verification(
         )
         
         if not accepted:
-            # Retire only this failed attempt; older delivered links remain usable.
-            await db.execute(update(AuthToken).where(AuthToken.token_hash == hashlib.sha256(token.encode()).hexdigest())
-                             .values(used_at=datetime.now(timezone.utc)))
-            await db.commit()
+            # A provider timeout can happen after acceptance. Keep unexpired links usable
+            # if that email arrives later; no raw verification token is exposed in this response.
             logger.error("verification_delivery_failed user_id=%s", user.id)
             raise HTTPException(status_code=503, detail={
                 "code": "EMAIL_DELIVERY_FAILED",
-                "message": "De verificatie-e-mail kon niet worden verstuurd. Probeer het later opnieuw of neem contact op met support.",
+                "message": "Er is een probleem bij het versturen van de verificatie-e-mail. Probeer het later opnieuw of neem contact op met support.",
             })
 
         logger.info(

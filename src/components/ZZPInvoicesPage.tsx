@@ -1256,7 +1256,7 @@ const InvoiceCard = ({
           <p className="text-xs text-muted-foreground">{formatDate(invoice.issue_date)}</p>
         </div>
       </div>
-      <div className="flex items-center justify-between gap-2 pt-3 border-t border-border/50">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-border/50">
         {invoice.status === 'draft' || invoice.status === 'cancelled' ? (
           <StatusBadge status={invoice.status} size="sm" />
         ) : (

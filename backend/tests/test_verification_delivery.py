@@ -1,5 +1,6 @@
 """Real verification request flow: provider failures and existing usable links."""
 from unittest.mock import AsyncMock
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
@@ -40,14 +41,19 @@ async def test_resend_uses_case_insensitive_lookup_and_keeps_delayed_links_valid
 @pytest.mark.asyncio
 async def test_provider_failure_is_503_and_does_not_invalidate_an_older_link(async_client, db_session, unverified_user, monkeypatch):
     old = await create_auth_token(db_session, unverified_user.id, TokenType.EMAIL_VERIFY)
-    monkeypatch.setattr(auth.email_service, 'send_verification_email', AsyncMock(return_value=False))
+    send = AsyncMock(return_value=False)
+    monkeypatch.setattr(auth.email_service, 'send_verification_email', send)
     response = await async_client.post('/api/v1/auth/resend-verification', json={'email': 'verify.me@example.com'})
     assert response.status_code == 503
     assert response.json()['detail']['code'] == 'EMAIL_DELIVERY_FAILED'
     assert old not in response.text
     tokens = (await db_session.execute(select(AuthToken))).scalars().all()
     assert next(token for token in tokens if token.token_hash == hash_token(old)).used_at is None
-    assert sum(token.used_at is not None for token in tokens) == 1
+    assert len(tokens) == 2 and all(token.used_at is None for token in tokens)
+    # A timeout might occur after provider acceptance; a late message must still work.
+    late_token = send.call_args.kwargs['token']
+    late = await async_client.get('/api/v1/auth/verify-email', params={'token': late_token})
+    assert late.status_code == 200 and late.json()['verified'] is True
 
 
 @pytest.mark.asyncio
@@ -71,9 +77,22 @@ async def test_unknown_email_keeps_generic_success_response(async_client, unveri
 
 @pytest.mark.asyncio
 async def test_registration_rejects_duplicate_email_casing(async_client, db_session, unverified_user):
+    before = len((await db_session.execute(select(User))).scalars().all())
     response = await async_client.post('/api/v1/auth/register', json={
         'email':'VERIFY.ME@example.com', 'password':'StrongPassword123', 'full_name':'Duplicate', 'role':'zzp',
     })
     assert response.status_code == 409
-    assert len((await db_session.execute(select(User))).scalars().all()) == 1
+    assert len((await db_session.execute(select(User))).scalars().all()) == before
     assert (await get_user_by_email(db_session, '  verify.me@example.com  ')).id == unverified_user.id
+
+
+@pytest.mark.asyncio
+async def test_expired_verification_token_is_rejected_after_database_roundtrip(async_client, db_session, unverified_user):
+    raw = await create_auth_token(db_session, unverified_user.id, TokenType.EMAIL_VERIFY)
+    record = (await db_session.execute(select(AuthToken).where(AuthToken.token_hash == hash_token(raw)))).scalar_one()
+    record.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    await db_session.commit()
+    await db_session.refresh(record)
+    response = await async_client.get('/api/v1/auth/verify-email', params={'token':raw})
+    assert response.status_code == 400
+    assert 'expired' in response.json()['detail'].lower()

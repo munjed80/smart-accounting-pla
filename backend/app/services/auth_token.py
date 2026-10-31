@@ -167,7 +167,10 @@ async def validate_and_consume_token(
     
     # Check if expired
     now = datetime.now(timezone.utc)
-    if now > auth_token.expires_at:
+    expires_at = auth_token.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if now >= expires_at:
         logger.warning(
             f"Expired {token_type.value} token attempted",
             extra={

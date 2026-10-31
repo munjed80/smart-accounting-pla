@@ -108,9 +108,9 @@ export const LandingPage = () => {
   const feature = features.find((item) => item.id === activeTab)!
 
   useSeoMeta({
-    title: 'ZZPers Hub | Facturen en boekhouding voor zzp’ers',
+    title: 'ZZPers Hub | Je administratie op één plek',
     description:
-      'Je facturen, uitgaven, klanten en uren op één overzichtelijke plek. Ontdek ZZPers Hub voor zzp’ers en begin met een gratis proefperiode van 3 maanden.',
+      'Maak facturen, beheer klanten en houd je uitgaven en uren bij. Overzichtelijk geregeld voor zzp’ers. Probeer ZZPers Hub 3 maanden gratis.',
     canonical: 'https://zzpershub.nl/',
   })
 

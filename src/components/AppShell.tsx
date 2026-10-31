@@ -566,17 +566,29 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
         </div>
       </div>
 
-      {/* User Info */}
-      <div className="workspace-profile" title={user?.email ?? undefined}>
-        <span className="workspace-avatar" aria-hidden="true">{user?.full_name?.split(/\s+/).slice(0, 2).map(name => name[0]).join('').toUpperCase()}</span>
-        <div className="text-sm min-w-0 flex-1">
-          <p className="font-medium truncate">{user?.full_name}</p>
-          <p className="workspace-profile-email text-xs text-muted-foreground truncate">{user?.email}</p>
-        <Badge variant="outline" className="workspace-profile-role capitalize">
-          {user?.role === 'zzp' ? t('roles.zzp') : user?.role === 'accountant' ? t('roles.accountant') : user?.role}
-        </Badge>
+      {/* Compact workspace entry; personal account details live in Settings. */}
+      {isZZP ? (
+        <div className="workspace-profile">
+          <button type="button" className="workspace-profile-link"
+            onClick={() => handleMenuClick(menuItems.find(item => item.tabValue === 'settings')!)}
+            aria-label="Bedrijfsgegevens openen">
+            <span className="workspace-avatar" aria-hidden="true"><Storefront size={18} /></span>
+            <span className="min-w-0 text-left">
+              <span className="block text-sm font-medium">Mijn werkplek</span>
+              <span className="block text-xs text-muted-foreground">Bedrijfsgegevens</span>
+            </span>
+          </button>
+          {onStartTour && <span className="hidden lg:block"><TourHelpButton onStart={onStartTour} /></span>}
         </div>
-      </div>
+      ) : (
+        <div className="workspace-profile">
+          <span className="workspace-avatar" aria-hidden="true"><User size={18} /></span>
+          <div className="text-sm min-w-0 flex-1">
+            <p className="font-medium truncate">{user?.full_name}</p>
+            <p className="text-xs text-muted-foreground">{isAccountant ? t('roles.accountant') : user?.role}</p>
+          </div>
+        </div>
+      )}
 
       {/* Navigation Menu - Main Items */}
       <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-4" aria-label="Main navigation">
@@ -721,7 +733,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
   return (
     <div className="workspace min-h-screen bg-background overflow-x-clip">
       {/* Top Header - Always visible */}
-      <header className="app-shell-header sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-sm" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
+      <header className={`app-shell-header sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-sm ${isZZP ? 'lg:hidden' : ''}`} style={{ top: 'env(safe-area-inset-top, 0px)' }}>
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Compact mobile brand; desktop sidebar already contains the brand. */}
@@ -875,7 +887,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
           className="fixed left-0 bottom-0 w-60 border-r border-border bg-card/50 overflow-hidden"
           style={{ 
             zIndex: 40,
-            top: 'calc(4rem + env(safe-area-inset-top, 0px))' // 4rem = h-16 header height
+            top: isZZP ? 'env(safe-area-inset-top, 0px)' : 'calc(4rem + env(safe-area-inset-top, 0px))'
           }}
         >
           {renderSidebarContent('desktop')}

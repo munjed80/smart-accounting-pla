@@ -1,7 +1,7 @@
 {
   "name": "ZZPers Hub",
   "short_name": "ZZPers Hub",
-  "description": "Gratis factuur maken voor zzp'ers. Professionele facturen, klantenbeheer, urenregistratie en btw-overzicht.",
+  "description": "Facturen, klanten, uitgaven en uren op één plek. Voor zzp’ers in Nederland.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

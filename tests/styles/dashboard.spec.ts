@@ -204,12 +204,19 @@ test('upload action opens the camera/file chooser without bypassing user file se
 test('workspace and navigation share the homepage identity at mobile and desktop sizes', async ({ page }, testInfo) => {
   await page.goto('/tests/styles/dashboard.html')
   await expect(page.getByText('1 factuur te laat')).toBeVisible()
-  await expect(page.locator('.app-shell-header .brand-lockup')).toBeVisible()
+  const desktop = page.viewportSize()!.width >= 1024
+  if (desktop) {
+    await expect(page.locator('aside .brand-lockup')).toBeVisible()
+    await expect(page.locator('.app-shell-header .brand-lockup')).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeHidden()
+  } else {
+    await expect(page.locator('.app-shell-header .brand-lockup')).toBeVisible()
+  }
   expect(await page.locator('body').evaluate(el => getComputedStyle(el).fontFamily)).toContain('ZZP Sans')
   await page.evaluate(() => document.fonts.ready)
   await page.screenshot({ path: testInfo.outputPath('brand-workspace.png'), fullPage: true })
-  await page.getByRole('button', { name: 'Open navigation menu' }).click()
-  const drawer = page.getByRole('dialog')
+  if (!desktop) await page.getByRole('button', { name: 'Open navigation menu' }).click()
+  const drawer = desktop ? page.locator('aside').filter({ has: page.locator('.workspace-sidebar') }) : page.getByRole('dialog')
   await expect(drawer.locator('.brand-lockup')).toBeVisible()
   await expect(drawer.locator('.workspace-sidebar')).toHaveCSS('background-color', 'rgb(28, 61, 52)')
   await expect(drawer.locator('.brand-wordmark')).toHaveCSS('color', 'rgb(241, 245, 236)')
@@ -233,12 +240,19 @@ test('workspace and navigation share the homepage identity at mobile and desktop
   await expect(logout).toBeInViewport()
   expect((await settings.boundingBox())!.y).toBeCloseTo((await logout.boundingBox())!.y, 0)
   const box = (await drawer.boundingBox())!
-  expect(box.width).toBeLessThanOrEqual(page.viewportSize()!.width - 39)
-  expect(box.y).toBe(0)
-  expect(box.height).toBe(page.viewportSize()!.height)
+  if (desktop) {
+    expect(box.width).toBe(240)
+    expect(box.y).toBeGreaterThan(0)
+  } else {
+    expect(box.width).toBeLessThanOrEqual(page.viewportSize()!.width - 31)
+    expect(box.y).toBe(0)
+    expect(box.height).toBe(page.viewportSize()!.height)
+  }
   await page.screenshot({ path: testInfo.outputPath('brand-navigation.png') })
-  await page.keyboard.press('Escape')
-  await expect(drawer).not.toBeVisible()
+  if (!desktop) {
+    await page.keyboard.press('Escape')
+    await expect(drawer).not.toBeVisible()
+  }
 })
 
 

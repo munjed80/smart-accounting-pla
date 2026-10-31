@@ -567,12 +567,12 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
       </div>
 
       {/* User Info */}
-      <div className="workspace-profile">
+      <div className="workspace-profile" title={user?.email ?? undefined}>
         <span className="workspace-avatar" aria-hidden="true">{user?.full_name?.split(/\s+/).slice(0, 2).map(name => name[0]).join('').toUpperCase()}</span>
         <div className="text-sm min-w-0 flex-1">
           <p className="font-medium truncate">{user?.full_name}</p>
-          <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-        <Badge variant="outline" className="mt-2 capitalize">
+          <p className="workspace-profile-email text-xs text-muted-foreground truncate">{user?.email}</p>
+        <Badge variant="outline" className="workspace-profile-role capitalize">
           {user?.role === 'zzp' ? t('roles.zzp') : user?.role === 'accountant' ? t('roles.accountant') : user?.role}
         </Badge>
         </div>
@@ -724,8 +724,8 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
       <header className="app-shell-header sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-sm" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Left: Hamburger Menu + Brand */}
-            <div className="flex items-center gap-3">
+            {/* Compact mobile brand; desktop sidebar already contains the brand. */}
+            <div className="flex items-center gap-3 lg:hidden">
               <Button
                 variant="ghost"
                 size="icon"
@@ -872,7 +872,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
       <div className="hidden lg:flex">
         {/* Fixed Sidebar */}
         <aside 
-          className="fixed left-0 bottom-0 w-64 border-r border-border bg-card/50 overflow-hidden"
+          className="fixed left-0 bottom-0 w-60 border-r border-border bg-card/50 overflow-hidden"
           style={{ 
             zIndex: 40,
             top: 'calc(4rem + env(safe-area-inset-top, 0px))' // 4rem = h-16 header height
@@ -884,7 +884,7 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
       </div>
 
       {/* Mount the page once: CSS adapts the same content to each viewport. */}
-      <main className={isZZP ? 'min-w-0 lg:ml-64 pb-20 lg:pb-0 pt-4' : 'min-w-0 lg:ml-64 pt-4'}>
+      <main className={isZZP ? 'min-w-0 lg:ml-60 pb-20 lg:pb-0 pt-4' : 'min-w-0 lg:ml-60 pt-4'}>
         <Suspense fallback={<div role="status" className="p-8 text-center text-muted-foreground">Pagina laden...</div>}>{children}</Suspense>
       </main>
 

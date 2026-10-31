@@ -46,10 +46,10 @@
   background: var(--sidebar);
   color: var(--sidebar-foreground);
 }
-.workspace-sidebar nav { scrollbar-color: #6c8a7c transparent; }
+.workspace-sidebar nav { scrollbar-color: #6c8a7c transparent; min-height: 0; }
 .workspace-sidebar nav::-webkit-scrollbar-track { background: transparent; }
 .workspace-sidebar nav::-webkit-scrollbar-thumb { background: #6c8a7c; border: 0; }
-.workspace-drawer { width: min(340px, calc(100vw - 40px)); max-width: none; }
+.workspace-drawer { width: min(300px, calc(100vw - 32px)); max-width: none; }
 .workspace-drawer > button { color: var(--sidebar-foreground); }
 .workspace h1, .workspace h2, .workspace h3 { letter-spacing: -0.025em; }
 @media (max-width: 480px) {
@@ -61,10 +61,10 @@
 .cookie-banner { max-height: 45dvh; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom, 0px); }
 
 /* The daily workspace keeps seven destinations in view, with tools behind disclosure. */
-.workspace-profile { display: flex; align-items: center; gap: 12px; padding: 22px 20px; border-bottom: 1px solid var(--border); }
-.workspace-avatar { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; background: #315548; color: #d9e8aa; font-size: 13px; font-weight: 600; letter-spacing: .03em; }
+.workspace-profile { display: flex; align-items: center; gap: 10px; padding: 12px; border-bottom: 1px solid var(--border); min-width: 0; }\n.workspace-profile-email { display: none; }\n.workspace-profile-role { margin-top: 4px; font-size: 10px; padding: 1px 7px; }
+.workspace-avatar { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%; background: #315548; color: #d9e8aa; font-size: 13px; font-weight: 600; letter-spacing: .03em; }
 .workspace-nav-caption { padding: 0 12px 8px; font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted-foreground); }
-.workspace-nav-item { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 8px 12px; border: 1px solid transparent; border-radius: 11px; color: var(--foreground); font-size: 14px; font-weight: 500; transition: background-color .15s, color .15s; }
+.workspace-nav-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 10px; border: 1px solid transparent; border-radius: 11px; color: var(--foreground); font-size: 14px; font-weight: 500; transition: background-color .15s, color .15s; }
 .workspace-nav-item:hover { background: #294b40; }
 .workspace-nav-icon { display: grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px; background: #ffffff09; color: #b8d0bd; }
 .workspace-nav-item.is-active { background: #d9e8aa; color: #1c3d34; border-color: #e5efc7; }

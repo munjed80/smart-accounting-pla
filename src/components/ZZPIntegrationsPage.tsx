@@ -332,9 +332,11 @@ export const ZZPIntegrationsPage = () => {
           description: result.error || undefined,
         })
       }
-      queryClient.invalidateQueries({ queryKey: ['ecommerce-connections'] })
+      for (const key of ['ecommerce-connections', 'ecommerce-orders', 'ecommerce-sync-logs', 'sales-review-summary', 'sales-review-mappings']) {
+        void queryClient.invalidateQueries({ queryKey: [key] })
+      }
     } catch (err: any) {
-      toast.error('Synchronisatie mislukt', {
+      toast.error('Synchronisatie niet bevestigd', {
         description: err?.message || 'Onbekende fout',
       })
     }
@@ -438,7 +440,7 @@ function ProviderCard({ provider, connection, onConnect, onSync, onDisconnect, o
   const hasError = connection?.status === 'error' || !!connection?.last_sync_error
 
   return (
-    <div className={`rounded-lg border p-4 sm:p-5 space-y-3 sm:space-y-4 ${isConnected ? meta.color : 'bg-card border-border'}`}>
+    <div className={`integration-provider rounded-lg border p-4 sm:p-5 space-y-3 sm:space-y-4 ${isConnected ? meta.color : 'bg-card border-border'}`}>
       {/* Provider header — stacked on mobile */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3 min-w-0">
@@ -454,7 +456,7 @@ function ProviderCard({ provider, connection, onConnect, onSync, onDisconnect, o
           {isConnected ? (
             <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">
               <CheckCircle size={14} weight="fill" className="mr-1" />
-              Verbonden
+              {hasError ? 'Aandacht nodig' : 'Verbonden'}
             </Badge>
           ) : connection?.status === 'disconnected' ? (
             <Badge variant="outline" className="text-muted-foreground text-xs">
@@ -491,7 +493,7 @@ function ProviderCard({ provider, connection, onConnect, onSync, onDisconnect, o
             <p className="flex items-center gap-1">
               <Clock size={12} className="shrink-0" />
               <span className="truncate">
-                Laatste sync: {new Date(connection.last_sync_at).toLocaleString('nl-NL')}
+                Laatste poging: {new Date(connection.last_sync_at).toLocaleString('nl-NL')}
                 {connection.last_sync_orders_count > 0 && ` · ${connection.last_sync_orders_count} orders`}
               </span>
             </p>
@@ -505,7 +507,7 @@ function ProviderCard({ provider, connection, onConnect, onSync, onDisconnect, o
           {hasError && connection.last_sync_error && (
             <p className="text-red-600 flex items-center gap-1">
               <Warning size={12} weight="fill" className="shrink-0" />
-              <span className="truncate">{connection.last_sync_error.slice(0, 100)}</span>
+              <span className="break-words">{connection.last_sync_error}</span>
             </p>
           )}
         </div>
@@ -583,8 +585,9 @@ function ShopifyConnectDialog({ open, onClose, onSuccess }: { open: boolean; onC
         <DialogHeader>
           <DialogTitle>Shopify verbinden</DialogTitle>
           <DialogDescription>
-            Maak een custom app in je Shopify admin onder Instellingen → Apps → Apps ontwikkelen.
-            Geef de app leesrechten voor bestellingen, klanten en retouren.
+            Gebruik een geldig Admin API-token met read_orders en read_customers.
+            Voor bestellingen ouder dan 60 dagen is ook read_all_orders nodig.
+            Tijdelijke tokens moeten na het verlopen opnieuw worden gekoppeld; deze koppeling vernieuwt ze niet automatisch.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
@@ -765,14 +768,16 @@ function ConnectionDetailPanel({
   setDetailTab: (t: DetailTab) => void
 }) {
   const providerName = connection.provider === 'shopify' ? 'Shopify' : 'WooCommerce'
+  const [ordersPage, setOrdersPage] = useState(1)
+  useEffect(() => setOrdersPage(1), [connection.id])
 
-  const { data: ordersData, isLoading: ordersLoading } = useQuery({
-    queryKey: ['ecommerce-orders', connection.id],
-    queryFn: () => integrationsApi.listOrders(connection.id),
+  const { data: ordersData, isLoading: ordersLoading, isError: ordersError, refetch: retryOrders } = useQuery({
+    queryKey: ['ecommerce-orders', connection.id, ordersPage],
+    queryFn: () => integrationsApi.listOrders(connection.id, ordersPage),
     enabled: detailTab === 'orders',
   })
 
-  const { data: logsData, isLoading: logsLoading } = useQuery({
+  const { data: logsData, isLoading: logsLoading, isError: logsError, refetch: retryLogs } = useQuery({
     queryKey: ['ecommerce-sync-logs', connection.id],
     queryFn: () => integrationsApi.listSyncLogs(connection.id),
     enabled: detailTab === 'sync-logs',
@@ -808,6 +813,8 @@ function ConnectionDetailPanel({
         <div>
           {ordersLoading ? (
             <p className="text-sm text-muted-foreground py-4">Laden...</p>
+          ) : ordersError ? (
+            <div role="alert" className="py-4 space-y-3"><p>Bestellingen konden niet worden geladen.</p><Button variant="outline" onClick={() => void retryOrders()}>Opnieuw proberen</Button></div>
           ) : !ordersData?.orders?.length ? (
             <p className="text-sm text-muted-foreground py-4">Nog geen bestellingen geïmporteerd. Klik op &quot;Sync nu&quot; om te starten.</p>
           ) : (
@@ -831,8 +838,8 @@ function ConnectionDetailPanel({
                       <td className="py-2 pr-3">
                         <OrderStatusBadge status={order.status} />
                       </td>
-                      <td className="py-2 pr-3 text-right font-medium">€{(order.total_amount_cents / 100).toFixed(2)}</td>
-                      <td className="py-2 pr-3 text-right text-muted-foreground">€{(order.tax_cents / 100).toFixed(2)}</td>
+                      <td className="py-2 pr-3 text-right font-medium">{new Intl.NumberFormat('nl-NL', { style: 'currency', currency: order.currency }).format(order.total_amount_cents / 100)}</td>
+                      <td className="py-2 pr-3 text-right text-muted-foreground">{new Intl.NumberFormat('nl-NL', { style: 'currency', currency: order.currency }).format(order.tax_cents / 100)}</td>
                       <td className="py-2 text-muted-foreground">
                         {order.ordered_at ? new Date(order.ordered_at).toLocaleDateString('nl-NL') : '-'}
                       </td>
@@ -841,8 +848,12 @@ function ConnectionDetailPanel({
                 </tbody>
               </table>
               <p className="text-xs text-muted-foreground mt-2">
-                {ordersData.total} bestelling{ordersData.total !== 1 ? 'en' : ''} totaal
+                {ordersData.total} bestelling{ordersData.total !== 1 ? 'en' : ''} totaal · Pagina {ordersPage}
               </p>
+              <div className="flex gap-2 pt-3" aria-label="Bestellingen pagina's">
+                <Button variant="outline" size="sm" disabled={ordersPage === 1} onClick={() => setOrdersPage(p => p - 1)}>Vorige</Button>
+                <Button variant="outline" size="sm" disabled={ordersPage * ordersData.per_page >= ordersData.total} onClick={() => setOrdersPage(p => p + 1)}>Volgende</Button>
+              </div>
             </div>
           )}
         </div>
@@ -853,6 +864,8 @@ function ConnectionDetailPanel({
         <div>
           {logsLoading ? (
             <p className="text-sm text-muted-foreground py-4">Laden...</p>
+          ) : logsError ? (
+            <div role="alert" className="py-4 space-y-3"><p>Synchronisaties konden niet worden geladen.</p><Button variant="outline" onClick={() => void retryLogs()}>Opnieuw proberen</Button></div>
           ) : !logsData?.logs?.length ? (
             <p className="text-sm text-muted-foreground py-4">Nog geen synchronisaties uitgevoerd.</p>
           ) : (

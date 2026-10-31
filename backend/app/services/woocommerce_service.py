@@ -12,6 +12,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from uuid import UUID
 
 import httpx
+from app.services.ecommerce_http import cents, normalize_store_url, store_get
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,14 +47,7 @@ def _map_wc_status(wc_status: Optional[str]) -> EcommerceOrderStatus:
     return mapping.get(wc_status or "", EcommerceOrderStatus.OPEN)
 
 
-def _cents(amount: Any) -> int:
-    """Convert WooCommerce amount (string or number) to cents."""
-    if amount is None:
-        return 0
-    try:
-        return int(round(float(str(amount)) * 100))
-    except (ValueError, TypeError):
-        return 0
+_cents = cents
 
 
 def _parse_dt(dt_str: Optional[str]) -> Optional[datetime]:
@@ -78,11 +72,11 @@ class WooCommerceService:
         """
         Verify WooCommerce credentials by calling the system status endpoint.
         """
-        url = self._build_url(shop_url, "system_status")
+        url = self._build_url(shop_url, "orders?per_page=1")
         auth = (consumer_key, consumer_secret)
 
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(url, auth=auth)
+        async with httpx.AsyncClient(timeout=15, trust_env=False) as client:
+            resp = await store_get(client, url, auth=auth, origin=shop_url)
             if resp.status_code == 401:
                 raise ValueError(
                     "Ongeldige WooCommerce API-sleutels. Controleer je consumer key en secret."
@@ -92,11 +86,11 @@ class WooCommerceService:
                     "WooCommerce API niet gevonden. Controleer de URL en zorg dat de REST API is ingeschakeld."
                 )
             resp.raise_for_status()
-            data = resp.json()
-            return {
-                "store_url": shop_url,
-                "wc_version": data.get("environment", {}).get("version", "unknown"),
-            }
+            if not isinstance(resp.json(), list):
+                raise ValueError("De winkel gaf geen geldige WooCommerce-reactie.")
+            customers = await store_get(client, self._build_url(shop_url, "customers?per_page=1"), auth=auth, origin=shop_url)
+            customers.raise_for_status()
+            return {"store_url": shop_url}
 
     async def sync_all(
         self,
@@ -126,26 +120,30 @@ class WooCommerceService:
         error_msg = None
 
         try:
-            shop_url = connection.shop_url or ""
-            auth = (consumer_key, consumer_secret)
+            async with db.begin_nested():
+                shop_url = connection.shop_url or ""
+                auth = (consumer_key, consumer_secret)
 
-            # --- Orders ---
-            oi, ou, order_ids = await self._sync_orders(db, connection, shop_url, auth)
-            orders_imported += oi
-            orders_updated += ou
+                # --- Orders ---
+                oi, ou, order_ids = await self._sync_orders(db, connection, shop_url, auth)
+                orders_imported += oi
+                orders_updated += ou
 
-            # --- Customers ---
-            ci = await self._sync_customers(db, connection, shop_url, auth)
-            customers_imported += ci
+                # --- Customers ---
+                ci = await self._sync_customers(db, connection, shop_url, auth)
+                customers_imported += ci
 
-            # --- Refunds ---
-            ri = await self._sync_refunds(db, connection, shop_url, auth, order_ids)
-            refunds_imported += ri
+                # --- Refunds ---
+                ri = await self._sync_refunds(db, connection, shop_url, auth, order_ids)
+                refunds_imported += ri
+                from app.services.ecommerce_review_refresh import refresh_reviews
+                await refresh_reviews(db, connection)
 
             sync_log.status = SyncStatus.SUCCESS
         except Exception as e:
             logger.exception(f"WooCommerce sync failed for connection {connection.id}")
-            error_msg = str(e)[:1000]
+            orders_imported = orders_updated = customers_imported = refunds_imported = 0
+            error_msg = "Synchronisatie afgebroken; wijzigingen zijn teruggedraaid. Controleer de toegang en probeer opnieuw."
             sync_log.status = SyncStatus.FAILED
             sync_log.error_message = error_msg
 
@@ -183,10 +181,12 @@ class WooCommerceService:
         order_ids: List[str] = []
         page = 1
 
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
             while True:
+                if page > 1000:
+                    raise ValueError("Excessive pagination")
                 url = self._build_url(shop_url, f"orders?per_page=100&page={page}")
-                resp = await client.get(url, auth=auth)
+                resp = await store_get(client, url, auth=auth, origin=shop_url)
                 resp.raise_for_status()
                 orders = resp.json()
 
@@ -197,7 +197,7 @@ class WooCommerceService:
                     ext_id = str(order.get("id", ""))
                     if not ext_id:
                         continue
-                    order_ids.append(ext_id)
+                    order_ids.append((ext_id, order.get("currency", "EUR")))
 
                     existing = (await db.execute(
                         select(EcommerceOrder).where(
@@ -258,10 +258,12 @@ class WooCommerceService:
         imported = 0
         page = 1
 
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
             while True:
+                if page > 1000:
+                    raise ValueError("Excessive pagination")
                 url = self._build_url(shop_url, f"customers?per_page=100&page={page}")
-                resp = await client.get(url, auth=auth)
+                resp = await store_get(client, url, auth=auth, origin=shop_url)
                 resp.raise_for_status()
                 customers = resp.json()
 
@@ -321,42 +323,52 @@ class WooCommerceService:
         """Fetch refunds for orders that have them."""
         imported = 0
 
-        async with httpx.AsyncClient(timeout=30) as client:
-            for order_ext_id in order_ids:
-                url = self._build_url(shop_url, f"orders/{order_ext_id}/refunds")
-                resp = await client.get(url, auth=auth)
-                if resp.status_code == 404:
-                    continue
-                resp.raise_for_status()
-                refunds = resp.json()
+        async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
+            for order_ext_id, currency in order_ids:
+                page = 1
+                while True:
+                    if page > 1000:
+                        raise ValueError("Excessive pagination")
+                    url = self._build_url(shop_url, f"orders/{order_ext_id}/refunds?per_page=100&page={page}")
+                    resp = await store_get(client, url, auth=auth, origin=shop_url)
+                    if resp.status_code == 404:
+                        break
+                    resp.raise_for_status()
+                    refunds = resp.json()
 
-                for refund in refunds:
-                    ext_id = str(refund.get("id", ""))
-                    if not ext_id:
-                        continue
+                    if not refunds:
+                        break
 
-                    existing = (await db.execute(
-                        select(EcommerceRefund).where(
-                            EcommerceRefund.connection_id == connection.id,
-                            EcommerceRefund.external_refund_id == ext_id,
+                    for refund in refunds:
+                        ext_id = str(refund.get("id", ""))
+                        if not ext_id:
+                            continue
+
+                        existing = (await db.execute(
+                            select(EcommerceRefund).where(
+                                EcommerceRefund.connection_id == connection.id,
+                                EcommerceRefund.external_refund_id == ext_id,
+                            )
+                        )).scalar_one_or_none()
+
+                        if existing:
+                            existing.amount_cents = abs(_cents(refund.get("amount")))
+                            existing.currency = currency
+                            continue
+
+                        new_refund = EcommerceRefund(
+                            connection_id=connection.id,
+                            administration_id=connection.administration_id,
+                            external_refund_id=ext_id,
+                            external_order_id=order_ext_id,
+                            amount_cents=abs(_cents(refund.get("amount"))),
+                            currency=currency,
+                            reason=refund.get("reason"),
+                            refunded_at=_parse_dt(refund.get("date_created_gmt") or refund.get("date_created")),
                         )
-                    )).scalar_one_or_none()
-
-                    if existing:
-                        continue
-
-                    new_refund = EcommerceRefund(
-                        connection_id=connection.id,
-                        administration_id=connection.administration_id,
-                        external_refund_id=ext_id,
-                        external_order_id=order_ext_id,
-                        amount_cents=abs(_cents(refund.get("amount"))),
-                        currency="EUR",
-                        reason=refund.get("reason"),
-                        refunded_at=_parse_dt(refund.get("date_created_gmt") or refund.get("date_created")),
-                    )
-                    db.add(new_refund)
-                    imported += 1
+                        db.add(new_refund)
+                        imported += 1
+                    page += 1
 
         await db.flush()
         return imported
@@ -368,9 +380,7 @@ class WooCommerceService:
     @staticmethod
     def _build_url(shop_url: str, path: str) -> str:
         """Build WooCommerce REST API URL."""
-        base = shop_url.rstrip("/")
-        if not base.startswith("http"):
-            base = f"https://{base}"
+        base = normalize_store_url(shop_url)
         return f"{base}/wp-json/{WC_API_VERSION}/{path}"
 
 

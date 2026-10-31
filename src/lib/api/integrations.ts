@@ -127,7 +127,7 @@ export const integrationsApi = {
 
   /** Trigger sync for a connection */
   triggerSync: async (connectionId: string): Promise<SyncTriggerResponse> => {
-    const response = await api.post(`/zzp/integrations/${connectionId}/sync`)
+    const response = await api.post(`/zzp/integrations/${connectionId}/sync`, undefined, { timeout: 300000 })
     return response.data
   },
 

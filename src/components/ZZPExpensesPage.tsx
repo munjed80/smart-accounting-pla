@@ -901,8 +901,7 @@ export const ZZPExpensesPage = () => {
   }, [handleScanReceipt])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
+    <div className="workspace-page min-h-screen bg-background">
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
         <ServerPagination {...pagination} loading={isLoading} />
         {/* Header */}

@@ -724,8 +724,8 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
       <header className="app-shell-header sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-sm" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Left: Hamburger Menu + Brand */}
-            <div className="flex items-center gap-3">
+            {/* Compact mobile brand; desktop sidebar already contains the brand. */}
+            <div className="flex items-center gap-3 lg:hidden">
               <Button
                 variant="ghost"
                 size="icon"

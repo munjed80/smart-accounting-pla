@@ -218,6 +218,8 @@ test('workspace and navigation share the homepage identity at mobile and desktop
   if (!desktop) await page.getByRole('button', { name: 'Open navigation menu' }).click()
   const drawer = desktop ? page.locator('aside').filter({ has: page.locator('.workspace-sidebar') }) : page.getByRole('dialog')
   await expect(drawer.locator('.brand-lockup')).toBeVisible()
+  await expect(drawer.getByRole('button', { name: 'Bedrijfsgegevens openen' })).toBeVisible()
+  await expect(drawer.locator('.workspace-profile')).not.toContainText('@')
   await expect(drawer.locator('.workspace-sidebar')).toHaveCSS('background-color', 'rgb(28, 61, 52)')
   await expect(drawer.locator('.brand-wordmark')).toHaveCSS('color', 'rgb(241, 245, 236)')
   await expect.poll(async () => (await drawer.boundingBox())?.x).toBeCloseTo(0, 1)
@@ -242,7 +244,7 @@ test('workspace and navigation share the homepage identity at mobile and desktop
   const box = (await drawer.boundingBox())!
   if (desktop) {
     expect(box.width).toBe(240)
-    expect(box.y).toBeGreaterThan(0)
+    expect(box.y).toBe(0)
   } else {
     expect(box.width).toBeLessThanOrEqual(page.viewportSize()!.width - 31)
     expect(box.y).toBe(0)

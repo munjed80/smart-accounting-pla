@@ -29,7 +29,7 @@ export function useSeoMeta({
   title,
   description,
   canonical,
-  image = 'https://zzpershub.nl/og-image.png',
+  image = 'https://zzpershub.nl/social/zzpershub-preview-v2.png',
   robots = 'index, follow',
   type = 'website',
 }: SeoMetaOptions) {

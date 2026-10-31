@@ -23,3 +23,6 @@ header.writeUInt32LE(png.length, 14)
 header.writeUInt32LE(22, 18)
 await writeFile(new URL('favicon.ico', output), Buffer.concat([header, png]))
 console.log('ZZPers Hub install icons generated from public/icon.svg')
+
+// Outlined text makes the social card reproducible on font-free Docker builders.
+await import('./build-social-preview.mjs').then(({ buildSocialPreview }) => buildSocialPreview(output))

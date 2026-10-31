@@ -61,7 +61,10 @@
 .cookie-banner { max-height: 45dvh; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom, 0px); }
 
 /* The daily workspace keeps seven destinations in view, with tools behind disclosure. */
-.workspace-profile { display: flex; align-items: center; gap: 10px; padding: 12px; border-bottom: 1px solid var(--border); min-width: 0; }\n.workspace-profile-email { display: none; }\n.workspace-profile-role { margin-top: 4px; font-size: 10px; padding: 1px 7px; }
+.workspace-profile { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); min-width: 0; }
+.workspace-profile-link { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 4px; border-radius: 8px; color: inherit; }
+.workspace-profile-link:hover { background: #ffffff09; }
+.workspace-profile-link:focus-visible { outline: 2px solid #d9e8aa; outline-offset: 2px; }
 .workspace-avatar { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%; background: #315548; color: #d9e8aa; font-size: 13px; font-weight: 600; letter-spacing: .03em; }
 .workspace-nav-caption { padding: 0 12px 8px; font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted-foreground); }
 .workspace-nav-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 10px; border: 1px solid transparent; border-radius: 11px; color: var(--foreground); font-size: 14px; font-weight: 500; transition: background-color .15s, color .15s; }

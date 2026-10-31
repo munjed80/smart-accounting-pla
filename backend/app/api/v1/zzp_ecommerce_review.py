@@ -58,7 +58,7 @@ async def _get_administration(user: CurrentUser, db: AsyncSession) -> Administra
         select(Administration)
         .join(AdministrationMember)
         .where(AdministrationMember.user_id == user.id)
-        .order_by(AdministrationMember.created_at.asc())
+        .order_by(AdministrationMember.created_at.asc()).limit(1)
     )
     admin = result.scalar_one_or_none()
     if not admin:
@@ -199,6 +199,8 @@ async def generate_mappings(
     Safe to call repeatedly – skips records that already have a mapping.
     """
     administration = await _require_pro_plan(current_user, db)
+
+    await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
 
     # Build connection filter
     conn_filter = [EcommerceConnection.administration_id == administration.id]
@@ -435,6 +437,7 @@ async def get_mapping(
     """Get a single mapping with source data."""
     administration = await _require_pro_plan(current_user, db)
 
+    await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
     result = await db.execute(
         select(EcommerceMapping, EcommerceOrder)
         .outerjoin(EcommerceOrder, EcommerceMapping.order_id == EcommerceOrder.id)
@@ -481,6 +484,7 @@ async def mapping_action(
     """
     administration = await _require_pro_plan(current_user, db)
 
+    await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
     result = await db.execute(
         select(EcommerceMapping, EcommerceOrder)
         .outerjoin(EcommerceOrder, EcommerceMapping.order_id == EcommerceOrder.id)
@@ -534,14 +538,13 @@ async def mapping_action(
                 status_code=409,
                 detail="Dit record is al geboekt. Verwijder eerst de bestaande boeking.",
             )
-        # Phase 2: mark as posted (intermediate layer – no direct journal posting yet)
-        # This creates a reviewable "ready to post" state.
-        # Full journal posting will be added in Phase 3.
+        from app.services.ecommerce_posting import post_mapping
+        entry = await post_mapping(db, mapping)
         mapping.review_status = MappingReviewStatus.POSTED
         mapping.posted_by = current_user.id
         mapping.posted_at = now
-        mapping.posted_entity_type = "pending_revenue"
-        mapping.posted_entity_id = mapping.id  # self-reference as placeholder
+        mapping.posted_entity_type = "journal_entry"
+        mapping.posted_entity_id = entry.id
 
     elif action == "skip":
         mapping.review_status = MappingReviewStatus.SKIPPED

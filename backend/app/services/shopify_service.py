@@ -13,6 +13,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from uuid import UUID
 
 import httpx
+from app.services.ecommerce_http import cents, normalize_store_url, store_get
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,7 +32,7 @@ from app.models.ecommerce import (
 logger = logging.getLogger(__name__)
 
 # Shopify API version (use stable version)
-SHOPIFY_API_VERSION = "2024-10"
+SHOPIFY_API_VERSION = "2026-10"
 
 
 def _map_shopify_financial_status(financial_status: Optional[str]) -> EcommerceOrderStatus:
@@ -48,14 +49,7 @@ def _map_shopify_financial_status(financial_status: Optional[str]) -> EcommerceO
     return mapping.get(financial_status or "", EcommerceOrderStatus.OPEN)
 
 
-def _cents(amount_str: Optional[str]) -> int:
-    """Convert a Shopify decimal string to cents."""
-    if not amount_str:
-        return 0
-    try:
-        return int(round(float(amount_str) * 100))
-    except (ValueError, TypeError):
-        return 0
+_cents = cents
 
 
 def _parse_dt(dt_str: Optional[str]) -> Optional[datetime]:
@@ -79,14 +73,19 @@ class ShopifyService:
         url = self._build_url(shop_url, "shop.json")
         headers = self._headers(access_token)
 
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(url, headers=headers)
+        async with httpx.AsyncClient(timeout=15, trust_env=False) as client:
+            resp = await store_get(client, url, headers=headers, origin=shop_url)
             if resp.status_code == 401:
                 raise ValueError("Ongeldige Shopify-toegangstoken. Controleer je API-token.")
             if resp.status_code == 404:
                 raise ValueError("Shopify-winkel niet gevonden. Controleer de URL.")
             resp.raise_for_status()
             data = resp.json()
+            scopes_response = await store_get(client, normalize_store_url(shop_url, shopify=True) + "/admin/oauth/access_scopes.json", headers=headers, origin=shop_url)
+            scopes_response.raise_for_status()
+            scopes = {scope['handle'] for scope in scopes_response.json().get('access_scopes', [])}
+            if not ({'read_orders', 'write_orders'} & scopes) or not ({'read_customers', 'write_customers'} & scopes):
+                raise ValueError("Geef de app leestoegang tot bestellingen en klanten. Voor oudere bestellingen is read_all_orders nodig.")
             return data.get("shop", {})
 
     async def sync_all(
@@ -116,26 +115,30 @@ class ShopifyService:
         error_msg = None
 
         try:
-            shop_url = connection.shop_url or ""
-            headers = self._headers(access_token)
+            async with db.begin_nested():
+                shop_url = connection.shop_url or ""
+                headers = self._headers(access_token)
 
-            # --- Orders ---
-            oi, ou, refunds_from_orders = await self._sync_orders(db, connection, shop_url, headers)
-            orders_imported += oi
-            orders_updated += ou
+                # --- Orders ---
+                oi, ou, refunds_from_orders = await self._sync_orders(db, connection, shop_url, headers)
+                orders_imported += oi
+                orders_updated += ou
 
-            # --- Customers ---
-            ci = await self._sync_customers(db, connection, shop_url, headers)
-            customers_imported += ci
+                # --- Customers ---
+                ci = await self._sync_customers(db, connection, shop_url, headers)
+                customers_imported += ci
 
-            # --- Refunds (from orders that have refunds) ---
-            ri = await self._sync_refunds(db, connection, refunds_from_orders)
-            refunds_imported += ri
+                # --- Refunds (from orders that have refunds) ---
+                ri = await self._sync_refunds(db, connection, refunds_from_orders)
+                refunds_imported += ri
+                from app.services.ecommerce_review_refresh import refresh_reviews
+                await refresh_reviews(db, connection)
 
             sync_log.status = SyncStatus.SUCCESS
         except Exception as e:
             logger.exception(f"Shopify sync failed for connection {connection.id}")
-            error_msg = str(e)[:1000]
+            orders_imported = orders_updated = customers_imported = refunds_imported = 0
+            error_msg = "Synchronisatie afgebroken; wijzigingen zijn teruggedraaid. Controleer de toegang en probeer opnieuw."
             sync_log.status = SyncStatus.FAILED
             sync_log.error_message = error_msg
 
@@ -173,9 +176,13 @@ class ShopifyService:
         all_refunds: List[Dict] = []
         url = self._build_url(shop_url, "orders.json?status=any&limit=250")
 
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
+            visited = set()
             while url:
-                resp = await client.get(url, headers=headers)
+                if url in visited or len(visited) >= 1000:
+                    raise ValueError("Invalid or excessive pagination")
+                visited.add(url)
+                resp = await store_get(client, url, headers=headers, origin=shop_url)
                 resp.raise_for_status()
                 data = resp.json()
                 orders = data.get("orders", [])
@@ -189,6 +196,7 @@ class ShopifyService:
                     if order.get("refunds"):
                         for refund in order["refunds"]:
                             refund["_parent_order_id"] = ext_id
+                            refund["currency"] = order.get("currency", "EUR")
                             all_refunds.append(refund)
 
                     # Check if exists
@@ -202,7 +210,7 @@ class ShopifyService:
                     customer = order.get("customer", {}) or {}
                     order_data = {
                         "external_order_number": str(order.get("order_number", "")),
-                        "status": _map_shopify_financial_status(order.get("financial_status")),
+                        "status": EcommerceOrderStatus.CANCELLED if order.get("cancelled_at") else _map_shopify_financial_status(order.get("financial_status")),
                         "customer_name": f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip() or None,
                         "customer_email": customer.get("email") or order.get("email"),
                         "currency": order.get("currency", "EUR"),
@@ -212,7 +220,7 @@ class ShopifyService:
                         "shipping_cents": sum(_cents(sl.get("price")) for sl in (order.get("shipping_lines") or [])),
                         "discount_cents": abs(_cents(order.get("total_discounts"))),
                         "ordered_at": _parse_dt(order.get("created_at")),
-                        "paid_at": _parse_dt(order.get("closed_at")) if order.get("financial_status") == "paid" else None,
+                        "paid_at": None,  # closed_at is fulfillment closure, not a payment timestamp
                     }
 
                     if existing:
@@ -246,9 +254,13 @@ class ShopifyService:
         imported = 0
         url = self._build_url(shop_url, "customers.json?limit=250")
 
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
+            visited = set()
             while url:
-                resp = await client.get(url, headers=headers)
+                if url in visited or len(visited) >= 1000:
+                    raise ValueError("Invalid or excessive pagination")
+                visited.add(url)
+                resp = await store_get(client, url, headers=headers, origin=shop_url)
                 resp.raise_for_status()
                 data = resp.json()
 
@@ -313,13 +325,16 @@ class ShopifyService:
                 )
             )).scalar_one_or_none()
 
-            if existing:
-                continue
-
             # Sum refund line items
             amount_cents = 0
             for tx in refund.get("transactions", []):
-                amount_cents += _cents(tx.get("amount"))
+                if tx.get("kind") == "refund" and tx.get("status") == "success":
+                    amount_cents += _cents(tx.get("amount"))
+
+            if existing:
+                existing.amount_cents = amount_cents
+                existing.currency = refund.get("currency", "EUR")
+                continue
 
             new_refund = EcommerceRefund(
                 connection_id=connection.id,
@@ -344,9 +359,7 @@ class ShopifyService:
     @staticmethod
     def _build_url(shop_url: str, path: str) -> str:
         """Build Shopify Admin API URL."""
-        shop = shop_url.rstrip("/")
-        if not shop.startswith("http"):
-            shop = f"https://{shop}"
+        shop = normalize_store_url(shop_url, shopify=True)
         return f"{shop}/admin/api/{SHOPIFY_API_VERSION}/{path}"
 
     @staticmethod

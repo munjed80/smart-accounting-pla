@@ -438,7 +438,7 @@ function ProviderCard({ provider, connection, onConnect, onSync, onDisconnect, o
   const hasError = connection?.status === 'error' || !!connection?.last_sync_error
 
   return (
-    <div className={`rounded-lg border p-4 sm:p-5 space-y-3 sm:space-y-4 ${isConnected ? meta.color : 'bg-card border-border'}`}>
+    <div className={`integration-provider rounded-lg border p-4 sm:p-5 space-y-3 sm:space-y-4 ${isConnected ? meta.color : 'bg-card border-border'}`}>
       {/* Provider header — stacked on mobile */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3 min-w-0">
@@ -454,7 +454,7 @@ function ProviderCard({ provider, connection, onConnect, onSync, onDisconnect, o
           {isConnected ? (
             <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">
               <CheckCircle size={14} weight="fill" className="mr-1" />
-              Verbonden
+              {hasError ? 'Aandacht nodig' : 'Verbonden'}
             </Badge>
           ) : connection?.status === 'disconnected' ? (
             <Badge variant="outline" className="text-muted-foreground text-xs">
@@ -491,7 +491,7 @@ function ProviderCard({ provider, connection, onConnect, onSync, onDisconnect, o
             <p className="flex items-center gap-1">
               <Clock size={12} className="shrink-0" />
               <span className="truncate">
-                Laatste sync: {new Date(connection.last_sync_at).toLocaleString('nl-NL')}
+                Laatste poging: {new Date(connection.last_sync_at).toLocaleString('nl-NL')}
                 {connection.last_sync_orders_count > 0 && ` · ${connection.last_sync_orders_count} orders`}
               </span>
             </p>
@@ -505,7 +505,7 @@ function ProviderCard({ provider, connection, onConnect, onSync, onDisconnect, o
           {hasError && connection.last_sync_error && (
             <p className="text-red-600 flex items-center gap-1">
               <Warning size={12} weight="fill" className="shrink-0" />
-              <span className="truncate">{connection.last_sync_error.slice(0, 100)}</span>
+              <span className="break-words">{connection.last_sync_error}</span>
             </p>
           )}
         </div>

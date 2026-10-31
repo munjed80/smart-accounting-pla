@@ -7,7 +7,8 @@ from datetime import datetime
 from typing import Optional, List
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from app.services.ecommerce_http import normalize_store_url
 
 
 # ---------------------------------------------------------------------------
@@ -20,6 +21,11 @@ class ConnectShopifyRequest(BaseModel):
     access_token: str = Field(..., description="Shopify Admin API access token from a custom app")
     shop_name: Optional[str] = Field(None, description="Display name for the connection")
 
+    @field_validator("shop_url")
+    @classmethod
+    def validate_shop_url(cls, value):
+        return normalize_store_url(value, shopify=True)
+
 
 class ConnectWooCommerceRequest(BaseModel):
     """Request to connect a WooCommerce store."""
@@ -27,6 +33,11 @@ class ConnectWooCommerceRequest(BaseModel):
     consumer_key: str = Field(..., description="WooCommerce REST API consumer key")
     consumer_secret: str = Field(..., description="WooCommerce REST API consumer secret")
     shop_name: Optional[str] = Field(None, description="Display name for the connection")
+
+    @field_validator("shop_url")
+    @classmethod
+    def validate_shop_url(cls, value):
+        return normalize_store_url(value, shopify=False)
 
 
 class ConnectionResponse(BaseModel):

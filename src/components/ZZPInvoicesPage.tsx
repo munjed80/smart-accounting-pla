@@ -228,7 +228,7 @@ const StatsCard = ({
   icon: React.ElementType
   className?: string 
 }) => (
-  <Card className={`bg-card/80 backdrop-blur-sm border border-border/50 ${className}`}>
+  <Card className={`workspace-stat bg-card border border-border/50 ${className}`}>
     <CardContent className="p-4 sm:p-5">
       <div className="flex items-center justify-between">
         <div className="min-w-0 flex-1">
@@ -2183,8 +2183,11 @@ const ZZPInvoicesPageContent = () => {
                     <SelectItem value="cancelled">{t('zzpInvoices.filterCancelled')}</SelectItem>
                   </SelectContent>
                 </Select>
-                <Input type="date" value={filters.from} onChange={(e) => setFilter('from', e.target.value)} className="h-11" />
-                <Input type="date" value={filters.to} onChange={(e) => setFilter('to', e.target.value)} className="h-11" />
+                <details className="invoice-advanced-filters sm:col-span-2 lg:col-span-4">
+                  <summary>Meer filters <span>Datum, bedrag en klant</span></summary>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-4">
+                <Input type="date" aria-label="Vanaf datum" value={filters.from} onChange={(e) => setFilter('from', e.target.value)} className="h-11" />
+                <Input type="date" aria-label="Tot datum" value={filters.to} onChange={(e) => setFilter('to', e.target.value)} className="h-11" />
                 <Input type="number" step="0.01" placeholder="Min bedrag" value={filters.min} onChange={(e) => setFilter('min', e.target.value)} className="h-11" />
                 <Input type="number" step="0.01" placeholder="Max bedrag" value={filters.max} onChange={(e) => setFilter('max', e.target.value)} className="h-11" />
                 <Select value={filters.customer_id || 'all'} onValueChange={(value) => setFilter('customer_id', value === 'all' ? '' : value)}>
@@ -2194,7 +2197,9 @@ const ZZPInvoicesPageContent = () => {
                     {customers.map((customer) => <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Button variant="outline" onClick={reset} className="h-11">Clear filters</Button>
+                <Button variant="outline" onClick={reset} className="h-11">Filters wissen</Button>
+                  </div>
+                </details>
               </div>
 
               {activeFilterChips.length > 0 && (

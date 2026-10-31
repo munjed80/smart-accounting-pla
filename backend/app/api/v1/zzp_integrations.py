@@ -5,6 +5,7 @@ Endpoints for managing Shopify and WooCommerce integrations.
 All endpoints are gated to Pro-plan users only.
 """
 from app.core.billing_catalog import PREPAID_PLAN_CODES
+from app.services.ecommerce_http import normalize_store_url
 import logging
 from typing import Annotated, Optional
 from uuid import UUID
@@ -23,6 +24,7 @@ from app.models.ecommerce import (
     EcommerceCustomer,
     EcommerceRefund,
     EcommerceSyncLog,
+    EcommerceMapping,
     EcommerceProvider,
     ConnectionStatus,
 )
@@ -58,7 +60,7 @@ async def _get_administration(user: CurrentUser, db: AsyncSession) -> Administra
         select(Administration)
         .join(AdministrationMember)
         .where(AdministrationMember.user_id == user.id)
-        .order_by(AdministrationMember.created_at.asc())
+        .order_by(AdministrationMember.created_at.asc()).limit(1)
     )
     admin = result.scalar_one_or_none()
     if not admin:
@@ -207,6 +209,9 @@ async def connect_shopify(
             detail="Shopify is al gekoppeld. Ontkoppel eerst voordat je opnieuw verbindt.",
         )
 
+    if existing and existing.shop_url and normalize_store_url(existing.shop_url) != body.shop_url:
+        raise HTTPException(status_code=409, detail="Deze koppeling hoort bij een andere winkel. Bewaar de oude gegevens en gebruik een aparte administratie voor de nieuwe winkel.")
+
     # Verify credentials with Shopify API
     from app.services.shopify_service import shopify_service
     try:
@@ -270,6 +275,9 @@ async def connect_woocommerce(
             detail="WooCommerce is al gekoppeld. Ontkoppel eerst voordat je opnieuw verbindt.",
         )
 
+    if existing and existing.shop_url and normalize_store_url(existing.shop_url) != body.shop_url:
+        raise HTTPException(status_code=409, detail="Deze koppeling hoort bij een andere winkel. Bewaar de oude gegevens en gebruik een aparte administratie voor de nieuwe winkel.")
+
     # Verify credentials with WooCommerce API
     from app.services.woocommerce_service import woocommerce_service
     try:
@@ -331,6 +339,14 @@ async def trigger_sync(
             detail="Integratie is niet actief. Verbind opnieuw.",
         )
 
+    # Serialize store imports and return immediately if another request is running.
+    from sqlalchemy.exc import OperationalError
+    try:
+        await db.execute(select(EcommerceConnection.id).where(EcommerceConnection.id == conn.id).with_for_update(nowait=True))
+    except OperationalError:
+        await db.rollback()
+        raise HTTPException(409, detail="Er loopt al een synchronisatie. Wacht tot deze klaar is.")
+
     # Decrypt credentials
     if not conn.encrypted_credentials:
         raise HTTPException(status_code=400, detail="Geen opgeslagen inloggegevens.")
@@ -389,6 +405,9 @@ async def delete_integration(
     administration = await _require_pro_plan(current_user, db)
     conn = await _get_connection(connection_id, administration.id, db)
 
+    posted = await db.scalar(select(EcommerceMapping.id).where(EcommerceMapping.connection_id == conn.id, EcommerceMapping.posted_entity_id.is_not(None)).limit(1))
+    if posted:
+        raise HTTPException(409, detail="Deze koppeling bevat geboekte gegevens. Ontkoppel de winkel om de boekingshistorie te bewaren.")
     await db.delete(conn)
     await db.commit()
 

@@ -40,21 +40,17 @@ export function PageContainer({
         : "max-w-7xl"
 
   const paddingClass =
-    padding === "compact" ? "py-6 sm:py-8" : "py-6 sm:py-12"
+    padding === "compact" ? "py-6 sm:py-8" : "py-6 sm:py-9"
 
   return (
     <div
       data-slot="page-container"
       className={cn(
-        "relative min-h-screen bg-gradient-to-br from-background via-secondary to-background",
+        "workspace-page relative min-h-screen bg-background",
         className,
       )}
       {...props}
     >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),rgba(255,255,255,0))]"
-      />
       <div
         className={cn(
           "relative mx-auto px-4 sm:px-6 lg:px-8",

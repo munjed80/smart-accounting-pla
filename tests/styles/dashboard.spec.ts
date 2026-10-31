@@ -97,7 +97,7 @@ test('overview fits mobile and desktop, renders actual chart bars and supports d
   expect(Math.min(...bars)).toBeGreaterThan(30)
   await page.evaluate(() => document.fonts.ready)
   await page.screenshot({
-    path: testInfo.outputPath('overview.png'),
+    path: testInfo.outputPath('brand-overview.png'),
     fullPage: true,
   })
   const light = await page
@@ -109,7 +109,7 @@ test('overview fits mobile and desktop, renders actual chart bars and supports d
     light,
   )
   await page.screenshot({
-    path: testInfo.outputPath('overview-dark.png'),
+    path: testInfo.outputPath('brand-overview-dark.png'),
     fullPage: true,
   })
   expect(errors).toEqual([])

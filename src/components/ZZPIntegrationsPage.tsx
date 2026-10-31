@@ -583,8 +583,9 @@ function ShopifyConnectDialog({ open, onClose, onSuccess }: { open: boolean; onC
         <DialogHeader>
           <DialogTitle>Shopify verbinden</DialogTitle>
           <DialogDescription>
-            Maak een custom app in je Shopify admin onder Instellingen → Apps → Apps ontwikkelen.
-            Geef de app leesrechten voor bestellingen, klanten en retouren.
+            Gebruik een geldig Admin API-token met read_orders en read_customers.
+            Voor bestellingen ouder dan 60 dagen is ook read_all_orders nodig.
+            Tijdelijke tokens moeten na het verlopen opnieuw worden gekoppeld; deze koppeling vernieuwt ze niet automatisch.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">

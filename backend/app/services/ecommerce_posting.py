@@ -3,6 +3,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from fastapi import HTTPException
 from sqlalchemy import select
 from app.models.administration import Administration
+from app.models.ledger import AccountingPeriod
 from app.models.ecommerce import EcommerceOrder, EcommerceRefund
 from app.repositories.ledger_repository import LedgerRepository
 from app.services.zzp_integrity import require_open_dates
@@ -29,6 +30,17 @@ async def post_mapping(db, mapping):
             reject('Geannuleerde bestellingen kunnen niet als omzet worden geboekt.')
         if (source.total_amount_cents, source.tax_cents, source.currency) != (mapping.net_amount_cents, mapping.tax_cents, mapping.currency):
             reject('De bestelling is gewijzigd. Vernieuw en controleer de gegevens opnieuw.')
+    if mapping.refund_id:
+        source = await db.get(EcommerceRefund, mapping.refund_id)
+        if (source.amount_cents, source.currency) != (mapping.refund_cents, mapping.currency):
+            reject('De restitutie is gewijzigd. Vernieuw en controleer de gegevens opnieuw.')
+    closed = await db.scalar(select(AccountingPeriod.id).where(
+        AccountingPeriod.administration_id == mapping.administration_id,
+        AccountingPeriod.start_date <= mapping.accounting_date,
+        AccountingPeriod.end_date >= mapping.accounting_date,
+        AccountingPeriod.is_closed.is_(True)).limit(1))
+    if closed:
+        reject('Deze boekingsperiode is afgesloten.')
     gross = abs(mapping.net_amount_cents)
     tax = mapping.vat_amount_cents
     if mapping.record_type == 'refund':

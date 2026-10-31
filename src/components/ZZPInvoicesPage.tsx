@@ -249,7 +249,7 @@ const StatsCard = ({
 
 // Loading skeleton for stats
 const StatsLoadingSkeleton = () => (
-  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-6 mb-6">
     {[1, 2, 3, 4].map((i) => (
       <Card key={i} className="bg-card/80 backdrop-blur-sm">
         <CardContent className="p-4 sm:p-5">
@@ -2491,7 +2491,7 @@ const ZZPInvoicesPageContent = () => {
         {showLoading ? (
           <StatsLoadingSkeleton />
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-6 mb-6" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
             <StatsCard
               title={t('zzpInvoices.statsTotal')}
               value={stats.total}

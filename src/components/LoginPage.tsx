@@ -134,7 +134,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
     setResendFeedback('')
     try {
       await resendVerification(email)
-      setResendFeedback('Als je account nog niet is bevestigd, ontvang je een nieuwe verificatielink. Controleer ook je spammap.')
+      setResendFeedback('Je verzendverzoek is geaccepteerd. Als je account nog niet is bevestigd, ontvang je een nieuwe verificatielink. Controleer ook je spammap.')
       // Start cooldown after successful resend
       startCooldownTimer(60)
     } catch (error) {

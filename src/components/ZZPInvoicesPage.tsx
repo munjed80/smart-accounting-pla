@@ -1306,11 +1306,18 @@ const InvoiceCard = ({
             {canEdit ? <PencilSimple size={16} /> : <Eye size={16} />}
             <span className="hidden sm:inline">{canEdit ? t('common.edit') : t('common.view')}</span>
           </Button>
+          <Button variant="ghost" size="sm" onClick={onDownloadPdf} disabled={isDownloading}
+            aria-label={`${t('zzpInvoices.downloadPdf')} ${invoice.invoice_number}`}
+            title={t('zzpInvoices.downloadPdf')} className="h-9 w-9 p-0">
+            {isDownloading ? <SpinnerGap size={16} className="animate-spin" /> : <Download size={16} />}
+          </Button>
           {(invoice.status === 'draft' || invoice.status === 'cancelled') && (
             <Button
               variant="ghost"
               size="sm"
               onClick={onDelete}
+              aria-label={t('common.delete')}
+              title={t('common.delete')}
               className="h-9 px-3 gap-2 text-destructive hover:text-destructive"
             >
               <TrashSimple size={16} />
@@ -1562,7 +1569,6 @@ const ZZPInvoicesPageContent = () => {
   
   // Status change state - tracks which invoice is updating status
   const [updatingStatusInvoiceId, setUpdatingStatusInvoiceId] = useState<string | null>(null)
-  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false)
   
   // Pre-selected invoice ID from URL
   const [preSelectedInvoiceId, setPreSelectedInvoiceId] = useState<string | null>(null)
@@ -2053,48 +2059,18 @@ const ZZPInvoicesPageContent = () => {
 
   useQuickCreate('new', openNewForm, !isLoading && !!user?.id)
 
-  // Generate invoice draft with sensible defaults and open it directly
-  const handleGenerateInvoice = useCallback(async () => {
+  // Prepare an unsaved form. Only an explicit save may create a database invoice.
+  const handleGenerateInvoice = useCallback(() => {
     if (activeCustomers.length === 0) {
       toast.error(t('zzpInvoices.noActiveCustomers'))
       return
     }
-
-    setIsGeneratingInvoice(true)
-    try {
-      const selectedCustomer = [...activeCustomers].sort((a, b) => a.name.localeCompare(b.name))[0]
-      const issueDate = new Date()
-      const dueDate = new Date(issueDate)
-      dueDate.setDate(dueDate.getDate() + 14)
-
-      const generatedInvoice = await zzpApi.invoices.create({
-        customer_id: selectedCustomer.id,
-        issue_date: extractDatePart(issueDate.toISOString()),
-        due_date: extractDatePart(dueDate.toISOString()),
-        notes: t('zzpInvoices.generatedInvoiceNote'),
-        lines: [
-          {
-            description: t('zzpInvoices.generatedLineDescription'),
-            quantity: 1,
-            unit_price_cents: 10000,
-            vat_rate: 21,
-          },
-        ],
-      })
-
-      setViewingInvoice(undefined)
-      setEditingInvoice(generatedInvoice)
-      setIsFormOpen(true)
-      toast.success(t('zzpInvoices.invoiceGenerated'))
-      await loadData()
-      setMonthlyRefreshKey(k => k + 1)
-    } catch (err) {
-      console.error('Failed to generate invoice:', err)
-      toast.error(parseApiError(err))
-    } finally {
-      setIsGeneratingInvoice(false)
-    }
-  }, [activeCustomers, loadData])
+    const customer = [...activeCustomers].sort((a, b) => a.name.localeCompare(b.name))[0]
+    setDialogCustomerId(customer.id)
+    setEditingInvoice(undefined)
+    setViewingInvoice(undefined)
+    setIsFormOpen(true)
+  }, [activeCustomers])
 
   // Open form for editing (only for draft invoices)
   const openEditForm = useCallback((invoice: ZZPInvoice) => {
@@ -2118,7 +2094,7 @@ const ZZPInvoicesPageContent = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold  text-foreground mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
               <FileText size={28} className="text-primary sm:hidden" weight="duotone" />
               <FileText size={40} className="text-primary hidden sm:block" weight="duotone" />
               {t('zzpInvoices.title')}
@@ -2132,13 +2108,9 @@ const ZZPInvoicesPageContent = () => {
               onClick={handleGenerateInvoice}
               variant="secondary"
               className="gap-2 h-10 sm:h-11 w-full sm:w-auto"
-              disabled={!hasActiveCustomers || isGeneratingInvoice}
+              disabled={!hasActiveCustomers}
             >
-              {isGeneratingInvoice ? (
-                <SpinnerGap size={18} className="animate-spin" />
-              ) : (
-                <Receipt size={18} weight="bold" />
-              )}
+              <Receipt size={18} weight="bold" />
               {t('zzpInvoices.generateInvoice')}
             </Button>
             <Button onClick={openNewForm} className="gap-2 h-10 sm:h-11 w-full sm:w-auto" disabled={!hasActiveCustomers} data-onboarding="new-invoice-btn">
@@ -2154,125 +2126,6 @@ const ZZPInvoicesPageContent = () => {
             <NoCustomersWarning />
           </div>
         )}
-
-        {/* Stats Cards */}
-        {showLoading ? (
-          <StatsLoadingSkeleton />
-        ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
-            <StatsCard 
-              title={t('zzpInvoices.statsTotal')} 
-              value={stats.total}
-              subtitle={`${formatAmountEUR(stats.totalAmount)}`}
-              icon={Receipt}
-              className="border-primary/20"
-            />
-            <StatsCard 
-              title={t('zzpInvoices.statsOpen')} 
-              value={stats.sent + stats.overdue}
-              subtitle={`${formatAmountEUR(stats.openAmount)}`}
-              icon={Hourglass}
-              className="border-blue-500/20"
-            />
-            <StatsCard 
-              title={t('zzpInvoices.statsPaid')} 
-              value={stats.paid}
-              subtitle={`${formatAmountEUR(stats.paidAmount)}`}
-              icon={Wallet}
-              className="border-green-500/20"
-            />
-            <StatsCard 
-              title={t('zzpInvoices.statsDraft')} 
-              value={stats.draft}
-              subtitle={t('zzpInvoices.statsDraftSubtitle')}
-              icon={Clock}
-              className="border-gray-500/20"
-            />
-          </div>
-        )}
-
-        {/* Maandoverzicht facturen */}
-        <div className="mb-6">
-          <Card className="bg-card/80 backdrop-blur-sm">
-            <CardHeader className="pb-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <CalendarBlank size={18} weight="duotone" className="text-primary" />
-                    {t('zzpInvoices.monthlyOverviewTitle')}
-                  </CardTitle>
-                  <CardDescription className="text-xs mt-0.5">
-                    {t('zzpInvoices.monthlyOverviewDescription')}
-                  </CardDescription>
-                </div>
-                <div className="flex gap-1.5">
-                  <SegmentedControl<MonthlyInvoicePeriod>
-                    value={monthlyPeriod}
-                    onChange={setMonthlyPeriod}
-                    ariaLabel={t('zzpInvoices.monthlyOverviewTitle')}
-                    options={[
-                      { value: 'this_month', label: t('zzpInvoices.monthlyPeriodThisMonth') },
-                      { value: 'last_6_months', label: t('zzpInvoices.monthlyPeriodLast6Months') },
-                      { value: 'this_year', label: t('zzpInvoices.monthlyPeriodThisYear') },
-                    ]}
-                  />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {isLoadingMonthly ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="h-9 bg-muted/30 rounded-md animate-pulse" />
-                  ))}
-                </div>
-              ) : monthlyData.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-3">{t('zzpInvoices.monthlyNoData')}</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-xs font-medium text-muted-foreground uppercase tracking-wide border-b border-border/30">
-                        <th className="text-left pb-2 font-medium">{t('zzpInvoices.monthlyColumnMonth')}</th>
-                        <th className="text-right pb-2 font-medium">{t('zzpInvoices.monthlyColumnSent')}</th>
-                        <th className="text-right pb-2 font-medium">{t('zzpInvoices.monthlyColumnPaid')}</th>
-                        <th className="text-right pb-2 font-medium">{t('zzpInvoices.monthlyColumnOpen')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...monthlyData].reverse().map((m: MonthlyInvoiceSummary) => (
-                        <tr
-                          key={m.month_key}
-                          className="border-b border-border/10 last:border-0 hover:bg-muted/20 transition-colors"
-                        >
-                          <td className="py-2 pr-4 font-medium">{m.month_label}</td>
-                          <td className="py-2 text-right text-muted-foreground tabular-nums">
-                            <span className="block">{formatAmountEUR(m.sent_total)}</span>
-                            {m.sent_count > 0 && (
-                              <span className="text-xs text-muted-foreground/60">
-                                {m.sent_count} {m.sent_count === 1 ? 'factuur' : 'facturen'}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-2 text-right tabular-nums">
-                            <span className={`block ${m.paid_total > 0 ? 'text-green-500' : 'text-muted-foreground'}`}>
-                              {formatAmountEUR(m.paid_total)}
-                            </span>
-                          </td>
-                          <td className="py-2 text-right tabular-nums">
-                            <span className={`block ${m.open_total > 0 ? 'text-amber-500' : 'text-muted-foreground'}`}>
-                              {formatAmountEUR(m.open_total)}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Show loading, error, empty state or content */}
         {showLoading ? (
@@ -2391,7 +2244,7 @@ const ZZPInvoicesPageContent = () => {
               </div>
 
               {/* Desktop: Table */}
-              <div className="hidden sm:block rounded-lg border border-border/50 overflow-hidden">
+              <div className="hidden sm:block rounded-lg border border-border/50 overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-secondary/50 hover:bg-secondary/50">
@@ -2475,6 +2328,12 @@ const ZZPInvoicesPageContent = () => {
                                 >
                                   {canEdit ? <PencilSimple size={16} /> : <Eye size={16} />}
                                   <span className="sr-only">{canEdit ? t('common.edit') : t('common.view')}</span>
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleDownloadPdf(invoice)}
+                                  disabled={downloadingInvoiceId === invoice.id}
+                                  aria-label={`${t('zzpInvoices.downloadPdf')} ${invoice.invoice_number}`}
+                                  title={t('zzpInvoices.downloadPdf')} className="h-8 w-8 p-0">
+                                  {downloadingInvoiceId === invoice.id ? <SpinnerGap size={16} className="animate-spin" /> : <Download size={16} />}
                                 </Button>
                                 {(invoice.status === 'draft' || invoice.status === 'cancelled') && (
                                   <Button
@@ -2623,6 +2482,126 @@ const ZZPInvoicesPageContent = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Stats Cards */}
+        {showLoading ? (
+          <StatsLoadingSkeleton />
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6" style={{ opacity: 1, transition: 'opacity 200ms ease-in-out' }}>
+            <StatsCard
+              title={t('zzpInvoices.statsTotal')}
+              value={stats.total}
+              subtitle={`${formatAmountEUR(stats.totalAmount)}`}
+              icon={Receipt}
+              className="border-primary/20"
+            />
+            <StatsCard
+              title={t('zzpInvoices.statsOpen')}
+              value={stats.sent + stats.overdue}
+              subtitle={`${formatAmountEUR(stats.openAmount)}`}
+              icon={Hourglass}
+              className="border-blue-500/20"
+            />
+            <StatsCard
+              title={t('zzpInvoices.statsPaid')}
+              value={stats.paid}
+              subtitle={`${formatAmountEUR(stats.paidAmount)}`}
+              icon={Wallet}
+              className="border-green-500/20"
+            />
+            <StatsCard
+              title={t('zzpInvoices.statsDraft')}
+              value={stats.draft}
+              subtitle={t('zzpInvoices.statsDraftSubtitle')}
+              icon={Clock}
+              className="border-gray-500/20"
+            />
+          </div>
+        )}
+
+        {/* Maandoverzicht facturen */}
+        <div className="mb-6">
+          <Card className="bg-card/80 backdrop-blur-sm">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <CalendarBlank size={18} weight="duotone" className="text-primary" />
+                    {t('zzpInvoices.monthlyOverviewTitle')}
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    {t('zzpInvoices.monthlyOverviewDescription')}
+                  </CardDescription>
+                </div>
+                <div className="flex gap-1.5">
+                  <SegmentedControl<MonthlyInvoicePeriod>
+                    value={monthlyPeriod}
+                    onChange={setMonthlyPeriod}
+                    ariaLabel={t('zzpInvoices.monthlyOverviewTitle')}
+                    options={[
+                      { value: 'this_month', label: t('zzpInvoices.monthlyPeriodThisMonth') },
+                      { value: 'last_6_months', label: t('zzpInvoices.monthlyPeriodLast6Months') },
+                      { value: 'this_year', label: t('zzpInvoices.monthlyPeriodThisYear') },
+                    ]}
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {isLoadingMonthly ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="h-9 bg-muted/30 rounded-md animate-pulse" />
+                  ))}
+                </div>
+              ) : monthlyData.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-3">{t('zzpInvoices.monthlyNoData')}</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[480px] text-sm">
+                    <thead>
+                      <tr className="text-xs font-medium text-muted-foreground uppercase tracking-wide border-b border-border/30">
+                        <th className="text-left pb-2 font-medium">{t('zzpInvoices.monthlyColumnMonth')}</th>
+                        <th className="text-right pl-4 pb-2 font-medium">{t('zzpInvoices.monthlyColumnSent')}</th>
+                        <th className="text-right pl-4 pb-2 font-medium">{t('zzpInvoices.monthlyColumnPaid')}</th>
+                        <th className="text-right pl-4 pb-2 font-medium">{t('zzpInvoices.monthlyColumnOpen')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...monthlyData].reverse().map((m: MonthlyInvoiceSummary) => (
+                        <tr
+                          key={m.month_key}
+                          className="border-b border-border/10 last:border-0 hover:bg-muted/20 transition-colors"
+                        >
+                          <td className="py-2 pr-4 font-medium">{m.month_label}</td>
+                          <td className="py-2 text-right text-muted-foreground tabular-nums">
+                            <span className="block">{formatAmountEUR(m.sent_total)}</span>
+                            {m.sent_count > 0 && (
+                              <span className="text-xs text-muted-foreground/60">
+                                {m.sent_count} {m.sent_count === 1 ? 'factuur' : 'facturen'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 text-right tabular-nums">
+                            <span className={`block ${m.paid_total > 0 ? 'text-green-500' : 'text-muted-foreground'}`}>
+                              {formatAmountEUR(m.paid_total)}
+                            </span>
+                          </td>
+                          <td className="py-2 text-right tabular-nums">
+                            <span className={`block ${m.open_total > 0 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                              {formatAmountEUR(m.open_total)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
 
         {debugEnabled && (
           <Card className="mt-4 border-dashed border-amber-500/40 bg-amber-50/40 dark:bg-amber-950/10">

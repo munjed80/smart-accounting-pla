@@ -7,7 +7,7 @@ import * as AuthContext from '../lib/AuthContext'
 
 vi.mock('../lib/api', () => ({
   zzpApi: {
-    invoices: { list: vi.fn(), updateStatus: vi.fn(), get: vi.fn(), preview: vi.fn(), downloadPdf: vi.fn(), suggestPrice: vi.fn().mockResolvedValue({ suggested_price_euros: null }) },
+    invoices: { create: vi.fn(), list: vi.fn(), updateStatus: vi.fn(), get: vi.fn(), preview: vi.fn(), downloadPdf: vi.fn(), suggestPrice: vi.fn().mockResolvedValue({ suggested_price_euros: null }) },
     customers: { list: vi.fn() },
     profile: { get: vi.fn() },
   },
@@ -111,4 +111,22 @@ it('shows a download failure without announcing success', async () => {
   fireEvent.click(screen.getByRole('button',{name:'PDF downloaden'}))
   expect(await screen.findByText('PDF service unavailable')).toBeInTheDocument()
   expect(toast.success).not.toHaveBeenCalled()
+})
+
+
+it('prepares an unsaved invoice and cancelling never calls create', async () => {
+  vi.mocked(AuthContext.useAuth).mockReturnValue({ user: { id: 'u1', role: 'zzp' } } as any)
+  vi.mocked(api.zzpApi.invoices.list).mockResolvedValue({ invoices: [], total: 0 } as any)
+  vi.mocked(api.zzpApi.customers.list).mockResolvedValue({ customers: [customer], total: 1 } as any)
+  vi.mocked(api.zzpApi.profile.get).mockResolvedValue({} as any)
+  render(<ZZPInvoicesPage />)
+  const generate = await screen.findByRole('button', { name: 'zzpInvoices.generateInvoice' })
+  await waitFor(() => expect(generate).not.toBeDisabled())
+  fireEvent.click(generate)
+  const dialog = await screen.findByRole('dialog')
+  expect(api.zzpApi.invoices.create).not.toHaveBeenCalled()
+  expect(within(dialog).getAllByPlaceholderText('0,00').every(input => (input as HTMLInputElement).value === '')).toBe(true)
+  fireEvent.click(within(dialog).getByRole('button', { name: 'common.cancel' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  expect(api.zzpApi.invoices.create).not.toHaveBeenCalled()
 })

@@ -1300,7 +1300,7 @@ const ZZPOffertesPageContent = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold  text-foreground mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
               <FileText size={28} className="text-primary sm:hidden" weight="duotone" />
               <FileText size={40} className="text-primary hidden sm:block" weight="duotone" />
               Offertes

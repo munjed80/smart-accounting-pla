@@ -157,7 +157,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       setIsLoading(true)
       await authApi.resendVerification(email)
-      toast.success('Als je account nog niet is bevestigd, ontvang je een nieuwe verificatielink.')
+      toast.success('Verificatie-e-mail aangevraagd. Controleer je inbox en spammap.')
     } catch (error) {
       const message = getErrorMessage(error)
       toast.error('Verificatielink verzenden niet gelukt: ' + message)

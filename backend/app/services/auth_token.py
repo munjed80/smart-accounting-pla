@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -41,6 +41,7 @@ async def create_auth_token(
     token_type: TokenType,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
+    invalidate_existing: bool = True,
 ) -> str:
     """
     Create a new authentication token.
@@ -62,16 +63,17 @@ async def create_auth_token(
     if not isinstance(token_type, TokenType):
         raise TypeError(f"token_type must be a TokenType enum member, got {type(token_type)}")
     
-    # Invalidate any existing unused tokens of the same type for this user
-    await db.execute(
-        update(AuthToken)
-        .where(
-            AuthToken.user_id == user_id,
-            AuthToken.token_type == token_type,
-            AuthToken.used_at.is_(None),
+    if invalidate_existing:
+        # Invalidate any existing unused tokens of the same type for this user
+        await db.execute(
+            update(AuthToken)
+            .where(
+                AuthToken.user_id == user_id,
+                AuthToken.token_type == token_type,
+                AuthToken.used_at.is_(None),
+            )
+            .values(used_at=datetime.now(timezone.utc))  # Mark as used
         )
-        .values(used_at=datetime.now(timezone.utc))  # Mark as used
-    )
     
     # Generate new token
     raw_token = generate_token()
@@ -208,8 +210,13 @@ async def validate_and_consume_token(
 
 
 async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
-    """Get a user by email address."""
-    result = await db.execute(
-        select(User).where(User.email == email)
-    )
-    return result.scalar_one_or_none()
+    """Preserve exact legacy identities, then accept a unique case-insensitive match."""
+    address = email.strip()
+    exact = (await db.execute(select(User).where(User.email == address))).scalar_one_or_none()
+    if exact:
+        return exact
+    matches = (await db.execute(select(User).where(func.lower(User.email) == address.lower()).limit(2))).scalars().all()
+    if len(matches) > 1:
+        logger.warning("Ambiguous legacy email casing; refusing an account guess")
+        return None
+    return matches[0] if matches else None

@@ -131,7 +131,7 @@ Hulp nodig? Neem contact op via {settings.SUPPORT_EMAIL}
         """
         
         try:
-            self.client.Emails.send({
+            result = self.client.Emails.send({
                 "from": f"ZZPers Hub <{settings.RESEND_FROM_EMAIL}>",
                 "to": [to_email],
                 "subject": f"Bevestig je e-mailadres - {brand_text}",
@@ -139,8 +139,12 @@ Hulp nodig? Neem contact op via {settings.SUPPORT_EMAIL}
                 "text": text_content,
             })
             
+            message_id = result.get("id") if isinstance(result, dict) else None
+            if not message_id:
+                logger.error("verification_delivery_failed: Resend did not return a message ID")
+                return False
             logger.info(
-                f"Verification email sent",
+                "Verification email accepted by Resend: %s", message_id,
                 extra={
                     "event": "email_verification_sent",
                     "to_email": to_email,

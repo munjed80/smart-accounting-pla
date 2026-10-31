@@ -403,6 +403,8 @@ async def delete_integration(
 ):
     """Completely remove an integration and all its imported data."""
     administration = await _require_pro_plan(current_user, db)
+    # Share the posting lock so deletion cannot race a new ledger entry.
+    await db.execute(select(Administration.id).where(Administration.id == administration.id).with_for_update())
     conn = await _get_connection(connection_id, administration.id, db)
 
     posted = await db.scalar(select(EcommerceMapping.id).where(EcommerceMapping.connection_id == conn.id, EcommerceMapping.posted_entity_id.is_not(None)).limit(1))

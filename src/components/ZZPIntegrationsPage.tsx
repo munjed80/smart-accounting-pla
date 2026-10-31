@@ -332,9 +332,11 @@ export const ZZPIntegrationsPage = () => {
           description: result.error || undefined,
         })
       }
-      queryClient.invalidateQueries({ queryKey: ['ecommerce-connections'] })
+      for (const key of ['ecommerce-connections', 'ecommerce-orders', 'ecommerce-sync-logs', 'sales-review-summary', 'sales-review-mappings']) {
+        void queryClient.invalidateQueries({ queryKey: [key] })
+      }
     } catch (err: any) {
-      toast.error('Synchronisatie mislukt', {
+      toast.error('Synchronisatie niet bevestigd', {
         description: err?.message || 'Onbekende fout',
       })
     }

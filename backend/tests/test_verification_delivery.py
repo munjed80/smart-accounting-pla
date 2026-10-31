@@ -71,7 +71,7 @@ async def test_unknown_email_keeps_generic_success_response(async_client, unveri
     monkeypatch.setattr(auth.email_service, 'send_verification_email', send)
     response = await async_client.post('/api/v1/auth/resend-verification', json={'email':'unknown@example.com'})
     assert response.status_code == 200
-    assert 'If an account' in response.json()['message']
+    assert 'Als er een' in response.json()['message']
     send.assert_not_called()
 
 
@@ -95,4 +95,4 @@ async def test_expired_verification_token_is_rejected_after_database_roundtrip(a
     await db_session.refresh(record)
     response = await async_client.get('/api/v1/auth/verify-email', params={'token':raw})
     assert response.status_code == 400
-    assert 'expired' in response.json()['detail'].lower()
+    assert 'verlopen' in response.json()['detail'].lower()

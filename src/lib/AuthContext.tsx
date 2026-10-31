@@ -58,7 +58,7 @@ export const getEmailNotVerifiedMessage = (error: AxiosError | ApiHttpError): { 
   }
   const detail = (error.response?.data as { detail?: { message?: string; hint?: string } } | undefined)?.detail
   return {
-    message: detail?.message || 'Please verify your email before logging in',
+    message: detail?.message || 'Bevestig je e-mailadres voordat je inlogt.',
     hint: detail?.hint || 'Check your inbox for a verification email or request a new one',
   }
 }
@@ -171,10 +171,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       setIsLoading(true)
       await authApi.forgotPassword(email)
-      toast.success('If an account with this email exists, a password reset email has been sent.')
+      toast.success('Als er een account met dit e-mailadres bestaat, ontvang je een e-mail om je wachtwoord opnieuw in te stellen.')
     } catch (error) {
       const message = getErrorMessage(error)
-      toast.error('Failed to send reset email: ' + message)
+      toast.error('De resetmail kon niet worden verstuurd: ' + message)
       throw error
     } finally {
       setIsLoading(false)
@@ -185,10 +185,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       setIsLoading(true)
       await authApi.resetPassword({ token, new_password: newPassword })
-      toast.success('Password reset successfully! You can now log in.')
+      toast.success('Je wachtwoord is gewijzigd. Je kunt nu inloggen.')
     } catch (error) {
       const message = getErrorMessage(error)
-      toast.error('Failed to reset password: ' + message)
+      toast.error('Je wachtwoord kon niet worden gewijzigd: ' + message)
       throw error
     } finally {
       setIsLoading(false)
@@ -200,12 +200,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setIsLoading(true)
       const response = await authApi.verifyEmail(token)
       if (response.verified) {
-        toast.success(response.message || 'Email verified successfully!')
+        toast.success(response.message || 'Je e-mailadres is bevestigd.')
       }
       return response
     } catch (error) {
       const message = getErrorMessage(error)
-      toast.error('Failed to verify email: ' + message)
+      toast.error('Je e-mailadres kon niet worden bevestigd: ' + message)
       throw error
     } finally {
       setIsLoading(false)
@@ -235,7 +235,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     
     setUser(null)
     setIsLoading(false)
-    toast.success('Logged out successfully')
+    toast.success('Je bent uitgelogd.')
   }, [])
 
   const hasPermission = useCallback((requiredRole: 'zzp' | 'accountant' | 'admin' | 'super_admin'): boolean => {

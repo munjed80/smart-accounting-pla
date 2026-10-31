@@ -29,22 +29,41 @@ def _auth_email(*, brand: str, title: str, greeting: str, body: str,
                 action: str, url: str, expiry: int, notice: str) -> str:
     """Email-safe shared layout with inline styles and a plain-link fallback."""
     safe_url = html.escape(url, quote=True)
-    support = html.escape(settings.SUPPORT_EMAIL, quote=True)
-    return f'''<!DOCTYPE html>
-<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:24px 12px;background:#f7f6f0;color:#192e2b;font-family:Arial,Helvetica,sans-serif;line-height:1.65;">
-<table role="presentation" style="width:100%;max-width:560px;margin:0 auto;border-collapse:collapse;"><tr><td style="padding:20px 0;">
-<span style="display:inline-block;background:#245c4e;color:#ffffff;border-radius:9px;padding:2px 12px;font-size:30px;font-weight:bold;vertical-align:middle;">z<span style="color:#d9e8aa;">.</span></span>
-<span style="font-size:23px;font-weight:bold;margin-left:10px;vertical-align:middle;">{brand}</span>
-</td></tr><tr><td style="background:#ffffff;border:1px solid #dcded5;border-radius:12px;padding:28px;">
-<h1 style="margin:0 0 24px;font-size:26px;line-height:1.25;color:#192e2b;">{title}</h1>
-<p>{html.escape(greeting)}</p><p>{body}</p>
-<p style="margin:28px 0;"><a href="{safe_url}" style="display:inline-block;background:#245c4e;color:#ffffff;padding:13px 22px;border-radius:7px;font-weight:bold;text-decoration:none;">{action}</a></p>
-<p style="color:#60716b;font-size:14px;">Deze link is {expiry} uur geldig.</p>
-<p style="color:#60716b;font-size:14px;">{notice}</p>
+    content = f"""<p>{html.escape(greeting)}</p><p>{body}</p>
+<table role="presentation" cellspacing="0" cellpadding="0"><tr><td bgcolor="#245c4e" style="border-radius:8px;">
+<a href="{safe_url}" style="display:inline-block;padding:14px 22px;color:#ffffff;font-size:16px;font-weight:bold;text-decoration:none;">{action}</a>
+</td></tr></table>
+<p style="font-size:14px;">Deze link is {expiry} uur geldig.</p><p style="font-size:14px;">{notice}</p>
 <hr style="border:0;border-top:1px solid #dcded5;margin:24px 0;">
-<p style="font-size:12px;color:#60716b;">Werkt de knop niet? Open deze link:<br><a href="{safe_url}" style="color:#245c4e;word-break:break-all;">{safe_url}</a></p>
-</td></tr><tr><td style="padding:20px 0;font-size:12px;color:#60716b;">{brand} · Je administratie op één plek.<br>Hulp nodig? <a href="mailto:{support}" style="color:#245c4e;">{support}</a></td></tr></table></body></html>'''
+<p style="font-size:12px;overflow-wrap:anywhere;word-break:break-all;">Werkt de knop niet? Kopieer deze link naar je browser:<br>
+<a href="{safe_url}" style="color:#245c4e;">{safe_url}</a></p>"""
+    return render_email(title=title, content=content, preheader=action, support=settings.SUPPORT_EMAIL)
+
+
+def render_email(*, title: str, content: str, preheader: str, support: str) -> str:
+    """Shared Dutch layout. Callers must escape dynamic values in content."""
+    title, preheader, support = (html.escape(v, quote=True) for v in (title, preheader, support))
+    return f'''<!DOCTYPE html>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">
+<title>{title} | ZZPers Hub</title>
+<style>
+body,table,td,a {{ -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }}
+p {{ margin:0 0 20px; }}
+@media (max-width:480px) {{ .email-card {{ padding:24px 20px !important; }} }}
+@media (prefers-color-scheme:dark) {{ .email-bg {{ background:#172b26 !important; }} .email-card {{ background:#213b33 !important;color:#f2f4ec !important; }} .email-footer {{ color:#d4dfd8 !important; }} }}
+</style></head>
+<body class="email-bg" style="margin:0;padding:0;background:#f7f6f0;font-family:Arial,Helvetica,sans-serif;">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">{preheader}</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;">
+<tr><td bgcolor="#245c4e" style="padding:22px 28px;border-radius:12px 12px 0 0;color:#ffffff;font-size:22px;font-weight:bold;">Z<span style="color:#d9e8aa;">.</span> &nbsp; ZZPers Hub</td></tr>
+<tr><td class="email-card" bgcolor="#ffffff" style="padding:28px;border:1px solid #dcded5;border-top:0;border-radius:0 0 12px 12px;color:#192e2b;font-size:16px;line-height:1.6;">
+<h1 style="margin:0 0 24px;font-size:24px;line-height:1.3;font-weight:600;">{title}</h1>{content}</td></tr>
+<tr><td class="email-footer" style="padding:20px 12px;color:#60716b;font-size:12px;line-height:1.6;text-align:center;">ZZPers Hub · Je administratie op één plek.<br>
+Hulp nodig? <a href="mailto:{support}" style="color:inherit;">{support}</a></td></tr>
+</table></td></tr></table></body></html>'''
+
 
 
 class EmailService:
@@ -104,8 +123,8 @@ class EmailService:
         
         verify_url = self._build_verify_url(token)
         greeting = f"Hallo {user_name}," if user_name else "Hallo,"
-        brand_html = _safe_brand(settings.APP_NAME)
-        brand_text = " ".join((settings.APP_NAME or "ZZPers Hub").split())
+        brand_html = _safe_brand("ZZPers Hub")
+        brand_text = "ZZPers Hub"
         
         html_content = _auth_email(
             brand=brand_html, title="Welkom bij ZZPers Hub", greeting=greeting,
@@ -134,6 +153,7 @@ Hulp nodig? Neem contact op via {settings.SUPPORT_EMAIL}
             result = self.client.Emails.send({
                 "from": f"ZZPers Hub <{settings.RESEND_FROM_EMAIL}>",
                 "to": [to_email],
+                "reply_to": settings.SUPPORT_EMAIL,
                 "subject": f"Bevestig je e-mailadres - {brand_text}",
                 "html": html_content,
                 "text": text_content,
@@ -193,8 +213,8 @@ Hulp nodig? Neem contact op via {settings.SUPPORT_EMAIL}
         
         reset_url = self._build_reset_url(token)
         greeting = f"Hallo {user_name}," if user_name else "Hallo,"
-        brand_html = _safe_brand(settings.APP_NAME)
-        brand_text = " ".join((settings.APP_NAME or "ZZPers Hub").split())
+        brand_html = _safe_brand("ZZPers Hub")
+        brand_text = "ZZPers Hub"
         
         html_content = _auth_email(
             brand=brand_html, title="Een nieuw wachtwoord kiezen", greeting=greeting,
@@ -219,16 +239,20 @@ Hulp nodig? Neem contact op via {settings.SUPPORT_EMAIL}
         """
         
         try:
-            self.client.Emails.send({
+            result = self.client.Emails.send({
                 "from": f"ZZPers Hub <{settings.RESEND_FROM_EMAIL}>",
                 "to": [to_email],
+                "reply_to": settings.SUPPORT_EMAIL,
                 "subject": f"Stel je wachtwoord opnieuw in - {brand_text}",
                 "html": html_content,
                 "text": text_content,
             })
             
+            if not isinstance(result, dict) or not result.get("id"):
+                logger.error("password_reset_delivery_failed: Resend did not return a message ID")
+                return False
             logger.info(
-                f"Password reset email sent",
+                "Password reset email accepted by Resend",
                 extra={
                     "event": "password_reset_sent",
                     "to_email": to_email,

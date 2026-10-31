@@ -16,3 +16,13 @@ it('preserves the stored receipt reference when saving scanned expense data', as
   await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ document_id: 'document-a', amount_cents: 1000 })))
   expect(screen.getByRole('button', { name: 'Bonnetje downloaden' })).toBeVisible()
 })
+
+it('sends explicit nulls when optional expense fields are cleared', async () => {
+  const save = vi.fn().mockResolvedValue(undefined)
+  const data = { vendor: 'Receipt shop', description: 'Old description', notes: 'Old note', amount_cents: 1000, vat_rate: 21, expense_date: '2026-10-26', category: 'overig', document_id: 'document-a' }
+  render(<ExpenseFormDialog open onOpenChange={vi.fn()} categories={['overig']} scannedData={data} onSave={save} />)
+  fireEvent.change(document.getElementById('expense-description')!, { target: { value: '' } })
+  fireEvent.change(document.getElementById('expense-notes')!, { target: { value: '' } })
+  fireEvent.click(await screen.findByRole('button', { name: 'Uitgave opslaan' }))
+  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ description: null, notes: null, document_id: 'document-a' })))
+})

@@ -79,7 +79,6 @@ export const SettingsPage = () => {
   const { user } = useAuth()
   const [administrations, setAdministrations] = useState<Administration[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -275,14 +274,6 @@ export const SettingsPage = () => {
     }
   }, [user?.id, user?.role])
 
-  const handleSaveNotifications = async () => {
-    setIsSaving(true)
-    // Simulate save - in full implementation this would call an API
-    await new Promise(resolve => setTimeout(resolve, 500))
-    toast.success(t('settings.preferencesSaved'))
-    setIsSaving(false)
-  }
-  
   const handleSaveBusinessProfile = async () => {
     if (!user?.id) return
     
@@ -295,7 +286,13 @@ export const SettingsPage = () => {
     setIsSavingProfile(true)
     
     try {
-      const saved = await zzpApi.profile.upsert(profileForm)
+      const payload = { ...profileForm }
+      for (const key of Object.keys(payload) as (keyof ZZPBusinessProfileCreate)[]) {
+        const value = payload[key]
+        if (typeof value === 'string') Object.assign(payload, { [key]: value.trim() })
+      }
+      const saved = await zzpApi.profile.upsert(payload)
+      setProfileForm(payload)
       setBusinessProfile(saved)
       toast.success(t('settings.businessProfileSaved'))
       // Emit onboarding event so the tour can auto-advance
@@ -1000,7 +997,7 @@ export const SettingsPage = () => {
                 {t('settings.notificationPreferences')}
               </CardTitle>
               <CardDescription>
-                {t('settings.notificationDescription')}
+                Automatische e-mailvoorkeuren zijn nog niet beschikbaar. Pushmeldingen kun je hieronder beheren.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -1014,6 +1011,7 @@ export const SettingsPage = () => {
                   </div>
                   <Switch
                     id="emailDigest"
+                    disabled
                     checked={notifications.emailDigest}
                     onCheckedChange={(checked) => 
                       setNotifications(prev => ({ ...prev, emailDigest: checked }))
@@ -1032,6 +1030,7 @@ export const SettingsPage = () => {
                   </div>
                   <Switch
                     id="transactionAlerts"
+                    disabled
                     checked={notifications.transactionAlerts}
                     onCheckedChange={(checked) => 
                       setNotifications(prev => ({ ...prev, transactionAlerts: checked }))
@@ -1050,6 +1049,7 @@ export const SettingsPage = () => {
                   </div>
                   <Switch
                     id="vatReminders"
+                    disabled
                     checked={notifications.vatReminders}
                     onCheckedChange={(checked) => 
                       setNotifications(prev => ({ ...prev, vatReminders: checked }))
@@ -1068,6 +1068,7 @@ export const SettingsPage = () => {
                   </div>
                   <Switch
                     id="documentProcessed"
+                    disabled
                     checked={notifications.documentProcessed}
                     onCheckedChange={(checked) => 
                       setNotifications(prev => ({ ...prev, documentProcessed: checked }))
@@ -1107,8 +1108,7 @@ export const SettingsPage = () => {
               </div>
 
               <div className="flex justify-end pt-4">
-                <Button onClick={handleSaveNotifications} disabled={isSaving}>
-                  {isSaving && <ArrowsClockwise size={18} className="mr-2 animate-spin" />}
+                <Button disabled title="Binnenkort beschikbaar">
                   {t('settings.savePreferences')}
                 </Button>
               </div>

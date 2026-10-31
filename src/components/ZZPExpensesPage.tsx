@@ -308,14 +308,16 @@ export const ExpenseFormDialog = ({
     try {
       await onSave({
         vendor: vendor.trim(),
-        description: description.trim() || undefined,
+        description: description.trim() || null,
         expense_date: expenseDate,
         amount_cents: amountCents,
         vat_rate: vatRate,
         category,
-        notes: notes.trim() || undefined,
+        notes: notes.trim() || null,
         document_id: expense?.document_id || scannedData?.document_id || undefined,
       })
+    } catch {
+      // The parent displays the API error; preserve the form for retry.
     } finally {
       setIsSubmitting(false)
     }

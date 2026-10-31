@@ -42,3 +42,27 @@ async def test_verification_email_requires_provider_acceptance(monkeypatch, resp
     service._client = Mock()
     service._client.Emails.send.return_value = response
     assert not await service.send_verification_email('person@example.com', 'safe-token')
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('response', [{}, {'error': 'rejected'}])
+async def test_password_reset_requires_provider_acceptance(monkeypatch, response):
+    monkeypatch.setattr(email_module, 'settings', Mock(
+        email_enabled=True, is_development=False, APP_NAME='Old Product',
+        FRONTEND_URL='https://zzpershub.nl', SUPPORT_EMAIL='info@zzpershub.nl',
+        RESEND_FROM_EMAIL='no-reply@zzpershub.nl', PASSWORD_RESET_TOKEN_EXPIRE_HOURS=1,
+    ))
+    service = email_module.EmailService()
+    service._client = Mock()
+    service._client.Emails.send.return_value = response
+    assert not await service.send_password_reset_email('person@example.com', 'safe-token')
+    payload = service._client.Emails.send.call_args.args[0]
+    assert 'Old Product' not in payload['text'] + payload['html'] + payload['subject']
+    assert payload['reply_to'] == 'info@zzpershub.nl'
+
+
+def test_shared_layout_escapes_subject_and_preheader():
+    result = email_module.render_email(title='<img src=x>', preheader='<script>',
+        content='<p>Veilige inhoud</p>', support='info@zzpershub.nl')
+    assert '<img src=x>' not in result and '<script>' not in result
+    assert '&lt;img src=x&gt;' in result
+    assert 'prefers-color-scheme:dark' in result

@@ -453,9 +453,9 @@ export const ZZPTimeTrackingPage = () => {
         entry_date: formState.entry_date,
         hours: parsedHours,
         description,
-        customer_id: selectedCustomerId || undefined,
-        project_name: formState.project_name || undefined,
-        hourly_rate: parsedHourlyRate,
+        customer_id: selectedCustomerId,
+        project_name: formState.project_name.trim() || null,
+        hourly_rate: parsedHourlyRate ?? null,
         billable: formState.billable,
       }
 

@@ -196,7 +196,7 @@ const TableLoadingSkeleton = () => (
 )
 
 // Customer form dialog
-const CustomerFormDialog = ({
+export const CustomerFormDialog = ({
   open,
   onOpenChange,
   customer,
@@ -205,7 +205,7 @@ const CustomerFormDialog = ({
   open: boolean
   onOpenChange: (open: boolean) => void
   customer?: ZZPCustomer
-  onSave: (data: ZZPCustomerCreate) => Promise<void>
+  onSave: (data: ZZPCustomerCreate | ZZPCustomerUpdate) => Promise<void>
 }) => {
   const isEdit = !!customer
   
@@ -323,6 +323,13 @@ const CustomerFormDialog = ({
   }
 
   const handleSave = async () => {
+    if (isSubmitting) return
+    setNameError('')
+    setEmailError('')
+    setKvkError('')
+    setBtwError('')
+    setIbanError('')
+    setBicError('')
     let hasError = false
     
     // Validate name
@@ -332,68 +339,67 @@ const CustomerFormDialog = ({
     }
     
     // Validate email format
-    if (email && !validateEmail(email)) {
+    if (email.trim() && email !== customer?.email && !validateEmail(email.trim())) {
       setEmailError(t('zzpCustomers.formEmailInvalid'))
       hasError = true
     }
 
     // Validate KVK
-    if (kvkNumber && !validateKvk(kvkNumber)) {
+    if (kvkNumber && kvkNumber !== customer?.kvk_number && !validateKvk(kvkNumber)) {
       setKvkError(t('zzpCustomers.formKvkInvalid'))
       hasError = true
     }
 
     // Validate BTW
-    if (btwNumber && !validateBtw(btwNumber)) {
+    if (btwNumber && btwNumber !== customer?.btw_number && !validateBtw(btwNumber)) {
       setBtwError(t('zzpCustomers.formBtwInvalid'))
       hasError = true
     }
 
     // Validate IBAN
-    if (iban && !validateIban(iban)) {
+    if (iban && iban !== customer?.iban && !validateIban(iban)) {
       setIbanError(t('zzpCustomers.formIbanInvalid'))
       hasError = true
     }
 
     // Validate BIC
-    if (bankBic && !validateBic(bankBic)) {
+    if (bankBic && bankBic !== customer?.bank_bic && !validateBic(bankBic)) {
       setBicError(t('zzpCustomers.formBicInvalid'))
       hasError = true
     }
 
-    if (hasError) return
+    if (hasError) {
+      toast.error('Controleer de gemarkeerde velden. Je wijzigingen zijn nog niet opgeslagen.')
+      return
+    }
 
     setIsSubmitting(true)
 
     try {
       await onSave({
         name: name.trim(),
-        email: email.trim() || undefined,
-        phone: phone.trim() || undefined,
-        contact_person: contactPerson.trim() || undefined,
-        address_street: addressStreet.trim() || undefined,
-        address_line2: addressLine2.trim() || undefined,
-        address_postal_code: addressPostalCode.trim().toUpperCase().replace(/\s/g, '') || undefined,
-        address_city: addressCity.trim() || undefined,
-        address_country: addressCountry.trim() || undefined,
-        kvk_number: kvkNumber.replace(/\s/g, '') || undefined,
-        btw_number: btwNumber.replace(/[\s.]/g, '').toUpperCase() || undefined,
-        iban: iban.replace(/\s/g, '').toUpperCase() || undefined,
-        bank_bic: bankBic.replace(/\s/g, '').toUpperCase() || undefined,
-        notes: notes.trim() || undefined,
+        email: email.trim() || null,
+        phone: phone.trim() || null,
+        contact_person: contactPerson.trim() || null,
+        address_street: addressStreet.trim() || null,
+        address_line2: addressLine2.trim() || null,
+        address_postal_code: addressPostalCode.trim().toUpperCase().replace(/\s/g, '') || null,
+        address_city: addressCity.trim() || null,
+        address_country: addressCountry.trim() || null,
+        kvk_number: kvkNumber.replace(/\s/g, '') || null,
+        btw_number: btwNumber.replace(/[\s.]/g, '').toUpperCase() || null,
+        iban: iban.replace(/\s/g, '').toUpperCase() || null,
+        bank_bic: bankBic.replace(/\s/g, '').toUpperCase() || null,
+        notes: notes.trim() || null,
         status,
       })
+    } catch {
+      // The parent reports the API error. Keep all entered values for retry.
+
     } finally {
       setIsSubmitting(false)
     }
   }
-
-  const isFormValid = name.trim() && 
-    (!email || validateEmail(email)) && 
-    (!kvkNumber || validateKvk(kvkNumber)) &&
-    (!btwNumber || validateBtw(btwNumber)) &&
-    (!iban || validateIban(iban)) &&
-    (!bankBic || validateBic(bankBic))
 
   // Section header component
   const SectionHeader = ({ title }: { title: string }) => (
@@ -757,7 +763,7 @@ const CustomerFormDialog = ({
           </Button>
           <Button 
             onClick={handleSave}
-            disabled={isSubmitting || !isFormValid}
+            disabled={isSubmitting}
             className="h-11 min-w-[140px]"
           >
             {isSubmitting ? (
@@ -1137,26 +1143,16 @@ export const ZZPCustomersPage = () => {
   }, [customers, debouncedSearch, statusFilter])
 
   // Handle adding/editing customer
-  const handleSaveCustomer = useCallback(async (data: ZZPCustomerCreate) => {
-    if (!user?.id) return
-
+  const handleSaveCustomer = useCallback(async (data: ZZPCustomerCreate | ZZPCustomerUpdate) => {
     try {
-      console.log('[Customer Save] Starting save operation:', { 
-        user_id: user.id, 
-        is_edit: !!editingCustomer,
-        customer_data: data 
-      })
-      
+      if (!user?.id) throw new Error('Je sessie is verlopen. Log opnieuw in.')
       if (editingCustomer) {
         // Update existing
-        console.log('[Customer Save] Updating customer:', editingCustomer.id)
         await zzpApi.customers.update(editingCustomer.id, data as ZZPCustomerUpdate)
         toast.success(t('zzpCustomers.customerSaved'))
       } else {
         // Add new - show CTA to create invoice
-        console.log('[Customer Save] Creating new customer')
-        const newCustomer = await zzpApi.customers.create(data)
-        console.log('[Customer Save] Customer created successfully:', newCustomer.id)
+        const newCustomer = await zzpApi.customers.create(data as ZZPCustomerCreate)
         setNewlyCreatedCustomer(newCustomer)
         setShowCreateInvoiceCta(true)
         // Emit onboarding event so the tour can auto-advance
@@ -1164,12 +1160,10 @@ export const ZZPCustomersPage = () => {
       }
 
       // Reload customers list
-      console.log('[Customer Save] Reloading customers list')
       await loadCustomers()
 
       setIsFormOpen(false)
       setEditingCustomer(undefined)
-      console.log('[Customer Save] Save operation completed successfully')
     } catch (error) {
       console.error('[Customer Save] Failed to save customer:', error)
       // Log detailed error information

@@ -389,6 +389,8 @@ class ReminderService:
         if not HTTPX_AVAILABLE:
             raise ReminderServiceError("httpx package not installed - email sending unavailable")
         
+        from html import escape
+        from app.services.email import render_email
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -398,16 +400,22 @@ class ReminderService:
                         "Content-Type": "application/json",
                     },
                     json={
-                        "from": self.from_email,
+                        "from": f"ZZPers Hub <{self.from_email}>",
+                        "reply_to": settings.SUPPORT_EMAIL,
                         "to": [reminder.email_address],
                         "subject": reminder.title,
                         "text": reminder.message,
+                        "html": render_email(title=reminder.title, preheader=reminder.title,
+                            content="<p>" + escape(reminder.message).replace("\n", "<br>") + "</p>",
+                            support=settings.SUPPORT_EMAIL),
                     },
                     timeout=30.0,
                 )
                 
-                if response.status_code != 200:
-                    raise ReminderServiceError(f"Resend API error: {response.status_code} - {response.text}")
+                if response.status_code not in (200, 201):
+                    raise ReminderServiceError(f"Resend API error: {response.status_code}")
+                if not response.json().get("id"):
+                    raise ReminderServiceError("Resend did not return a message ID")
                     
         except httpx.RequestError as e:
             raise ReminderServiceError(f"Failed to send email: {str(e)}")
@@ -437,8 +445,7 @@ async def process_scheduled_reminders(db: AsyncSession) -> int:
     for reminder in reminders:
         try:
             if reminder.channel == "EMAIL":
-                # Would need to instantiate service with proper accountant_id
-                # For now, mark as SENT for IN_APP or leave for external processor
+                await ReminderService(db, reminder.created_by_id)._send_email(reminder)
                 reminder.status = "SENT"
                 reminder.sent_at = now
             else:

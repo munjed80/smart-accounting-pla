@@ -30,7 +30,7 @@ export const VerifyEmailPage = ({ token, onNavigateToLogin }: VerifyEmailPagePro
     const verify = async () => {
       if (!token) {
         setState('error')
-        setErrorMessage('No verification token provided')
+        setErrorMessage('De verificatielink ontbreekt. Vraag een nieuwe link aan.')
         return
       }
 
@@ -48,7 +48,7 @@ export const VerifyEmailPage = ({ token, onNavigateToLogin }: VerifyEmailPagePro
         // Check if component is still mounted before updating state
         if (abortController.signal.aborted) return
         
-        if (response.message?.includes('already verified')) {
+        if (response.message?.includes('al bevestigd') || response.message?.includes('already verified')) {
           setState('already_verified')
         } else {
           setState('success')
@@ -60,10 +60,10 @@ export const VerifyEmailPage = ({ token, onNavigateToLogin }: VerifyEmailPagePro
         // Handle 429 rate limit error specifically
         if (error instanceof AxiosError && error.response?.status === 429) {
           setState('rate_limited')
-          setErrorMessage('Too many attempts. Please wait 60 seconds and try again.')
+          setErrorMessage('Te veel pogingen. Wacht 60 seconden en probeer het opnieuw.')
         } else {
           setState('error')
-          setErrorMessage('Invalid or expired verification link. Please request a new one.')
+          setErrorMessage('Deze verificatielink is ongeldig of verlopen. Vraag een nieuwe link aan.')
         }
       } finally {
         // Always set loading to false to prevent infinite spinner

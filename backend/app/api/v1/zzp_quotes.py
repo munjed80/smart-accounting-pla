@@ -402,13 +402,13 @@ async def update_quote(
     # Update basic fields
     if data.issue_date is not None:
         quote.issue_date = date.fromisoformat(data.issue_date)
-    if data.valid_until is not None:
-        quote.valid_until = date.fromisoformat(data.valid_until)
-    if data.title is not None:
+    if "valid_until" in data.model_fields_set:
+        quote.valid_until = date.fromisoformat(data.valid_until) if data.valid_until else None
+    if "title" in data.model_fields_set:
         quote.title = data.title
-    if data.notes is not None:
+    if "notes" in data.model_fields_set:
         quote.notes = data.notes
-    if data.terms is not None:
+    if "terms" in data.model_fields_set:
         quote.terms = data.terms
     
     # Update customer if changed

@@ -475,7 +475,7 @@ class TestInvoiceSendEmail:
             mock_filename.return_value = 'INV-2026-0001.pdf'
             mock_email.client = MagicMock()
             mock_email.client.Emails = MagicMock()
-            mock_email.client.Emails.send = MagicMock()
+            mock_email.client.Emails.send = MagicMock(return_value={"id": "test-message"})
             
             # Call the endpoint
             response = await async_client.post(

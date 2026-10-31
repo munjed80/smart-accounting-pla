@@ -1,4 +1,3 @@
-import { STARTER_PRICE_NL } from '@/lib/billingCatalog'
 import { navigateTo } from '@/lib/navigation'
 import { useSeoMeta } from '@/hooks/useSeoMeta'
 import { Button } from '@/components/ui/button'
@@ -55,9 +54,9 @@ export const TermsPage = () => {
           <section>
             <h2 className="text-xl font-semibold mb-3">3. Gratis proefperiode en abonnement</h2>
             <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground leading-relaxed">
-              <li>Nieuwe gebruikers ontvangen een gratis proefperiode van 365 dagen (1 jaar) met toegang tot alle functies.</li>
+              <li>Nieuwe gebruikers ontvangen een gratis proefperiode van 3 maanden met toegang tot alle functies.</li>
               <li>Na afloop van de proefperiode is een betaald abonnement vereist voor voortgezet gebruik.</li>
-              <li>Het abonnement voor ZZP-gebruikers bedraagt {STARTER_PRICE_NL} per maand (excl. BTW), maandelijks opzegbaar.</li>
+              <li>Na de proefperiode kies je 1 maand voor €6, 3 maanden voor €14, 6 maanden voor €25 of 12 maanden voor €39. Dit zijn de totale betaalbedragen per periode. Je betaalt vooraf; er is geen automatische verlenging.</li>
               <li>Accountants/kantoren: prijsafspraken worden individueel vastgesteld.</li>
               <li>Bij niet-betaling wordt de toegang beperkt tot alleen-lezen; gegevens blijven bewaard.</li>
             </ul>

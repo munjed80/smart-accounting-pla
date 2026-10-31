@@ -240,3 +240,57 @@ test('workspace and navigation share the homepage identity at mobile and desktop
   await page.keyboard.press('Escape')
   await expect(drawer).not.toBeVisible()
 })
+
+
+test('invoice list comes first, PDF is direct and cancelling preparation never saves', async ({ page }, testInfo) => {
+  let creates = 0
+  const invoice = {
+    id: 'invoice-review', administration_id: 'a1', customer_id: 'c1', customer_name: 'Example BV',
+    invoice_number: 'INV-2026-0099', status: 'draft', issue_date: '2026-10-31', due_date: null,
+    subtotal_cents: 20000, vat_total_cents: 4200, total_cents: 24200, amount_paid_cents: 0,
+    lines: [{ id:'l1', description:'Consultancy', quantity:2, unit_price_cents:10000, vat_rate:21 }],
+  }
+  await page.route('**/api/v1/zzp/invoices**', async route => {
+    if (route.request().method() === 'POST') {
+      creates += 1
+      return route.fulfill({ status: 201, json: invoice })
+    }
+    if (new URL(route.request().url()).pathname.includes('/suggest-price/')) {
+      return route.fulfill({ json: { suggested_price_euros: null, message: 'Geen voorstel' } })
+    }
+    if (new URL(route.request().url()).pathname.endsWith('/pdf')) {
+      return route.fulfill({ contentType: 'application/pdf', body: '%PDF-1.7 test invoice' })
+    }
+    return route.fulfill({ json: { invoices:[invoice], total:1 } })
+  })
+  await page.goto('/tests/styles/dashboard.html')
+  await expect(page.getByText('1 factuur te laat')).toBeVisible()
+  await page.evaluate(() => {
+    history.pushState({}, '', '/zzp/invoices')
+    window.dispatchEvent(new Event('app:route-change'))
+  })
+  const title = page.getByRole('heading', { level: 1, name: 'Facturen', exact: true })
+  await expect(title).toHaveCSS('color', 'rgb(25, 46, 43)')
+  await expect(title).toHaveCSS('-webkit-text-fill-color', 'rgb(25, 46, 43)')
+  const list = page.getByText('Facturenlijst', { exact: true })
+  const monthly = page.getByText('Maandoverzicht facturen', { exact: true })
+  await expect(list).toBeVisible()
+  expect((await list.boundingBox())!.y).toBeLessThan((await monthly.boundingBox())!.y)
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'PDF downloaden INV-2026-0099', exact: true }).click()
+  expect((await download).suggestedFilename()).toBe('INV-2026-0099.pdf')
+  for (const close of ['cancel', 'escape']) {
+    await page.getByRole('button', { name:'Genereer factuur', exact:true }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    for (const price of await dialog.getByPlaceholder('0,00', { exact: true }).all()) await expect(price).toHaveValue('')
+    if (close === 'cancel') await dialog.getByRole('button', { name: 'Annuleren', exact:true }).click()
+    else await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    expect(creates).toBe(0)
+  }
+  await page.evaluate(() => window.scrollTo({ top:0, behavior:'instant' }))
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('brand-invoices-list-first.png'), fullPage:true })
+})

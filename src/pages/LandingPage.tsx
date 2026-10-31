@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import {
+  Users,
+  CalendarDays,
+  NotebookPen,
+  LayoutDashboard,
+  Store,
+  Plug,
   ArrowRight,
   ArrowUpRight,
   Check,
@@ -11,6 +17,7 @@ import {
   Clock3,
   X,
 } from 'lucide-react'
+import { PrepaidPlanCards } from '@/components/PrepaidPlanCards'
 import { BrandLockup } from '@/components/BrandLockup'
 import { useSeoMeta } from '@/hooks/useSeoMeta'
 import { CookieBanner } from '@/components/marketing/CookieBanner'
@@ -70,9 +77,9 @@ const questions = [
       'Voor zzp’ers en freelancers die hun facturen, klanten, uitgaven en uren op één plek willen bijhouden. Je hebt geen boekhoudachtergrond nodig om te beginnen.',
   },
   {
-    question: 'Hoe werkt het gratis jaar?',
+    question: 'Hoe werken de drie gratis maanden?',
     answer:
-      'Je begint met een gratis proefperiode van 365 dagen. Bij het aanmaken van je account is geen creditcard nodig. Bekijk de pakketten voor de voorwaarden en het abonnement na je proefperiode.',
+      'Je begint met drie maanden gratis toegang, zonder creditcard. Daarna kies je 1 maand voor €6, 3 maanden voor €14, 6 maanden voor €25 of 12 maanden voor €39. Je betaalt de gekozen periode in één keer. Geen automatische verlenging.',
   },
   {
     question: 'Kan ik mijn boekhouder erbij betrekken?',
@@ -103,7 +110,7 @@ export const LandingPage = () => {
   useSeoMeta({
     title: 'ZZPers Hub | Facturen en boekhouding voor zzp’ers',
     description:
-      'Je facturen, uitgaven, klanten en uren op één overzichtelijke plek. Ontdek ZZPers Hub voor zzp’ers en begin met een gratis proefjaar.',
+      'Je facturen, uitgaven, klanten en uren op één overzichtelijke plek. Ontdek ZZPers Hub voor zzp’ers en begin met een gratis proefperiode van 3 maanden.',
     canonical: 'https://zzpershub.nl/',
   })
 
@@ -150,6 +157,7 @@ export const LandingPage = () => {
           <nav className="lp-desktop-nav" aria-label="Hoofdnavigatie">
             <a href="#voor-zzp">Het product</a>
             <a href="#hoe-werkt-het">Zo werkt het</a>
+            <a href="#koppelingen">Webshops</a>
             <a href="#voor-accountants">Voor boekhouders</a>
             <a href="#prijzen">Prijzen</a>
           </nav>
@@ -182,6 +190,7 @@ export const LandingPage = () => {
           >
             <a href="#voor-zzp">Het product</a>
             <a href="#hoe-werkt-het">Zo werkt het</a>
+            <a href="#koppelingen">Webshops</a>
             <a href="#voor-accountants">Voor boekhouders</a>
             <a href="#prijzen">Prijzen</a>
             <a href="/login">Inloggen</a>
@@ -211,7 +220,7 @@ export const LandingPage = () => {
               </p>
               <div className="lp-hero-actions">
                 <a href="/register" className="lp-button">
-                  Begin je gratis jaar <ArrowRight size={18} />
+                  Start 3 maanden gratis <ArrowRight size={18} />
                 </a>
                 <a href="#voor-zzp" className="lp-text-link">
                   Neem een kijkje <span aria-hidden="true">↗</span>
@@ -325,6 +334,40 @@ export const LandingPage = () => {
           </div>
         </section>
 
+        <section id="werkplek" className="lp-section lp-workspace-tools">
+          <div className="lp-container">
+            <div className="lp-section-heading"><div><p className="lp-eyebrow">JE HELE WERKDAG</p><h2>Van eerste afspraak.<br /><em>Tot betaald werk.</em></h2></div><p>De zeven onderdelen van je dagelijkse administratie. Elk met een eigen taak, samen één werkplek.</p></div>
+            <div className="lp-tool-grid">
+              {[
+                { icon: LayoutDashboard, title: 'Overzicht', text: 'Zie je omzet, openstaande facturen en punten die aandacht vragen. Begin je dag met een helder beeld.' },
+                { icon: Users, title: 'Klanten', text: 'Bewaar contact- en bedrijfsgegevens op één plek. Kies je klant bij een offerte, factuur of urenregistratie.' },
+                { icon: FileText, title: 'Facturen', text: 'Maak facturen met btw en een eigen nummer. Download de PDF en volg wat nog openstaat.' },
+                { icon: NotebookPen, title: 'Offertes', text: 'Leg werkzaamheden en prijzen vooraf vast. Zet een akkoord om naar een factuur en werk verder vanuit dezelfde gegevens.' },
+                { icon: Receipt, title: 'Uitgaven', text: 'Registreer zakelijke kosten met een foto of PDF als bijlage. Houd je bonnetjes bij de juiste uitgave.' },
+                { icon: Clock3, title: 'Uren', text: 'Houd tijd per klant en opdracht bij. Maak factureerbaar werk zichtbaar in je urenoverzicht.' },
+                { icon: CalendarDays, title: 'Agenda', text: 'Plan afspraken en werkzaamheden. Houd je planning naast de uren en administratie van je bedrijf.' },
+              ].map(tool => <article className="lp-tool" key={tool.title}><span className="lp-tool-icon"><tool.icon size={23} aria-hidden="true" /></span><h3>{tool.title}</h3><p>{tool.text}</p></article>)}
+            </div>
+          </div>
+        </section>
+
+        <section id="uren" className="lp-section lp-hours-section">
+          <div className="lp-container lp-hours-grid">
+            <div><p className="lp-eyebrow">URENREGISTRATIE</p><h2>Weet waar je tijd blijft.<br /><em>En wat je kunt factureren.</em></h2><p>Een korte opdracht of een volle werkweek: registreer je tijd met een klant, datum en omschrijving. Bekijk je uren per periode en neem factureerbare uren mee naar je factuur.</p><ul className="lp-detail-list"><li><Check size={17} />Tijd bij de juiste klant en opdracht</li><li><Check size={17} />Factureerbare uren duidelijk herkenbaar</li><li><Check size={17} />Van urenoverzicht naar factuurregels</li></ul><a href="/register" className="lp-text-link">Begin met je eerste uren <ArrowRight size={17} /></a></div>
+            <figure className="lp-hours-preview"><figcaption>Voorbeeld / Mijn werkweek</figcaption><div className="lp-hours-total"><strong>10,5 <span>uur</span></strong><span>Deze week geregistreerd</span></div>{[{day:'Ma',title:'Ontwerp · Studio Noord',hours:'2,5 u'},{day:'Di',title:'Overleg · De Werkplaats',hours:'3 u'},{day:'Do',title:'Uitvoering · Studio Noord',hours:'5 u'}].map(row=><div className="lp-hours-row" key={row.day}><span>{row.day}</span><strong>{row.title}</strong><span>{row.hours}</span></div>)}<p><Check size={15} /> Klaar om mee te nemen naar je factuur</p></figure>
+          </div>
+        </section>
+
+        <section id="koppelingen" className="lp-section lp-integrations-section">
+          <div className="lp-container">
+            <div className="lp-section-heading"><div><p className="lp-eyebrow">JE WEBSHOP, VERBONDEN</p><h2>Verkopen in je winkel.<br /><em>Overzicht in je administratie.</em></h2></div><p>Verbind Shopify of WooCommerce. Haal bestellingen, klantgegevens en restituties op, en beoordeel de import voordat je die verwerkt in je boekhouding.</p></div>
+            <div className="lp-store-grid">{[{name:'Shopify',text:'Verbind je winkel met je winkeladres en toegangsgegevens. Start een synchronisatie en bekijk de opgehaalde bestellingen.'},{name:'WooCommerce',text:'Koppel je webshop met je winkeladres en API-sleutels. Houd geïmporteerde verkopen, klanten en restituties bij elkaar.'}].map(store=><article className="lp-store" key={store.name}><Store size={26} aria-hidden="true" /><h3>{store.name}</h3><p>{store.text}</p><span><Plug size={15} /> Inbegrepen in alle nieuwe ZZP-pakketten</span></article>)}</div>
+            <ol className="lp-sync-steps"><li><span>01</span>Verbind je winkel</li><li><span>02</span>Haal je verkopen op</li><li><span>03</span>Controleer en verwerk</li></ol>
+            <p className="lp-integration-note">Een koppeling vereist een eigen webshop en de juiste toegangsrechten. Importeren en beoordelen zijn aparte stappen; een verkoop wordt niet ongemerkt geboekt.</p>
+            <a href="/register" className="lp-text-link">Start met een verbonden werkplek <ArrowRight size={17} /></a>
+          </div>
+        </section>
+
         <section id="hoe-werkt-het" className="lp-process lp-section">
           <div className="lp-container">
             <div className="lp-section-heading">
@@ -415,7 +458,7 @@ export const LandingPage = () => {
               <h2>
                 Leer het kennen.
                 <br />
-                <em>Een jaar lang.</em>
+                <em>Drie maanden lang.</em>
               </h2>
               <p>
                 Een nieuwe manier van werken kies je niet in een middag. Neem de
@@ -427,11 +470,11 @@ export const LandingPage = () => {
             </div>
             <div className="lp-trial">
               <div className="lp-trial-top">
-                <span>Jouw eerste jaar</span>
+                <span>Jouw eerste drie maanden</span>
                 <span className="lp-trial-tag">Gratis proberen</span>
               </div>
               <p className="lp-trial-price">
-                € 0<span>/ eerste jaar</span>
+                € 0<span>/ eerste 3 maanden</span>
               </p>
               <p>
                 Facturen, klanten, uren en uitgaven.
@@ -439,7 +482,7 @@ export const LandingPage = () => {
                 Een rustige start voor je administratie.
               </p>
               <a className="lp-button" href="/register">
-                Begin je gratis jaar <ArrowRight size={18} />
+                Start 3 maanden gratis <ArrowRight size={18} />
               </a>
               <small>
                 Geen creditcard bij aanmelding. Daarna kies je een betaald
@@ -448,6 +491,8 @@ export const LandingPage = () => {
             </div>
           </div>
         </section>
+
+        <section className="lp-section lp-paid-periods" aria-labelledby="lp-periods-title"><div className="lp-container"><p className="lp-eyebrow">NA JE GRATIS PROEFPERIODE</p><h2 id="lp-periods-title">Dezelfde werkplek.<br /><em>Kies je looptijd.</em></h2><p className="lp-periods-intro">Je betaalt het totaalbedrag in één keer. Alle ZZP-functies zijn inbegrepen, inclusief webshopkoppelingen. Geen automatische verlenging.</p><PrepaidPlanCards /><p className="lp-periods-note">1 maand €6 · 3 maanden €14 · 6 maanden €25 · 12 maanden €39. Resterende gratis of betaalde toegang blijft behouden bij een aankoop.</p></div></section>
 
         <section className="lp-faq lp-section">
           <div className="lp-container lp-faq-grid">
@@ -483,7 +528,7 @@ export const LandingPage = () => {
             <a className="lp-button lp-button-cream" href="/register">
               Maak je werkplek aan <ArrowRight size={18} />
             </a>
-            <span>Je eerste jaar is gratis.</span>
+            <span>Je eerste drie maanden zijn gratis.</span>
           </div>
         </section>
       </main>
@@ -515,7 +560,7 @@ export const LandingPage = () => {
             <div>
               <strong>Gemaakt door MHM IT</strong>
               <span>Alkmaar, Nederland</span>
-              <span>KvK 69779716</span>
+
               <a href="/contact">
                 Voor boekhouders <ArrowUpRight size={13} />
               </a>

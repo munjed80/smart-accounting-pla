@@ -1,5 +1,5 @@
 import { BrandLockup } from '@/components/BrandLockup'
-import { STARTER_PRICE_NL, PRO_PRICE_NL } from '@/lib/billingCatalog'
+import { PrepaidPlanCards } from '@/components/PrepaidPlanCards'
 import { isAccountantRole } from '@/lib/roles'
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -222,41 +222,22 @@ const ForbiddenAdminAccess = () => (
  */
 const TrialExpiredScreen = ({ onGoToSubscriptions, onLogout }: { onGoToSubscriptions: () => void; onLogout: () => void }) => (
   <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center p-4">
-    <div className="max-w-md w-full rounded-lg border bg-card p-8 space-y-5 text-center shadow-lg">
+    <div className="max-w-5xl w-full rounded-lg border bg-card p-6 sm:p-8 space-y-5 text-center shadow-lg">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-orange-100">
         <LockSimple className="h-7 w-7 text-orange-600" weight="fill" />
       </div>
       <div className="space-y-2">
         <h2 className="text-xl font-semibold">Je proefperiode is afgelopen</h2>
         <p className="text-sm text-muted-foreground">
-          Je gratis jaar is verlopen of je hebt nog geen actief abonnement.
+          Je gratis drie maanden is verlopen of je hebt nog geen actief abonnement.
           Kies een abonnement om de app te blijven gebruiken.
         </p>
       </div>
-      <div className="space-y-3 text-left">
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-          <p className="text-sm font-semibold text-blue-900 mb-1">Starter — {STARTER_PRICE_NL}/maand</p>
-          <ul className="space-y-1 text-xs text-blue-800">
-            <li>✓ Onbeperkt facturen</li>
-            <li>✓ Urenregistratie & agenda</li>
-            <li>✓ 5 GB opslag</li>
-          </ul>
-        </div>
-        <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
-          <p className="text-sm font-semibold text-purple-900 mb-1">
-            Pro — {PRO_PRICE_NL}/maand <span className="font-normal line-through text-purple-400">€11,99</span>
-          </p>
-          <ul className="space-y-1 text-xs text-purple-800">
-            <li>✓ Alles van Starter</li>
-            <li>✓ BTW-aangifte via Digipoort</li>
-            <li>✓ Bankrekening koppeling</li>
-            <li>✓ Exports (PDF, CSV)</li>
-          </ul>
-        </div>
-      </div>
+      <p className="text-sm text-muted-foreground">Kies je looptijd. Je betaalt één keer, zonder automatische verlenging.</p>
+      <PrepaidPlanCards />
       <div className="flex flex-col gap-2">
         <Button onClick={onGoToSubscriptions} className="w-full bg-orange-600 hover:bg-orange-700">
-          Upgraden naar Pro
+          Kies je looptijd
         </Button>
         <Button variant="outline" onClick={onLogout} className="w-full">
           Uitloggen

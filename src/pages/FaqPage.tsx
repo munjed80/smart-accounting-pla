@@ -1,4 +1,4 @@
-import { STARTER_PRICE_NL } from '@/lib/billingCatalog'
+import { MONTHLY_PRICE_NL } from '@/lib/billingCatalog'
 import { useEffect } from 'react'
 import { navigateTo } from '@/lib/navigation'
 import { useSeoMeta } from '@/hooks/useSeoMeta'
@@ -46,7 +46,7 @@ export const FaqPage = () => {
             name: 'Wat kost het na de proefperiode?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: `Het eerste jaar is volledig gratis — geen creditcard nodig bij aanmelding. Daarna is ZZPers Hub ${STARTER_PRICE_NL} per maand. Je kunt op elk moment opzeggen; er zijn geen opzegtermijnen of verborgen kosten.`,
+              text: `De eerste drie maanden zijn volledig gratis — geen creditcard nodig bij aanmelding. Daarna is ZZPers Hub ${MONTHLY_PRICE_NL} per maand. Je kiest een looptijd en betaalt die in één keer. Er is geen automatische verlenging.`,
             },
           },
           {
@@ -54,7 +54,7 @@ export const FaqPage = () => {
             name: 'Hoe werkt de gratis proefperiode?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'Je krijgt 365 dagen (1 jaar) gratis toegang tot alle functies, zonder creditcard bij aanmelding. Na 365 dagen wordt je account automatisch beperkt tot alleen-lezen modus tenzij je een abonnement activeert. Je gegevens blijven bewaard.',
+              text: 'Je krijgt 3 maanden gratis toegang tot alle functies, zonder creditcard bij aanmelding. Na 3 maanden wordt je account automatisch beperkt tot alleen-lezen modus tenzij je een abonnement activeert. Je gegevens blijven bewaard.',
             },
           },
           {

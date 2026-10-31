@@ -4,6 +4,7 @@ ZZP E-commerce Integrations API
 Endpoints for managing Shopify and WooCommerce integrations.
 All endpoints are gated to Pro-plan users only.
 """
+from app.core.billing_catalog import PREPAID_PLAN_CODES
 import logging
 from typing import Annotated, Optional
 from uuid import UUID
@@ -88,7 +89,7 @@ async def _require_pro_plan(user: CurrentUser, db: AsyncSession) -> Administrati
         )
 
     # If user has an active paid subscription, must be on zzp_pro plan
-    if entitlements.is_paid and entitlements.plan_code not in ("zzp_pro", "pro"):
+    if entitlements.is_paid and entitlements.plan_code not in ({"zzp_pro", "pro"} | PREPAID_PLAN_CODES):
         raise HTTPException(
             status_code=403,
             detail={
@@ -171,7 +172,7 @@ async def check_integration_entitlements(
     administration = await _get_administration(current_user, db)
     entitlements = await subscription_service.compute_entitlements(db, administration.id)
 
-    is_pro = entitlements.plan_code in ("zzp_pro", "pro")
+    is_pro = entitlements.plan_code in ({"zzp_pro", "pro"} | PREPAID_PLAN_CODES)
     can_use = entitlements.can_use_pro_features and (entitlements.in_trial or is_pro)
 
     return {

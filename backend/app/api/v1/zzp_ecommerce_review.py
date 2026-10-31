@@ -9,6 +9,7 @@ Workflow:
   2. User opens review workspace → generates mapping rows automatically
   3. User reviews, approves, and (optionally) posts to bookkeeping
 """
+from app.core.billing_catalog import PREPAID_PLAN_CODES
 import logging
 from datetime import datetime, date, timezone
 from decimal import Decimal
@@ -79,7 +80,7 @@ async def _require_pro_plan(user: CurrentUser, db: AsyncSession) -> Administrati
                 "plan_code": entitlements.plan_code,
             },
         )
-    if entitlements.is_paid and entitlements.plan_code not in ("zzp_pro", "pro"):
+    if entitlements.is_paid and entitlements.plan_code not in ({"zzp_pro", "pro"} | PREPAID_PLAN_CODES):
         raise HTTPException(
             status_code=403,
             detail={

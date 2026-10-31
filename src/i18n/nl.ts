@@ -1,5 +1,5 @@
 import { BRAND_NAME } from '@/lib/brand'
-import { STARTER_PRICE_NL } from '@/lib/billingCatalog'
+import { MONTHLY_PRICE_NL } from '@/lib/billingCatalog'
 /**
  * Dutch (nl-NL) translations for ZZP-HUB Smart Accounting Platform
  * 
@@ -124,7 +124,7 @@ export const nl = {
     createAccountCta: "Maak er nu één aan",
     haveAccount: "Al een account?",
     loginCta: "Log hier in",
-    trialInfo: `1 jaar gratis. Daarna vanaf ${STARTER_PRICE_NL}/maand.`,
+    trialInfo: `3 maanden gratis. Daarna vanaf ${MONTHLY_PRICE_NL} per periode.`,
     showPassword: "Wachtwoord tonen",
     hidePassword: "Wachtwoord verbergen",
     secureLogin: "Beveiligde verbinding",
@@ -2581,7 +2581,7 @@ export const nl = {
     whyDifferent: "Waarom dit systeem anders is",
     
     // CTAs
-    startZzp: "Start gratis jaar",
+    startZzp: "Start 3 maanden gratis",
     contactAccountants: "Contact voor accountants",
     
     // Status badges

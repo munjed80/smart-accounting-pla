@@ -17,6 +17,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from dateutil import parser as dateutil_parser
+from dateutil.relativedelta import relativedelta
 
 from app.core.config import settings
 from app.models.subscription import Subscription, SubscriptionStatus, WebhookEvent, Plan
@@ -34,7 +35,7 @@ SUBSCRIPTION_CURRENCY = "EUR"
 SUBSCRIPTION_INTERVAL = "1 month"
 
 # Plan metadata for Mollie checkout
-from app.core.billing_catalog import PLAN_METADATA
+from app.core.billing_catalog import PLAN_METADATA, PREPAID_PLAN_CODES
 
 
 # Default plan for activation when no plan_code is specified
@@ -140,6 +141,78 @@ class MollieSubscriptionService:
         
         return customer_data["id"]
 
+    async def _activate_prepaid(self, db: AsyncSession, user: User, administration_id: UUID, plan_code: str) -> Dict[str, Any]:
+        """Charge once; grant the selected calendar period only after a verified paid webhook."""
+        subscription = await subscription_service.ensure_trial_started(db, administration_id)
+        if subscription.provider_subscription_id and not (subscription.cancel_at_period_end or subscription.status == SubscriptionStatus.CANCELED):
+            raise ValueError("Zeg eerst je bestaande automatische abonnement op voordat je een vooruitbetaald pakket kiest.")
+        plan = (await db.execute(select(Plan).where(Plan.code == plan_code))).scalar_one_or_none()
+        administration = (await db.execute(select(Administration).where(Administration.id == administration_id))).scalar_one_or_none()
+        if not plan or not administration:
+            raise ValueError("Het gekozen pakket is nog niet beschikbaar. Werk de database bij.")
+        customer_id = await self.ensure_mollie_customer(db, user, administration, subscription)
+        meta = PLAN_METADATA[plan_code]
+        async with MollieClient() as mollie:
+            payment = await mollie.create_payment(
+                amount=meta['price'], currency=SUBSCRIPTION_CURRENCY,
+                description=meta['description'], redirect_url=self._get_payment_redirect_url(),
+                webhook_url=self._get_webhook_url(), customer_id=customer_id,
+                sequence_type='oneoff', locale=settings.MOLLIE_LOCALE,
+                metadata={'administration_id': str(administration_id), 'subscription_id': str(subscription.id),
+                          'payment_type': 'prepaid', 'plan_code': plan_code},
+            )
+        checkout_url = payment.get('_links', {}).get('checkout', {}).get('href')
+        if not checkout_url:
+            raise ValueError("De betaalprovider heeft geen betaallink teruggegeven.")
+        db.add(AuditLog(client_id=administration_id, entity_type='subscription', entity_id=subscription.id,
+                        action='SUBSCRIPTION_CHECKOUT_CREATED', user_id=user.id, user_role=user.role,
+                        new_value={'mollie_payment_id': payment['id'], 'plan_code': plan_code,
+                                   'amount': str(meta['price']), 'currency': SUBSCRIPTION_CURRENCY}))
+        await db.commit()
+        return {'status': subscription.status.value, 'in_trial': subscription.status == SubscriptionStatus.TRIALING,
+                'trial_end_at': subscription.trial_end_at.isoformat() if subscription.trial_end_at else None,
+                'scheduled': False, 'provider_subscription_id': None, 'checkout_url': checkout_url,
+                'message_nl': 'Eenmalig betalen. Je looptijd sluit aan op je proefperiode of betaalde toegang.'}
+
+    async def _apply_prepaid_payment(self, db: AsyncSession, subscription: Subscription, payment: Dict[str, Any]) -> None:
+        """Pending and failed purchases never remove existing access or restart a trial."""
+        if payment.get('status') != 'paid':
+            return
+        metadata = payment.get('metadata') or {}
+        code = metadata.get('plan_code')
+        if code not in PREPAID_PLAN_CODES or payment.get('sequenceType') != 'oneoff':
+            raise ValueError('Invalid prepaid payment metadata')
+        meta = PLAN_METADATA[code]
+        amount = payment.get('amount') or {}
+        if (amount.get('currency') != SUBSCRIPTION_CURRENCY or
+                Decimal(str(amount.get('value', '0'))) != meta['price'] or
+                metadata.get('administration_id') != str(subscription.administration_id)):
+            raise ValueError('Prepaid payment amount, currency or administration mismatch')
+        if subscription.provider_subscription_id and not (subscription.cancel_at_period_end or subscription.status == SubscriptionStatus.CANCELED):
+            raise ValueError('Prepaid payment cannot replace an active recurring subscription')
+        plan = (await db.execute(select(Plan).where(Plan.code == code))).scalar_one_or_none()
+        if not plan:
+            raise ValueError('Prepaid plan not found')
+        now = datetime.now(timezone.utc)
+        def aware(value):
+            return value.replace(tzinfo=timezone.utc) if value and value.tzinfo is None else value
+        # A purchase during trial or before expiry adds time instead of consuming remaining access.
+        base = max(value for value in (now, aware(subscription.trial_end_at), aware(subscription.current_period_end)) if value)
+        previous_end = aware(subscription.current_period_end)
+        subscription.current_period_start = (aware(subscription.current_period_start) if previous_end and previous_end > now else None) or base
+        subscription.current_period_end = base + relativedelta(months=meta['months'])
+        subscription.ends_at = subscription.current_period_end
+        subscription.plan_id = plan.id
+        subscription.plan_code = code
+        subscription.status = SubscriptionStatus.ACTIVE
+        subscription.provider = 'mollie'
+        subscription.cancel_at_period_end = False
+        subscription.provider_subscription_id = None
+        db.add(AuditLog(client_id=subscription.administration_id, entity_type='subscription', entity_id=subscription.id,
+                        action='SUBSCRIPTION_PREPAID_GRANTED', user_id=None, user_role='system',
+                        new_value={'mollie_payment_id': payment['id'], 'plan_code': code,
+                                   'period_end': subscription.current_period_end.isoformat()}))
+
     # Payment flow reference:
     #   Button:   src/components/SettingsPage.tsx  handleActivateSubscription()
     #   Endpoint: POST /api/v1/me/subscription/activate
@@ -181,6 +254,8 @@ class MollieSubscriptionService:
             ValueError: If plan_code is not a valid paid plan
         """
         chosen_plan = plan_code or DEFAULT_ACTIVATE_PLAN
+        if chosen_plan in PREPAID_PLAN_CODES:
+            return await self._activate_prepaid(db, user, administration_id, chosen_plan)
         if chosen_plan not in PLAN_METADATA:
             raise ValueError(
                 f"Invalid plan_code '{chosen_plan}'. "
@@ -337,6 +412,10 @@ class MollieSubscriptionService:
         if not subscription:
             raise ValueError("No subscription found")
         
+        if subscription.plan_code in PREPAID_PLAN_CODES:
+            return {"subscription": {"status": subscription.status.value, "cancel_at_period_end": False,
+                    "current_period_end": subscription.current_period_end.isoformat() if subscription.current_period_end else None},
+                    "message_nl": "Dit pakket wordt niet automatisch verlengd. Je toegang blijft geldig tot de einddatum."}
         # Idempotent: If already canceled or marked for cancellation
         if subscription.status == SubscriptionStatus.CANCELED:
             return {
@@ -501,6 +580,11 @@ class MollieSubscriptionService:
         # Ensure trial started
         subscription = await subscription_service.ensure_trial_started(db, administration_id)
         
+        if subscription.plan_code in PREPAID_PLAN_CODES:
+            return {"subscription": {"status": subscription.status.value, "cancel_at_period_end": False,
+                    "scheduled": False, "provider_subscription_id": None},
+                    "message_nl": "Kies een looptijd en betaal eenmalig om je toegang te verlengen."}
+
         # Get administration
         admin_result = await db.execute(
             select(Administration).where(Administration.id == administration_id)
@@ -763,6 +847,22 @@ class MollieSubscriptionService:
                     subscription_id=subscription_id
                 )
         
+        # Open/pending callbacks are not final; allow the later paid callback through.
+        if payment_id and resource_data.get('status') in ('open', 'pending', 'authorized'):
+            if (resource_data.get('metadata') or {}).get('payment_type') != 'prepaid':
+                await self._process_payment_webhook(db, resource_data)
+                await db.commit()
+            return {'status': 'pending', 'event_id': event_id}
+        if payment_id and (resource_data.get('metadata') or {}).get('payment_type') == 'prepaid':
+            internal_id = (resource_data.get('metadata') or {}).get('subscription_id')
+            # Serialize grants and recheck idempotency after acquiring the row lock.
+            locked_subscription = (await db.execute(select(Subscription).where(Subscription.id == UUID(internal_id)).with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
+            if not locked_subscription:
+                raise ValueError('Prepaid subscription not found')
+            duplicate = (await db.execute(select(WebhookEvent).where(WebhookEvent.event_id == event_id))).scalar_one_or_none()
+            if duplicate:
+                return {'status': 'already_processed', 'event_id': event_id}
+
         # Record webhook event (use resource_id + event_type for idempotency)
         webhook_event = WebhookEvent(
             provider="mollie",
@@ -866,6 +966,10 @@ class MollieSubscriptionService:
                     payment_id,
                 )
                 return
+
+        if (payment_data.get('metadata') or {}).get('payment_type') == 'prepaid':
+            await self._apply_prepaid_payment(db, subscription, payment_data)
+            return
 
         # --- Update subscription status based on payment status ---
         if status == "paid":

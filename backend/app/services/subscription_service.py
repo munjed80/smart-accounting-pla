@@ -9,6 +9,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 from uuid import UUID
 
+from dateutil.relativedelta import relativedelta
+from app.core.billing_catalog import PREPAID_PLAN_CODES
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -69,7 +72,7 @@ class SubscriptionService:
     """Service for managing subscriptions and computing entitlements"""
     
     ZZP_FREE_PLAN_CODE = "free"
-    DEFAULT_TRIAL_DAYS = 365
+    DEFAULT_TRIAL_DAYS = 90
     
     async def ensure_trial_started(
         self,
@@ -102,7 +105,7 @@ class SubscriptionService:
             )
             return existing_subscription
         
-        # Get Free plan (1-year trial)
+        # Get the configured free trial plan
         plan_result = await db.execute(
             select(Plan).where(Plan.code == self.ZZP_FREE_PLAN_CODE)
         )
@@ -118,7 +121,7 @@ class SubscriptionService:
         if override_days is not None:
             trial_end = now + timedelta(days=override_days)
         else:
-            trial_end = now + timedelta(days=plan.trial_days)
+            trial_end = now + (relativedelta(months=3) if plan.code == "free" and plan.trial_days == 90 else timedelta(days=plan.trial_days))
         
         subscription = Subscription(
             administration_id=administration_id,
@@ -250,6 +253,15 @@ class SubscriptionService:
                 )
         
         elif subscription.status == SubscriptionStatus.ACTIVE:
+            # Prepaid access expires without a recurring provider callback.
+            if subscription.plan_code in PREPAID_PLAN_CODES:
+                end = subscription.current_period_end
+                if end and end.tzinfo is None:
+                    end = end.replace(tzinfo=timezone.utc)
+                if not end or now >= end:
+                    subscription.status = SubscriptionStatus.EXPIRED
+                    await db.commit()
+                    return EntitlementResult(False, False, False, 0, subscription.status.value, subscription.plan_code)
             # Active paid subscription
             return EntitlementResult(
                 is_paid=True,

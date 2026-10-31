@@ -104,9 +104,9 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0">
-        <h1 className="mb-1 flex items-center gap-2 bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-2xl font-bold text-transparent sm:mb-2 sm:gap-3 sm:text-3xl lg:text-4xl">
+        <h1 className="mb-1 flex items-center gap-2  text-2xl font-bold text-foreground sm:mb-2 sm:gap-3 sm:text-3xl lg:text-4xl">
           {icon ? <span className="shrink-0 text-primary">{icon}</span> : null}
-          <span className="truncate">{title}</span>
+          <span className="min-w-0 break-words">{title}</span>
         </h1>
         {description ? (
           <p className="text-sm text-muted-foreground sm:text-base">

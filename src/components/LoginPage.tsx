@@ -28,7 +28,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
   useSeoMeta({
     title: activeTab === 'register' ? "Start gratis — ZZPers Hub | Gratis factuur maken voor zzp'ers" : 'Inloggen | ZZPers Hub',
     description: activeTab === 'register'
-      ? "Maak gratis een account aan bij ZZPers Hub. 1 jaar gratis facturen maken als zzp'er — geen creditcard vereist."
+      ? "Maak gratis een account aan bij ZZPers Hub. 3 maanden gratis facturen maken als zzp'er — geen creditcard vereist."
       : "Log in op uw ZZPers Hub account en beheer uw facturen, klanten en uren.",
     canonical: 'https://zzpershub.nl/login',
   })
@@ -134,7 +134,7 @@ export const LoginPage = ({ onSuccess, onForgotPassword }: LoginPageProps) => {
     setResendFeedback('')
     try {
       await resendVerification(email)
-      setResendFeedback('Als je account nog niet is bevestigd, ontvang je een nieuwe verificatielink. Controleer ook je spammap.')
+      setResendFeedback('Je verzendverzoek is geaccepteerd. Als je account nog niet is bevestigd, ontvang je een nieuwe verificatielink. Controleer ook je spammap.')
       // Start cooldown after successful resend
       startCooldownTimer(60)
     } catch (error) {

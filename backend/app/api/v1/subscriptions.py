@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.config import settings
+from app.core.billing_catalog import PREPAID_PLAN_CODES
 from app.api.v1.deps import CurrentUser, get_current_user, require_zzp
 from app.models.administration import AdministrationMember
 from app.models.subscription import SubscriptionStatus
@@ -87,7 +88,7 @@ async def get_my_subscription(
     # If subscription is active and has current_period_end, that's the next payment date
     # If scheduled (in trial), trial_end_at is approximately the next payment date
     next_payment_date = None
-    if subscription.current_period_end:
+    if subscription.current_period_end and subscription.plan_code not in PREPAID_PLAN_CODES:
         next_payment_date = subscription.current_period_end
     elif scheduled and subscription.trial_end_at:
         next_payment_date = subscription.trial_end_at
@@ -127,7 +128,7 @@ async def start_trial(
     Start a trial subscription for the current user.
     
     Idempotent: Returns existing subscription if already started.
-    Auto-starts the configured free trial for the ZZP free plan (365 days by default).
+    Auto-starts the configured free trial for the ZZP free plan (three calendar months by default).
     """
     # Get user's primary administration (ZZP users have one)
     result = await db.execute(
@@ -207,7 +208,7 @@ async def activate_subscription(
     """
     Activate Mollie subscription for the current user.
 
-    Always creates a Mollie first-payment checkout and returns a checkout_url.
+    Creates a one-off checkout for the selected prepaid period and returns its URL.
     The frontend must redirect the browser to checkout_url immediately so the
     user can complete payment on the Mollie payment page.
 
@@ -215,7 +216,7 @@ async def activate_subscription(
     a new checkout URL).
 
     Body (optional):
-        plan_code: 'starter' (€4.95/mo) or 'zzp_pro' (€6.95/mo). Defaults to 'starter'.
+        plan_code: zzp_1m (€6), zzp_3m (€14), zzp_6m (€25), zzp_12m (€39).
 
     Returns:
         ActivateSubscriptionResponse with checkout_url for Mollie redirect
@@ -239,12 +240,15 @@ async def activate_subscription(
             detail={"code": "NO_ADMINISTRATION", "message": "User has no administration"}
         )
     
+    if body.plan_code and body.plan_code not in PREPAID_PLAN_CODES:
+        raise HTTPException(status_code=400, detail="Kies een actuele looptijd van 1, 3, 6 of 12 maanden.")
+
     try:
         result = await mollie_subscription_service.activate_subscription(
             db=db,
             user=current_user,
             administration_id=member.administration_id,
-            plan_code=body.plan_code,
+            plan_code=body.plan_code or "zzp_1m",
         )
         
         return ActivateSubscriptionResponse(**result)
@@ -436,6 +440,7 @@ async def get_subscription_me(
             detail={"code": "NO_ADMINISTRATION", "message": "User has no administration"},
         )
 
+    await subscription_service.compute_entitlements(db, member.administration_id)
     subscription = await subscription_service.get_subscription(db, member.administration_id)
 
     if not subscription:
@@ -481,6 +486,10 @@ async def get_subscription_me(
         "free": "Gratis proefperiode",
         "starter": "Starter",
         "zzp_pro": "Pro",
+        "zzp_1m": "ZZPers Hub — 1 maand",
+        "zzp_3m": "ZZPers Hub — 3 maanden",
+        "zzp_6m": "ZZPers Hub — 6 maanden",
+        "zzp_12m": "ZZPers Hub — 12 maanden",
     }
     plan_name = plan_name_map.get(plan_code, plan_code)
 

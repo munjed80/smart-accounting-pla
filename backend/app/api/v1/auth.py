@@ -5,7 +5,7 @@ import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -65,8 +65,8 @@ async def register(
     
     try:
         # Check if email already exists
-        result = await db.execute(select(User).where(User.email == user_in.email))
-        if result.scalar_one_or_none():
+        existing_email = await db.execute(select(User.id).where(func.lower(User.email) == user_in.email.strip().lower()).limit(1))
+        if existing_email.scalar_one_or_none():
             logger.warning(
                 "Registration attempted with existing email",
                 extra={
@@ -82,7 +82,7 @@ async def register(
         
         # Create user with email_verified_at = None
         user = User(
-            email=user_in.email,
+            email=user_in.email.strip().lower(),
             hashed_password=get_password_hash(user_in.password),
             full_name=user_in.full_name,
             role=user_in.role,
@@ -152,10 +152,16 @@ async def resend_verification(
     """
     Resend verification email.
     
-    Always returns success message to prevent email enumeration.
+    Successful responses remain generic; delivery failures are reported explicitly.
     Only sends email if user exists and is not yet verified.
     """
     check_rate_limit("resend_verification", request)
+    if not settings.email_enabled:
+        logger.error("verification_delivery_unavailable: email provider is not configured")
+        raise HTTPException(status_code=503, detail={
+            "code": "EMAIL_DELIVERY_UNAVAILABLE",
+            "message": "Verificatie-e-mail kan momenteel niet worden verstuurd. Probeer het later opnieuw.",
+        })
     
     # Always return same response to prevent email enumeration
     response = GenericMessageResponse(
@@ -175,15 +181,25 @@ async def resend_verification(
             token_type=TokenType.EMAIL_VERIFY,
             ip_address=ip_address,
             user_agent=user_agent,
+            invalidate_existing=False,
         )
         
         # Send verification email
-        await email_service.send_verification_email(
+        accepted = await email_service.send_verification_email(
             to_email=user.email,
             token=token,
             user_name=user.full_name,
         )
         
+        if not accepted:
+            # A provider timeout can happen after acceptance. Keep unexpired links usable
+            # if that email arrives later; no raw verification token is exposed in this response.
+            logger.error("verification_delivery_failed user_id=%s", user.id)
+            raise HTTPException(status_code=503, detail={
+                "code": "EMAIL_DELIVERY_FAILED",
+                "message": "Er is een probleem bij het versturen van de verificatie-e-mail. Probeer het later opnieuw of neem contact op met support.",
+            })
+
         logger.info(
             f"Verification email resent",
             extra={

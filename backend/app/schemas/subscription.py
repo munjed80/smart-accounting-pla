@@ -70,8 +70,8 @@ class StartTrialResponse(BaseModel):
 class ActivateSubscriptionRequest(BaseModel):
     """Request schema for activating a subscription"""
     plan_code: Optional[str] = Field(
-        None,
-        description="Plan to activate: 'starter' (€4.95/mo) or 'zzp_pro' (€6.95/mo). Defaults to 'starter'.",
+        'zzp_1m',
+        description="Prepaid access: zzp_1m (€6), zzp_3m (€14), zzp_6m (€25), zzp_12m (€39).",
     )
 
 

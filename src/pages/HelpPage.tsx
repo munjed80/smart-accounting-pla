@@ -607,10 +607,10 @@ const helpGroups: HelpGroup[] = [
         title: 'Abonnement & betaling',
         purpose: 'Beheer van je abonnement en facturatie.',
         whatYouCanDo: [
-          '1 jaar gratis proefperiode gebruiken zonder creditcard.',
+          '3 maanden gratis proefperiode gebruiken zonder creditcard.',
           'Een abonnement activeren via Instellingen → Abonnement.',
           'Betalen via iDEAL of creditcard.',
-          'Je abonnement op elk moment opzeggen — toegang blijft tot het einde van de betaalde periode.',
+          'Een looptijd kiezen en in één keer betalen — nieuwe pakketten stoppen automatisch op de einddatum.',
           'Na elke betaling automatisch een factuur per e-mail ontvangen.',
         ],
         keyActions: [

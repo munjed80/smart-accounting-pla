@@ -110,7 +110,7 @@ export const SupportPage = () => {
       <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-2 flex items-center gap-3">
+          <h1 className="text-3xl font-bold  text-foreground mb-2 flex items-center gap-3">
             <Headset size={32} weight="duotone" className="text-primary" />
             {t('support.title')}
           </h1>

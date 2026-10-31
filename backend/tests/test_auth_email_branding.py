@@ -16,6 +16,7 @@ async def test_auth_emails_share_brand_palette_and_escape_customer_name(monkeypa
     monkeypatch.setattr(email_module, "settings", settings)
     service = email_module.EmailService()
     service._client = Mock()
+    service._client.Emails.send.return_value = {"id": "re_test_message"}
     assert await getattr(service, method)("person@example.com", "safe-token", '<script>alert(1)</script>')
     payload = service._client.Emails.send.call_args.args[0]
     assert payload["from"] == "ZZPers Hub <no-reply@zzpershub.nl>"
@@ -27,3 +28,17 @@ async def test_auth_emails_share_brand_palette_and_escape_customer_name(monkeypa
     assert "https://zzpershub.nl/" in payload["text"]
     assert "safe-token" in payload["text"]
     assert "#667eea" not in payload["html"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('response', [{}, {'error': 'rejected'}])
+async def test_verification_email_requires_provider_acceptance(monkeypatch, response):
+    monkeypatch.setattr(email_module, 'settings', Mock(
+        email_enabled=True, is_development=False, APP_NAME='ZZPers Hub',
+        FRONTEND_URL='https://zzpershub.nl', SUPPORT_EMAIL='info@zzpershub.nl',
+        RESEND_FROM_EMAIL='no-reply@zzpershub.nl', EMAIL_VERIFY_TOKEN_EXPIRE_HOURS=24,
+    ))
+    service = email_module.EmailService()
+    service._client = Mock()
+    service._client.Emails.send.return_value = response
+    assert not await service.send_verification_email('person@example.com', 'safe-token')

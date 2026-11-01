@@ -242,3 +242,27 @@ test('public pricing and product coverage match the prepaid catalog', async ({ p
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('brand-prepaid-pricing.png'), fullPage: true })
 })
+
+test('start guide plays, pauses, seeks and navigates all five steps', async ({ page }) => {
+  const guide = page.locator('#startgids')
+  await page.getByRole('link', { name: 'Bekijk de uitleg' }).click()
+  await expect(guide).toBeInViewport()
+  await expect(guide.getByRole('heading', { name: 'Begin met je bedrijfsgegevens.' })).toBeVisible()
+  await guide.getByRole('button', { name: 'Uitleg afspelen' }).click()
+  await expect(guide.getByRole('slider')).not.toHaveValue('0', { timeout: 4000 })
+  await guide.getByRole('button', { name: 'Pauzeren' }).click()
+  const paused = await guide.getByRole('slider').inputValue()
+  await page.waitForTimeout(1200)
+  await expect(guide.getByRole('slider')).toHaveValue(paused)
+  for (const name of ['Eerste klant', 'Factuur maken', 'Versturen', 'Betaling']) {
+    await guide.getByRole('button', { name: new RegExp(name) }).click()
+    await expect(guide.getByRole('button', { name: new RegExp(name) })).toHaveAttribute('aria-current', 'step')
+  }
+  await guide.getByRole('slider').fill('75')
+  await expect(guide.getByRole('status')).toContainText('Je bent klaar')
+  await expect(guide.locator('.sg-badge')).toHaveText('Betaald')
+  await guide.getByRole('button', { name: 'Startgids opnieuw beginnen' }).click()
+  await expect(guide.getByRole('slider')).toHaveValue('0')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await guide.screenshot({ path: test.info().outputPath('start-guide.png') })
+})

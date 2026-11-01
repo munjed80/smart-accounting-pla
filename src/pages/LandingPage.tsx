@@ -26,6 +26,7 @@ import {
   ProductPreview,
   type PreviewTab,
 } from '@/components/landing/ProductPreview'
+import { StartGuide } from '@/components/landing/StartGuide'
 import '@/styles/landing.css'
 
 const features = [
@@ -222,8 +223,8 @@ export const LandingPage = () => {
                 <a href="/register" className="lp-button">
                   Start 3 maanden gratis <ArrowRight size={18} />
                 </a>
-                <a href="#voor-zzp" className="lp-text-link">
-                  Neem een kijkje <span aria-hidden="true">↗</span>
+                <a href="#startgids" className="lp-text-link">
+                  Bekijk de uitleg <span aria-hidden="true">↗</span>
                 </a>
               </div>
               <p className="lp-cta-note">
@@ -262,6 +263,8 @@ export const LandingPage = () => {
             </div>
           </div>
         </section>
+
+        <StartGuide />
 
         <section id="voor-zzp" className="lp-product lp-section">
           <div className="lp-container">

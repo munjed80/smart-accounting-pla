@@ -24,7 +24,8 @@ def aware(value):
 async def prepaid_setup(db_session):
     user = User(email='prepaid@example.com', full_name='Prepaid Customer', role='zzp', hashed_password='hash', is_active=True)
     administration = Administration(name='Prepaid company')
-    free = Plan(code='free', name='Free', price_monthly=0, trial_days=90)
+    # Simulate a production plan row left over from the one-year offer.
+    free = Plan(code='free', name='Free', price_monthly=0, trial_days=365)
     db_session.add_all([user, administration, free])
     for code in PREPAID_PLAN_CODES:
         meta = PLAN_METADATA[code]

@@ -23,7 +23,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.services.invoice_rendering import render_invoice_pdf, pdf_disposition
+from app.services.invoice_rendering import load_company_logo, render_invoice_pdf, pdf_disposition
 from app.services.invoice_pdf import get_invoice_pdf_filename
 from app.services.email import email_service
 from app.models.zzp import (
@@ -78,7 +78,8 @@ async def preview_invoice(payload: InvoicePreview, current_user: CurrentUser, db
         invoice.vat_total_cents += vat
     invoice.total_cents = invoice.subtotal_cents + invoice.vat_total_cents
     try:
-        data = await run_in_threadpool(render_invoice_pdf, invoice)
+        logo = await load_company_logo(db, administration.id)
+        data = await run_in_threadpool(render_invoice_pdf, invoice, logo)
     except Exception as error:
         raise HTTPException(503, detail={'code': 'PDF_NOT_AVAILABLE', 'message': 'Voorbeeld genereren mislukt. Probeer opnieuw.'}) from error
     return Response(data, media_type='application/pdf', headers={'Content-Disposition': 'inline; filename="concept.pdf"', 'Cache-Control':'no-store'})
@@ -681,7 +682,8 @@ async def get_invoice_pdf(
         )
 
     try:
-        pdf_bytes = await run_in_threadpool(render_invoice_pdf, invoice)
+        logo = await load_company_logo(db, administration.id)
+        pdf_bytes = await run_in_threadpool(render_invoice_pdf, invoice, logo)
     except Exception as error:
         raise HTTPException(503, detail={'code': 'PDF_NOT_AVAILABLE', 'message': 'PDF-generatie is tijdelijk niet beschikbaar. Probeer opnieuw.'}) from error
 
@@ -773,7 +775,8 @@ async def send_invoice(
     
     # Generate PDF
     try:
-        pdf_bytes = await run_in_threadpool(render_invoice_pdf, invoice)
+        logo = await load_company_logo(db, administration.id)
+        pdf_bytes = await run_in_threadpool(render_invoice_pdf, invoice, logo)
         filename = get_invoice_pdf_filename(invoice)
     except Exception as pdf_error:
         logger.error(f"Failed to generate PDF for invoice {invoice_id}: {pdf_error}")

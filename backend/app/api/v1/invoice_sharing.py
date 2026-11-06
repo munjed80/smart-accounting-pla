@@ -27,7 +27,7 @@ from app.models.zzp import ZZPInvoice
 from app.models.administration import Administration, AdministrationMember
 from app.api.v1.deps import CurrentUser, require_zzp
 from starlette.concurrency import run_in_threadpool
-from app.services.invoice_rendering import render_invoice_pdf, pdf_disposition
+from app.services.invoice_rendering import load_company_logo, render_invoice_pdf, pdf_disposition
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +161,8 @@ async def get_public_invoice_pdf(
         raise HTTPException(status_code=404, detail="Factuur niet gevonden.")
 
     try:
-        pdf_bytes = await run_in_threadpool(render_invoice_pdf, invoice)
+        logo = await load_company_logo(db, invoice.administration_id)
+        pdf_bytes = await run_in_threadpool(render_invoice_pdf, invoice, logo)
     except Exception as error:
         raise HTTPException(503, detail='PDF-generatie is tijdelijk niet beschikbaar.') from error
 

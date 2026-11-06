@@ -7,7 +7,7 @@ import { useCloseOverlayOnRouteChange } from '@/hooks/useCloseOverlayOnRouteChan
 import { usePreventBodyScrollLock } from '@/hooks/usePreventBodyScrollLock'
 import { useEntitlements } from '@/hooks/useEntitlements'
 import { navigateTo } from '@/lib/navigation'
-import { salesReviewApi } from '@/lib/api'
+import { salesReviewApi, zzpApi } from '@/lib/api'
 import { TourHelpButton } from '@/components/OnboardingTour'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -394,6 +394,13 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
   const isAccountant = isAccountantRole(user?.role)
   const isSuperAdmin = user?.role === 'super_admin'
   const isZZP = user?.role === 'zzp'
+  const { data: businessProfile } = useQuery({
+    queryKey: ['zzp-business-profile', user?.id],
+    queryFn: () => zzpApi.profile.get(),
+    enabled: isZZP,
+    retry: false,
+    staleTime: 60_000,
+  })
 
   // Entitlements: only ZZP users need subscription checks; accountants bypass
   const { entitlements } = useEntitlements()
@@ -572,7 +579,13 @@ export const AppShell = ({ children, activeTab, onTabChange, onStartTour }: AppS
           <button type="button" className="workspace-profile-link"
             onClick={() => handleMenuClick(menuItems.find(item => item.tabValue === 'settings')!)}
             aria-label="Bedrijfsgegevens openen">
-            <span className="workspace-avatar" aria-hidden="true"><Storefront size={18} /></span>
+            <span className="workspace-avatar" aria-hidden="true">
+              {businessProfile?.logo_data_url ? (
+                <img src={businessProfile.logo_data_url} alt="" className="h-full w-full rounded-[inherit] object-contain p-1" />
+              ) : (
+                <Storefront size={18} />
+              )}
+            </span>
             <span className="min-w-0 text-left">
               <span className="block text-sm font-medium">Mijn werkplek</span>
               <span className="block text-xs text-muted-foreground">Bedrijfsgegevens</span>

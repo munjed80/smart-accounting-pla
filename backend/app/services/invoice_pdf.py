@@ -5,10 +5,12 @@ Generates professional PDF invoices using WeasyPrint.
 Uses HTML/CSS templates for flexible layout control.
 """
 import io
+from html import escape
 from typing import Optional
 import logging
 
 from app.models.zzp import ZZPInvoice
+from app.services.company_logo import LOGO_DATA_PREFIX
 from app.services.invoice_view import invoice_view
 from app.services.invoice_formatting import (
     format_amount,
@@ -18,7 +20,7 @@ from app.services.invoice_formatting import (
 
 logger = logging.getLogger(__name__)
 
-def generate_invoice_html(invoice: ZZPInvoice) -> str:
+def generate_invoice_html(invoice: ZZPInvoice, logo_data_url: str | None = None) -> str:
     """
     Generate HTML for an invoice.
 
@@ -59,6 +61,10 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
             seller_detail_lines.append(" &nbsp;&middot;&nbsp; ".join(contact_parts))
 
     seller_details_html = "<br>".join(seller_detail_lines)
+    logo_html = (
+        f'<img class="company-logo" src="{escape(logo_data_url, quote=True)}" alt="">'
+        if logo_data_url else ""
+    )
 
     # ── Customer address ───────────────────────────────────────────────────────
     customer_addr_lines = []
@@ -170,6 +176,14 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
             margin-bottom: 5px;
         }}
 
+        .company-logo {{
+            display: block;
+            width: auto;
+            height: auto;
+            max-width: 34mm;
+            max-height: 18mm;
+            margin-bottom: 3mm;
+        }}
         .company-details {{
             font-size: 8pt;
             color: #64748b;
@@ -416,6 +430,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
         <!-- ── HEADER ── -->
         <div class="header">
             <div class="sender-block">
+                {logo_html}
                 <div class="company-name">{company_name}</div>
                 {f'<div class="company-details">{seller_details_html}</div>' if seller_details_html else ''}
             </div>
@@ -506,7 +521,7 @@ def generate_invoice_html(invoice: ZZPInvoice) -> str:
     return html
 
 
-def generate_invoice_pdf(invoice: ZZPInvoice) -> bytes:
+def generate_invoice_pdf(invoice: ZZPInvoice, logo_data_url: str | None = None) -> bytes:
     """
     Generate a PDF for an invoice.
     
@@ -521,7 +536,7 @@ def generate_invoice_pdf(invoice: ZZPInvoice) -> bytes:
     """
     # Lazy import WeasyPrint to avoid import-time crashes when system libs are missing
     try:
-        from weasyprint import HTML, CSS
+        from weasyprint import HTML, CSS, URLFetcher
     except (ImportError, OSError) as e:
         # ImportError: Python package not installed
         # OSError: System libraries missing (e.g., libgobject-2.0-0)
@@ -531,12 +546,15 @@ def generate_invoice_pdf(invoice: ZZPInvoice) -> bytes:
         ) from e
     
     try:
-        html_content = generate_invoice_html(invoice)
+        html_content = generate_invoice_html(invoice, logo_data_url)
         
         # Generate PDF
-        def reject_external_resource(url, *args, **kwargs):
+        def fetch_invoice_resource(url, *args, **kwargs):
+            if logo_data_url and url == logo_data_url and url.startswith(LOGO_DATA_PREFIX):
+                return URLFetcher().fetch(url, *args, **kwargs)
             raise ValueError('External PDF resources are disabled')
-        html = HTML(string=html_content, url_fetcher=reject_external_resource)
+
+        html = HTML(string=html_content, url_fetcher=fetch_invoice_resource)
         pdf_buffer = io.BytesIO()
         html.write_pdf(pdf_buffer)
         pdf_buffer.seek(0)

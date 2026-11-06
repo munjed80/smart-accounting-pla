@@ -11,7 +11,7 @@ from app.core.database import get_db
 from app.api.v1.deps import CurrentUser, require_zzp
 from app.services.zzp_administration import get_user_administration
 from app.services.credit_notes import CreditNoteService, balance, credit_pdf_view
-from app.services.invoice_rendering import render_invoice_pdf, pdf_disposition
+from app.services.invoice_rendering import load_company_logo, render_invoice_pdf, pdf_disposition
 from app.models.credit_note import ZZPCreditNote, ZZPCreditLine, ZZPCustomerRefund
 from app.schemas.credit_note import CreditNoteRequest, RefundRequest
 
@@ -215,7 +215,8 @@ async def credit_pdf(
     note = await CreditNoteService(db, admin.id).note(note_id)
     view = credit_pdf_view(note)
     try:
-        data = await run_in_threadpool(render_invoice_pdf, view)
+        logo = await load_company_logo(db, admin.id)
+        data = await run_in_threadpool(render_invoice_pdf, view, logo)
     except Exception as error:
         raise HTTPException(
             503,

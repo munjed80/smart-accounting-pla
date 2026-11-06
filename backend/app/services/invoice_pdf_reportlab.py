@@ -5,6 +5,7 @@ Generates professional PDF invoices using ReportLab.
 ReportLab is a pure-Python library that doesn't require system dependencies,
 making it more reliable in Docker environments.
 """
+import base64
 import io
 from typing import List
 import logging
@@ -13,12 +14,13 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm, cm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable, Image
 from reportlab.pdfgen import canvas
 from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
 
 from app.models.zzp import ZZPInvoice, ZZPQuote
 from app.services.invoice_view import invoice_view
+from app.services.company_logo import LOGO_DATA_PREFIX
 from app.services.invoice_formatting import (
     format_amount,
     format_date_nl,
@@ -77,7 +79,7 @@ def _make_style(base_styles, name: str, parent: str = "Normal", **kwargs) -> Par
     return ParagraphStyle(name, parent=base_styles[parent], **kwargs)
 
 
-def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
+def generate_invoice_pdf_reportlab(invoice: ZZPInvoice, logo_data_url: str | None = None) -> bytes:
     """
     Generate a professional Dutch ZZP invoice PDF using ReportLab.
 
@@ -250,7 +252,13 @@ def generate_invoice_pdf_reportlab(invoice: ZZPInvoice) -> bytes:
 
         # ── Header: company (left) + FACTUUR + meta (right) ───────────────────
         # Left inner table: company name + detail lines
-        left_rows: list = [[Paragraph(company_name, s_company_name)]]
+        left_rows: list = []
+        if logo_data_url and logo_data_url.startswith(LOGO_DATA_PREFIX):
+            logo_bytes = base64.b64decode(logo_data_url.removeprefix(LOGO_DATA_PREFIX))
+            logo = Image(io.BytesIO(logo_bytes), width=34 * mm, height=18 * mm, kind="proportional")
+            logo.hAlign = "LEFT"
+            left_rows.append([logo])
+        left_rows.append([Paragraph(company_name, s_company_name)])
         if company_detail_text:
             left_rows.append([Paragraph(company_detail_text, s_company_detail)])
 

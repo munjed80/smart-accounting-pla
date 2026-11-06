@@ -225,6 +225,7 @@ class BusinessProfile(Base):
     
     # Logo
     logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    logo_data_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

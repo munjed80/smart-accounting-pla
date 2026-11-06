@@ -8,7 +8,7 @@ import { type PrepaidPlanCode } from '@/lib/billingCatalog'
  */
 
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -80,6 +80,8 @@ export const SettingsPage = () => {
   const [administrations, setAdministrations] = useState<Administration[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [isReadingLogo, setIsReadingLogo] = useState(false)
+  const queryClient = useQueryClient()
   const [isLoadingProfile, setIsLoadingProfile] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   
@@ -253,6 +255,7 @@ export const SettingsPage = () => {
             phone: profile.phone || '',
             website: profile.website || '',
             logo_url: profile.logo_url || '',
+            logo_data_url: profile.logo_data_url,
           })
         }
       } catch (error: unknown) {
@@ -291,8 +294,14 @@ export const SettingsPage = () => {
         const value = payload[key]
         if (typeof value === 'string') Object.assign(payload, { [key]: value.trim() })
       }
+      if (payload.logo_data_url === businessProfile?.logo_data_url) {
+        delete payload.logo_data_url
+      }
       const saved = await zzpApi.profile.upsert(payload)
-      setProfileForm(payload)
+      const profileKey = ['zzp-business-profile', user?.id]
+      await queryClient.cancelQueries({ queryKey: profileKey, exact: true })
+      queryClient.setQueryData(profileKey, saved)
+      setProfileForm({ ...payload, logo_data_url: saved.logo_data_url })
       setBusinessProfile(saved)
       toast.success(t('settings.businessProfileSaved'))
       // Emit onboarding event so the tour can auto-advance
@@ -307,6 +316,25 @@ export const SettingsPage = () => {
   
   const updateProfileField = (field: keyof ZZPBusinessProfileCreate, value: string) => {
     setProfileForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  const readCompanyLogo = (file: File) => {
+    if (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 600 * 1024) {
+      toast.error('Kies een PNG- of JPEG-afbeelding van maximaal 600 KB.')
+      return
+    }
+
+    setIsReadingLogo(true)
+    const reader = new FileReader()
+    reader.onload = () => {
+      const data = reader.result
+      if (typeof data === 'string') {
+        setProfileForm(previous => ({ ...previous, logo_data_url: data }))
+      }
+    }
+    reader.onerror = () => toast.error('Het bedrijfslogo kan niet worden gelezen.')
+    reader.onloadend = () => setIsReadingLogo(false)
+    reader.readAsDataURL(file)
   }
 
   // PSD2 Bank Connection handlers
@@ -710,6 +738,45 @@ export const SettingsPage = () => {
                   </div>
                 ) : (
                   <>
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border bg-background">
+                    {profileForm.logo_data_url ? (
+                      <img src={profileForm.logo_data_url} alt="Voorbeeld van je bedrijfslogo" className="h-full w-full rounded-xl object-contain p-2" />
+                    ) : (
+                      <Buildings size={26} className="text-muted-foreground" aria-hidden="true" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Label htmlFor="company-logo">Bedrijfslogo</Label>
+                    <p id="company-logo-hint" className="text-sm text-muted-foreground">
+                      PNG of JPG, maximaal 600 KB. Sla je profiel op om het logo op je werkplek en factuur-PDF’s te tonen.
+                    </p>
+                    <Input
+                      id="company-logo"
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      aria-describedby="company-logo-hint"
+                      disabled={isReadingLogo || isLoadingProfile || isSavingProfile}
+                      onChange={event => {
+                        const file = event.currentTarget.files?.[0]
+                        event.currentTarget.value = ''
+                        if (file) readCompanyLogo(file)
+                      }}
+                    />
+                    {profileForm.logo_data_url && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isReadingLogo || isSavingProfile}
+                        onClick={() => setProfileForm(previous => ({ ...previous, logo_data_url: null }))}
+                      >
+                        Logo verwijderen
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <Separator />
                 {/* Company Identity */}
                 <div>
                   <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
@@ -974,7 +1041,7 @@ export const SettingsPage = () => {
                 </div>
 
                 <div className="flex justify-end pt-4">
-                  <Button onClick={handleSaveBusinessProfile} disabled={isSavingProfile} className="gap-2">
+                  <Button onClick={handleSaveBusinessProfile} disabled={isSavingProfile || isReadingLogo || isLoadingProfile} className="gap-2">
                     {isSavingProfile ? (
                       <ArrowsClockwise size={18} className="animate-spin" />
                     ) : (

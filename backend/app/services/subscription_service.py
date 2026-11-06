@@ -72,7 +72,6 @@ class SubscriptionService:
     """Service for managing subscriptions and computing entitlements"""
     
     ZZP_FREE_PLAN_CODE = "free"
-    DEFAULT_TRIAL_DAYS = 90
     
     async def ensure_trial_started(
         self,
@@ -116,13 +115,12 @@ class SubscriptionService:
         
         # Create new trial subscription
         now = datetime.now(timezone.utc)
-        # Respect BILLING_TRIAL_OVERRIDE_DAYS if set (force-paywall test mode)
+        # The public offer is three calendar months, even if the plan row predates it.
+        trial_end = now + relativedelta(months=3)
         override_days = settings.billing_trial_override_days
         if override_days is not None:
-            trial_end = now + timedelta(days=override_days)
-        else:
-            trial_end = now + (relativedelta(months=3) if plan.code == "free" and plan.trial_days == 90 else timedelta(days=plan.trial_days))
-        
+            trial_end = min(trial_end, now + timedelta(days=override_days))
+
         subscription = Subscription(
             administration_id=administration_id,
             plan_id=plan.id,

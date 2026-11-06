@@ -133,8 +133,7 @@ async def create_administration(
     )
 
     # New ZZP administrations should immediately receive the configured free
-    # trial subscription. The subscription service uses the free plan's
-    # trial_days value (365 days by default) for trial_end_at.
+    # trial subscription for three calendar months.
     if current_user.role == "zzp":
         await subscription_service.ensure_trial_started(db, administration.id)
     

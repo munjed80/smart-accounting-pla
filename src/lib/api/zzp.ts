@@ -83,6 +83,7 @@ export interface ZZPBusinessProfile {
   phone?: string
   website?: string
   logo_url?: string
+  logo_data_url?: string | null
   created_at: string
   updated_at: string
 }
@@ -101,6 +102,7 @@ export interface ZZPBusinessProfileCreate {
   phone?: string
   website?: string
   logo_url?: string
+  logo_data_url?: string | null
 }
 
 // Invoice Types

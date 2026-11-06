@@ -11,6 +11,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator, EmailStr
 
+from app.services.company_logo import MAX_LOGO_DATA_LENGTH, normalize_company_logo
+
 
 # ============================================================================
 # Constants
@@ -120,7 +122,16 @@ class CustomerListResponse(BaseModel):
 # Business Profile Schemas
 # ============================================================================
 
-class BusinessProfileCreate(BaseModel):
+class BusinessLogoInput(BaseModel):
+    logo_data_url: Optional[str] = Field(None, max_length=MAX_LOGO_DATA_LENGTH)
+
+    @field_validator("logo_data_url")
+    @classmethod
+    def validate_logo(cls, value: Optional[str]) -> Optional[str]:
+        return normalize_company_logo(value)
+
+
+class BusinessProfileCreate(BusinessLogoInput):
     """Create or update business profile."""
     company_name: str = Field(..., min_length=1, max_length=255, description="Company name")
     trading_name: Optional[str] = Field(None, max_length=255, description="Trading name")
@@ -138,7 +149,7 @@ class BusinessProfileCreate(BaseModel):
     logo_url: Optional[str] = Field(None, max_length=500)
 
 
-class BusinessProfileUpdate(BaseModel):
+class BusinessProfileUpdate(BusinessLogoInput):
     """Update business profile (partial)."""
     company_name: Optional[str] = Field(None, min_length=1, max_length=255)
     trading_name: Optional[str] = Field(None, max_length=255)
@@ -174,6 +185,7 @@ class BusinessProfileResponse(BaseModel):
     phone: Optional[str]
     website: Optional[str]
     logo_url: Optional[str]
+    logo_data_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     

@@ -76,6 +76,7 @@ vi.mock('../lib/api', () => ({
   getApiBaseUrl: vi.fn(() => 'http://localhost:8000/api/v1'),
   subscribeApiOfflineStatus: vi.fn(() => () => undefined),
   retryLastFailedApiRequest: vi.fn(async () => false),
+  zzpApi: { profile: { get: vi.fn(async () => ({ logo_data_url: null })) } },
   salesReviewApi: {
     getSummary: vi.fn(async () => ({ total: 0, status_counts: {} })),
   },

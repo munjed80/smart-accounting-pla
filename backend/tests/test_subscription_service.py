@@ -7,6 +7,7 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+from dateutil.relativedelta import relativedelta
 from sqlalchemy import select
 
 from app.services.subscription_service import subscription_service, EntitlementResult
@@ -40,7 +41,7 @@ async def test_ensure_trial_started_creates_new_subscription(db_session):
         code="free",
         name="Free",
         price_monthly=0.00,
-        trial_days=30,
+        trial_days=90,
         max_invoices=999999,
         max_storage_mb=5120,
         max_users=1,
@@ -60,9 +61,7 @@ async def test_ensure_trial_started_creates_new_subscription(db_session):
     assert subscription.trial_end_at is not None
     assert subscription.cancel_at_period_end is False
     
-    # Check trial duration
-    trial_duration = subscription.trial_end_at - subscription.trial_start_at
-    assert trial_duration.days == 30
+    assert subscription.trial_end_at == subscription.trial_start_at + relativedelta(months=3)
 
 
 @pytest.mark.asyncio
